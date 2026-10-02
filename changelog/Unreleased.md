@@ -11,6 +11,7 @@
 - Online players can choose their laser color from the Laser button's menu on the join page, and everyone sees lasers in the color their owner picked. The laser color you set in Atlas now shows on the players' pages too
 - Run online play from the map: the **Online session** button in the toolbar opens a panel with the join link, players waiting to join, each player's tokens (given with a token's **Controlled by** menu), an X to remove a player, the presented scene and a stop button for the session. The button shows a dot while you host and how many players wait to join. The command palette lists the same actions under Online play, and while a session runs a scene tab's eye shows the scene to online players only; right-click it for **Open player window**. The presented scene's eye hides it again.
 - **Log online play events** (Settings → Online play) writes what Atlas sends to online players, and every change of the presented scene, to the developer console, for troubleshooting.
+- Play from Obsidian: players with Atlas run **Join online session…**, paste your join link and enter a name. Once you let them in, an **Online scene** tab shows the presented scene drawn by Atlas, with Atlas's own tools: drag their tokens with the drag ruler, measure, point the laser and roll from the dice tray into the shared dice log. They follow your view, with **Follow GM** and **Fit map**, and see why a session ended, with **Reconnect** after a lost connection. Nothing goes into their vault. Your online panel marks players who joined from Obsidian.
 
 ## Fixed
 

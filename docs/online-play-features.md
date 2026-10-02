@@ -95,3 +95,26 @@ The join page has Atlas's table tools: the drag ruler, the measure tool, the las
   - Gestures are tested on `PlayerTools` with `ViewInput`, drawings on `RecordingSurface`, and the page's DOM under jsdom (`pageToolbar.test.ts`, `diceTrayView.test.ts`, `diceLogView.test.ts`).
   - Messages are tested end to end over `MemoryTransport` with `tests/unit/online/toolsFixtures.ts`.
   - `online-client/main.mts` is neither linted nor tested. After `npm run build:online`, search `dist-online/` for the new message types, element ids and copy.
+
+## 10. Obsidian players
+
+Players can also join from Atlas in Obsidian (`src/app/online/obsidian/`). Their **Online scene** tab is an `AtlasView` on a remote store (`createViewAtlasStore(..., { remote: true })`), which never saves and keeps no undo history. It draws the scene with Atlas's own renderers, and the web page's shared modules feed it: `PlayerSession`, `PlayerSceneMirror`, `AssetLoader`, `CameraController` and `LaserBatcher`.
+
+- **The converter.** `playerSceneToAtlasState` rebuilds Atlas records from what players receive, field by field (`convertTokens.ts`, `convertShapes.ts`, `convertPanels.ts`). A field recorded as `sent` in step 1 needs a mapping there, and a round-trip check in `tests/unit/online/obsidian/convertCoverage.test.ts`, which fails for a sent field without one. Never spread a received record into the store.
+- **Writing the store.** `RemoteSceneApplier` keeps every Atlas record whose received record did not change, so Atlas's renderers redraw only what changed. It writes with `setState`, never with the store's actions: `setTokens` drops tokens with `blob:` images.
+- **What the view adds.** The view store's `remoteScene` holds what Atlas's records cannot:
+  - the tokens the player may drag;
+  - the GM's measurement;
+  - neutral condition badges;
+  - the status bar;
+  - whether the camera follows the GM.
+
+  It is null in every other view. UI that differs in the online scene reads `Boolean(state.remoteScene)`, and reaches the view's actions through `AtlasView.onlineControls()`.
+- **One tab per Atlas.** The Online scene tab is not navigable: opening a map never replaces it, and a second Online scene view closes itself instead of taking over the session. Closing the tab leaves the session.
+- **Images.** Each image is shown by two object URLs, one for the map and one for tokens (`objectUrlImages.ts`). Atlas's background cache and token cache each unload by URL, so they must never share one. A blob background is unloaded as soon as nobody shows it.
+- **Tools.** The player's tools are Atlas's own:
+  - `InteractionController` drags only the tokens `mayMoveAsOnlinePlayer` allows, one at a time, and emits `ONLINE_TOKEN_DROPPED`. `RemoteTokenMoves` sends the drop and holds the token until the GM answers.
+  - The laser goes through the view's `LaserHub` and `OnlineLaserLink`.
+  - The dice tray and the dice log's "Roll again" send `dice-roll` through `onlineControls().rollDice`. The online tray allows at most 20 dice, the limit the GM enforces.
+  - A new tool for Obsidian players follows the same pattern: Atlas's tool, gated on `remoteScene`, sending through the join service.
+- **Never the vault.** Nothing in the online scene reads or writes the vault or the settings. Only the Join dialog writes `online.playerName`, and the settings tab writes `online.keepImages`. Nothing in the online scene dispatches `atlas-dice-rolled`: every open map view records that event and saves it into its map file. `tests/unit/online/obsidian/obsidianPlayerEndToEnd.test.ts` checks both over `MemoryTransport`.

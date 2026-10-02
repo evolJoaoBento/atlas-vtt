@@ -23,9 +23,11 @@ Players open the join page from `evoljoaobento.github.io` (GitHub Pages) by defa
 
 With **Keep images on this device** on (the default), the join page keeps the images it received in the player's browser storage for later sessions, up to 500 MB, until the player switches it off or chooses **Clear saved images**; with it off, images are kept only while the page is open. Browsers give every site under `evoljoaobento.github.io` the same storage, so the join page should stay the only site published there, or move to its own address.
 
+When you join a session from Atlas (**Join online session…**), Atlas connects to the signaling and relay servers the join link names, the STUN server, and directly to the GM, only while the Online scene tab is open. The GM receives the name you enter, that you joined from Atlas, and the same things a web player sends. Nothing you receive is written into your vault: the scene is kept in memory only. With **Keep online images on this device** on (the default), the images are kept in Obsidian's browser storage on this device, outside the vault and shared by all vaults on the device, up to 500 MB. Switching it off deletes them. Atlas remembers the last name you joined with in its settings.
+
 ## Files outside the vault
 
-Atlas VTT does not read or write files outside your vault.
+Atlas VTT does not read or write files outside your vault. Images kept for online play when you join from Atlas are in Obsidian's browser storage, not in files (see [Online play](#online-play)).
 
 ## Code execution
 
