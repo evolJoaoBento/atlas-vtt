@@ -52,7 +52,7 @@ export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, o
       <section className="atlas-share__section">
         <LabelledCheck label="Everyone in my sessions" checked={everyone} onChange={() => setEveryone(!everyone)} />
         <ul className="atlas-share__people">
-          {(everyone ? known : rows).map((row) => (
+          {(everyone ? rows.filter((row) => row.known || except.includes(row.key)) : rows).map((row) => (
             <li key={row.key}>
               {everyone
                 ? <LabelledCheck label={`Except ${row.name}`} checked={except.includes(row.key)} onChange={() => setExcept(toggled(except, row.key))} />

@@ -1,4 +1,5 @@
 import type { BundleFile, BundleFileRole } from './bundleFormat';
+import { withoutJsonSharing } from './bundleSharing';
 import { remapPaths, type PathMap } from './pathRemap';
 
 /** JSON files carry vault paths and asset ids that must follow the files and records they point at. */
@@ -24,7 +25,7 @@ function indentationOf(text: string): string | undefined {
 function rewriteJson(text: string, rewrites: PathMap): string {
   try {
     const parsed: unknown = JSON.parse(text);
-    const remapped = remapPaths(parsed, rewrites);
+    const remapped = remapPaths(withoutJsonSharing(parsed), rewrites);
     if (JSON.stringify(remapped) === JSON.stringify(parsed)) return text;
     return JSON.stringify(remapped, null, indentationOf(text)) + (text.endsWith('\n') ? '\n' : '');
   } catch {
@@ -72,5 +73,6 @@ export function rewriteContent(file: BundleFile, raw: ArrayBuffer, rewrites: Pat
 export const refersToFiles = (file: BundleFile): boolean =>
   JSON_ROLES.has(file.role) || (file.role === 'statblock-note' && file.statblockImage !== undefined);
 
-/** Whether `rewriteContent` may change the file's bytes, so they must be read to know the result. */
-export const mayRewrite = (file: BundleFile, rewrites: PathMap): boolean => rewrites.size > 0 && refersToFiles(file);
+/** Whether `rewriteContent` may change the file's bytes, so they must be read to know the result. Record files may carry a map share, which never travels. */
+export const mayRewrite = (file: BundleFile, rewrites: PathMap): boolean =>
+  refersToFiles(file) && (rewrites.size > 0 || file.role === 'asset-file');

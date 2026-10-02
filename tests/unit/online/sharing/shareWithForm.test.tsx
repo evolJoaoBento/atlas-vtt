@@ -34,6 +34,16 @@ describe('Share with form', () => {
     expect(save).toHaveBeenCalledWith({ everyone: false, people: ['k/ana'], except: [], mode: 'full', notes: ['Notes/Inn.md'] });
   });
 
+  it('lists an unknown name under except, so it can be unticked', () => {
+    const save = vi.fn();
+    render(<ShareWithForm rows={rows} initial={{ everyone: true, people: [], except: ['name:Zed'] }} map={null} preview={null} warnings={[]} onSave={save} onCancel={() => {}} />);
+    expect((screen.getByLabelText('Except Zed') as HTMLInputElement).checked).toBe(true);
+    expect(screen.queryByLabelText('Except Ana')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Except Zed'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ everyone: true, except: [] }));
+  });
+
   it('a player-safe share does not offer notes only hidden things link to', () => {
     render(<ShareWithForm rows={rows} initial={{ everyone: true, people: [], except: [] }}
       map={{ mode: 'player-safe', notes: [{ path: 'Notes/Inn.md', label: 'Inn', private: false }, { path: 'Notes/Plot.md', label: 'Plot', private: false, hidden: true }], ticked: ['Notes/Plot.md'] }}

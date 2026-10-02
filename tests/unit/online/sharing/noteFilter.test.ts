@@ -119,3 +119,36 @@ describe('private text that cannot be read fails closed', () => {
     expect(unknownNamesIn('- > [!only|Zed]\n  > x\n\t> [!except|Yan]', people)).toEqual(['Yan', 'Zed']);
   });
 });
+
+describe('HTML comments and a byte order mark', () => {
+  it('drops HTML comments, one line or several, but not in code fences', () => {
+    expect(forPerson('ana', 'a <!-- gm note --> b\n<!--\nmore\n-->\nc')).toBe('a  b\nc');
+    expect(forPerson('ana', 'a <!-- never closed\nsecret')).toBe('a');
+    expect(forPerson('ana', '```\n<!-- in code -->\n```')).toBe('```\n<!-- in code -->\n```');
+    expect(forPerson('ana', '<!-- %% -->\nx %% gone %%')).toBe('x');
+  });
+
+  it('reads frontmatter after a BOM, and ends it only at ---', () => {
+    expect(forPerson('ana', '﻿---\natlas-share: [Ana]\nsecret: x\ntags: [a]\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
+    expect(forPerson('ana', '---\ntags: [a]\n...\nsecret: x\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
+  });
+});
+
+describe('a code fence ends with its container (I1)', () => {
+  it('a fence in a quote ends when the quote does', () => {
+    expect(forPerson('ana', '> ```\n> code\n\n%% gm secret %%\nafter')).toBe('> ```\n> code\n\nafter');
+    expect(forPerson('ana', '> ```\n> code\nlazy\n%% gm secret %%\nafter')).not.toContain('gm secret');
+    expect(forPerson('ana', '> > ~~~\n> > code\n> %% gm secret %%\nafter')).not.toContain('gm secret');
+  });
+
+  it('a fence in a list item ends when the item does', () => {
+    expect(forPerson('ana', '- item\n  ```\n  code\nPara %% gm secret %%')).toBe('- item\n  ```\n  code\nPara');
+    expect(forPerson('ana', '1. item\n   ```\n   code\n\n%% gm secret %%\nafter')).not.toContain('gm secret');
+  });
+
+  it('still keeps comments inside a fence that is still open', () => {
+    expect(forPerson('ana', '> ```\n> %% in code %%\n> ```\nafter')).toBe('> ```\n> %% in code %%\n> ```\nafter');
+    expect(forPerson('ana', '- item\n  ```\n  %% in code %%\n  ```')).toBe('- item\n  ```\n  %% in code %%\n  ```');
+    expect(forPerson('ana', '```\ncode\n\n%% in code %%\nstill code')).toContain('%% in code %%');
+  });
+});

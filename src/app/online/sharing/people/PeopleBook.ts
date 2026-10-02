@@ -73,6 +73,13 @@ export class PeopleBook {
       ?? null;
   }
 
+  /** Everyone a name matches, now or formerly (names are unique, so older data is the only way to get more than one). */
+  allByName(name: string, tableId?: string): Person[] {
+    const key = nameKey(name);
+    return this.people.filter((person) => (!tableId || person.tableId === tableId)
+      && (nameKey(person.name) === key || person.formerNames.some((former) => nameKey(former) === key)));
+  }
+
   /** The GM admits a new device as a new person. */
   admit(tableId: string, name: string, deviceId: string): Person {
     const person: Person = {
@@ -110,7 +117,7 @@ export class PeopleBook {
       this.replace(person, { name: cleaned });
       return null;
     }
-    if (this.people.some((other) => other !== person && nameKey(other.name) === nameKey(cleaned))) {
+    if (this.nameTaken(nameKey(cleaned), person)) {
       return `Someone in your people list is already called ${cleaned}.`;
     }
     this.replace(person, { name: cleaned, formerNames: [...person.formerNames.filter((former) => nameKey(former) !== nameKey(cleaned)), person.name] });
@@ -147,9 +154,14 @@ export class PeopleBook {
     return () => { this.listeners.delete(listener); };
   }
 
+  /** A current or former name of anyone (but `except`): a former name is never given to someone else. */
+  private nameTaken(key: string, except?: Person): boolean {
+    return this.people.some((other) => other !== except && (nameKey(other.name) === key || other.formerNames.some((former) => nameKey(former) === key)));
+  }
+
   private freeName(name: string): string {
     const cleaned = normalizePlayerName(name) ?? 'Someone';
-    return uniqueName(cleaned, (key) => this.people.some((person) => nameKey(person.name) === key));
+    return uniqueName(cleaned, (key) => this.nameTaken(key));
   }
 
   /** Applies `changes`; the file is written at once only when something other than `lastSeen` differs. */

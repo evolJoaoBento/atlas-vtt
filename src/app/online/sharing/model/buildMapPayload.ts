@@ -5,7 +5,6 @@
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
 import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
-import { mapStrings } from '../../../utils/mapStrings';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
 import { FogCoverage } from '../../scene/FogCoverage';
@@ -117,16 +116,31 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
   return { format: MAP_PAYLOAD_FORMAT, mode: 'player-safe', name, scene, pins, tokenNotes, notes: [...context.linked], images: sceneAssetIds(scene) };
 }
 
+/** Keys that hold a vault path: `notePath`, `imagePath`, `statblockPath`, an audio's `path`, the `background`. A new `*Path` field is covered by its name. */
+const PATH_KEY = /path$|^background$/i;
+
+/** `value` with `replace` applied to every string in it, told whether the string sits under a path key. */
+function replaceStrings(value: unknown, replace: (text: string, underPathKey: boolean) => string, underPathKey = false): unknown {
+  if (typeof value === 'string') return replace(value, underPathKey);
+  if (Array.isArray(value)) return value.map((item: unknown) => replaceStrings(item, replace, underPathKey));
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]): [string, unknown] => [key, replaceStrings(item, replace, PATH_KEY.test(key))]));
+  }
+  return value;
+}
+
 export function fullPayload(source: SharedMapSource, name: string, context: PayloadContext): FullMapPayload {
   const { map } = source;
   const body = { background: map.background, grid: map.grid, objects: map.objects, camera: map.camera, ...source.extra };
-  const replaced = mapStrings(body, (text) => {
+  // Paths go by key, whether or not the file exists: only images and ticked notes stay, as references.
+  // Any other string that is an existing file is cleared too, wherever it is.
+  const replaced = replaceStrings(body, (text, underPathKey) => {
     const image = context.images.fingerprints.get(text);
     if (image) return `${IMAGE_REF_PREFIX}${image}`;
     const note = context.noteItem(text);
     if (note) return `${NOTE_REF_PREFIX}${note}`;
-    return context.isFile(text) ? '' : text;
-  });
+    return underPathKey || context.isFile(text) ? '' : text;
+  }) as Record<string, unknown>;
   return {
     format: MAP_PAYLOAD_FORMAT, mode: 'full', name, map: replaced,
     notes: [...context.linked], images: [...new Set(context.images.fingerprints.values())],

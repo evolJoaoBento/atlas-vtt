@@ -1,9 +1,11 @@
 /**
  * Links in a shared note. A link to a note the receiver also gets points at that note's shared
  * title; every other link (and every embed of a file that is not a note) becomes its text, so
- * no name of an unshared note or file leaves the sender. Web links stay. Reference-style links
- * (`[text][ref]` with a `[ref]: target` line) are resolved like inline ones, and the HTML
- * attributes `href`, `src` and the like are dropped unless they point at the web.
+ * no name of an unshared note or file leaves the sender. Only web links stay (`https`, `mailto`
+ * and the like): `obsidian://`, `app://` and `file://` carry vault names and paths. Reference-style
+ * links (`[text][ref]` with a `[ref]: target` line) are resolved like inline ones, a link around an
+ * image is rewritten from the inside out, and the HTML attributes `href`, `src` and the like are
+ * dropped unless they point at the web.
  */
 
 /** The title the receiver knows a link target by; null when they do not get it. */
@@ -14,9 +16,15 @@ const LABEL = String.raw`((?:\\.|[^\[\]\\]|\[[^\[\]]*\])*)`;
 const MARKDOWN_LINK = new RegExp(String.raw`(!?)\[${LABEL}\]\(([^)]*)\)`, 'g');
 const REFERENCE_LINK = new RegExp(String.raw`(!?)\[${LABEL}\]\[([^\]]*)\]`, 'g');
 const SHORTCUT_LINK = new RegExp(String.raw`(!?)\[${LABEL}\](?![(\[:])`, 'g');
-const DEFINITION = /^(?:[ \t]*(?:>|[-*+]|\d{1,9}[.)]))*[ \t]*\[(?!\^)((?:\\.|[^\]\\])+)\]:[ \t]*(<[^>]*>|\S+)(?:[ \t]+(?:"[^"]*"|'[^']*'|\([^)]*\)))?[ \t]*$/;
-const EXTERNAL = /^[a-z][a-z0-9+.-]*:|^\/\//i;
-const HTML_TAG = /<[a-zA-Z][^>]*>/g;
+const DEFINITION_HEAD = String.raw`^(?:[ \t]*(?:>|[-*+]|\d{1,9}[.)]))*[ \t]*\[(?!\^)((?:\\.|[^\]\\])+)\]:`;
+const DEFINITION = new RegExp(String.raw`${DEFINITION_HEAD}[ \t]*(<[^>]*>|\S+)(?:[ \t]+(?:"[^"]*"|'[^']*'|\([^)]*\)))?[ \t]*$`);
+/** A definition whose target is on the next line. */
+const DEFINITION_ALONE = new RegExp(String.raw`${DEFINITION_HEAD}[ \t]*$`);
+const TARGET_LINE = /^[ \t]*(<[^>]*>|\S+)(?:[ \t]+(?:"[^"]*"|'[^']*'|\([^)]*\)))?[ \t]*$/;
+const TITLE_LINE = /^[ \t]*(?:"[^"]*"|'[^']*'|\([^)]*\))[ \t]*$/;
+/** Targets that stay as written. */
+const WEB = /^(?:https?|mailto|tel|ftp|data):|^\/\//i;
+const HTML_TAG = /<[a-zA-Z](?:"[^"]*"|'[^']*'|[^>"'])*>/g;
 const URL_ATTRIBUTE = /\s(?:href|src|srcset|poster|data|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/gi;
 
 const nameOf = (path: string): string => (path.split('/').pop() ?? path).replace(/\.md$/i, '');
@@ -40,7 +48,7 @@ function decoded(target: string): string {
 /** The result of a link to `target` with `label`, or null when it points at the web and stays as written. */
 function rewriteTarget(bang: string, label: string, rawTarget: string, resolve: LinkResolver): string | null {
   const target = cleanTarget(rawTarget);
-  if (EXTERNAL.test(target)) return null;
+  if (WEB.test(target)) return null;
   const { path, sub } = splitTarget(decoded(target));
   const title = path ? resolve(path) : null;
   if (!title) return label;
@@ -61,39 +69,48 @@ function rewriteWiki(text: string, resolve: LinkResolver): string {
 function takeDefinitions(lines: readonly string[]): { kept: string[]; targets: Map<string, string> } {
   const targets = new Map<string, string>();
   const kept: string[] = [];
-  for (const line of lines) {
+  for (let at = 0; at < lines.length; at++) {
+    const line = lines[at] ?? '';
+    const alone = DEFINITION_ALONE.exec(line);
+    const next = alone ? TARGET_LINE.exec(lines[at + 1] ?? '') : null;
     const match = DEFINITION.exec(line);
-    const target = match ? cleanTarget(match[2] ?? '') : '';
-    if (!match || EXTERNAL.test(target)) {
+    const label = match?.[1] ?? alone?.[1];
+    const target = cleanTarget(match?.[2] ?? next?.[1] ?? '');
+    if (label === undefined || target === '' || WEB.test(target)) {
       kept.push(line);
       continue;
     }
-    targets.set((match[1] ?? '').trim().toLowerCase(), target);
+    targets.set(label.trim().toLowerCase(), target);
+    if (next) at += TITLE_LINE.test(lines[at + 2] ?? '') ? 2 : 1;
   }
   return { kept, targets };
 }
 
-function rewriteReferences(text: string, targets: ReadonlyMap<string, string>, resolve: LinkResolver): string {
-  const through = (all: string, bang: string, label: string, key: string): string => {
-    const target = targets.get(key.trim().toLowerCase());
-    return target === undefined ? all : rewriteTarget(bang, label, target, resolve) ?? all;
+/** Reference and inline links, each rewritten from the inside out so a link around an image leaks neither path. */
+function rewriteSpans(text: string, targets: ReadonlyMap<string, string>, resolve: LinkResolver): string {
+  const inside = (label: string): string => rewriteSpans(label, targets, resolve);
+  const through = (all: string, bang: string, label: string, ref: string): string => {
+    const target = targets.get(ref.trim().toLowerCase());
+    return target === undefined ? all : rewriteTarget(bang, inside(label), target, resolve) ?? all;
   };
   return text
     .replace(REFERENCE_LINK, (all: string, bang: string, label: string, ref: string) => through(all, bang, label, ref === '' ? label : ref))
-    .replace(SHORTCUT_LINK, (all: string, bang: string, label: string) => through(all, bang, label, label));
+    .replace(SHORTCUT_LINK, (all: string, bang: string, label: string) => through(all, bang, label, label))
+    .replace(MARKDOWN_LINK, (all: string, bang: string, label: string, raw: string) => {
+      const inner = inside(label);
+      return rewriteTarget(bang, inner, raw, resolve) ?? (inner === label ? all : `${bang}[${inner}](${raw})`);
+    });
 }
 
 function stripHtmlUrls(text: string): string {
   return text.replace(HTML_TAG, (tag) => tag.replace(URL_ATTRIBUTE, (all: string, double?: string, single?: string, bare?: string) => {
     const value = (double ?? single ?? bare ?? '').trim();
     const urls = value.split(',').map((candidate) => candidate.trim().split(/\s+/)[0] ?? '');
-    return urls.every((url) => EXTERNAL.test(url) || url.startsWith('#')) ? all : '';
+    return urls.every((url) => WEB.test(url) || url.startsWith('#')) ? all : '';
   }));
 }
 
 export function rewriteLinks(text: string, resolve: LinkResolver): string {
   const { kept, targets } = takeDefinitions(rewriteWiki(text, resolve).split('\n'));
-  const inline = rewriteReferences(kept.join('\n'), targets, resolve).replace(MARKDOWN_LINK, (all: string, bang: string, label: string, raw: string) =>
-    rewriteTarget(bang, label, raw, resolve) ?? all);
-  return stripHtmlUrls(inline);
+  return stripHtmlUrls(rewriteSpans(kept.join('\n'), targets, resolve));
 }

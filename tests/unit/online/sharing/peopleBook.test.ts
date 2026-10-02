@@ -147,4 +147,21 @@ describe('PeopleBook', () => {
       vi.useRealTimers();
     }
   });
+
+  it('never gives a former name to someone else, and finds every person a name matches (I3)', async () => {
+    const people = book();
+    await people.ready();
+    const ana = people.admit(T, 'Ana', D1);
+    people.rename(personKey(T, ana.personId), 'Ana Silva');
+    const second = people.admit(T, 'Ana', D2);
+    expect(second.name).toBe('Ana (2)');
+    expect(people.seen(U, 'x'.repeat(22), 'ANA').name).toBe('ANA (3)');
+    const ben = people.admit(T, 'Ben', 'c'.repeat(43));
+    expect(people.rename(personKey(T, ben.personId), 'ana')).toBe('Someone in your people list is already called ana.');
+    // The renamed person may take their own former name back.
+    expect(people.rename(personKey(T, ana.personId), 'Ana')).toBeNull();
+    expect(people.allByName('Ana').map((person) => person.personId)).toEqual([ana.personId]);
+    expect(people.allByName('Ana Silva').map((person) => person.personId)).toEqual([ana.personId]);
+    expect(people.allByName('Nobody')).toEqual([]);
+  });
 });

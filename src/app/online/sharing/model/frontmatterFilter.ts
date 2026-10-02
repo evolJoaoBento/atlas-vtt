@@ -1,10 +1,12 @@
 /** A note's frontmatter, split off and reduced to the properties that may be shared. Text only, never parsed as YAML. */
 import { SHARE_PROPERTY } from './shareRule';
 
-export function splitFrontmatter(text: string): { frontmatter: string[] | null; body: string } {
+/** Frontmatter opens at the first line (after a byte order mark) and ends at the next `---`, as in Obsidian. */
+export function splitFrontmatter(source: string): { frontmatter: string[] | null; body: string } {
+  const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source;
   const lines = text.split('\n');
   if (lines[0]?.trimEnd() !== '---') return { frontmatter: null, body: text };
-  const end = lines.findIndex((line, index) => index > 0 && (line.trimEnd() === '---' || line.trimEnd() === '...'));
+  const end = lines.findIndex((line, index) => index > 0 && line.trimEnd() === '---');
   if (end < 0) return { frontmatter: null, body: text };
   return { frontmatter: lines.slice(1, end), body: lines.slice(end + 1).join('\n') };
 }

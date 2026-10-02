@@ -1085,3 +1085,18 @@ describe('refreshing the index during an import', () => {
     expect(await reloadedTokenNames(fan)).toEqual(['Goblin']);
   });
 });
+
+describe('map shares', () => {
+  it('stay out of an exported bundle', async () => {
+    const creator = await creatorVault();
+    const [scene] = await creator.assets.getAssets('source', 'scene');
+    const sharing = { item: 'i'.repeat(22), everyone: true, people: [], except: [], mode: 'full', notes: ['Secret/Plan.md'] };
+    await creator.assets.updateAsset(scene!.id, { data: { mapPath: MAP_PATH, sharing } });
+    const blob = await exportFrom(creator);
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const everything = await Promise.all(Object.values(zip.files).filter((entry) => !entry.dir && /\.(json)$/.test(entry.name)).map((entry) => entry.async('string')));
+    expect(everything.join('\n')).not.toContain('Secret/Plan.md');
+    expect(everything.join('\n')).not.toContain('"sharing"');
+  });
+});

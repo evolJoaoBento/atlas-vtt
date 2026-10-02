@@ -14,6 +14,8 @@ export interface ShareRule {
   public: boolean;
   only: string[];
   except: string[];
+  /** Set when an entry could not be read (the rule is then private) so the dialog can say so. */
+  unreadable?: boolean;
 }
 
 /** What the Share with… dialog chose: names for notes, person keys for maps. */
@@ -23,21 +25,50 @@ export interface ShareChoice {
   except: string[];
 }
 
-function entriesOf(value: unknown): string[] {
-  const values = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
-  return values.flatMap((entry) => (typeof entry === 'string' ? entry.split(',') : [])).map((entry) => entry.trim()).filter(Boolean);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const split = (text: string): string[] => text.split(',').map((entry) => entry.trim()).filter(Boolean);
+
+/**
+ * The entries of a value, as the text they would be written as. YAML reads `[public, except Cara]`
+ * as two strings but `[public, except: Cara]` as a string and a mapping, so `{except: X}` and
+ * `{only: X}` (X a string or a list of strings) are read too. Anything else that is not a string
+ * is `bad`: the rule then fails closed.
+ */
+function entriesOf(value: unknown): { entries: string[]; bad: boolean } {
+  if (value === undefined || value === null) return { entries: [], bad: false };
+  const items = Array.isArray(value) ? value : [value];
+  const entries: string[] = [];
+  let bad = false;
+  for (const item of items) {
+    if (typeof item === 'string') {
+      entries.push(...split(item));
+      continue;
+    }
+    const keys = isRecord(item) ? Object.keys(item) : [];
+    const key = keys.length === 1 ? (keys[0] ?? '').toLowerCase() : '';
+    const names = isRecord(item) ? item[keys[0] ?? ''] : null;
+    const list = typeof names === 'string' ? [names] : Array.isArray(names) ? names : [null];
+    if ((key !== 'except' && key !== 'only') || !list.every((name): name is string => typeof name === 'string')) {
+      bad = true;
+      continue;
+    }
+    entries.push(...list.flatMap(split).map((name) => `${key} ${name}`));
+  }
+  return { entries, bad };
 }
 
 export function parseShareRule(value: unknown): ShareRule {
   const rule: ShareRule = { private: false, public: false, only: [], except: [] };
-  for (const entry of entriesOf(value)) {
+  const { entries, bad } = entriesOf(value);
+  for (const entry of entries) {
     const lower = entry.toLowerCase();
     if (lower === 'private') rule.private = true;
     else if (lower === 'public') rule.public = true;
     else if (/^except\s+/i.test(entry)) rule.except.push(entry.replace(/^except\s+/i, '').trim());
     else rule.only.push(entry.replace(/^only\s+/i, '').trim());
   }
-  return rule;
+  // An entry nobody can read is never taken to mean less than it says: the note shares with nobody.
+  return bad ? { ...rule, private: true, unreadable: true } : rule;
 }
 
 /** The property value for a choice; null removes the property (nobody). */

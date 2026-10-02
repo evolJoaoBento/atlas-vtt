@@ -65,11 +65,12 @@ class ShareWithModal extends Modal {
   }
 
   /** What the sender should know before saving: names the list lacks, and private text that could not be read. */
-  private async noteWarnings(unknownInRule: readonly string[]): Promise<string[]> {
+  private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<string[]> {
     const text = await this.app.vault.cachedRead(this.file);
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
     const unreadable = [...new Set(unreadablePrivateTextIn(text))].slice(0, MAX_UNREADABLE_WARNINGS);
     return [
+      ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
       ...unreadable.map((start) => `Could not read the private part that starts with "${start}". It is hidden from everyone.`),
     ];
@@ -82,7 +83,7 @@ class ShareWithModal extends Modal {
     const unknown = unknownRuleNames(rule, people);
     const rows = [...known, ...unknown.map((name) => ({ key: nameKey(name), name, known: false }))];
     const nameFor = (key: string): string => rows.find((row) => row.key === key)?.name ?? key.replace(/^name:/, '');
-    const warnings = await this.noteWarnings(unknown);
+    const warnings = await this.noteWarnings(unknown, rule.unreadable === true);
     this.root?.render(
       <ShareWithForm
         rows={rows}

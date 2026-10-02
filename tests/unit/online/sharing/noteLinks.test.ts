@@ -41,4 +41,23 @@ describe('links in shared notes', () => {
     expect(rewriteLinks('<img srcset="a.png 1x, https://example.org/b.png 2x" src="https://example.org/b.png"> <a href="#top">t</a>', shared))
       .toBe('<img src="https://example.org/b.png"> <a href="#top">t</a>');
   });
+
+  it('a link around an image leaks neither path (I5)', () => {
+    expect(rewriteLinks('[![img](GM/a.png)](GM/b.md)', shared)).toBe('img');
+    expect(rewriteLinks('[![img](GM/a.png)](Places/Cave.md)', shared)).toBe('[[Cave|img]]');
+    expect(rewriteLinks('[![img][r]](GM/b.md)\n\n[r]: GM/a.png', shared)).toBe('img\n');
+    expect(rewriteLinks('[![[GM/a.png]]](GM/b.md)', shared)).toBe('a.png');
+    expect(rewriteLinks('[![i](GM/a.png)](https://example.org)', shared)).toBe('[i](https://example.org)');
+    expect(rewriteLinks('[![i](https://example.org/a.png)](https://example.org)', shared)).toBe('[![i](https://example.org/a.png)](https://example.org)');
+  });
+
+  it('only web links stay: Obsidian, app and file links become their text', () => {
+    expect(rewriteLinks('[x](obsidian://open?vault=V&file=GM%2FSecret%20plan) [m](mailto:a@b.c)', shared)).toBe('x [m](mailto:a@b.c)');
+    expect(rewriteLinks('<img src="app://abc/C:/Users/x/a.png"> <img src="file:///C:/a.png"> <a href="javascript:alert(1)">j</a>', shared)).toBe('<img> <img> <a>j</a>');
+  });
+
+  it('sees a definition whose target is on the next line, and a tag whose attribute holds a ">"', () => {
+    expect(rewriteLinks('see [r]\n\n[r]:\n  GM/Secret.md\n"title"\nend', shared)).toBe('see r\n\nend');
+    expect(rewriteLinks('<a title=">" href="GM/Secret.md">x</a>', shared)).toBe('<a title=">">x</a>');
+  });
 });

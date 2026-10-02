@@ -2,6 +2,7 @@ import type { App } from 'obsidian';
 import { COLLECTIONS_DIR, type Asset, type AssetService, type CollectionMetadata } from '../AssetService';
 import { BUNDLE_FORMAT, BUNDLE_MANIFEST, zipPathFor, type BundleFile, type CollectionBundleManifest } from './bundleFormat';
 import { rewriteContent } from './bundleContent';
+import { withoutSceneSharing } from './bundleSharing';
 import { selectContent } from './bundleContents';
 import { reportFileStep, type BundleProgressListener } from './bundleProgress';
 import { coverCandidates, coverFileFor, currentCover, storeCover, type CoverCandidate, type CoverChoice, type CoverFile, type CurrentCover } from './collectionCover';
@@ -185,7 +186,7 @@ export async function exportCollectionBundle(
     exportedAt,
     collection,
     release: { kind: choice.kind === 'share' ? 'share' : 'release', ...(notes ? { notes } : {}) },
-    assets: selected.assets.map((asset) => remapPaths(asset, origin.names)),
+    assets: selected.assets.map((asset) => remapPaths(withoutSceneSharing(asset), origin.names)),
     files,
   };
   zip.file(BUNDLE_MANIFEST, JSON.stringify(manifest, null, 2));

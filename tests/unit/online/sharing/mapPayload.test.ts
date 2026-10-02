@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { fullPayload, playerSafePayload, type PayloadContext, type SharedMapSource } from '../../../../src/app/online/sharing/model/buildMapPayload';
 import { IMAGE_REF_PREFIX, NOTE_REF_PREFIX, parseMapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
@@ -58,6 +60,33 @@ describe('map payloads', () => {
     expect(text).not.toMatch(/Notes\/|art\/|maps\/|GM\//);
     expect(payload.map).toMatchObject({ objects: { walls: { w: { id: 'w' } } } });
     expect(parseMapPayload(JSON.parse(text))).toEqual(payload);
+  });
+
+  it('full: clears paths by key, whether or not the file exists (I4)', () => {
+    const stale = migrateMapFile({
+      background: 'maps/gone.png',
+      objects: {
+        tokens: { t: { id: 't', kind: 'character', x: 0, y: 0, imagePath: 'art/missing.png', statblockPath: 'GM/Twist reveal.md', notePath: 'GM/Renamed away.md' } },
+        pins: { p: { id: 'p', kind: 'pin', x: 1, y: 1, notePath: 'GM/Folder' } },
+        audios: { a: { id: 'a', kind: 'audio', x: 0, y: 0, path: 'sounds/lost.ogg' } },
+      },
+    });
+    const none = { ...source(), map: stale, extra: { dmNotePath: 'GM/Prep', mapPath: 'atlas-vtt/collections/c/Inn.atlasmap' } };
+    const text = JSON.stringify(fullPayload(none, 'Inn', { ...context([]), images: { fingerprints: new Map(), size: { width: 0, height: 0 } }, isFile: () => false }));
+    expect(text).not.toMatch(/GM\/|art\/|maps\/|sounds\/|atlas-vtt\//);
+  });
+
+  it('every *Path field of the map types is covered by that test (a new one must be added)', () => {
+    const types = readFileSync(resolve(__dirname, '../../../../src/app/types.ts'), 'utf8');
+    const fields = [...new Set([...types.matchAll(/\b(\w*Path)\??:/g)].map((match) => match[1]))].sort();
+    expect(fields).toEqual(['imagePath', 'notePath', 'statblockPath']);
+    const token = { id: 't', kind: 'character', x: 0, y: 0 };
+    const filled = migrateMapFile({
+      background: 'maps/inn.png',
+      objects: { tokens: { t: { ...token, ...Object.fromEntries(fields.map((field) => [field, `Secret/${field}.md`])) } }, pins: { p: { id: 'p', kind: 'pin', x: 1, y: 1, notePath: 'Secret/pin.md' } } },
+    });
+    const text = JSON.stringify(fullPayload({ ...source(), map: filled }, 'Inn', { ...context([]), isFile: () => false }));
+    expect(text).not.toContain('Secret/');
   });
 
   it('refuses payloads of the wrong shape', () => {

@@ -21,7 +21,7 @@ describe('atlas-share', () => {
     expect(parseShareRule(['only Ana', 'ONLY Ben'])).toMatchObject({ only: ['Ana', 'Ben'] });
     expect(parseShareRule(['public', 'except Cara'])).toMatchObject({ public: true, except: ['Cara'] });
     expect(parseShareRule('Ana, Ben')).toMatchObject({ only: ['Ana', 'Ben'] });
-    expect(parseShareRule([7, '  ', 'Ana'])).toMatchObject({ only: ['Ana'] });
+    expect(parseShareRule(['  ', 'Ana'])).toMatchObject({ only: ['Ana'] });
   });
 
   it('decides who it reaches: private wins over everything, except over a name, unknown except reaches nobody', () => {
@@ -52,5 +52,37 @@ describe('atlas-share', () => {
     expect(calloutAllows({ kind: 'except', names: ['Cara'] }, as(ana), people)).toBe(true);
     expect(calloutAllows({ kind: 'except', names: ['Cara'] }, as(cara), people)).toBe(false);
     expect(calloutAllows({ kind: 'except', names: ['Zed'] }, as(ana), people)).toBe(false);
+  });
+
+  it('reads the mapping entries YAML makes of `except Cara` and `only Ana` (I2)', () => {
+    expect(parseShareRule(['public', { except: 'Cara' }])).toMatchObject({ public: true, except: ['Cara'], private: false });
+    expect(parseShareRule([{ except: ['Cara', 'Ben'] }, { only: 'Ana' }])).toMatchObject({ except: ['Cara', 'Ben'], only: ['Ana'] });
+    expect(parseShareRule([{ EXCEPT: 'Cara' }, 'public'])).toMatchObject({ except: ['Cara'] });
+    expect(ruleReaches(parseShareRule(['public', { except: 'Cara' }]), as(cara), people)).toBe(false);
+    expect(ruleReaches(parseShareRule({ except: 'Cara' }), as(ana), people)).toBe(false);
+  });
+
+  it('any other entry that is not a string makes the note private, and says so (I2)', () => {
+    for (const value of [['public', 7], ['public', true], ['public', ['except Cara']], ['public', { except: 'Cara', other: 1 }], ['public', { colour: 'red' }], ['public', { except: 4 }], 5, true]) {
+      const rule = parseShareRule(value);
+      expect(rule, JSON.stringify(value)).toMatchObject({ private: true, unreadable: true });
+      expect(ruleReaches(rule, as(ana), people)).toBe(false);
+    }
+    expect(parseShareRule(null)).toEqual({ private: false, public: false, only: [], except: [] });
+    expect(parseShareRule(['public', { except: 'Cara' }])).not.toHaveProperty('unreadable');
+  });
+
+  it('except excludes every person any of its names matches, current or former (I3)', () => {
+    const newAna = person('ana2', 'Ana');
+    const many = { byName: people.byName, allByName: (name: string): Person[] => [ana, newAna, ben].filter((p) => p.name === name || p.formerNames.includes(name)) };
+    // Old Ana was renamed; a second entry now holds the same name.
+    const renamed = person('ana', 'Ana Silva', { formerNames: ['Ana'] });
+    const both = { byName: (name: string): Person | null => (name === 'Ana' ? newAna : name === 'Ana Silva' ? renamed : null), allByName: (name: string): Person[] => [renamed, newAna].filter((p) => p.name === name || p.formerNames.includes(name)) };
+    expect(ruleReaches(parseShareRule(['public', 'except Ana']), as(renamed), both)).toBe(false);
+    expect(ruleReaches(parseShareRule(['public', 'except Ana']), as(newAna), both)).toBe(false);
+    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(renamed), both)).toBe(false);
+    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(newAna), both)).toBe(false);
+    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(ben), both)).toBe(true);
+    expect(many.allByName('Ana')).toHaveLength(2);
   });
 });
