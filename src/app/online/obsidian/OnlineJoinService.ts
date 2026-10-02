@@ -91,6 +91,8 @@ export class OnlineJoinService {
   private joined: Joined | null = null;
   private sink: OnlineSceneSink | null = null;
   private cache: AssetCache | null = null;
+  /** The last "Keep online images" setting seen: other settings changing must not touch the storage. */
+  private keepImages: boolean;
   private readonly keys = new Map<string, string>();
   private readonly createClient: NonNullable<OnlineJoinDeps['createClient']>;
   private readonly openStore: NonNullable<OnlineJoinDeps['openStore']>;
@@ -116,8 +118,9 @@ export class OnlineJoinService {
       const status = onlineSessionStore.getState().status;
       return status === 'starting' || status === 'hosting';
     });
-    // Switching keeping off deletes the stored images at once.
-    this.stopSettings = settings.onChange(() => { void this.cache?.setKeep(this.settings.getOnlineSettings().keepImages); });
+    // Switching keeping off deletes the stored images at once, joined or not.
+    this.keepImages = settings.getOnlineSettings().keepImages;
+    this.stopSettings = settings.onChange(() => this.keepChanged(this.settings.getOnlineSettings().keepImages));
     OnlineJoinService.instances.set(app, this);
   }
 
@@ -229,6 +232,18 @@ export class OnlineJoinService {
     const cache = this.cache;
     this.cache = null;
     void cache?.dispose();
+  }
+
+  private keepChanged(keep: boolean): void {
+    if (keep === this.keepImages) return;
+    this.keepImages = keep;
+    if (this.cache) {
+      void this.cache.setKeep(keep);
+      return;
+    }
+    if (keep) return;
+    // Nothing joined: a cache that keeps nothing clears the storage as it opens, then lets go of it.
+    void new AssetCache({ keep: false, openStore: this.openStore }).dispose();
   }
 
   private imageCache(): AssetCache {

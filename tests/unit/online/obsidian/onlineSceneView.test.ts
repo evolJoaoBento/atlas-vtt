@@ -79,4 +79,16 @@ describe('OnlineSceneView', () => {
     expect(clients.made[0]!.dispose).toHaveBeenCalledOnce();
     expect(service.leave).toHaveBeenCalledOnce();
   });
+
+  it('leaves the session when it closes before it attached', async () => {
+    const ws = workspace();
+    const early = openView(ws);
+    await early.view.onClose();
+    expect(early.view.isAttached).toBe(false);
+    expect(service.leave).toHaveBeenCalledOnce();
+  });
+
+  it('never loads a file', async () => {
+    await expect(openView(workspace()).view.onLoadFile()).resolves.toBeUndefined();
+  });
 });

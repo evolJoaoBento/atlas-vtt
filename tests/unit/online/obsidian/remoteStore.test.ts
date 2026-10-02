@@ -59,6 +59,14 @@ describe('remote view store', () => {
     expect(getHistoryStore(store)?.getState().pastStates.length).toBeGreaterThan(0);
   });
 
+  it('ignores a remote part in a map file: only the online scene view has one', () => {
+    const { app } = createInMemoryApp();
+    const store = createViewAtlasStore(app, 'map-2');
+    const merge = store.persist.getOptions().merge;
+    const merged = merge?.({ remoteScene: { status: {} }, isPlayerView: false }, store.getState());
+    expect(merged?.remoteScene).toBeNull();
+  });
+
   it('keeps a player view store a player view, without a remote part', () => {
     const { app } = createInMemoryApp();
     const store = createViewAtlasStore(app, 'player-1', undefined, true);

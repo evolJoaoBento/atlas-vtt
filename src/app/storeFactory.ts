@@ -1486,7 +1486,8 @@ export function createViewAtlasStore(
           // The map file arrives unchecked; fields that need it are checked here, once per load.
           merge: (persisted, current): ViewAtlasState => {
             const saved: Partial<ViewAtlasState> = isRecord(persisted) ? persisted : {};
-            return { ...current, ...saved, lootRoller: readLootRollerState(saved.lootRoller) };
+            // `remoteScene` marks the online scene view and never comes from a file.
+            return { ...current, ...saved, remoteScene: current.remoteScene, lootRoller: readLootRollerState(saved.lootRoller) };
           },
 
           onRehydrateStorage: () => {

@@ -35,7 +35,7 @@ export async function openMapInView(app: App, mapFile: TFile): Promise<void> {
 
   let leaf = app.workspace.getMostRecentLeaf();
   // A pinned leaf, or the online scene (opening a map there would end the session), keeps its place.
-  if (!leaf || leaf.getViewState().pinned || leaf.view.getViewType() === ONLINE_SCENE_VIEW_TYPE) {
+  if (!leaf || leaf.getViewState().pinned || leaf.getViewState().type === ONLINE_SCENE_VIEW_TYPE) {
     leaf = app.workspace.getLeaf('tab');
   }
 

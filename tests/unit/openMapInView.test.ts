@@ -5,8 +5,8 @@ vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class {}, ATLAS_VIEW_TYP
 import { openMapInView } from '../../src/app/plugin/atlasLeaves';
 
 function appWith(recent: { type: string; pinned?: boolean }): { app: never; fresh: { setViewState: ReturnType<typeof vi.fn> }; recentLeaf: { setViewState: ReturnType<typeof vi.fn> } } {
-  const make = (type: string, pinned = false): { setViewState: ReturnType<typeof vi.fn>; loadIfDeferred: () => Promise<void>; getViewState: () => { pinned: boolean }; view: { getViewType: () => string } } => ({
-    setViewState: vi.fn(), loadIfDeferred: async () => undefined, getViewState: () => ({ pinned }), view: { getViewType: () => type },
+  const make = (type: string, pinned = false): { setViewState: ReturnType<typeof vi.fn>; loadIfDeferred: () => Promise<void>; getViewState: () => { pinned: boolean; type: string }; view: { getViewType: () => string } } => ({
+    setViewState: vi.fn(), loadIfDeferred: async () => undefined, getViewState: () => ({ pinned, type }), view: { getViewType: () => type },
   });
   const recentLeaf = make(recent.type, recent.pinned);
   const fresh = make('empty');

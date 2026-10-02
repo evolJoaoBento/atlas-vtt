@@ -87,11 +87,11 @@ export class OnlineSceneView extends AtlasView {
   }
 
   async onClose(): Promise<void> {
-    // Only the view that is the session's sink leaves it; a copy that never attached closes quietly.
-    const attached = this.client !== null;
     this.client?.dispose();
     this.client = null;
-    if (attached) OnlineJoinService.forApp(this.app)?.leave();
+    // Closing the tab leaves the session, also when it closed before attaching; only a copy that
+    // gives way to the tab showing the session closes quietly.
+    if (!this.otherAttachedView()) OnlineJoinService.forApp(this.app)?.leave();
     await super.onClose();
   }
 
@@ -108,10 +108,20 @@ export class OnlineSceneView extends AtlasView {
     return this.client !== null;
   }
 
+  /** The leaf of another Online scene view that shows the session, if any. */
+  private otherAttachedView(): WorkspaceLeaf | undefined {
+    return this.app.workspace.getLeavesOfType(ONLINE_SCENE_VIEW_TYPE)
+      .find((leaf) => leaf !== this.leaf && leaf.view instanceof OnlineSceneView && leaf.view.isAttached);
+  }
+
+  /** A linked pane's file-open would load a map into this view; it never opens a file. */
+  async onLoadFile(): Promise<void> {
+    // Nothing to load: the scene comes from the joined session.
+  }
+
   private attachSession(): void {
     if (this.isClosed || this.client) return;
-    const shown = this.app.workspace.getLeavesOfType(ONLINE_SCENE_VIEW_TYPE)
-      .find((leaf) => leaf !== this.leaf && leaf.view instanceof OnlineSceneView && leaf.view.isAttached);
+    const shown = this.otherAttachedView();
     if (shown) {
       // One tab per session: a copy (a split, a duplicate) gives way to the one that has it.
       this.leaf.detach();

@@ -211,6 +211,27 @@ describe('OnlineJoinService', () => {
     w.service.dispose();
   });
 
+  it('deletes the stored images when keeping is switched off with no session joined', async () => {
+    const store = new MemoryStore();
+    await store.put({ id: 'a'.repeat(43), mime: 'image/webp', bytes: new ArrayBuffer(8) }, 1);
+    const w = world({ store });
+    w.settings.setOnlineSettings({ keepImages: false });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.images.size).toBe(0);
+    expect(store.closed).toBe(true);
+    w.service.dispose();
+  });
+
+  it('leaves the stored images when keeping is switched on with no session joined', async () => {
+    const store = new MemoryStore();
+    await store.put({ id: 'a'.repeat(43), mime: 'image/webp', bytes: new ArrayBuffer(8) }, 1);
+    const w = world({ store });
+    w.settings.setOnlineSettings({ keepImages: true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.images.size).toBe(1);
+    w.service.dispose();
+  });
+
   it('keeps one player key per GM for the life of the plugin', () => {
     const { service } = world();
     expect(service.playerKeyFor('a')).toBe(service.playerKeyFor('a'));
@@ -240,8 +261,8 @@ describe('OnlineJoinService', () => {
     const dispose = vi.spyOn(AssetCache.prototype, 'dispose');
     const store = new MemoryStore();
     const w = world({ store });
-    w.settings.setOnlineSettings({ keepImages: false });
     w.service.join(LINK, 'Ben');
+    w.settings.setOnlineSettings({ keepImages: false });
     await w.admitLast();
     expect(store.closed).toBe(false);
     w.service.leave();
