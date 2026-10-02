@@ -13,6 +13,23 @@ export interface PlayerDiceLogOptions {
   onChange(): void;
 }
 
+/**
+ * A dice log after `entries` arrived: a replay replaces it; new rolls go first, each once by id,
+ * at most 50. `list` is the same array when nothing was new; `newest` is the newest new roll.
+ */
+export function mergeDiceLog(
+  list: readonly DiceLogEntry[],
+  entries: readonly DiceLogEntry[],
+  replay: boolean,
+): { list: readonly DiceLogEntry[]; newest: DiceLogEntry | null } {
+  if (replay) return { list: entries.slice(0, DICE_LIMITS.logEntries), newest: null };
+  const known = new Set(list.map((entry) => entry.id));
+  const fresh = entries.filter((entry) => !known.has(entry.id));
+  const newest = fresh[0] ?? null;
+  if (!newest) return { list, newest: null };
+  return { list: [...fresh, ...list].slice(0, DICE_LIMITS.logEntries), newest };
+}
+
 export class PlayerDiceLog {
   private list: readonly DiceLogEntry[] = [];
   private latest: DiceLogEntry | null = null;
@@ -36,17 +53,10 @@ export class PlayerDiceLog {
   }
 
   receive(entries: readonly DiceLogEntry[], replay: boolean): void {
-    if (replay) {
-      this.list = entries.slice(0, DICE_LIMITS.logEntries);
-      this.options.onChange();
-      return;
-    }
-    const known = new Set(this.list.map((entry) => entry.id));
-    const fresh = entries.filter((entry) => !known.has(entry.id));
-    const newest = fresh[0];
-    if (!newest) return;
-    this.list = [...fresh, ...this.list].slice(0, DICE_LIMITS.logEntries);
-    if (!this.open) this.showToast(newest);
+    const merged = mergeDiceLog(this.list, entries, replay);
+    if (merged.list === this.list) return;
+    this.list = merged.list;
+    if (merged.newest && !this.open) this.showToast(merged.newest);
     this.options.onChange();
   }
 

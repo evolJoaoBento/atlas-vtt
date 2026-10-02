@@ -17,6 +17,8 @@ export interface SessionPlayer {
   playerId: string;
   name: string;
   status: PlayerStatus;
+  /** Set for a player who joined from Atlas in Obsidian; absent for the web page. */
+  client?: 'obsidian';
 }
 
 export interface SessionHandler {

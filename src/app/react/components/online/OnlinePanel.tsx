@@ -1,14 +1,15 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Copy, Network, Square } from 'lucide-react';
-import { Notice } from 'obsidian';
+import { Notice, type App } from 'obsidian';
 import { Button } from '../../../packages/components/primitives/button';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import { useDialogWindowVariants } from '../../../packages/components/primitives/dialogMotion';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { openJoinSessionModal } from '../../../online/obsidian/ui/JoinSessionModal';
 import { OnlineSessionService } from '../../../online/OnlineSessionService';
 import type { OnlineSessionState } from '../../../online/onlineSessionStore';
-import { ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../../../online/ui/onlineCopy';
+import { JOIN_SESSION_LABEL, ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../../../online/ui/onlineCopy';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { useAtlasStore } from '../../ViewStoreContext';
 import { OnlinePlayerList } from './OnlinePlayerList';
@@ -47,13 +48,13 @@ function OnlinePanelWindow(): React.ReactElement {
       <div className="atlas-online-panel__body">
         {session.status === 'hosting' && service
           ? <HostingView session={session} service={service} />
-          : <StartView session={session} service={service} />}
+          : <StartView session={session} service={service} app={app} />}
       </div>
     </motion.section>
   );
 }
 
-function StartView({ session, service }: { session: OnlineSessionState; service: OnlineSessionService | undefined }): React.ReactElement {
+function StartView({ session, service, app }: { session: OnlineSessionState; service: OnlineSessionService | undefined; app: App }): React.ReactElement {
   const starting = session.status === 'starting';
   return (
     <section className="atlas-online-panel__section">
@@ -62,6 +63,9 @@ function StartView({ session, service }: { session: OnlineSessionState; service:
         <p className="atlas-online-panel__error" role="alert">{session.error}</p>
       )}
       <div className="atlas-online-panel__footer">
+        <Button variant="outline" disabled={starting} onClick={() => openJoinSessionModal(app)}>
+          {JOIN_SESSION_LABEL}
+        </Button>
         <Button variant="default" disabled={starting || !service} onClick={() => { void service?.start(); }}>
           {starting ? 'Starting…' : START_SESSION_LABEL}
         </Button>

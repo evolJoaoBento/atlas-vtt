@@ -159,6 +159,17 @@ $online-panel-padding: $spacing-m;
   color: var(--text-muted);
 }
 
+.atlas-online-panel__client {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+
+  svg {
+    width: $icon-xs;
+    height: $icon-xs;
+  }
+}
+
 .atlas-online-panel__chips {
   display: flex;
   flex-wrap: wrap;
@@ -184,4 +195,5 @@ $online-panel-padding: $spacing-m;
 .atlas-online-panel__footer {
   display: flex;
   justify-content: flex-end;
+  gap: $spacing-s;
 }

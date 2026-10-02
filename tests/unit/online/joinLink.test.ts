@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildJoinUrl, parseJoinFragment } from '../../../src/app/online/joinLink';
+import { buildJoinUrl, parseJoinFragment, parseJoinLink } from '../../../src/app/online/joinLink';
 import { DEFAULT_ONLINE_SETTINGS, DEFAULT_STUN } from '../../../src/app/online/onlineSettings';
 
 describe('join links', () => {
@@ -55,5 +55,18 @@ describe('join links', () => {
 
   it('will not build a link for an invalid host id', () => {
     expect(() => buildJoinUrl('https://example.github.io/', 'bad id!', DEFAULT_ONLINE_SETTINGS)).toThrow();
+  });
+});
+
+describe('parseJoinLink', () => {
+  it('reads a whole pasted link or only its fragment, around spaces', () => {
+    expect(parseJoinLink('  https://example.org/join/#id=gm-1  ')).toEqual(parseJoinFragment('#id=gm-1'));
+    expect(parseJoinLink('#id=gm-1')?.hostId).toBe('gm-1');
+  });
+
+  it('refuses text without a fragment or with a broken one', () => {
+    expect(parseJoinLink('https://example.org/join/')).toBeNull();
+    expect(parseJoinLink('gm-1')).toBeNull();
+    expect(parseJoinLink('https://example.org/#nothing=here')).toBeNull();
   });
 });

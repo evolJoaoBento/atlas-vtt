@@ -49,6 +49,8 @@ describe('online settings', () => {
       turnServers: [{ urls: 'turn:a.example', username: 'u', credential: 'c' }],
       playerPageUrl: 'https://p.example/',
       logEvents: false,
+      playerName: '',
+      keepImages: true,
     });
   });
 
@@ -56,5 +58,11 @@ describe('online settings', () => {
     expect(DEFAULT_ONLINE_SETTINGS.logEvents).toBe(false);
     expect(resolveOnlineSettings({ logEvents: true }).logEvents).toBe(true);
     expect(resolveOnlineSettings({ logEvents: 'yes' }).logEvents).toBe(false);
+  });
+
+  it("remembers the player's name and keeps images unless switched off", () => {
+    expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true });
+    expect(resolveOnlineSettings({ playerName: 'Anna', keepImages: false })).toMatchObject({ playerName: 'Anna', keepImages: false });
+    expect(resolveOnlineSettings({ playerName: 4, keepImages: 'no' })).toMatchObject({ playerName: '', keepImages: true });
   });
 });

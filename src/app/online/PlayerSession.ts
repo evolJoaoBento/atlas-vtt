@@ -41,6 +41,8 @@ export interface PlayerSessionOptions {
   name: string;
   playerKey: string;
   clientVersion: string;
+  /** The app that joins: the web page (the default) or Atlas in Obsidian. */
+  clientKind?: 'web' | 'obsidian';
   transport: ClientTransport;
   onChange(state: PlayerSessionState): void;
   /** The presented scene changed: a snapshot or patch applied, or null when the GM shows none. */
@@ -157,7 +159,7 @@ export class PlayerSession {
     });
     link.send('control', encodeControl({
       v: 1, type: 'join', name: this.options.name, playerKey: this.options.playerKey,
-      client: { kind: 'web', version: this.options.clientVersion },
+      client: { kind: this.options.clientKind ?? 'web', version: this.options.clientVersion },
     }));
     if (!this.wasAdmitted && this.state.status === 'connecting') this.update({ status: 'waiting' });
   }

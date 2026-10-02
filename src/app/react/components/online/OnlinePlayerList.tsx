@@ -1,17 +1,26 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Gem, X } from 'lucide-react';
 import { Button } from '../../../packages/components/primitives/button';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import type { TokenControl } from '../../../online/control/TokenControl';
 import type { SessionPlayer } from '../../../online/GmSession';
 import type { OnlineSessionService } from '../../../online/OnlineSessionService';
-import { REMOVE_PLAYER_LABEL } from '../../../online/ui/onlineCopy';
+import { OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL } from '../../../online/ui/onlineCopy';
 import { usePresentedSceneSummary, useTokenControlVersion } from './useOnlineState';
 
 interface OnlinePlayerListProps {
   players: readonly SessionPlayer[];
   control: TokenControl | null;
   service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick'>;
+}
+
+/** Marks a player who joined from Atlas in Obsidian. */
+function ObsidianMark(): React.ReactElement {
+  return (
+    <LabelTooltip label={OBSIDIAN_PLAYER_LABEL}>
+      <span className="atlas-online-panel__client" role="img" aria-label={OBSIDIAN_PLAYER_LABEL}><Gem aria-hidden="true" /></span>
+    </LabelTooltip>
+  );
 }
 
 /**
@@ -36,6 +45,7 @@ export function OnlinePlayerList({ players, control, service }: OnlinePlayerList
               <li key={player.playerId} className="atlas-online-panel__player" aria-label={player.name}>
                 <div className="atlas-online-panel__player-row">
                   <span className="atlas-online-panel__name">{player.name}</span>
+                  {player.client === 'obsidian' && <ObsidianMark />}
                   <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
                   <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
                 </div>
@@ -61,6 +71,7 @@ export function OnlinePlayerList({ players, control, service }: OnlinePlayerList
                 <li key={player.playerId} className="atlas-online-panel__player" aria-label={player.name}>
                   <div className="atlas-online-panel__player-row">
                     <span className="atlas-online-panel__name">{player.name}</span>
+                    {player.client === 'obsidian' && <ObsidianMark />}
                     {player.status === 'gone' && <span className="atlas-online-panel__note">Disconnected</span>}
                     <LabelTooltip label={`${REMOVE_PLAYER_LABEL} ${player.name}`}>
                       <Button variant="ghost" size="icon" aria-label={`${REMOVE_PLAYER_LABEL} ${player.name}`} onClick={() => service.kick(player.playerId)}>

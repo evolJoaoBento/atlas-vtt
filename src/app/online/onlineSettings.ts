@@ -13,6 +13,10 @@ export interface OnlineSettings {
   playerPageUrl: string;
   /** Developer diagnostics: log presented-scene events and messages to players to the console. */
   logEvents: boolean;
+  /** The name this Atlas last joined a session with, offered next time. */
+  playerName: string;
+  /** Joining from Atlas: keep a session's images on this device (outside the vault) for the next one. */
+  keepImages: boolean;
 }
 
 export const DEFAULT_STUN = 'stun:stun.l.google.com:19302';
@@ -22,6 +26,8 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   turnServers: [],
   playerPageUrl: 'https://evoljoaobento.github.io/atlas-vtt/',
   logEvents: false,
+  playerName: '',
+  keepImages: true,
 };
 
 /** PeerJS options for these settings: the PeerJS cloud unless a custom server is set. */
@@ -80,5 +86,7 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
       : [],
     playerPageUrl: typeof source.playerPageUrl === 'string' ? source.playerPageUrl : defaults.playerPageUrl,
     logEvents: source.logEvents === true,
+    playerName: typeof source.playerName === 'string' ? source.playerName.slice(0, 200) : defaults.playerName,
+    keepImages: source.keepImages !== false,
   };
 }

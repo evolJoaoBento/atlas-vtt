@@ -30,6 +30,12 @@ interface LinkState {
  * The GM's side of an online session: who may join, who is here, and a hook
  * for later pieces to send and receive game messages. It never learns about maps.
  */
+/** Records which app a player joined from; a returning player may come back from the other one. */
+function setClient(player: SessionPlayer, kind: 'web' | 'obsidian'): void {
+  if (kind === 'obsidian') player.client = 'obsidian';
+  else delete player.client;
+}
+
 export class GmSession {
   private readonly entries = new Map<string, Entry>();
   private readonly links = new Map<PeerLink, LinkState>();
@@ -181,6 +187,7 @@ export class GmSession {
       }
       const older = known.link;
       known.link = link;
+      setClient(known.player, message.client.kind);
       state.entry = known;
       if (older && older !== link) {
         this.links.get(older)!.entry = null;
@@ -200,7 +207,7 @@ export class GmSession {
       return;
     }
     const entry: Entry = {
-      player: { playerId: randomId(), name, status: 'pending' },
+      player: { playerId: randomId(), name, status: 'pending', ...(message.client.kind === 'obsidian' ? { client: 'obsidian' as const } : {}) },
       playerKey: message.playerKey,
       link,
       lastPong: Date.now(),

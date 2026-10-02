@@ -16,6 +16,7 @@ import { PlayerLootDisplay } from './src/app/services/PlayerLootDisplay';
 import { LootHistoryStore } from './src/app/loot/LootHistoryStore';
 import { PlayerWindowService } from './src/app/services/PlayerWindowService';
 import { presentedScene } from './src/app/services/PresentedScene';
+import { OnlineJoinService } from './src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from './src/app/online/OnlineSessionService';
 import { registerOnline } from './src/app/online/registerOnline';
 import { AssetService } from './src/app/services/AssetService';
@@ -72,6 +73,8 @@ export default class AtlasVTTPlugin extends Plugin {
     // Created before the views so every restored tab shares it; it reads the
     // settings file only once the migration has put it in place.
     this.settingsService = new SettingsService(this.app, storageReady);
+    // Before the views: a restored Online scene tab looks for it when it opens.
+    const onlineJoins = new OnlineJoinService(this.app, this.settingsService, this.manifest.version);
 
     // Before the views: a restored map may start Atlas's first check of the vault,
     // whose folder renames reach map files only through these vault events.
@@ -83,7 +86,7 @@ export default class AtlasVTTPlugin extends Plugin {
     await storageReady;
     await this.settingsService.initialize();
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
-    registerOnline(this, onlineSessions);
+    registerOnline(this, onlineSessions, onlineJoins);
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
       existingInstallation: await existingInstallation,

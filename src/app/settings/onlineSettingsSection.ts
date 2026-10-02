@@ -78,6 +78,16 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         },
       },
       {
+        name: 'Keep online images on this device',
+        desc: 'When you join a session from Atlas, keep its images outside your vault so the next session loads faster. Switching it off deletes them.',
+        aliases: ['cache', 'images', 'join', 'online'],
+        render: (setting) => {
+          setting.addToggle((toggle) => toggle
+            .setValue(settings.getOnlineSettings().keepImages)
+            .onChange((keepImages) => settings.setOnlineSettings({ keepImages })));
+        },
+      },
+      {
         name: 'Log online play events',
         desc: 'For troubleshooting: writes what Atlas sends to online players, and every change of the presented scene, to the developer console.',
         aliases: ['debug', 'diagnostics', 'console', 'online'],

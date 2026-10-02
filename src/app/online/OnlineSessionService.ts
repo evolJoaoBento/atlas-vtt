@@ -20,12 +20,16 @@ import { LaserRelay } from './tools/LaserRelay';
 import { SceneBroadcaster, type PresentedSceneSource } from './scene/SceneBroadcaster';
 import { createPeerHost, type PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
+import { isInSession, joinedSessionStore } from './obsidian/joinedSessionStore';
 import { showJoinRequestNotice } from './ui/joinRequestNotice';
 
 const BAD_PAGE_URL = "The player page address in Settings → Online play isn't a valid web address.";
+const HOSTING_WHILE_JOINED = 'Leave the online session you joined before hosting one.';
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
 
 interface Deps {
+  /** Whether this Atlas is in a session it joined; the joined session store unless a test passes its own. */
+  isJoined?: () => boolean;
   createHost?: (options: PeerServerOptions) => Promise<HostTransport>;
   showRequest?: (player: SessionPlayer, answer: (allow: boolean) => void) => { hide(): void };
   /** Which scene players see; the plugin's `presentedScene` unless a test passes its own. */
@@ -66,11 +70,13 @@ export class OnlineSessionService {
   private readonly notices = new Map<string, { hide(): void }>();
   private readonly createHost: (options: PeerServerOptions) => Promise<HostTransport>;
   private readonly showRequest: NonNullable<Deps['showRequest']>;
+  private readonly isJoined: () => boolean;
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
 
   constructor(private readonly app: App, private readonly settings: SettingsService, deps: Deps = {}) {
     this.createHost = deps.createHost ?? createPeerHost;
     this.showRequest = deps.showRequest ?? showJoinRequestNotice;
+    this.isJoined = deps.isJoined ?? ((): boolean => isInSession(joinedSessionStore.getState()));
     this.presented = deps.presented ?? presentedScene;
     this.diceFeed = deps.diceFeed ?? documentDiceFeed();
     this.images = deps.images ?? vaultImageFiles(app);
@@ -85,6 +91,10 @@ export class OnlineSessionService {
 
   async start(): Promise<void> {
     if (this.current || onlineSessionStore.getState().status === 'starting') return;
+    if (this.isJoined()) {
+      onlineSessionStore.setState({ status: 'error', error: HOSTING_WHILE_JOINED });
+      return;
+    }
     onlineSessionStore.setState({ status: 'starting', error: null });
     const generation = ++this.generation;
     try {

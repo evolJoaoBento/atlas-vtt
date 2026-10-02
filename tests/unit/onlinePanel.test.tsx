@@ -4,14 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
-const { service, presentViewToPlayers, stopPresenting, ui } = vi.hoisted(() => ({
+const { service, presentViewToPlayers, stopPresenting, ui, openJoinSessionModal } = vi.hoisted(() => ({
   service: { start: vi.fn(() => Promise.resolve()), stop: vi.fn(), allow: vi.fn(), deny: vi.fn(), kick: vi.fn() },
   presentViewToPlayers: vi.fn(() => Promise.resolve()),
   stopPresenting: vi.fn(),
   ui: { view: null as unknown },
+  openJoinSessionModal: vi.fn(),
 }));
 
 vi.mock('../../src/app/online/OnlineSessionService', () => ({ OnlineSessionService: { forApp: () => service } }));
+vi.mock('../../src/app/online/obsidian/ui/JoinSessionModal', () => ({ openJoinSessionModal }));
 vi.mock('../../src/app/services/presentToPlayers', () => ({ presentViewToPlayers, stopPresenting }));
 vi.mock('../../src/app/react/root/AtlasUIContext', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../src/app/react/root/AtlasUIContext')>(),
@@ -183,4 +185,16 @@ describe('online panel', () => {
     expect(screen.queryByRole('listitem', { name: 'Anna' })).toBeNull();
   });
 
+  it('offers to join a session from here while not hosting', () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Join online session…' }));
+    expect(openJoinSessionModal).toHaveBeenCalledOnce();
+  });
+
+  it('marks a player who joined from Obsidian', () => {
+    hosting([{ ...anna, client: 'obsidian' }, dan]);
+    renderPanel();
+    expect(within(screen.getByRole('listitem', { name: 'Anna' })).getByRole('img', { name: 'Joined from Obsidian' })).toBeTruthy();
+    expect(within(screen.getByRole('listitem', { name: 'Dan' })).queryByRole('img', { name: 'Joined from Obsidian' })).toBeNull();
+  });
 });

@@ -33,3 +33,11 @@
 // The join request notice lives in Obsidian's notice container, outside any Atlas view.
 .atlas-online-request { @include atlas-flex-col($gap: $spacing-s); }
 .atlas-online-request__actions { @include atlas-flex-row($gap: $spacing-s); }
+
+// "Join online session…": status under the fields, a problem in the error colour.
+.atlas-join-modal__status {
+  @include atlas-help-text;
+  min-height: 1lh;
+  margin: $spacing-s 0;
+}
+.atlas-join-modal__status--problem { color: var(--text-error); }

@@ -91,3 +91,10 @@ export function parseJoinFragment(hash: string): JoinTarget | null {
     return null;
   }
 }
+
+/** The GM and servers of a pasted join link: the whole link or only its `#…` part; null for anything else. */
+export function parseJoinLink(text: string): JoinTarget | null {
+  const trimmed = text.trim();
+  const hash = trimmed.indexOf('#');
+  return hash === -1 ? null : parseJoinFragment(trimmed.slice(hash));
+}

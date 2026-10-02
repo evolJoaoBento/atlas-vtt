@@ -27,8 +27,8 @@ const REASONS: Record<string, string> = {
   unreachable: UNREACHABLE_TEXT,
   'connection-lost': 'Lost the connection to your GM. Reload the page to try again.',
 };
-/** Own keys only: a reason from the network such as `constructor` must not reach the prototype. */
-function reasonText(reason: string | null | undefined, fallback: 'denied' | 'unreachable'): string {
+/** Why a session ended, as the join page says it. Own keys only: a reason from the network such as `constructor` must not reach the prototype. */
+export function sessionReasonText(reason: string | null | undefined, fallback: 'denied' | 'unreachable'): string {
   const key = reason ?? fallback;
   return Object.hasOwn(REASONS, key) ? REASONS[key]! : REASONS[fallback]!;
 }
@@ -39,9 +39,9 @@ export function pageScreen(state: PlayerSessionState | null, hasScene: boolean):
   const title = state.title ?? DEFAULT_TITLE;
   switch (state.status) {
     case 'denied':
-      return { kind: 'message', text: reasonText(state.reason, 'denied') };
+      return { kind: 'message', text: sessionReasonText(state.reason, 'denied') };
     case 'lost':
-      return { kind: 'message', text: reasonText(state.reason, 'unreachable') };
+      return { kind: 'message', text: sessionReasonText(state.reason, 'unreachable') };
     case 'waiting':
       return { kind: 'message', text: 'Waiting for the GM to let you in…' };
     case 'connecting':

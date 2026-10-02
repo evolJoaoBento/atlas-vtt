@@ -400,4 +400,12 @@ describe('OnlineSessionService', () => {
     feed.publish(rollFormula('d6'));
     expect(received.filter((message) => message.type === 'dice-log')).toHaveLength(before);
   });
+
+  it('does not host while this Atlas is in a session it joined', async () => {
+    const createHost = vi.fn();
+    const svc = new OnlineSessionService(app, settings, { createHost, isJoined: () => true });
+    await svc.start();
+    expect(createHost).not.toHaveBeenCalled();
+    expect(onlineSessionStore.getState()).toMatchObject({ status: 'error', error: 'Leave the online session you joined before hosting one.' });
+  });
 });
