@@ -31,7 +31,7 @@ function service(network = new MemoryNetwork(), presented = new PresentedScene()
   const host = network.host('gm-id');
   const notices: Array<{ name: string; answer: (allow: boolean) => void; hidden: boolean }> = [];
   const svc = new OnlineSessionService(app, settings, {
-    createHost: async () => host,
+    table: async () => null, createHost: async () => host,
     presented,
     ...(images ? { images } : {}),
     showRequest: (player, answer) => {
@@ -75,7 +75,7 @@ describe('OnlineSessionService', () => {
 
   it('reports a failure to start', async () => {
     const svc = new OnlineSessionService(app, settings, {
-      createHost: async () => { throw { code: 'server-error', message: 'Could not reach the signaling server' }; },
+      table: async () => null, createHost: async () => { throw { code: 'server-error', message: 'Could not reach the signaling server' }; },
       showRequest: () => ({ hide: () => {} }),
     });
     await svc.start();
@@ -95,7 +95,7 @@ describe('OnlineSessionService', () => {
   it('keeps hosting but warns when the relay settings are too long for a link', async () => {
     const turnServers = Array.from({ length: 9 }, (_, i) => ({ urls: `turn:t${i}.example.com:3478`, username: 'u', credential: 'c' }));
     const svc = new OnlineSessionService(app, { ...(settings as object), getOnlineSettings: () => ({ ...DEFAULT_ONLINE_SETTINGS, turnServers }) } as never, {
-      createHost: async () => new MemoryNetwork().host('gm-id'),
+      table: async () => null, createHost: async () => new MemoryNetwork().host('gm-id'),
       showRequest: () => ({ hide: () => {} }),
     });
     await svc.start();
@@ -108,7 +108,7 @@ describe('OnlineSessionService', () => {
     const host = new MemoryNetwork().host('gm-id');
     const closeSpy = vi.spyOn(host, 'close');
     const svc = new OnlineSessionService(app, { getOnlineSettings: () => ({ ...DEFAULT_ONLINE_SETTINGS, playerPageUrl: 'foo' }) } as never, {
-      createHost: async () => host,
+      table: async () => null, createHost: async () => host,
       showRequest: () => ({ hide: () => {} }),
     });
     await expect(svc.start()).resolves.toBeUndefined();
@@ -123,7 +123,7 @@ describe('OnlineSessionService', () => {
     const closeSpy = vi.spyOn(host, 'close');
     const presented = new PresentedScene();
     vi.spyOn(presented, 'subscribe').mockImplementation(() => { throw new Error('no scene source'); });
-    const svc = new OnlineSessionService(app, settings, { createHost: async () => host, presented, showRequest: () => ({ hide: () => {} }) });
+    const svc = new OnlineSessionService(app, settings, { table: async () => null, createHost: async () => host, presented, showRequest: () => ({ hide: () => {} }) });
     await expect(svc.start()).resolves.toBeUndefined();
     expect(onlineSessionStore.getState()).toMatchObject({ status: 'error', error: 'no scene source' });
     expect(svc.session).toBeNull();
@@ -146,7 +146,7 @@ describe('OnlineSessionService', () => {
     const closeSpy = vi.spyOn(host, 'close');
     let resolve!: (h: typeof host) => void;
     const svc = new OnlineSessionService(app, settings, {
-      createHost: () => new Promise((r) => { resolve = r; }),
+      table: async () => null, createHost: () => new Promise((r) => { resolve = r; }),
       showRequest: () => ({ hide: () => {} }),
     });
     const started = svc.start();
@@ -161,7 +161,7 @@ describe('OnlineSessionService', () => {
   it('does not report a late failure after stop', async () => {
     let reject!: (e: unknown) => void;
     const svc = new OnlineSessionService(app, settings, {
-      createHost: () => new Promise((_, r) => { reject = r; }),
+      table: async () => null, createHost: () => new Promise((_, r) => { reject = r; }),
       showRequest: () => ({ hide: () => {} }),
     });
     const started = svc.start();
@@ -226,7 +226,7 @@ describe('OnlineSessionService', () => {
     const images = { stat: () => null, read: async (): Promise<ArrayBuffer> => new ArrayBuffer(0), onChange: () => stop };
     const host = new MemoryNetwork().host('gm-id');
     const svc = new OnlineSessionService(app, settings, {
-      createHost: async () => host, presented: new PresentedScene(), images, showRequest: () => ({ hide: () => {} }),
+      table: async () => null, createHost: async () => host, presented: new PresentedScene(), images, showRequest: () => ({ hide: () => {} }),
     });
     await svc.start();
     expect(stop).not.toHaveBeenCalled();
@@ -290,7 +290,7 @@ describe('OnlineSessionService', () => {
     const host = network.host('gm-id');
     const notices: Array<(allow: boolean) => void> = [];
     const svc = new OnlineSessionService(app, logging, {
-      createHost: async () => host, presented: new PresentedScene(),
+      table: async () => null, createHost: async () => host, presented: new PresentedScene(),
       showRequest: (_player, answer) => { notices.push(answer); return { hide: () => {} }; },
     });
     await svc.start();
@@ -346,7 +346,7 @@ describe('OnlineSessionService', () => {
     const answers: Array<(allow: boolean) => void> = [];
     const asked: Array<string | null> = [];
     const svc = new OnlineSessionService(app, settings, {
-      createHost: async () => host,
+      table: async () => null, createHost: async () => host,
       presented,
       showRequest: (_player, answer) => { answers.push(answer); return { hide: () => {} }; },
       collectionGrid: (mapPath) => {
@@ -378,7 +378,7 @@ describe('OnlineSessionService', () => {
     const host = network.host('gm-id');
     const answers: Array<(allow: boolean) => void> = [];
     const svc = new OnlineSessionService(app, settings, {
-      createHost: async () => host, presented, diceFeed: feed,
+      table: async () => null, createHost: async () => host, presented, diceFeed: feed,
       showRequest: (_player, answer) => { answers.push(answer); return { hide: () => {} }; },
     });
     await svc.start();
@@ -403,9 +403,24 @@ describe('OnlineSessionService', () => {
 
   it('does not host while this Atlas is in a session it joined', async () => {
     const createHost = vi.fn();
-    const svc = new OnlineSessionService(app, settings, { createHost, isJoined: () => true });
+    const svc = new OnlineSessionService(app, settings, { table: async () => null, createHost, isJoined: () => true });
     await svc.start();
     expect(createHost).not.toHaveBeenCalled();
     expect(onlineSessionStore.getState()).toMatchObject({ status: 'error', error: 'Leave the online session you joined before hosting one.' });
+  });
+
+  it('puts the table id in the link when it has a table key', async () => {
+    const network = new MemoryNetwork();
+    const host = network.host('gm-id');
+    const svc = new OnlineSessionService(app, settings, {
+      createHost: async () => host, presented: new PresentedScene(), showRequest: () => ({ hide: () => {} }),
+      table: async () => ({ id: 'T'.repeat(43), keys: { publicKey: 'k', privateKey: {} } }),
+    });
+    await svc.start();
+    expect(onlineSessionStore.getState().joinUrl).toBe(`https://evoljoaobento.github.io/atlas-vtt/#id=gm-id&table=${'T'.repeat(43)}`);
+    expect(svc.table?.id).toBe('T'.repeat(43));
+    expect(svc.hostId).toBe('gm-id');
+    svc.stop();
+    expect(svc.table).toBeNull();
   });
 });

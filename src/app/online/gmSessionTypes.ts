@@ -1,5 +1,5 @@
 /** The GM session's limits, and what its handlers and its owner see. */
-import type { ControlMessage } from './protocol';
+import type { ControlMessage, DeviceProof, TableProof } from './protocol';
 
 export const SESSION_LIMITS = {
   joinTimeoutMs: 10_000,
@@ -19,6 +19,14 @@ export interface SessionPlayer {
   status: PlayerStatus;
   /** Set for a player who joined from Atlas in Obsidian; absent for the web page. */
   client?: 'obsidian';
+  /** The person the GM admitted them as (Obsidian players with a verified device); absent otherwise. */
+  personId?: string;
+}
+
+/** Who the GM admits a player as: the person id, and the table proof that tells the player. */
+export interface Admission {
+  personId: string;
+  table: TableProof;
 }
 
 export interface SessionHandler {
@@ -31,8 +39,13 @@ export interface SessionHandler {
 
 export interface GmSessionOptions {
   title: string;
-  /** A new player is waiting; answer with `allow` or `deny`. */
-  onJoinRequest(player: SessionPlayer): void;
+  /** A new player is waiting; answer with `allow` or `deny`. `device` is the Obsidian player's device proof, unchecked. */
+  onJoinRequest(player: SessionPlayer, device: DeviceProof | null): void;
+  /**
+   * A player the GM admitted with a person id joins again with a device proof for a new join (new nonce):
+   * the admission to give them (the device checked, the table proof signed for the new nonce), or null to deny.
+   */
+  reissue?(player: SessionPlayer, device: DeviceProof): Promise<Admission | null>;
   /** A request is no longer open: answered, expired, withdrawn or the session stopped. */
   onRequestClosed(playerId: string): void;
   onPlayersChanged(players: SessionPlayer[]): void;

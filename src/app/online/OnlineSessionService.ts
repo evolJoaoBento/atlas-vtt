@@ -9,6 +9,10 @@ import { buildJoinUrl, parseJoinFragment } from './joinLink';
 import { createOnlineLog, loggedSession, logPresentedScene } from './onlineLog';
 import { onlineSessionStore, resetOnlineSessionStore } from './onlineSessionStore';
 import { peerServerOptions } from './onlineSettings';
+import { normalizePlayerName } from './protocol';
+import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
+import { tableReissuer } from './sharing/identity/reissue';
+import { ensureTableIdentity } from './sharing/identity/tableKey';
 import { AssetServer } from './assets/AssetServer';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import { AssetRegistry, type ImageFiles } from './scene/AssetRegistry';
@@ -40,6 +44,9 @@ interface Deps {
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
   /** Atlas's dice rolls; the `atlas-dice-rolled` document event unless a test passes its own. */
   diceFeed?: DiceFeed;
+  /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
+  table?: () => Promise<TableIdentity | null>;
+  identityCrypto?: IdentityCrypto;
 }
 
 function errorText(error: unknown): string {
@@ -72,6 +79,10 @@ export class OnlineSessionService {
   private readonly showRequest: NonNullable<Deps['showRequest']>;
   private readonly isJoined: () => boolean;
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
+  private readonly loadTable: () => Promise<TableIdentity | null>;
+  private readonly identityCrypto: IdentityCrypto;
+  private currentTable: TableIdentity | null = null;
+  private currentHostId: string | null = null;
 
   constructor(private readonly app: App, private readonly settings: SettingsService, deps: Deps = {}) {
     this.createHost = deps.createHost ?? createPeerHost;
@@ -82,12 +93,20 @@ export class OnlineSessionService {
     this.images = deps.images ?? vaultImageFiles(app);
     this.collectionGrid = deps.collectionGrid
       ?? ((mapPath) => (mapPath ? collectionGridDefaultsFor(AssetService.getInstance(app), mapPath) : null));
+    this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
+    this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.settings, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
   }
 
   get session(): GmSession | null {
     return this.current;
   }
+
+  /** This Atlas's table while hosting; null otherwise or when it has none. */
+  get table(): TableIdentity | null { return this.current ? this.currentTable : null; }
+
+  /** The current host id while hosting. */
+  get hostId(): string | null { return this.current ? this.currentHostId : null; }
 
   async start(): Promise<void> {
     if (this.current || onlineSessionStore.getState().status === 'starting') return;
@@ -111,10 +130,22 @@ export class OnlineSessionService {
       host.close();
       return;
     }
+    let table: TableIdentity | null = null;
+    try {
+      table = await this.loadTable();
+    } catch (error) {
+      console.error('[Atlas online] Could not prepare the table key; hosting without sharing:', error);
+    }
+    if (generation !== this.generation) {
+      host.close();
+      return;
+    }
+    this.currentTable = table;
+    this.currentHostId = host.id;
     let joinUrl: string;
     let linkWorks: boolean;
     try {
-      joinUrl = buildJoinUrl(online.playerPageUrl, host.id, online);
+      joinUrl = buildJoinUrl(online.playerPageUrl, host.id, online, table?.id ?? null);
       linkWorks = parseJoinFragment(new URL(joinUrl).hash) !== null;
     } catch {
       host.close();
@@ -124,6 +155,8 @@ export class OnlineSessionService {
     const log = createOnlineLog(() => this.settings.getOnlineSettings().logEvents);
     const session = new GmSession(host, {
       title: this.app.vault.getName(),
+      // A person admitted with an id who joins again on a new join gets a fresh table proof for its nonce.
+      ...(table ? { reissue: tableReissuer(this.identityCrypto, table, host.id, () => normalizePlayerName(this.settings.getOnlineSettings().playerName) ?? 'GM') } : {}),
       onJoinRequest: (player) => {
         this.notices.set(player.playerId, this.showRequest(player, (allow) => allow ? this.allow(player.playerId) : this.deny(player.playerId)));
       },

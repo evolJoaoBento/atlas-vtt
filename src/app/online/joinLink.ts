@@ -1,5 +1,5 @@
 /**
- * Join links: `<page>#id=<gm id>[&signal=...][&ice=...]`. Everything sits in the
+ * Join links: `<page>#id=<gm id>[&table=<table id>][&signal=...][&ice=...]`. Everything sits in the
  * fragment, which browsers never send to the page's host. Shared with the web
  * player page, so it imports no Obsidian code.
  */
@@ -9,7 +9,11 @@ import { PEER_ID_PATTERN, type PeerServerOptions } from './transport/peerOptions
 export interface JoinTarget {
   hostId: string;
   server: PeerServerOptions;
+  /** The GM's table id (sharing between Obsidian clients); null for older links or a malformed value. */
+  tableId: string | null;
 }
+
+const TABLE_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 const MAX_RELAYS = 8;
 
@@ -64,11 +68,12 @@ function fromBase64Url(text: string): unknown {
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
 }
 
-export function buildJoinUrl(pageUrl: string, hostId: string, settings: OnlineSettings): string {
+export function buildJoinUrl(pageUrl: string, hostId: string, settings: OnlineSettings, tableId: string | null = null): string {
   if (!validHostId(hostId)) throw new Error('Invalid host id');
   const base = pageUrl.split('#')[0];
   const { iceServers, ...server } = peerServerOptions(settings);
   const params = [`id=${hostId}`];
+  if (tableId && TABLE_ID_PATTERN.test(tableId)) params.push(`table=${tableId}`);
   if (Object.keys(server).length) params.push(`signal=${toBase64Url(server)}`);
   const relays = iceServers.filter((ice) => ice.urls !== DEFAULT_STUN);
   if (relays.length) params.push(`ice=${toBase64Url(relays)}`);
@@ -86,7 +91,12 @@ export function parseJoinFragment(hash: string): JoinTarget | null {
     const server = signal ? validSignal(fromBase64Url(signal)) : {};
     const relays = ice ? validRelays(fromBase64Url(ice)) : [];
     if (!server || !relays) return null;
-    return { hostId, server: { ...server, iceServers: [{ urls: DEFAULT_STUN }, ...relays] } };
+    const table = params.get('table');
+    return {
+      hostId,
+      server: { ...server, iceServers: [{ urls: DEFAULT_STUN }, ...relays] },
+      tableId: table && TABLE_ID_PATTERN.test(table) ? table : null,
+    };
   } catch {
     return null;
   }

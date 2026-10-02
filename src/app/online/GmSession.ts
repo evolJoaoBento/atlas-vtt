@@ -1,36 +1,13 @@
 // src/app/online/GmSession.ts
-import { SESSION_LIMITS, type GmSessionOptions, type PlayerStatus, type SessionHandler, type SessionPlayer } from './gmSessionTypes';
+import { presenceOf, rejoinCheck, reissued, setClient, type Entry, type LinkState } from './gmSessionEntries';
+import { SESSION_LIMITS, type Admission, type GmSessionOptions, type PlayerStatus, type SessionHandler, type SessionPlayer } from './gmSessionTypes';
 import { randomId } from './ids';
-import { decodeControl, encodeControl, normalizePlayerName, PLAYER_MESSAGE_TYPES, type ControlMessage, type DenyReason, type PresencePlayer } from './protocol';
+import { decodeControl, encodeControl, normalizePlayerName, PLAYER_MESSAGE_TYPES, type ControlMessage, type DenyReason } from './protocol';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, HostTransport, PeerLink, Unsubscribe } from './transport/types';
 
 export { SESSION_LIMITS } from './gmSessionTypes';
-export type { GmSessionOptions, PlayerStatus, SessionHandler, SessionPlayer } from './gmSessionTypes';
-
-interface Entry {
-  player: SessionPlayer;
-  playerKey: string;
-  link: PeerLink | null;
-  lastPong: number;
-  requestTimer: number | null;
-}
-
-/** Per connection, before and after it joins. */
-interface LinkState {
-  entry: Entry | null;
-  invalid: number;
-  /** A rejected message was logged for this connection already. */
-  warned: boolean;
-  joinTimer: number | null;
-  unsubscribe: Unsubscribe[];
-}
-
-/** Records which app a player joined from; a returning player may come back from the other one. */
-function setClient(player: SessionPlayer, kind: 'web' | 'obsidian'): void {
-  if (kind === 'obsidian') player.client = 'obsidian';
-  else delete player.client;
-}
+export type { Admission, GmSessionOptions, PlayerStatus, SessionHandler, SessionPlayer } from './gmSessionTypes';
 
 /**
  * The GM's side of an online session: who may join, who is here, and a hook
@@ -61,7 +38,8 @@ export class GmSession {
     return [...this.entries.values()].map((entry) => ({ ...entry.player }));
   }
 
-  allow(playerId: string): void {
+  /** Admits a waiting player; `admission` gives them a person id and tells them with the table proof. */
+  allow(playerId: string, admission?: Admission): void {
     const entry = this.entries.get(playerId);
     if (this.stopped || !entry || entry.player.status !== 'pending' || !entry.link) return;
     this.closeRequest(entry);
@@ -71,7 +49,16 @@ export class GmSession {
       this.changed();
       return;
     }
+    if (admission) {
+      entry.player.personId = admission.personId;
+      entry.table = admission.table;
+    }
     this.admit(entry);
+  }
+
+  /** The person an admitted or gone player was admitted as; null for web players and unknown ids. */
+  personOf(playerId: string): string | null {
+    return this.entries.get(playerId)?.player.personId ?? null;
   }
 
   deny(playerId: string): void {
@@ -127,7 +114,7 @@ export class GmSession {
       link.close();
       return;
     }
-    const state: LinkState = { entry: null, invalid: 0, warned: false, joinTimer: null, unsubscribe: [] };
+    const state: LinkState = { entry: null, invalid: 0, warned: false, joinTimer: null, joining: false, unsubscribe: [] };
     state.joinTimer = window.setTimeout(() => link.close(), SESSION_LIMITS.joinTimeoutMs);
     state.unsubscribe.push(
       link.onMessage((channel, data) => { if (channel === 'control') this.receive(link, state, data); else this.receiveAsset(link, state, data); }),
@@ -151,7 +138,7 @@ export class GmSession {
     }
     const message = decoded.message;
     if (message.type === 'join') {
-      if (!state.entry) this.join(link, state, message);
+      if (!state.entry && !state.joining) this.join(link, state, message);
       return;
     }
     const entry = state.entry;
@@ -180,25 +167,10 @@ export class GmSession {
 
     const known = [...this.entries.values()].find((entry) => entry.playerKey === message.playerKey);
     if (known) {
-      // Another tab of the same player, or a reconnect: the new link takes over.
-      if (known.player.status === 'gone' && this.countStatus('admitted') >= SESSION_LIMITS.maxPlayers) {
-        this.refuse(link, 'full');
-        return;
-      }
-      const older = known.link;
-      known.link = link;
-      setClient(known.player, message.client.kind);
-      state.entry = known;
-      if (older && older !== link) {
-        this.links.get(older)!.entry = null;
-        older.send('control', encodeControl({ v: 1, type: 'bye', reason: 'replaced' }));
-        older.close();
-      }
-      if (known.player.status === 'pending') {
-        this.changed();
-        return;
-      }
-      this.admit(known);
+      const check = rejoinCheck(known, message.device);
+      if (check === 'deny') this.refuse(link, 'denied');
+      else if (check === 'reissue') this.reissue(link, state, known, message);
+      else this.takeOver(link, state, known, message);
       return;
     }
 
@@ -212,12 +184,57 @@ export class GmSession {
       link,
       lastPong: Date.now(),
       requestTimer: null,
+      device: message.device ?? null,
+      table: null,
     };
     entry.requestTimer = window.setTimeout(() => this.deny(entry.player.playerId), SESSION_LIMITS.requestTimeoutMs);
     state.entry = entry;
     this.entries.set(entry.player.playerId, entry);
     this.changed();
-    this.options.onJoinRequest({ ...entry.player });
+    this.options.onJoinRequest({ ...entry.player }, entry.device);
+  }
+
+  /** Another tab of the same player, or a reconnect: the new link takes over. */
+  private takeOver(link: PeerLink, state: LinkState, known: Entry, message: Extract<ControlMessage, { type: 'join' }>): void {
+    if (known.player.status === 'gone' && this.countStatus('admitted') >= SESSION_LIMITS.maxPlayers) {
+      this.refuse(link, 'full');
+      return;
+    }
+    const older = known.link;
+    known.link = link;
+    setClient(known.player, message.client.kind);
+    state.entry = known;
+    if (older && older !== link) {
+      this.links.get(older)!.entry = null;
+      older.send('control', encodeControl({ v: 1, type: 'bye', reason: 'replaced' }));
+      older.close();
+    }
+    if (known.player.status === 'pending') {
+      this.changed();
+      return;
+    }
+    this.admit(known);
+  }
+
+  /** The same person on a new join: the owner checks the new device proof and signs a table proof for its nonce. */
+  private reissue(link: PeerLink, state: LinkState, known: Entry, message: Extract<ControlMessage, { type: 'join' }>): void {
+    const device = message.device;
+    if (!device) {
+      this.refuse(link, 'denied');
+      return;
+    }
+    state.joining = true;
+    void reissued(this.options, known, device).then((admission) => {
+      state.joining = false;
+      if (this.stopped || !this.links.has(link)) return;
+      if (!admission || this.entries.get(known.player.playerId) !== known) {
+        this.refuse(link, 'denied');
+        return;
+      }
+      known.device = device;
+      known.table = admission.table;
+      this.takeOver(link, state, known, message);
+    });
   }
 
   private admit(entry: Entry): void {
@@ -225,6 +242,7 @@ export class GmSession {
     entry.lastPong = Date.now();
     entry.link?.send('control', encodeControl({
       v: 1, type: 'admitted', playerId: entry.player.playerId, session: { title: this.options.title },
+      ...(entry.table ? { table: entry.table } : {}),
     }));
     this.changed();
     this.broadcastPresence();
@@ -262,9 +280,7 @@ export class GmSession {
   }
 
   private broadcastPresence(): void {
-    const players: PresencePlayer[] = [...this.entries.values()]
-      .filter((entry) => entry.player.status !== 'pending')
-      .map((entry) => ({ playerId: entry.player.playerId, name: entry.player.name, connected: entry.link !== null }));
+    const players = presenceOf(this.entries.values());
     const message = encodeControl({ v: 1, type: 'presence', players });
     for (const entry of this.entries.values()) {
       if (entry.player.status === 'admitted') entry.link?.send('control', message);

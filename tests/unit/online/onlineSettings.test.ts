@@ -51,6 +51,7 @@ describe('online settings', () => {
       logEvents: false,
       playerName: '',
       keepImages: true,
+      table: null,
     });
   });
 
@@ -61,7 +62,7 @@ describe('online settings', () => {
   });
 
   it("remembers the player's name and keeps images unless switched off", () => {
-    expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true });
+    expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true, table: null });
     expect(resolveOnlineSettings({ playerName: 'Anna', keepImages: false })).toMatchObject({ playerName: 'Anna', keepImages: false });
     expect(resolveOnlineSettings({ playerName: 4, keepImages: 'no' })).toMatchObject({ playerName: '', keepImages: true });
   });

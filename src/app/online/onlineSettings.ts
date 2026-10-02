@@ -6,6 +6,23 @@ export interface TurnServer {
   credential: string;
 }
 
+export interface StoredTable {
+  /** The table id: the key's id, carried in join links. */
+  id: string;
+  publicKey: string;
+  privateKey: JsonWebKey;
+}
+
+/** A stored table key of the right shape; null for anything else. */
+function validStoredTable(value: unknown): StoredTable | null {
+  if (!isRecord(value)) return null;
+  const { id, publicKey, privateKey } = value;
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(id)) return null;
+  if (typeof publicKey !== 'string' || publicKey.length > 200) return null;
+  if (!isRecord(privateKey) || privateKey.kty !== 'EC' || privateKey.crv !== 'P-256' || typeof privateKey.d !== 'string') return null;
+  return { id, publicKey, privateKey };
+}
+
 export interface OnlineSettings {
   signaling: { mode: 'cloud' | 'custom'; host: string; port: number; path: string; key: string; secure: boolean };
   turnServers: TurnServer[];
@@ -17,6 +34,8 @@ export interface OnlineSettings {
   playerName: string;
   /** Joining from Atlas: keep a session's images on this device (outside the vault) for the next one. */
   keepImages: boolean;
+  /** The GM's table key (sharing between Obsidian clients): made the first time this Atlas hosts; null before. */
+  table: StoredTable | null;
 }
 
 export const DEFAULT_STUN = 'stun:stun.l.google.com:19302';
@@ -28,6 +47,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   logEvents: false,
   playerName: '',
   keepImages: true,
+  table: null,
 };
 
 /** PeerJS options for these settings: the PeerJS cloud unless a custom server is set. */
@@ -88,5 +108,6 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
     logEvents: source.logEvents === true,
     playerName: typeof source.playerName === 'string' ? source.playerName.slice(0, 200) : defaults.playerName,
     keepImages: source.keepImages !== false,
+    table: validStoredTable(source.table),
   };
 }

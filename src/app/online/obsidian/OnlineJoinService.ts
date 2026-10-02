@@ -16,44 +16,26 @@ import { randomId } from '../ids';
 import { parseJoinLink, type JoinTarget } from '../joinLink';
 import { onlineSessionStore } from '../onlineSessionStore';
 import { mergeDiceLog } from '../page/diceLogModel';
-import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT } from '../page/pageScreen';
 import type { PlayerSession, PlayerSessionState } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
 import { normalizePlayerName } from '../protocol';
+import { DeviceKeys, obsidianLocalStore } from '../sharing/identity/deviceKeys';
+import { webIdentityCrypto, type IdentityCrypto } from '../sharing/identity/identityCrypto';
+import { JoinIdentity, type SessionIdentity } from '../sharing/identity/JoinIdentity';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from '../scene/sceneTypes';
-import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
+import type { DiceLogEntry } from '../tools/toolMessages';
 import { createPeerClient } from '../transport/PeerTransport';
 import type { ClientTransport } from '../transport/types';
 import { isInSession, joinedSessionStore } from './joinedSessionStore';
+import { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink } from './onlineJoinTypes';
 import { decodeToObjectUrls, urlsOf } from './objectUrlImages';
 import { openOnlineSceneTab } from './onlineSceneTab';
 import type { RemoteImages } from './remoteScene';
 
-/** What the Online scene view takes from the joined session. */
-export interface OnlineSceneSink {
-  session(state: PlayerSessionState): void;
-  scene(scene: PlayerScene | null): void;
-  camera(camera: SceneCamera): void;
-  control(tokenIds: readonly string[]): void;
-  moveRefused(tokenId: string): void;
-  /** The shared dice log, newest first, whole. */
-  diceLog(entries: readonly DiceLogEntry[]): void;
-  laser(laser: PlayerLaser): void;
-  /** Images arrived, failed or went. */
-  images(): void;
-  /** The session was left from elsewhere (a new join, the plugin unloading): close the tab. */
-  close(): void;
-}
+export type { SessionIdentity };
 
-export type JoinProblem = 'link' | 'name' | 'hosting' | 'joined';
-
-export const JOIN_PROBLEM_TEXT: Record<JoinProblem, string> = {
-  link: INCOMPLETE_LINK_TEXT,
-  name: NAME_PROBLEM_TEXT,
-  hosting: 'Stop hosting your online session before joining another.',
-  joined: 'You are already in an online session. Close its tab to leave it first.',
-};
+export { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink } from './onlineJoinTypes';
 
 export interface OnlineJoinDeps {
   createClient?: (server: JoinTarget['server']) => ClientTransport;
@@ -64,6 +46,9 @@ export interface OnlineJoinDeps {
   /** Opens the Online scene tab; its view attaches itself. */
   openSceneTab?: () => Promise<void>;
   isHosting?: () => boolean;
+  identityCrypto?: IdentityCrypto;
+  /** This device's keys per table; Obsidian's local storage unless a test passes its own. */
+  deviceKeys?: Pick<DeviceKeys, 'forTable'>;
 }
 
 type JoinSettings = Pick<SettingsService, 'getOnlineSettings' | 'setOnlineSettings' | 'onChange'>;
@@ -80,6 +65,7 @@ interface Joined {
   camera: SceneCamera | null;
   control: readonly string[];
   dice: readonly DiceLogEntry[];
+  ids: JoinIdentity;
 }
 
 export class OnlineJoinService {
@@ -101,6 +87,9 @@ export class OnlineJoinService {
   private readonly openSceneTab: () => Promise<void>;
   private readonly isHosting: () => boolean;
   private readonly stopSettings: () => void;
+  private readonly identityCrypto: IdentityCrypto;
+  private readonly deviceKeys: Pick<DeviceKeys, 'forTable'>;
+  private readonly identityListeners = new Set<(identity: SessionIdentity | null) => void>();
 
   /** The scene's images by object URL: one URL for the map, another for tokens. */
   readonly images: RemoteImages = {
@@ -118,6 +107,8 @@ export class OnlineJoinService {
       const status = onlineSessionStore.getState().status;
       return status === 'starting' || status === 'hosting';
     });
+    this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
+    this.deviceKeys = deps.deviceKeys ?? new DeviceKeys(obsidianLocalStore(app), this.identityCrypto);
     // Switching keeping off deletes the stored images at once, joined or not.
     this.keepImages = settings.getOnlineSettings().keepImages;
     this.stopSettings = settings.onChange(() => this.keepChanged(this.settings.getOnlineSettings().keepImages));
@@ -127,6 +118,16 @@ export class OnlineJoinService {
   /** The joined session as the player has it; null while Atlas joins none. */
   get state(): PlayerSessionState | null {
     return this.joined?.session?.state ?? null;
+  }
+
+  /** Who this Atlas is in the joined session; null without a joined session or a verified table. */
+  get identity(): SessionIdentity | null {
+    return this.joined?.ids.identity ?? null;
+  }
+
+  onIdentity(listener: (identity: SessionIdentity | null) => void): () => void {
+    this.identityListeners.add(listener);
+    return () => { this.identityListeners.delete(listener); };
   }
 
   /** The name to offer in the Join dialog. */
@@ -151,9 +152,12 @@ export class OnlineJoinService {
     const joined: Joined = {
       target, name: cleaned, playerKey: this.playerKeyFor(target.hostId), loader, session: null,
       opened: false, scene: null, camera: null, control: [], dice: [],
+      ids: new JoinIdentity(target, this.identityCrypto, this.deviceKeys),
     };
     this.joined = joined;
-    this.startSession(joined);
+    // A link with a table starts once the device proof is made; one without starts at once.
+    if (target.tableId) void joined.ids.prepare().then(() => { if (this.joined === joined) this.startSession(joined); });
+    else this.startSession(joined);
     return null;
   }
 
@@ -174,6 +178,7 @@ export class OnlineJoinService {
     const joined = this.joined;
     if (!joined) return;
     this.joined = null;
+    if (joined.ids.identity) this.identityListeners.forEach((listener) => listener(null));
     joined.session?.stop();
     joined.loader.dispose();
     this.releaseCache();
@@ -260,6 +265,7 @@ export class OnlineJoinService {
       playerKey: joined.playerKey,
       clientVersion: this.clientVersion,
       clientKind: 'obsidian',
+      ...(joined.ids.device ? { device: joined.ids.device } : {}),
       transport: this.createClient(joined.target.server),
       onChange: (state) => { if (current()) this.changed(joined, state); },
       onScene: (scene) => {
@@ -294,10 +300,17 @@ export class OnlineJoinService {
   private changed(joined: Joined, state: PlayerSessionState): void {
     joinedSessionStore.setState({ session: state });
     this.sink?.session(state);
+    if (state.status === 'admitted') void this.verify(joined);
     if (state.status !== 'admitted' || joined.opened) return;
     joined.opened = true;
     this.openSceneTab().catch((error: unknown) => {
       console.error('[Atlas online] Could not open the online scene:', error);
     });
+  }
+
+  /** Takes the identity from the GM's table proof, once per join. */
+  private async verify(joined: Joined): Promise<void> {
+    if (!(await joined.ids.verify(joined.session?.table ?? null)) || this.joined !== joined) return;
+    this.identityListeners.forEach((listener) => listener(joined.ids.identity));
   }
 }

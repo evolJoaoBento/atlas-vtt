@@ -6,7 +6,7 @@ describe('join links', () => {
   it('puts only the id in the fragment on the default server', () => {
     const url = buildJoinUrl('https://example.github.io/atlas-vtt/', 'abc_DEF-123', DEFAULT_ONLINE_SETTINGS);
     expect(url).toBe('https://example.github.io/atlas-vtt/#id=abc_DEF-123');
-    expect(parseJoinFragment(new URL(url).hash)).toEqual({ hostId: 'abc_DEF-123', server: { iceServers: [{ urls: DEFAULT_STUN }] } });
+    expect(parseJoinFragment(new URL(url).hash)).toEqual({ hostId: 'abc_DEF-123', server: { iceServers: [{ urls: DEFAULT_STUN }] }, tableId: null });
   });
 
   it('carries a custom server and TURN relays, and reads them back', () => {
@@ -23,6 +23,7 @@ describe('join links', () => {
         host: 'peer.example.org', port: 9000, path: '/', key: 'peerjs', secure: true,
         iceServers: [{ urls: DEFAULT_STUN }, { urls: 'turn:relay.example.org:3478', username: 'u', credential: 'c' }],
       },
+      tableId: null,
     });
   });
 

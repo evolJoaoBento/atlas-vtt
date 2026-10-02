@@ -15,6 +15,38 @@ export const MAX_PLAYER_NAME_LENGTH = 40;
 /** The most tokens one player may control, and so the longest `token-control` list. */
 export const MAX_CONTROLLED_TOKENS = 256;
 
+/** A player's device key, proven for one GM table and host: its id is the device id. Sent by Obsidian players only. */
+export interface DeviceProof {
+  /** The table id from the join link. */
+  table: string;
+  /** Base64url SPKI of the device key. */
+  key: string;
+  /** Random, one per join; the GM's table proof signs it. */
+  nonce: string;
+  /** Base64url signature of `atlas-device-v1|table|host id|nonce`. */
+  sig: string;
+}
+
+/** The GM's table, proven to one joining player: it signs their nonce and the person id it gives them. */
+export interface TableProof {
+  id: string;
+  key: string;
+  personId: string;
+  gmName: string;
+  sig: string;
+}
+
+const KEY_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const PERSON_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const B64_PATTERN = /^[A-Za-z0-9_-]{1,200}$/;
+const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+
+/** A table or device id: base64url SHA-256, 43 characters. */
+export const isKeyId = (value: unknown): value is string => typeof value === 'string' && KEY_ID_PATTERN.test(value);
+/** A person id the GM gives (`randomId()`), or `gm`. */
+export const isPersonId = (value: unknown): value is string => typeof value === 'string' && PERSON_ID_PATTERN.test(value);
+const isB64 = (value: unknown): value is string => typeof value === 'string' && B64_PATTERN.test(value);
+
 export type DenyReason = 'denied' | 'kicked' | 'full' | 'version' | 'ended';
 const DENY_REASONS: readonly DenyReason[] = ['denied', 'kicked', 'full', 'version', 'ended'];
 
@@ -22,11 +54,13 @@ export interface PresencePlayer {
   playerId: string;
   name: string;
   connected: boolean;
+  /** The person the GM admitted them as; absent for web players. */
+  personId?: string;
 }
 
 export type ControlMessage =
-  | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string } }
-  | { v: 1; type: 'admitted'; playerId: string; session: { title: string } }
+  | { v: 1; type: 'join'; name: string; playerKey: string; client: { kind: 'web' | 'obsidian'; version: string }; device?: DeviceProof }
+  | { v: 1; type: 'admitted'; playerId: string; session: { title: string }; table?: TableProof }
   | { v: 1; type: 'denied'; reason: DenyReason }
   | { v: 1; type: 'presence'; players: PresencePlayer[] }
   | { v: 1; type: 'ping'; t: number }
@@ -76,14 +110,27 @@ const isString = (value: unknown, max = 1024): value is string => typeof value =
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isRecord = (value: unknown): value is Fields => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+function isDeviceProof(value: unknown): value is DeviceProof {
+  return isRecord(value) && isKeyId(value.table) && isB64(value.key) && typeof value.nonce === 'string'
+    && NONCE_PATTERN.test(value.nonce) && isB64(value.sig);
+}
+
+function isTableProof(value: unknown): value is TableProof {
+  return isRecord(value) && isKeyId(value.id) && isB64(value.key) && isPersonId(value.personId)
+    && isString(value.gmName, 200) && isB64(value.sig);
+}
+
 /** Checks the fields of each known type; returns whether the shape is right. */
 const VALIDATORS: Record<ControlMessage['type'], (m: Fields) => boolean> = {
   join: (m) => isString(m.name, 200) && isString(m.playerKey, 64) && m.playerKey.length > 0
-    && isRecord(m.client) && (m.client.kind === 'web' || m.client.kind === 'obsidian') && isString(m.client.version, 32),
-  admitted: (m) => isString(m.playerId, 64) && isRecord(m.session) && isString(m.session.title, 200),
+    && isRecord(m.client) && (m.client.kind === 'web' || m.client.kind === 'obsidian') && isString(m.client.version, 32)
+    && (m.device === undefined || isDeviceProof(m.device)),
+  admitted: (m) => isString(m.playerId, 64) && isRecord(m.session) && isString(m.session.title, 200)
+    && (m.table === undefined || isTableProof(m.table)),
   denied: (m) => DENY_REASONS.includes(m.reason as DenyReason),
   presence: (m) => Array.isArray(m.players) && m.players.length <= 64 && m.players.every((p) =>
-    isRecord(p) && isString(p.playerId, 64) && isString(p.name, 200) && typeof p.connected === 'boolean'),
+    isRecord(p) && isString(p.playerId, 64) && isString(p.name, 200) && typeof p.connected === 'boolean'
+    && (p.personId === undefined || isPersonId(p.personId))),
   ping: (m) => isNumber(m.t),
   pong: (m) => isNumber(m.t),
   bye: (m) => isString(m.reason, 200),

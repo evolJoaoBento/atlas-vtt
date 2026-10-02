@@ -4,7 +4,7 @@
  * so it imports nothing from Obsidian.
  */
 import type { DiceSelection } from '../tools/diceRolling';
-import { decodeControl, encodeControl, type PresencePlayer } from './protocol';
+import { decodeControl, encodeControl, type DeviceProof, type PresencePlayer, type TableProof } from './protocol';
 import { PlayerSceneMirror } from './scene/PlayerSceneMirror';
 import { cameraOfMessage, type SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
@@ -57,6 +57,8 @@ export interface PlayerSessionOptions {
   onDiceLog?(entries: readonly DiceLogEntry[], replay: boolean): void;
   /** Someone else's laser: its new points, for the scene `sceneId`. */
   onLaser?(laser: PlayerLaser): void;
+  /** An Obsidian player's device proof for the link's table, sent with every join of this session. */
+  device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
   assets?: PlayerAssetHandler;
 }
@@ -73,6 +75,7 @@ export class PlayerSession {
   private assetLink: PeerLink | null = null;
   private lastCamera: SceneCamera | null = null;
   private controlled: readonly string[] = [];
+  private tableProof: TableProof | null = null;
 
   private readonly mirror: PlayerSceneMirror;
 
@@ -86,6 +89,11 @@ export class PlayerSession {
   /** The presented scene as this player has it; null while the GM shows none. */
   get scene(): PlayerScene | null {
     return this.mirror.scene;
+  }
+
+  /** The GM's table proof from the latest admission; null before one or from a GM without a table. */
+  get table(): TableProof | null {
+    return this.tableProof;
   }
 
   /** The GM's latest camera; null before the first. */
@@ -160,6 +168,7 @@ export class PlayerSession {
     link.send('control', encodeControl({
       v: 1, type: 'join', name: this.options.name, playerKey: this.options.playerKey,
       client: { kind: this.options.clientKind ?? 'web', version: this.options.clientVersion },
+      ...(this.options.device ? { device: this.options.device } : {}),
     }));
     if (!this.wasAdmitted && this.state.status === 'connecting') this.update({ status: 'waiting' });
   }
@@ -175,6 +184,7 @@ export class PlayerSession {
       case 'admitted':
         this.wasAdmitted = true;
         this.attempt = 0;
+        this.tableProof = message.table ?? null;
         this.update({ status: 'admitted', playerId: message.playerId, title: message.session.title, reason: null });
         if (this.assetLink !== link) {
           // A repeated admission on the same link must not start the handler over.
