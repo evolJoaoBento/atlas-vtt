@@ -7,7 +7,7 @@
 @use '../../../../../styles/mixins' as *;
 @use 'online-marks' as *;
 
-$online-scene-bar-inset: $spacing-xs;
+$online-scene-bar-inset: $spacing-s;
 
 .atlas-online-scene-bar {
   @include atlas-elevated-surface;
@@ -18,8 +18,8 @@ $online-scene-bar-inset: $spacing-xs;
   display: flex;
   align-items: center;
   gap: $spacing-s;
-  padding: $online-scene-bar-inset $spacing-s;
-  min-height: $button-height-s + 2 * $online-scene-bar-inset;
+  // Uniform padding equal to the gap.
+  padding: $online-scene-bar-inset;
   pointer-events: auto;
   color: var(--text-normal);
   font-size: $font-ui-small;
@@ -53,7 +53,8 @@ $online-scene-bar-inset: $spacing-xs;
   white-space: nowrap;
 }
 
-// The button sits at the capsule's end, so its corner follows the bar's.
+// The button sits at the capsule's end: only the corners facing the bar's end follow it.
 .atlas-online-scene-bar__action {
-  border-radius: atlas-panel-inset-radius-value($online-scene-bar-inset, $button-height-s * 0.5);
+  border-top-right-radius: atlas-panel-inset-radius-value($online-scene-bar-inset, $button-height-s * 0.5);
+  border-bottom-right-radius: atlas-panel-inset-radius-value($online-scene-bar-inset, $button-height-s * 0.5);
 }

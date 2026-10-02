@@ -57,7 +57,7 @@ export class MapLoader {
       if (!(imgFile instanceof TFile)) {
         console.error(`[MapLoader] Background image not found: ${mapData.background}`);
         const placeholder = assetValidationService.getMissingAssetPlaceholder();
-        texture = placeholder ? await Assets.load<Texture>(placeholder) : placeholderTexture(mapData.grid?.size || 70);
+        texture = placeholder ? await Assets.load<Texture>(placeholder) : createPlaceholderTexture(mapData);
         hasBackground = false;
       } else {
         const url = app.vault.adapter.getResourcePath(imgFile.path);
@@ -67,7 +67,7 @@ export class MapLoader {
       }
     } else {
       // Create a placeholder texture for maps without backgrounds
-      texture = placeholderTexture(mapData.grid?.size || 70);
+      texture = createPlaceholderTexture(mapData);
       hasBackground = false;
     }
 
@@ -87,8 +87,9 @@ export class MapLoader {
  */
 const placeholderTextures = new Map<number, Texture>();
 
-/** Transparent 20x20-cell texture for maps without a background image; shared per grid size, never unloaded. */
-export function placeholderTexture(gridSize: number = 70): Texture {
+/** Transparent 20x20-cell texture for maps without a background image. */
+function createPlaceholderTexture(mapData: MapFile): Texture {
+  const gridSize = mapData.grid?.size || 70;
   const cached = placeholderTextures.get(gridSize);
   if (cached && !cached.destroyed) return cached;
   const canvas = createEl('canvas');

@@ -63,8 +63,13 @@ export function onlineSceneSetup(options: OnlineSceneSetupOptions = {}) {
     sendLaser: vi.fn((): boolean => true),
   };
   const service: OnlineSceneService = options.service ?? fake;
-  let queue: Array<() => void> = [];
-  const frames: Frames = { request: (draw) => { queue.push(draw); return queue.length; }, cancel: () => { queue = []; } };
+  const queue = new Map<number, () => void>();
+  let nextHandle = 0;
+  const frames: Frames = {
+    request: (draw) => { const handle = ++nextHandle; queue.set(handle, draw); return handle; },
+    /** Cancels only the frame it is given. */
+    cancel: (handle) => { queue.delete(handle); },
+  };
   let now = 0;
   const viewport = new FakeViewport();
   const backdrop = { show: vi.fn(), dispose: vi.fn() };
@@ -78,7 +83,7 @@ export function onlineSceneSetup(options: OnlineSceneSetupOptions = {}) {
     store, service, viewport, backdrop, initiative, parent, eventBus, laserHub: hub, laserColor: () => options.laserColor ?? LASER_PALETTE[0]!, closeTab, frames, now: () => now,
   });
   const attached = options.attach === false ? false : client.attach();
-  const runFrames = (): void => { const due = queue; queue = []; due.forEach((draw) => draw()); };
+  const runFrames = (): void => { const due = [...queue.values()]; queue.clear(); due.forEach((draw) => draw()); };
   const settle = (): void => { now += GLIDE_MS + 1; runFrames(); runFrames(); };
   return {
     vault, store, fake, client, attached, viewport, backdrop, initiative, eventBus, hub, showRemote, closeTab, detach, runFrames, settle,
@@ -86,6 +91,6 @@ export function onlineSceneSetup(options: OnlineSceneSetupOptions = {}) {
       if (!sink) throw new Error('The client did not attach to the fake service');
       return sink;
     },
-    pendingFrames: (): number => queue.length,
+    pendingFrames: (): number => queue.size,
   };
 }

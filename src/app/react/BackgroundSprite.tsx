@@ -19,6 +19,13 @@ const FALLBACK_GRID_OPTIONS: GridOptions = {
   enabled: true,
 };
 
+interface LoadedBackground {
+  texture: Texture;
+  /** The cache URL to release once the texture is no longer shown. */
+  url: string;
+  size: { width: number; height: number };
+}
+
 interface BackgroundSpriteProps {
   imagePath: string;
 }
@@ -26,15 +33,14 @@ interface BackgroundSpriteProps {
 export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath }) => {
   const { app, renderer } = useAtlasUI();
   const store = useViewStoreHook();
-  const [texture, setTexture] = useState<Texture | null>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  // The texture and the cache URL it holds travel together: the URL is released only once the
+  // sprite showing the texture is out of the viewport (an online map's texture is destroyed on release).
+  const [loaded, setLoaded] = useState<LoadedBackground | null>(null);
   const backgroundSpriteRef = useRef<Sprite | null>(null);
 
   useEffect(() => {
     if (!imagePath) return;
     let isCancelled = false;
-    // Every background goes through the shared cache, which releases what nobody shows.
-    let cachedUrl: string | null = null;
 
     const loadTexture = async (): Promise<void> => {
       try {
@@ -48,15 +54,14 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
           }
           url = app.vault.adapter.getResourcePath(imgFile.path);
         }
-        cachedUrl = url;
-        const loadedTexture = await backgroundTextureCache.acquire(url);
-        if (!isCancelled) {
-          setTexture(loadedTexture);
-          setSize({ width: loadedTexture.width, height: loadedTexture.height });
+        const texture = await backgroundTextureCache.acquire(url);
+        if (isCancelled) {
+          backgroundTextureCache.release(url);
+          return;
         }
+        setLoaded({ texture, url, size: { width: texture.width, height: texture.height } });
       } catch (error) {
         console.error(`[BackgroundSprite] Failed to load texture: ${imagePath}`, error);
-        cachedUrl = null;
       }
     };
 
@@ -64,13 +69,13 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
 
     return () => {
       isCancelled = true;
-      if (cachedUrl) backgroundTextureCache.release(cachedUrl);
     };
   }, [imagePath, app.vault]);
 
   // Add/update the sprite in the viewport when texture is loaded
   useEffect(() => {
-    if (!texture || !renderer) return;
+    if (!loaded || !renderer) return;
+    const { texture, size } = loaded;
     
     const viewport = renderer.getViewportInstance();
     if (!viewport) {
@@ -166,7 +171,14 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
         backgroundSpriteRef.current = null;
       }
     };
-  }, [texture, size, renderer]);
+  }, [loaded, renderer]);
+
+  // Declared after the sprite effect, so a replaced texture is released after its sprite left the viewport.
+  useEffect(() => {
+    if (!loaded) return;
+    const { url } = loaded;
+    return () => backgroundTextureCache.release(url);
+  }, [loaded]);
   
   // We're not returning any JSX as we're directly manipulating the Pixi viewport
   return null;

@@ -817,7 +817,7 @@ export class AtlasView extends FileView {
    * Sets up window resize detection to update the PIXI canvas
    * Only responds to actual window size changes, not container changes
    */
-  protected setupWindowResizeDetection(): void {
+  private setupWindowResizeDetection(): void {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;

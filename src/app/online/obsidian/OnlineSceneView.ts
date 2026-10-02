@@ -5,11 +5,10 @@
  * and closes itself once the layout is ready.
  */
 import type { WorkspaceLeaf } from 'obsidian';
-import { Sprite } from 'pixi.js';
+import { Sprite, Texture } from 'pixi.js';
 import type { Viewport } from 'pixi-viewport';
 import type AtlasVTTPlugin from '../../../../main';
 import { AtlasView } from '../../atlas-view';
-import { placeholderTexture } from '../../MapLoader';
 import { PlayerInitiativePanel } from '../../services/PlayerInitiativePanel';
 import type { PlayerSettingsSource } from '../../services/PlayerSceneOverlay';
 import { OnlineJoinService } from './OnlineJoinService';
@@ -41,9 +40,10 @@ function followViewport(viewport: Viewport): FollowViewport {
   };
 }
 
-/** Atlas's transparent placeholder at the map's size. */
-function placeholderSprite(width: number, height: number, cellSize: number): Sprite {
-  const sprite = new Sprite(placeholderTexture(cellSize));
+/** An invisible placeholder at the map's size: PIXI's 1 px white texture, scaled. */
+function placeholderSprite(width: number, height: number): Sprite {
+  const sprite = new Sprite(Texture.WHITE);
+  sprite.alpha = 0;
   sprite.width = width;
   sprite.height = height;
   return sprite;
@@ -54,6 +54,8 @@ export class OnlineSceneView extends AtlasView {
 
   constructor(leaf: WorkspaceLeaf, plugin?: AtlasVTTPlugin) {
     super(leaf, plugin, true, true);
+    // Opening a file, a dropped file or back/forward history would replace this tab and leave the session.
+    this.navigation = false;
   }
 
   getViewType(): string {
@@ -85,10 +87,11 @@ export class OnlineSceneView extends AtlasView {
   }
 
   async onClose(): Promise<void> {
+    // Only the view that is the session's sink leaves it; a copy that never attached closes quietly.
+    const attached = this.client !== null;
     this.client?.dispose();
     this.client = null;
-    // Closing the tab leaves the session.
-    OnlineJoinService.forApp(this.app)?.leave();
+    if (attached) OnlineJoinService.forApp(this.app)?.leave();
     await super.onClose();
   }
 
@@ -100,8 +103,21 @@ export class OnlineSceneView extends AtlasView {
     this.client?.resize();
   }
 
+  /** Whether this view is the one showing the joined session. */
+  get isAttached(): boolean {
+    return this.client !== null;
+  }
+
   private attachSession(): void {
     if (this.isClosed || this.client) return;
+    const shown = this.app.workspace.getLeavesOfType(ONLINE_SCENE_VIEW_TYPE)
+      .find((leaf) => leaf !== this.leaf && leaf.view instanceof OnlineSceneView && leaf.view.isAttached);
+    if (shown) {
+      // One tab per session: a copy (a split, a duplicate) gives way to the one that has it.
+      this.leaf.detach();
+      void this.app.workspace.revealLeaf(shown);
+      return;
+    }
     const service = OnlineJoinService.forApp(this.app);
     const viewport = this.serviceManager.getRendererService().getViewport();
     const renderer = this.renderer;

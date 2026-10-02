@@ -1,5 +1,6 @@
 import { App, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
 import { AtlasView, ATLAS_VIEW_TYPE } from '../atlas-view';
+import { ONLINE_SCENE_VIEW_TYPE } from '../online/obsidian/onlineSceneTab';
 
 function getExistingAtlasLeaf(app: App): WorkspaceLeaf | null {
   return app.workspace.getLeavesOfType(ATLAS_VIEW_TYPE)[0] ?? null;
@@ -33,7 +34,8 @@ export async function openMapInView(app: App, mapFile: TFile): Promise<void> {
   }
 
   let leaf = app.workspace.getMostRecentLeaf();
-  if (!leaf || leaf.getViewState().pinned) {
+  // A pinned leaf, or the online scene (opening a map there would end the session), keeps its place.
+  if (!leaf || leaf.getViewState().pinned || leaf.view.getViewType() === ONLINE_SCENE_VIEW_TYPE) {
     leaf = app.workspace.getLeaf('tab');
   }
 
