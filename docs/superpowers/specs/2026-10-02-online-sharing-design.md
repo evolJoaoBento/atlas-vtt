@@ -134,3 +134,18 @@ people. No accounts: identity comes from the session and a player name.
 - Merge: three-way with base; each per-note option; auto merge; history undo.
 - Relay through the GM without storing; push requests.
 - Manual: three vaults (GM, two players), share both ways, edit and re-pull.
+
+## Future direction (noted, not in this piece)
+
+Identity is meant to grow into campaigns and characters:
+
+- The GM creates a **campaign**; everything in its sessions is linked to the
+  campaign id (it replaces the table id).
+- Each player keeps a **character list** on their side and links characters to
+  campaigns. Joining a campaign's session picks the character linked to it
+  automatically, by id, so players never retype a name.
+- A new player creates a character or assigns one from their list on first join.
+- Stored behind the scenes (a Base-like store players never have to edit).
+- Needs a character creator, a campaign creator and assignment UI first; the
+  stable ids in this piece (campaign/table id, per-device player id) are chosen
+  so characters can be layered on without changing shares.
