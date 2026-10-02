@@ -5,7 +5,7 @@
  * while it is attached. Images stay until the session is left, so the tab keeps the last scene
  * after the session ends and Reconnect still has them. Nothing here reads or writes the vault.
  */
-import type { App } from 'obsidian';
+import { Notice, type App } from 'obsidian';
 import type { SettingsService } from '../../services/SettingsService';
 import type { DiceSelection } from '../../tools/diceRolling';
 import { AssetCache, type ImageStore } from '../assets/AssetCache';
@@ -128,7 +128,7 @@ export class OnlineJoinService {
 
   /** The name to offer in the Join dialog. */
   rememberedName(): string {
-    return this.settings.getOnlineSettings().playerName;
+    return normalizePlayerName(this.settings.getOnlineSettings().playerName) ?? '';
   }
 
   /** Starts joining; null once it started, else what stops it. A session that ended is left first. */
@@ -154,11 +154,16 @@ export class OnlineJoinService {
     return null;
   }
 
-  /** After the connection was lost: joins again with the same key, images and tab. */
-  reconnect(): void {
+  /** After the connection was lost: joins again with the same key, images and tab. Refused while hosting. */
+  reconnect(): JoinProblem | null {
     const joined = this.joined;
-    if (!joined || joined.session?.state.status !== 'lost') return;
+    if (!joined || joined.session?.state.status !== 'lost') return null;
+    if (this.isHosting()) {
+      new Notice(JOIN_PROBLEM_TEXT.hosting);
+      return 'hosting';
+    }
     this.startSession(joined);
+    return null;
   }
 
   /** Leaves the session: says bye, frees its images and closes its tab. */
@@ -168,6 +173,7 @@ export class OnlineJoinService {
     this.joined = null;
     joined.session?.stop();
     joined.loader.dispose();
+    this.releaseCache();
     joinedSessionStore.setState({ session: null });
     const sink = this.sink;
     this.sink = null;
@@ -205,6 +211,7 @@ export class OnlineJoinService {
   /** The plugin unloads. */
   dispose(): void {
     this.leave();
+    this.releaseCache();
     this.stopSettings();
   }
 
@@ -215,6 +222,13 @@ export class OnlineJoinService {
     const key = randomId();
     this.keys.set(hostId, key);
     return key;
+  }
+
+  /** The images belong to the session: memory is freed and the storage closed when it is left. */
+  private releaseCache(): void {
+    const cache = this.cache;
+    this.cache = null;
+    void cache?.dispose();
   }
 
   private imageCache(): AssetCache {

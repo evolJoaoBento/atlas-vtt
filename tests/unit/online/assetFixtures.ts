@@ -82,6 +82,9 @@ export function settle(): Promise<void> {
 export class MemoryStore implements ImageStore {
   readonly images = new Map<string, { image: StoredImage; shownAt: number }>();
   quota = Infinity;
+  closed = false;
+
+  close(): void { this.closed = true; }
 
   private used(): number {
     let total = 0;

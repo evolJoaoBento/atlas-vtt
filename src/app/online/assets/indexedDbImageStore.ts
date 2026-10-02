@@ -113,5 +113,6 @@ export async function openIndexedDbImageStore(): Promise<ImageStore | null> {
       images.clear();
       entries.clear();
     }),
+    close: (): void => db.close(),
   };
 }

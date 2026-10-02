@@ -3,7 +3,7 @@
  * until the GM lets them in (the Online scene tab opens and this closes) or not (the reason
  * shows and Join is offered again). Closing it before admission cancels the join.
  */
-import { Modal, Setting, type App } from 'obsidian';
+import { Modal, Notice, Setting, type App } from 'obsidian';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { sessionReasonText } from '../../page/pageScreen';
 import type { PlayerSessionState } from '../../PlayerSession';
@@ -21,6 +21,7 @@ export class JoinSessionModal extends Modal {
   private admitted = false;
   private statusEl: HTMLElement | null = null;
   private joinButton: HTMLButtonElement | null = null;
+  private linkInput: HTMLInputElement | null = null;
   private unsubscribe: (() => void) | null = null;
 
   constructor(app: App, private readonly service: JoinPort, name: string) {
@@ -38,6 +39,8 @@ export class JoinSessionModal extends Modal {
       .addText((text) => {
         text.setPlaceholder('Paste the link here').onChange((value) => { this.link = value; });
         text.inputEl.setAttribute('aria-label', 'Join link');
+        text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
+        this.linkInput = text.inputEl;
       });
     new Setting(contentEl)
       .setName('Your name')
@@ -45,6 +48,7 @@ export class JoinSessionModal extends Modal {
       .addText((text) => {
         text.setValue(this.name).onChange((value) => { this.name = value; });
         text.inputEl.setAttribute('aria-label', 'Your name');
+        text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
       });
     this.statusEl = contentEl.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
     const buttons = contentEl.createDiv({ cls: 'modal-button-container' });
@@ -52,6 +56,7 @@ export class JoinSessionModal extends Modal {
     this.joinButton.addEventListener('click', () => this.submit());
     buttons.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
     this.unsubscribe = joinedSessionStore.subscribe((state) => this.show(state.session));
+    this.linkInput?.focus();
   }
 
   onClose(): void {
@@ -61,6 +66,12 @@ export class JoinSessionModal extends Modal {
     if (this.joining && !this.admitted) this.service.leave();
     this.joining = false;
     this.contentEl.empty();
+  }
+
+  private submitOnEnter(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.isComposing || this.joinButton?.disabled) return;
+    event.preventDefault();
+    this.submit();
   }
 
   private submit(): void {
@@ -118,5 +129,9 @@ export class JoinSessionModal extends Modal {
 /** Opens the Join dialog with the last name used. */
 export function openJoinSessionModal(app: App): void {
   const service = OnlineJoinService.forApp(app);
-  if (service) new JoinSessionModal(app, service, service.rememberedName()).open();
+  if (!service) {
+    new Notice('Online play is not ready yet. Try again in a moment.');
+    return;
+  }
+  new JoinSessionModal(app, service, service.rememberedName()).open();
 }

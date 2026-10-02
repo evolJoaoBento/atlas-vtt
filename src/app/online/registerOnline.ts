@@ -1,5 +1,4 @@
 import type { Plugin } from 'obsidian';
-import type { OnlineJoinService } from './obsidian/OnlineJoinService';
 import { openJoinSessionModal } from './obsidian/ui/JoinSessionModal';
 import { onlineSessionStore } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
@@ -7,7 +6,7 @@ import { JOIN_SESSION_LABEL } from './ui/onlineCopy';
 import { openOnlineSession } from './ui/openOnlineSession';
 
 /** Commands, the status bar item, and stopping the session with the plugin. */
-export function registerOnline(plugin: Plugin, service: OnlineSessionService, joins: OnlineJoinService): void {
+export function registerOnline(plugin: Plugin, service: OnlineSessionService): void {
   plugin.addCommand({ id: 'online-session', name: 'Online session…', callback: () => openOnlineSession(plugin.app) });
   plugin.addCommand({ id: 'join-online-session', name: JOIN_SESSION_LABEL, callback: () => openJoinSessionModal(plugin.app) });
   plugin.addCommand({
@@ -33,5 +32,4 @@ export function registerOnline(plugin: Plugin, service: OnlineSessionService, jo
   render();
   plugin.register(onlineSessionStore.subscribe(render));
   plugin.register(() => service.stop());
-  plugin.register(() => joins.dispose());
 }

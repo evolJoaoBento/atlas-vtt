@@ -73,4 +73,14 @@ describe('Join online session dialog', () => {
     modal.onClose();
     expect(service.leave).toHaveBeenCalledOnce();
   });
+
+  it('focuses the link field and joins on Enter', () => {
+    const focus = vi.spyOn(HTMLInputElement.prototype, 'focus');
+    const { service, link, name, type } = open();
+    expect(focus.mock.contexts).toEqual([link]);
+    focus.mockRestore();
+    type(link, 'https://example.org/join/#id=gm');
+    name!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(service.join).toHaveBeenCalledWith('https://example.org/join/#id=gm', 'Anna');
+  });
 });

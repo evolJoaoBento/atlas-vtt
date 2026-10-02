@@ -172,4 +172,16 @@ describe('AssetCache', () => {
     expect(await inMemory.get(fp(4))).toBeNull();
     expect(await inMemory.get(fp(5))).not.toBeNull();
   });
+
+  it('lets go of its memory and closes the storage when disposed, and keeps nothing afterwards', async () => {
+    const store = new MemoryStore();
+    const cache = new AssetCache({ keep: false, openStore: async () => store, now: clock() });
+    await cache.put(image(1, 100));
+    expect(await cache.get(fp(1))).not.toBeNull();
+    await cache.dispose();
+    expect(store.closed).toBe(true);
+    await cache.put(image(2, 100));
+    expect(await cache.get(fp(1))).toBeNull();
+    expect(await cache.get(fp(2))).toBeNull();
+  });
 });

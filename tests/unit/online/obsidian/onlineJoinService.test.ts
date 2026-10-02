@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from 'obsidian';
-import { AssetCache } from '../../../../src/app/online/assets/AssetCache';
+import { AssetCache, type ImageStore } from '../../../../src/app/online/assets/AssetCache';
 import { AssetLoader, type ImageDecoder } from '../../../../src/app/online/assets/AssetLoader';
 import { GmSession, type SessionPlayer } from '../../../../src/app/online/GmSession';
 import { joinedSessionStore } from '../../../../src/app/online/obsidian/joinedSessionStore';
@@ -10,7 +10,7 @@ import { RECONNECT_GIVE_UP_MS, type PlayerSessionState } from '../../../../src/a
 import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../../src/app/online/transport/types';
 import type { AtlasSettings } from '../../../../src/app/services/SettingsService';
-import { nodeHash } from '../assetFixtures';
+import { MemoryStore, nodeHash } from '../assetFixtures';
 
 const LINK = 'https://example.org/join/#id=gm';
 
@@ -68,7 +68,7 @@ function recordingSink(): OnlineSceneSink & { calls: string[]; states: PlayerSes
   };
 }
 
-function world(options: { hosting?: boolean } = {}) {
+function world(options: { hosting?: boolean; store?: ImageStore } = {}) {
   const network = new MemoryNetwork();
   const requests: SessionPlayer[] = [];
   let players: SessionPlayer[] = [];
@@ -81,7 +81,7 @@ function world(options: { hosting?: boolean } = {}) {
   const opened = vi.fn(async (): Promise<void> => undefined);
   const decode: ImageDecoder = async () => ({ image: {} as HTMLImageElement, width: 1, height: 1, release: () => {} });
   const service = new OnlineJoinService({} as App, settings, '0.5.0', {
-    createClient: () => client.transport, openStore: async () => null, decode, hash: nodeHash, openSceneTab: opened,
+    createClient: () => client.transport, openStore: async () => options.store ?? null, decode, hash: nodeHash, openSceneTab: opened,
     isHosting: () => options.hosting ?? false,
   });
   const admitLast = async (): Promise<void> => {
@@ -215,5 +215,49 @@ describe('OnlineJoinService', () => {
     const { service } = world();
     expect(service.playerKeyFor('a')).toBe(service.playerKeyFor('a'));
     expect(service.playerKeyFor('a')).not.toBe(service.playerKeyFor('b'));
+  });
+
+  it('refuses to reconnect while hosting', async () => {
+    const options = { hosting: false };
+    const w = world(options);
+    w.service.join(LINK, 'Ben');
+    await w.admitLast();
+    w.client.setDown(true);
+    w.client.links.at(-1)?.close();
+    await vi.advanceTimersByTimeAsync(RECONNECT_GIVE_UP_MS + 20_000);
+    expect(w.service.state?.status).toBe('lost');
+    options.hosting = true;
+    w.client.setDown(false);
+    expect(w.service.reconnect()).toBe('hosting');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.service.state?.status).toBe('lost');
+    options.hosting = false;
+    expect(w.service.reconnect()).toBeNull();
+    w.service.dispose();
+  });
+
+  it('frees the image cache when the session is left, and uses a fresh one for the next', async () => {
+    const dispose = vi.spyOn(AssetCache.prototype, 'dispose');
+    const store = new MemoryStore();
+    const w = world({ store });
+    w.settings.setOnlineSettings({ keepImages: false });
+    w.service.join(LINK, 'Ben');
+    await w.admitLast();
+    expect(store.closed).toBe(false);
+    w.service.leave();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(store.closed).toBe(true);
+    w.service.join(LINK, 'Ben');
+    w.service.dispose();
+    expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a cleaned remembered name', () => {
+    const w = world();
+    w.settings.setOnlineSettings({ playerName: '  Anna ​ the   Bold ' });
+    expect(w.service.rememberedName()).toBe('Anna the Bold');
+    w.settings.setOnlineSettings({ playerName: '' });
+    expect(w.service.rememberedName()).toBe('');
   });
 });

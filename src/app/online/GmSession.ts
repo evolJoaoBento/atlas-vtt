@@ -26,16 +26,16 @@ interface LinkState {
   unsubscribe: Unsubscribe[];
 }
 
-/**
- * The GM's side of an online session: who may join, who is here, and a hook
- * for later pieces to send and receive game messages. It never learns about maps.
- */
 /** Records which app a player joined from; a returning player may come back from the other one. */
 function setClient(player: SessionPlayer, kind: 'web' | 'obsidian'): void {
   if (kind === 'obsidian') player.client = 'obsidian';
   else delete player.client;
 }
 
+/**
+ * The GM's side of an online session: who may join, who is here, and a hook
+ * for later pieces to send and receive game messages. It never learns about maps.
+ */
 export class GmSession {
   private readonly entries = new Map<string, Entry>();
   private readonly links = new Map<PeerLink, LinkState>();

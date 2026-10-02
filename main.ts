@@ -77,6 +77,7 @@ export default class AtlasVTTPlugin extends Plugin {
     this.settingsService = new SettingsService(this.app, storageReady);
     // Before the views: a restored Online scene tab looks for it when it opens.
     const onlineJoins = new OnlineJoinService(this.app, this.settingsService, this.manifest.version);
+    this.register(() => onlineJoins.dispose());
 
     // Before the views: a restored map may start Atlas's first check of the vault,
     // whose folder renames reach map files only through these vault events.
@@ -88,7 +89,7 @@ export default class AtlasVTTPlugin extends Plugin {
     await storageReady;
     await this.settingsService.initialize();
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
-    registerOnline(this, onlineSessions, onlineJoins);
+    registerOnline(this, onlineSessions);
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
       existingInstallation: await existingInstallation,

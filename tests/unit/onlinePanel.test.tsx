@@ -24,6 +24,7 @@ import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { OnlinePanel } from '../../src/app/react/components/online/OnlinePanel';
 import { TokenControl } from '../../src/app/online/control/TokenControl';
 import type { SessionPlayer } from '../../src/app/online/GmSession';
+import { joinedSessionStore } from '../../src/app/online/obsidian/joinedSessionStore';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../src/app/online/onlineSessionStore';
 import { presentedScene, type PresentedView } from '../../src/app/services/PresentedScene';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
@@ -196,5 +197,12 @@ describe('online panel', () => {
     renderPanel();
     expect(within(screen.getByRole('listitem', { name: 'Anna' })).getByRole('img', { name: 'Joined from Obsidian' })).toBeTruthy();
     expect(within(screen.getByRole('listitem', { name: 'Dan' })).queryByRole('img', { name: 'Joined from Obsidian' })).toBeNull();
+  });
+
+  it('does not offer a second join while already in a session', () => {
+    joinedSessionStore.setState({ session: { status: 'admitted', playerId: 'p', title: 'T', players: [], reason: null } });
+    renderPanel();
+    expect((screen.getByRole('button', { name: 'Join online session…' }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => { joinedSessionStore.setState({ session: null }); });
   });
 });

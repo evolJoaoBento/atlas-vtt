@@ -28,6 +28,8 @@ export interface ImageStore {
   delete(ids: readonly string[]): Promise<void>;
   entries(): Promise<StoredEntry[]>;
   clear(): Promise<void>;
+  /** Lets go of the connection to the storage; later calls reject. */
+  close?(): void;
 }
 
 export interface AssetCacheState {
@@ -69,6 +71,7 @@ export class AssetCache {
   private readonly now: () => number;
   private readonly limit: number;
   private readonly ready: Promise<void>;
+  private disposed = false;
   /** The last queued storage-changing call. */
   private tail: Promise<void>;
 
@@ -118,6 +121,7 @@ export class AssetCache {
   /** Keeps a finished image: stored when keeping is on and storage works, otherwise in memory. */
   put(image: StoredImage): Promise<void> {
     return this.run(async () => {
+      if (this.disposed) return;
       const now = this.now();
       const store = this.store;
       if (this.current.keep && this.current.available && store && await this.storeImage(store, image, now)) return;
@@ -137,6 +141,25 @@ export class AssetCache {
   /** "Clear saved images": empties the storage; images of this visit in memory stay. */
   clearSaved(): Promise<void> {
     return this.run(() => this.clearStore());
+  }
+
+  /** The cache is no longer used: forgets the images in memory and closes the storage. Stored images stay for the next visit. */
+  dispose(): Promise<void> {
+    this.disposed = true;
+    this.memory.clear();
+    this.memoryBytes = 0;
+    this.listeners.clear();
+    return this.run(async () => {
+      this.memory.clear();
+      this.memoryBytes = 0;
+      this.entries.clear();
+      try {
+        this.store?.close?.();
+      } catch {
+        // Already closed.
+      }
+      this.store = null;
+    });
   }
 
   /** Runs storage-changing work one call at a time, in call order, so limits and keeping hold. */

@@ -6,6 +6,8 @@ import { Button } from '../../../packages/components/primitives/button';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import { useDialogWindowVariants } from '../../../packages/components/primitives/dialogMotion';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { useStore } from 'zustand';
+import { isInSession, joinedSessionStore } from '../../../online/obsidian/joinedSessionStore';
 import { openJoinSessionModal } from '../../../online/obsidian/ui/JoinSessionModal';
 import { OnlineSessionService } from '../../../online/OnlineSessionService';
 import type { OnlineSessionState } from '../../../online/onlineSessionStore';
@@ -56,6 +58,7 @@ function OnlinePanelWindow(): React.ReactElement {
 
 function StartView({ session, service, app }: { session: OnlineSessionState; service: OnlineSessionService | undefined; app: App }): React.ReactElement {
   const starting = session.status === 'starting';
+  const joined = useStore(joinedSessionStore, isInSession);
   return (
     <section className="atlas-online-panel__section">
       <p className="atlas-online-panel__help">{START_HELP}</p>
@@ -63,7 +66,7 @@ function StartView({ session, service, app }: { session: OnlineSessionState; ser
         <p className="atlas-online-panel__error" role="alert">{session.error}</p>
       )}
       <div className="atlas-online-panel__footer">
-        <Button variant="outline" disabled={starting} onClick={() => openJoinSessionModal(app)}>
+        <Button variant="outline" disabled={starting || joined} onClick={() => openJoinSessionModal(app)}>
           {JOIN_SESSION_LABEL}
         </Button>
         <Button variant="default" disabled={starting || !service} onClick={() => { void service?.start(); }}>
