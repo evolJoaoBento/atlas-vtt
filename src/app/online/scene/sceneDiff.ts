@@ -7,7 +7,7 @@ import { SCENE_FIELD_KEYS, SCENE_RECORD_KEYS, type PlayerScene, type ScenePatchB
 type AnyRecord = Record<string, unknown>;
 
 /** Set an own property safely to prevent prototype pollution via special keys like "__proto__". */
-function setOwn(target: Record<string, unknown>, key: string, value: unknown): void {
+export function setOwn(target: Record<string, unknown>, key: string, value: unknown): void {
   Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
 }
 

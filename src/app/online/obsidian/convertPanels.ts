@@ -1,0 +1,73 @@
+/**
+ * The widget bar and the initiative order as Atlas holds them. Players receive only what the
+ * GM shows them, so every widget is visible to players and every entry is shown.
+ */
+import type { TokenEntity } from '../../types';
+import { createDefaultInitiativeState, DEFAULT_INITIATIVE_CONFIG, type InitiativeEntry, type InitiativeState } from '../../types/initiativeTypes';
+import { resolveWidgetIcon } from '../../types/widgetIcons';
+import type { AnyWidget, CounterWidget, TimerWidget, WidgetSettings } from '../../types/widgetTypes';
+import { setOwn } from '../scene/sceneDiff';
+import type { PlayerInitiative, PlayerWidget } from '../scene/sceneTypes';
+
+export interface AtlasWidgets {
+  widgetSettings: WidgetSettings;
+  widgetValues: Record<string, number>;
+}
+
+export interface AtlasInitiative {
+  initiative: InitiativeState;
+  initiativeTrackerOpen: boolean;
+}
+
+/**
+ * The widgets players may see, in the GM's order. Clocks show as counters (their filled count),
+ * since players receive no segment count; a timer shows its remaining time, which is also its duration.
+ */
+export function atlasWidgets(widgets: readonly PlayerWidget[]): AtlasWidgets {
+  const records: Record<string, AnyWidget> = {};
+  const values: Record<string, number> = {};
+  widgets.forEach((widget, order) => {
+    const common = {
+      id: widget.id, label: widget.label, icon: resolveWidgetIcon(widget.icon), visible: true, visibleToPlayers: true,
+      value: widget.value, order, scope: 'scene' as const,
+    };
+    if (widget.type === 'timer') {
+      const timer: TimerWidget = { ...common, type: 'timer', duration: Math.max(1, widget.value), direction: 'down' };
+      setOwn(records, widget.id, timer);
+      return;
+    }
+    const counter: CounterWidget = { ...common, type: 'counter' };
+    setOwn(records, widget.id, counter);
+    setOwn(values, widget.id, widget.value);
+  });
+  return { widgetSettings: { widgets: records, globalVisible: true, position: 'top', scale: 1 }, widgetValues: values };
+}
+
+/** The initiative order players may see; an entry's avatar is its token's art. */
+export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Readonly<Record<string, TokenEntity>>): AtlasInitiative {
+  if (!initiative) return { initiative: createDefaultInitiativeState(), initiativeTrackerOpen: false };
+  const entries = initiative.entries.map((entry, order): InitiativeEntry => ({
+    id: entry.id,
+    tokenId: entry.tokenId,
+    name: entry.name ?? '',
+    initiative: entry.initiative,
+    initiativeModifier: 0,
+    hp: entry.hp ? { current: entry.hp.current, max: entry.hp.max } : { current: 0, max: 0 },
+    imagePath: Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.imagePath ?? '' : '',
+    isActive: entry.isActive,
+    isDefeated: entry.hp !== null && entry.hp.current <= 0,
+    isNPC: true,
+    order,
+  }));
+  return {
+    initiative: {
+      entries,
+      currentIndex: entries.findIndex((entry) => entry.isActive),
+      round: initiative.round,
+      isActive: initiative.active,
+      config: { ...DEFAULT_INITIATIVE_CONFIG },
+      removedTokenIds: [],
+    },
+    initiativeTrackerOpen: true,
+  };
+}

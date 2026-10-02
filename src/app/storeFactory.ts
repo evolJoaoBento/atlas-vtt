@@ -21,7 +21,8 @@ import { createInitialUIState, createUIActions, type UISlice } from './stores/ui
 import { createPinnedNotePreviewActions, type PinnedNotePreviewSlice } from './stores/pinnedNotePreviewSlice';
 import { createInitialLootRollerState, createLootRollerActions, readLootRollerState, type LootRollerSlice } from './stores/lootRollerSlice';
 import { isRecord } from './services/assetMetadataGuards';
-import { createHistoryOptions } from './stores/history';
+import { initialRemoteScene, type RemoteSceneState } from './online/obsidian/remoteScene';
+import { createHistoryOptions, getHistoryStore } from './stores/history';
 import { withoutCollectionWidgets } from './utils/collectionWidgets';
 import { withWidgetOff } from './utils/widgetActivation';
 import { createMapObjectsActions, type MapObjectsSlice } from './stores/mapObjectsSlice';
@@ -214,6 +215,8 @@ export interface ViewAtlasState {
   
   // Player view state
   isPlayerView: boolean;
+  /** The online scene view's session data (`online/obsidian/remoteScene.ts`); null in every other view. Never persisted. */
+  remoteScene: RemoteSceneState | null;
 
   // GM view toggle (semi-transparent fog vs fully opaque)
   isGMView: boolean;
@@ -399,10 +402,33 @@ function applyTokenUpdates(token: TokenEntity | undefined, updates: TokenUpdates
   Object.assign(token, normalized);
 }
 
+/** How a view store is made. */
+export interface ViewStoreOptions {
+  /**
+   * The online scene view's store: a scene another Atlas sends. It never reads or writes
+   * storage and records no undo history, from creation, and is a player view.
+   */
+  remote?: boolean;
+}
+
+/** Storage of a store that never saves: it reads nothing and writes nothing. */
+const INERT_STORAGE = {
+  getItem: async (): Promise<StorageValue<PersistedViewState> | null> => null,
+  setItem: async (): Promise<void> => undefined,
+  removeItem: async (): Promise<void> => undefined,
+};
+
 /**
  * Creates an isolated Atlas store instance for a specific view
  */
-export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTTPlugin, isPlayerView: boolean = false): ViewAtlasStore {
+export function createViewAtlasStore(
+  app: App,
+  viewId: string,
+  plugin?: AtlasVTTPlugin,
+  isPlayerView: boolean = false,
+  options: ViewStoreOptions = {},
+): ViewAtlasStore {
+  const remote = options.remote === true;
   // Create a storage factory that will access the store once it's created
   let storeRef: Pick<StoreApi<ViewAtlasState>, 'getState'> | null = null;
 
@@ -491,9 +517,10 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           // Initialize with default state
           ...createInitialState(),
           
-          // Player view state (set during creation)
-          isPlayerView: isPlayerView,
-          isGMView: true,
+          // Player view state (set during creation); the online scene view's store is a player view that never saves
+          isPlayerView: isPlayerView || remote,
+          isGMView: !remote,
+          remoteScene: remote ? initialRemoteScene() : null,
 
           // Selection and tool state (not persisted)
           selectedIds: [],
@@ -512,7 +539,7 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           tokenSettings: { ...DEFAULT_TOKEN_SETTINGS },
           
           // Per-store persistence control (not persisted)
-          persistenceEnabled: true,
+          persistenceEnabled: !remote,
           setPersistenceEnabled: (enabled) => set((draft) => {
             draft.persistenceEnabled = enabled;
           }),
@@ -1414,7 +1441,8 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
           name: `atlas-view-${viewId}`,
           
           // Create a unique storage adapter for this view that uses this store instance
-          storage: createDelayedStorage(),
+          // A remote store never touches storage; others save through this view's map file.
+          storage: remote ? INERT_STORAGE : createDelayedStorage(),
           
           // Store version for migrations
           version: ATLAS_VERSION,
@@ -1480,6 +1508,8 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
 
   // Set the store reference after creation
   storeRef = store;
+  // A remote store's edits are the GM's scene or a preview; nothing of it is undoable.
+  if (remote) getHistoryStore(store)?.getState().pause();
 
   // Immer types `setState` with draft updaters, and WritableDraft<ViewAtlasState> is not
   // assignable back to ViewAtlasState because the state holds the Obsidian `plugin`.
