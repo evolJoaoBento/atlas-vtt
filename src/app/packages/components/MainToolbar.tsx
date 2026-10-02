@@ -9,6 +9,7 @@ import { CommandPalette } from "../../react/components/CommandPalette"
 import AssetManager from "./asset-manager/AssetManager"
 import { ToolButton } from "./primitives/ToolButton"
 import { CoinIcon } from "../../react/components/CoinIcon"
+import { onlineSceneToolbarItems } from "../../react/components/online/onlineSceneToolbarItems"
 import { onlineToolbarItem } from "../../react/components/online/onlineToolbarItem"
 import { useOnlineSession } from "../../react/components/online/useOnlineState"
 import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
@@ -41,6 +42,8 @@ type ToolMenu = 'move' | 'fog' | 'draw' | 'text' | 'measure' | 'wall'
  */
 const PRIORITY = {
   move: 100,
+  follow: 95,
+  fit: 92,
   measure: 90,
   fog: 85,
   assets: 80,
@@ -69,6 +72,9 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const hotkeyLabel = useHotkeyLabels()
 
   const isActualPlayerView = view?.getViewType?.() === 'atlas-vtt-player'
+  // The online scene view: another Atlas's scene, with the player's tools only
+  const remote = useAtlasStore(state => Boolean(state.remoteScene))
+  const following = useAtlasStore(state => state.remoteScene?.following ?? true)
 
   const diceTool = useMemo(() => view?.serviceManager?.getToolController?.()?.getDiceTool?.() ?? null, [view]);
 
@@ -129,7 +135,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   }, [isDiceTrayOpen, setDiceTrayOpen])
 
   useMapClipboardHotkeys(store, view, viewId);
-  useToolbarHotkeys(viewId, isActualPlayerView, {
+  useToolbarHotkeys(viewId, isActualPlayerView || remote, {
     selectTool: handleToolClick,
     toggleAssetManager: handleAssetManagerToggle,
     closeAssetManager: handleCloseAssetManager,
@@ -173,7 +179,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const toolButtonItem = (id: 'pin' | 'audio', tool: Tool, icon: ToolFace["icon"], label: string, shortcut: string): ResponsiveToolbarItem =>
     buttonItem(id, { icon, label, shortcut, isActive: activeTool === tool, onClick: () => handleToolClick(tool) }, activeTool === tool)
 
-  const dm = !isActualPlayerView
+  const dm = !isActualPlayerView && !remote
 
   const items: ResponsiveToolbarItem[] = [
     toolGroupItem('move', moveToolFace(activeTool), hotkeyLabel('move'), <MoveToolGroup {...groupControls('move')} />),
@@ -183,6 +189,9 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
       ? [toolGroupItem('text', textToolFace(activeTool), hotkeyLabel('text'), <TextToolGroup {...groupControls('text')} />)]
       : []),
     toolGroupItem('measure', measureToolFace(activeTool), hotkeyLabel('measure'), <MeasureToolGroup {...groupControls('measure')} />),
+    ...(remote && !following
+      ? onlineSceneToolbarItems({ priority: { follow: PRIORITY.follow, fit: PRIORITY.fit }, fitShortcut: hotkeyLabel('fitMap'), controls: view?.onlineControls() ?? null })
+      : []),
     ...(dm ? [toolButtonItem('pin', "note-pin", MapPin, "Note Pin Tool", hotkeyLabel('pin'))] : []),
     ...(dm && WALLS_AND_LIGHTING_ENABLED
       ? [toolGroupItem('wall', wallToolFace(activeTool), hotkeyLabel('wall'), <WallToolGroup {...groupControls('wall')} />)]
@@ -235,16 +244,20 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
           />
         )}
       />
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        toolbarRef={toolbarRef}
-      />
-      <AssetManager
-        isOpen={isAssetManagerOpen}
-        onClose={handleCloseAssetManager}
-        {...(assetManagerInitialTab && { initialTab: assetManagerInitialTab })}
-      />
+      {!remote && (
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          toolbarRef={toolbarRef}
+        />
+      )}
+      {!remote && (
+        <AssetManager
+          isOpen={isAssetManagerOpen}
+          onClose={handleCloseAssetManager}
+          {...(assetManagerInitialTab && { initialTab: assetManagerInitialTab })}
+        />
+      )}
       {isDiceTrayOpen && !diceTool && (
         <div style={{
           position: 'fixed',

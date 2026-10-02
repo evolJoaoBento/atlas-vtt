@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SceneCamera } from '../../../src/app/online/scene/sceneCamera';
 import { DEFAULT_CAMERA, GLIDE_MS, screenToWorld } from '../../../src/app/online/view/camera';
 import { CameraController } from '../../../src/app/online/view/CameraController';
@@ -216,5 +216,19 @@ describe('CameraController', () => {
     expect(controller.current()).toEqual({ centerX: 200, centerY: 300, zoom: 2 });
     controller.setGmCamera(gm());
     expect(changes()).toBe(before);
+  });
+
+  it('stays where the player moved the view, without moving it back, and tells once that it stopped following', () => {
+    const onChange = vi.fn();
+    const camera = new CameraController({ now: () => 0, onChange });
+    camera.setScreen({ width: 800, height: 600 });
+    onChange.mockClear();
+    camera.movedByPlayer({ centerX: 10, centerY: 20, zoom: 3 });
+    expect(camera.isFollowing()).toBe(false);
+    expect(camera.current()).toEqual({ centerX: 10, centerY: 20, zoom: 3 });
+    expect(onChange).toHaveBeenCalledOnce();
+    camera.movedByPlayer({ centerX: 11, centerY: 21, zoom: 3 });
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(camera.isMoving()).toBe(false);
   });
 });

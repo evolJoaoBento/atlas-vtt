@@ -9,6 +9,7 @@ import { presentedScene } from '../services/PresentedScene';
 import { presentActiveTabToPlayers, stopPresenting } from '../services/presentToPlayers';
 import { hasBestiaryFrontmatter } from '../services/statblockNoteSource';
 import { TokenStatblockLinkService } from '../services/TokenStatblockLinkService';
+import { activeMapView } from './atlasLeaves';
 import { cleanupMissingAssets } from './cleanupMissingAssets';
 
 export interface CommandDependencies {
@@ -108,7 +109,7 @@ function registerMapCommands(plugin: Plugin, deps: CommandDependencies): void {
     id: 'toggle-initiative-tracker',
     name: 'Toggle initiative tracker',
     checkCallback: (checking) => {
-      const view = app.workspace.getActiveViewOfType(AtlasView);
+      const view = activeMapView(app);
       if (!view) return false;
       if (!checking) {
         const state = view.getStore().getState();
@@ -122,7 +123,7 @@ function registerMapCommands(plugin: Plugin, deps: CommandDependencies): void {
     id: 'toggle-loot-roller',
     name: 'Toggle loot roller',
     checkCallback: (checking) => {
-      const view = app.workspace.getActiveViewOfType(AtlasView);
+      const view = activeMapView(app);
       if (!view) return false;
       if (!checking) {
         const state = view.getStore().getState();
@@ -150,7 +151,7 @@ function registerMapCommands(plugin: Plugin, deps: CommandDependencies): void {
     id: 'clean-up-missing-assets',
     name: 'Clean up missing assets in current map',
     checkCallback: (checking) => {
-      const view = app.workspace.getActiveViewOfType(AtlasView);
+      const view = activeMapView(app);
       if (!view) return false;
       if (!checking) void cleanupMissingAssets(app, view);
       return true;

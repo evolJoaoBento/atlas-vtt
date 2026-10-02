@@ -2,12 +2,9 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Texture, Sprite } from 'pixi.js';
 import { useAtlasUI } from './root/AtlasUIContext';
 import { useViewStoreHook } from './ViewStoreContext';
-import { toError } from '../utils/errors';
 import type { GridOptions } from '../grid/GridSystem';
-import { parseGridColor } from '../grid/gridContrastColor';
-import { hexNumberStyleOfGrid } from '../grid/hexNumbering';
+import { toGridOptions } from '../grid/gridStateOptions';
 import { backgroundTextureCache } from '../pixi/backgroundTextureCache';
-import type { GridState } from '../services/MapPersistence';
 import { destroyTree } from '../pixi/utils/destroyTree';
 
 const FALLBACK_GRID_OPTIONS: GridOptions = {
@@ -21,24 +18,6 @@ const FALLBACK_GRID_OPTIONS: GridOptions = {
   lineWidth: 1,
   enabled: true,
 };
-
-/** The store keeps the grid colour as a CSS hex string and its alpha as `opacity`; the GridSystem wants a number and `alpha`. */
-function toGridOptions(grid: GridState): GridOptions {
-  return {
-    size: grid.size,
-    offsetX: grid.offsetX,
-    offsetY: grid.offsetY,
-    color: parseGridColor(grid.color),
-    alpha: grid.opacity,
-    enabled: grid.enabled,
-    ...(grid.type !== undefined ? { type: grid.type } : {}),
-    ...(grid.lineType !== undefined ? { lineType: grid.lineType } : {}),
-    ...(grid.lineWidth !== undefined ? { lineWidth: grid.lineWidth } : {}),
-    ...(grid.scale !== undefined ? { scale: grid.scale } : {}),
-    ...(grid.mapScale !== undefined ? { mapScale: grid.mapScale } : {}),
-    hexNumbers: hexNumberStyleOfGrid(grid),
-  };
-}
 
 interface BackgroundSpriteProps {
   imagePath: string;
@@ -54,33 +33,23 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
   useEffect(() => {
     if (!imagePath) return;
     let isCancelled = false;
-    // Vault images are shared through the background cache; streamed maps arrive as blob URLs
+    // Every background goes through the shared cache, which releases what nobody shows.
     let cachedUrl: string | null = null;
-    let blobUrl: string | null = null;
 
     const loadTexture = async (): Promise<void> => {
       try {
-        let loadedTexture: Texture;
-        if (imagePath.startsWith('blob:')) {
-          blobUrl = imagePath;
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = (err) => reject(toError(err, 'Failed to load blob image'));
-            img.src = imagePath;
-          });
-          loadedTexture = Texture.from(img);
-        } else {
+        // The online scene's maps arrive as object URLs; vault images load by their resource URL.
+        let url = imagePath;
+        if (!imagePath.startsWith('blob:')) {
           const imgFile = app.vault.getAbstractFileByPath(imagePath);
           if (!imgFile) {
             console.error(`[BackgroundSprite] Image file not found: ${imagePath}`);
             return;
           }
-          const url = app.vault.adapter.getResourcePath(imgFile.path);
-          cachedUrl = url;
-          loadedTexture = await backgroundTextureCache.acquire(url);
+          url = app.vault.adapter.getResourcePath(imgFile.path);
         }
-
+        cachedUrl = url;
+        const loadedTexture = await backgroundTextureCache.acquire(url);
         if (!isCancelled) {
           setTexture(loadedTexture);
           setSize({ width: loadedTexture.width, height: loadedTexture.height });
@@ -96,11 +65,6 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
     return () => {
       isCancelled = true;
       if (cachedUrl) backgroundTextureCache.release(cachedUrl);
-      if (blobUrl) {
-        const urlToRevoke = blobUrl;
-        // Revoke after pending image operations complete
-        window.setTimeout(() => URL.revokeObjectURL(urlToRevoke), 100);
-      }
     };
   }, [imagePath, app.vault]);
 

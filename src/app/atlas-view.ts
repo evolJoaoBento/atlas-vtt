@@ -1,4 +1,5 @@
 import { FileView, WorkspaceLeaf, TFile, normalizePath, ViewStateResult, Notice } from "obsidian";
+import type { OnlineSceneControls } from './online/obsidian/remoteScene';
 import { ServiceManager } from './services/ServiceManager';
 import { createViewAtlasStore, ViewAtlasStore } from './storeFactory';
 import { getHistoryStore, runUntracked, type HistoryState } from './stores/history';
@@ -71,7 +72,7 @@ export class AtlasView extends FileView {
   private boundClaimLeafFocus: (() => void) | null = null;
   private boundHeaderLeafActivation: ((event: MouseEvent) => void) | null = null;
 
-  constructor(leaf: WorkspaceLeaf, plugin?: AtlasVTTPlugin, isPlayerView: boolean = false) {
+  constructor(leaf: WorkspaceLeaf, plugin?: AtlasVTTPlugin, isPlayerView: boolean = false, remote: boolean = false) {
     super(leaf);
     // Scene tabs handle deleted maps. Prevent FileView from concurrently replacing
     // or detaching this leaf while Atlas closes the deleted scene's tab.
@@ -85,13 +86,13 @@ export class AtlasView extends FileView {
 
     // Create isolated store for this view with plugin reference for collection service
     // Pass isPlayerView flag during store creation to ensure it's set from the start
-    this.store = createViewAtlasStore(this.app, this.viewId, this.plugin, isPlayerView);
+    this.store = createViewAtlasStore(this.app, this.viewId, this.plugin, isPlayerView, { remote });
 
     // Create the per-view tab metadata store
     this.tabMetaStore = createTabMetaStore();
 
     // Initialize the service manager with the view store and plugin
-    this._serviceManager = new ServiceManager(this.app, this.store, this.plugin, this.viewId);
+    this._serviceManager = new ServiceManager(this.app, this.store, this.plugin, this.viewId, { remote });
   }
 
   // --- State Management ---
@@ -190,6 +191,16 @@ export class AtlasView extends FileView {
   /** True once Obsidian has closed the view (until it is opened again); a closed view cannot be presented. */
   get isClosed(): boolean {
     return this.isViewClosing;
+  }
+
+  /** True for the online scene view, which shows another Atlas's scene and never one of this vault's maps. */
+  get isRemote(): boolean {
+    return this.store.getState().remoteScene !== null;
+  }
+
+  /** What the online scene's UI asks of its view; null for a map view. */
+  public onlineControls(): OnlineSceneControls | null {
+    return null;
   }
 
   getTabMetaStore(): TabMetaStore {
@@ -806,7 +817,7 @@ export class AtlasView extends FileView {
    * Sets up window resize detection to update the PIXI canvas
    * Only responds to actual window size changes, not container changes
    */
-  private setupWindowResizeDetection(): void {
+  protected setupWindowResizeDetection(): void {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
@@ -827,10 +838,16 @@ export class AtlasView extends FileView {
         // Resize the renderer to match the container
         const rendererService = this._serviceManager.getRendererService();
         rendererService.resize(currentWidth, currentHeight);
+        this.onContainerResized();
       }
     });
 
     // Observe the container element for size changes (fires immediately)
     this.resizeObserver.observe(this.containerEl);
+  }
+
+  /** The view's container changed size, after the renderer resized. */
+  protected onContainerResized(): void {
+    // Map views have nothing more to follow; the online scene refits its camera.
   }
 }

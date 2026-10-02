@@ -5,6 +5,9 @@ import type { AtlasSettings, SettingsService } from './SettingsService';
 
 export type PlayerSettings = AtlasSettings['localPlayerView'];
 
+/** Where an overlay reads the player view settings: Atlas's settings, or the online scene's show-what-arrives source. */
+export type PlayerSettingsSource = Pick<SettingsService, 'getLocalPlayerViewSettings' | 'onChange'>;
+
 /** Something drawn over the mirrored map in the player window. */
 export interface PlayerOverlay {
   /** Draw into `parent`, the popout's content. */
@@ -31,7 +34,7 @@ export abstract class PlayerSceneOverlay<Scene extends object> implements Player
   private unsubscribeStore: (() => void) | undefined;
   private readonly unsubscribeSettings: () => void;
 
-  protected constructor(private readonly containerInfo: DomElementInfo, settings: SettingsService) {
+  protected constructor(private readonly containerInfo: DomElementInfo, settings: PlayerSettingsSource) {
     this.playerSettings = settings.getLocalPlayerViewSettings();
     this.unsubscribeSettings = settings.onChange(() => {
       const playerSettings = settings.getLocalPlayerViewSettings();

@@ -1,3 +1,4 @@
+import { viewConditionDefinitions } from './token-renderer/viewConditionDefinitions';
 import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork';
 import type { AtlasSettings } from '../services/SettingsService';
 import { hiddenTokenLayers, type LayerVisibility } from './playerSafeFrame';
@@ -194,13 +195,7 @@ export class TokenRenderer {
     });
     
     // Wire condition definitions provider (shared by InteractionController + UIManager/TokenUIRenderers)
-    const conditionDefsProvider = (): ConditionDefinition[] => {
-      const mapPath = this.store.getState().mapPath;
-      if (!mapPath) return [];
-      const collectionId = this.assetService.getCollectionForMap(mapPath);
-      if (!collectionId) return [];
-      return this.assetService.getCollectionSettings(collectionId).conditions;
-    };
+    const conditionDefsProvider = (): ConditionDefinition[] => viewConditionDefinitions(this.store.getState(), this.assetService);
     this.interactionController.conditionDefsProvider = conditionDefsProvider;
     this.uiManager.conditionDefsProvider = conditionDefsProvider;
 

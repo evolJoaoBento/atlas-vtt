@@ -122,6 +122,19 @@ export class CameraController {
     this.glideTo(this.fitted());
   }
 
+  /**
+   * The player moved the view themselves (Atlas's viewport: its drag, wheel or pinch): the
+   * camera is where they put it and stops following. Nothing to draw, so only the change of
+   * following is told.
+   */
+  movedByPlayer(camera: Camera): void {
+    this.glide = null;
+    this.camera = camera;
+    if (!this.following) return;
+    this.following = false;
+    this.options.onChange();
+  }
+
   private target(): Camera {
     const gm = this.gm;
     if (gm && gm.sceneId === this.sceneId) return clampCamera(cameraForView(gm, this.screen), this.limits());

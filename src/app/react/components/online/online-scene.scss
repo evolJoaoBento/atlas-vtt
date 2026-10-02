@@ -1,0 +1,59 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// The online scene's status bar, at the start of the top row. Imported inside
+// the `.atlas-vtt-plugin` scope of styles/main.scss.
+// ═══════════════════════════════════════════════════════════════════════════
+
+@use '../../../../../styles/tokens' as *;
+@use '../../../../../styles/mixins' as *;
+@use 'online-marks' as *;
+
+$online-scene-bar-inset: $spacing-xs;
+
+.atlas-online-scene-bar {
+  @include atlas-elevated-surface;
+  // Shorter than the radius allows, so the bar renders as a capsule.
+  @include atlas-panel-radius($radius-2xl);
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: $spacing-s;
+  padding: $online-scene-bar-inset $spacing-s;
+  min-height: $button-height-s + 2 * $online-scene-bar-inset;
+  pointer-events: auto;
+  color: var(--text-normal);
+  font-size: $font-ui-small;
+}
+
+.atlas-online-scene-bar__dot {
+  width: $online-mark-size;
+  height: $online-mark-size;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--text-faint);
+
+  &--connected { background: var(--color-green); }
+  &--pending { background: var(--color-yellow); }
+  &--ended { background: var(--color-red); }
+}
+
+.atlas-online-scene-bar__title {
+  @include atlas-truncate;
+  font-weight: $font-weight-medium;
+}
+
+.atlas-online-scene-bar__connection,
+.atlas-online-scene-bar__message {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.atlas-online-scene-bar__notice {
+  color: var(--text-error);
+  white-space: nowrap;
+}
+
+// The button sits at the capsule's end, so its corner follows the bar's.
+.atlas-online-scene-bar__action {
+  border-radius: atlas-panel-inset-radius-value($online-scene-bar-inset, $button-height-s * 0.5);
+}

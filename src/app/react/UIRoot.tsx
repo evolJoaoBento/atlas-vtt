@@ -1,3 +1,4 @@
+import { OnlineSceneBar } from './components/online/OnlineSceneBar';
 import React, { useMemo, useState, useEffect } from 'react';
 import { App } from 'obsidian';
 import { Application } from 'pixi.js';
@@ -68,6 +69,12 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
       if (matchesMapHotkey(e, 'fitMap', settings)) {
         // Shift+1: Fit entire map in view with smooth animation
         e.preventDefault();
+        // The online scene fits through its camera, which then stops following the GM.
+        const onlineControls = view?.onlineControls() ?? null;
+        if (onlineControls) {
+          onlineControls.fitMap();
+          return;
+        }
         const vp = view?.renderer?.getViewportInstance?.();
         const bg = view?.renderer?.getBackgroundSprite?.();
         if (!vp || !bg) return;
@@ -134,6 +141,7 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
   // Check if this is a player view - use store state which is authoritative
   const storeIsPlayerView = useAtlasStore(state => state.isPlayerView);
   const isPlayerView = storeIsPlayerView || view?.getViewType?.() === 'atlas-vtt-player';
+  const remote = useAtlasStore(state => Boolean(state.remoteScene));
   // Get loading state from store
   const isMapLoading = useAtlasStore(state => state.isMapLoading);
   const mapLoadingProgress = useAtlasStore(state => state.mapLoadingProgress);
@@ -201,6 +209,7 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
           {/* Map chrome stays mounted while a scene loads; the loading overlay blocks input meanwhile */}
           {/* Top row — scene tabs (DM only) and widget bar share one flex row */}
           <div className="atlas-top-bar-row">
+            {remote && <OnlineSceneBar />}
             {!isPlayerView && (
               <SceneTabBar
                 onSwitchTab={switchTab}

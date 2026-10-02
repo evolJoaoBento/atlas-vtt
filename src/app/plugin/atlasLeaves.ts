@@ -75,3 +75,9 @@ export function registerAtlasLeafSync(plugin: Plugin): void {
     plugin.app.workspace.on('layout-change', () => mergeDuplicateAtlasLeaves(plugin.app))
   );
 }
+
+/** The active view of one of this vault's maps; null for none, or for the online scene, which shows another Atlas's. */
+export function activeMapView(app: App): AtlasView | null {
+  const view = app.workspace.getActiveViewOfType(AtlasView);
+  return view && !view.isRemote ? view : null;
+}

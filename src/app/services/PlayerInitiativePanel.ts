@@ -1,8 +1,7 @@
 import type { App } from 'obsidian';
 import type { ViewAtlasState } from '../storeFactory';
 import type { InitiativeEntry } from '../types/initiativeTypes';
-import { PlayerSceneOverlay, type PlayerSettings } from './PlayerSceneOverlay';
-import type { SettingsService } from './SettingsService';
+import { PlayerSceneOverlay, type PlayerSettings, type PlayerSettingsSource } from './PlayerSceneOverlay';
 import './player-initiative.scss';
 
 /** Separates token ids in `InitiativeScene.visibleTokenIds`. */
@@ -17,7 +16,7 @@ interface InitiativeScene {
 
 /** Read-only initiative projection; never mounts the DM tracker or its controls. */
 export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
-  constructor(private readonly app: App, settings: SettingsService) {
+  constructor(private readonly app: App, settings: PlayerSettingsSource) {
     super({ cls: 'atlas-player-initiative-container' }, settings);
   }
 
