@@ -45,7 +45,7 @@ export class JoinIdentity {
   }
 
   /**
-   * Takes the GM's table proof when it is for the link's table and this join's nonce, once per join.
+   * Takes the GM's table proof when it is for the link's table and host, this device and this join's nonce, once per join.
    * True when the identity was set now; otherwise sharing stays off.
    */
   async verify(proof: TableProof | null): Promise<boolean> {
@@ -53,7 +53,12 @@ export class JoinIdentity {
     this.checked = true;
     const tableId = this.target.tableId;
     if (!proof || !tableId || !this.device) return false;
-    if (!(await checkTableProof(this.crypto, proof, tableId, this.nonce))) return false;
+    try {
+      const deviceId = await this.crypto.keyId(this.device.key);
+      if (!(await checkTableProof(this.crypto, proof, tableId, { hostId: this.target.hostId, deviceId, nonce: this.nonce }))) return false;
+    } catch {
+      return false;
+    }
     this.identity = { tableId, personId: proof.personId, gmName: proof.gmName };
     return true;
   }

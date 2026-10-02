@@ -11,8 +11,18 @@ export function deviceProofText(table: string, hostId: string, nonce: string): s
   return `atlas-device-v1|${table}|${hostId}|${nonce}`;
 }
 
-export function tableProofText(table: string, nonce: string, personId: string): string {
-  return `atlas-table-v1|${table}|${nonce}|${personId}`;
+/** What a table proof is bound to besides the table: one GM host, one device and one join of it. */
+export interface TableBinding {
+  /** The GM's host id: a proof relayed from another host's session fails. */
+  hostId: string;
+  /** The device id (the key id of the player's device key) the proof is for: a proof made for another player's join fails. */
+  deviceId: string;
+  /** The player's nonce of this join. */
+  nonce: string;
+}
+
+export function tableProofText(table: string, binding: TableBinding, personId: string): string {
+  return `atlas-table-v1|${table}|${binding.hostId}|${binding.deviceId}|${binding.nonce}|${personId}`;
 }
 
 export async function makeDeviceProof(
@@ -34,20 +44,20 @@ export async function checkDeviceProof(crypto: IdentityCrypto, proof: DeviceProo
 }
 
 export async function makeTableProof(
-  crypto: IdentityCrypto, table: TableIdentity, nonce: string, personId: string, gmName: string,
+  crypto: IdentityCrypto, table: TableIdentity, binding: TableBinding, personId: string, gmName: string,
 ): Promise<TableProof> {
   return {
     id: table.id, key: table.keys.publicKey, personId, gmName,
-    sig: await crypto.sign(table.keys.privateKey, tableProofText(table.id, nonce, personId)),
+    sig: await crypto.sign(table.keys.privateKey, tableProofText(table.id, binding, personId)),
   };
 }
 
-/** Whether the proof's key is the link's table (its id) and it signed this player's nonce. */
-export async function checkTableProof(crypto: IdentityCrypto, proof: TableProof, tableId: string, nonce: string): Promise<boolean> {
+/** Whether the proof's key is the link's table (its id) and it signed this player's join: the link's host, their device and nonce. */
+export async function checkTableProof(crypto: IdentityCrypto, proof: TableProof, tableId: string, binding: TableBinding): Promise<boolean> {
   if (proof.id !== tableId) return false;
   try {
     if ((await crypto.keyId(proof.key)) !== tableId) return false;
-    return await crypto.verify(proof.key, tableProofText(tableId, nonce, proof.personId), proof.sig);
+    return await crypto.verify(proof.key, tableProofText(tableId, binding, proof.personId), proof.sig);
   } catch {
     return false;
   }

@@ -210,6 +210,7 @@ export class GmSession {
       older.close();
     }
     if (known.player.status === 'pending') {
+      known.device = message.device ?? null;
       this.changed();
       return;
     }
@@ -224,7 +225,17 @@ export class GmSession {
       return;
     }
     state.joining = true;
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      state.joining = false;
+      this.refuse(link, 'denied');
+    }, SESSION_LIMITS.reissueTimeoutMs);
     void reissued(this.options, known, device).then((admission) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
       state.joining = false;
       if (this.stopped || !this.links.has(link)) return;
       if (!admission || this.entries.get(known.player.playerId) !== known) {

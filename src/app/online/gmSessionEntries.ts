@@ -39,7 +39,10 @@ export function setClient(player: SessionPlayer, kind: 'web' | 'obsidian'): void
  * (a reconnect within one join), a proof for a new join (a new nonce) is signed anew by the owner.
  */
 export function rejoinCheck(entry: Entry, device: DeviceProof | undefined): 'open' | 'same' | 'reissue' | 'deny' {
-  if (!entry.player.personId) return 'open';
+  if (!entry.player.personId) {
+    // A waiting request stays with the device it was made for; its proof is refreshed (a new join has a new nonce).
+    return entry.player.status === 'pending' && (device?.key ?? null) !== (entry.device?.key ?? null) ? 'deny' : 'open';
+  }
   const known = entry.device;
   if (!device || !known || device.table !== known.table || device.key !== known.key) return 'deny';
   return device.nonce === known.nonce && device.sig === known.sig ? 'same' : 'reissue';

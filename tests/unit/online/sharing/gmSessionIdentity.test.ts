@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GmSession, type Admission, type SessionPlayer } from '../../../../src/app/online/GmSession';
+import { GmSession, SESSION_LIMITS, type Admission, type SessionPlayer } from '../../../../src/app/online/GmSession';
 import { decodeControl, encodeControl, type ControlMessage, type DeviceProof, type TableProof } from '../../../../src/app/online/protocol';
 import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
 
@@ -121,5 +121,33 @@ describe('GmSession identity on a new join of a known person', () => {
     const again = await player(network, 'k1', AGAIN);
     await vi.advanceTimersByTimeAsync(0);
     expect(again.received[0]).toEqual({ v: 1, type: 'denied', reason: 'denied' });
+  });
+});
+
+describe('GmSession identity edge cases', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('denies a reissue that never finishes, after the timeout', async () => {
+    const { network, session, requests } = setup(() => new Promise<Admission | null>(() => {}));
+    const first = await player(network, 'k1', DEVICE);
+    session.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: TABLE });
+    first.link.close();
+    const again = await player(network, 'k1', { ...DEVICE, nonce: 'M'.repeat(22), sig: 'R'.repeat(86) });
+    await vi.advanceTimersByTimeAsync(SESSION_LIMITS.reissueTimeoutMs - 1);
+    expect(again.received).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(again.received[0]).toEqual({ v: 1, type: 'denied', reason: 'denied' });
+  });
+
+  it('keeps a waiting request to its device, taking the newer proof of the same key', async () => {
+    const { network, session, requests } = setup();
+    await player(network, 'k1', DEVICE);
+    const newer = { ...DEVICE, nonce: 'M'.repeat(22), sig: 'R'.repeat(86) };
+    await player(network, 'k1', newer);
+    expect(requests).toHaveLength(1);
+    const stranger = await player(network, 'k1', { ...DEVICE, key: 'Q'.repeat(120) });
+    expect(stranger.received[0]).toEqual({ v: 1, type: 'denied', reason: 'denied' });
+    expect(session.getPlayers()[0]).toMatchObject({ status: 'pending' });
   });
 });

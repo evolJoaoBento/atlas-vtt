@@ -11,7 +11,7 @@ import { onlineSessionStore, resetOnlineSessionStore } from './onlineSessionStor
 import { peerServerOptions } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
-import { tableReissuer } from './sharing/identity/reissue';
+import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
 import { ensureTableIdentity } from './sharing/identity/tableKey';
 import { AssetServer } from './assets/AssetServer';
 import { vaultImageFiles } from './assets/vaultImageFiles';
@@ -81,7 +81,7 @@ export class OnlineSessionService {
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
   private readonly loadTable: () => Promise<TableIdentity | null>;
   private readonly identityCrypto: IdentityCrypto;
-  private currentTable: TableIdentity | null = null;
+  private currentTable: HostedTable | null = null;
   private currentHostId: string | null = null;
 
   constructor(private readonly app: App, private readonly settings: SettingsService, deps: Deps = {}) {
@@ -102,8 +102,8 @@ export class OnlineSessionService {
     return this.current;
   }
 
-  /** This Atlas's table while hosting; null otherwise or when it has none. */
-  get table(): TableIdentity | null { return this.current ? this.currentTable : null; }
+  /** This Atlas's table while hosting (never its private key); null otherwise or when it has none. */
+  get table(): HostedTable | null { return this.current ? this.currentTable : null; }
 
   /** The current host id while hosting. */
   get hostId(): string | null { return this.current ? this.currentHostId : null; }
@@ -140,7 +140,7 @@ export class OnlineSessionService {
       host.close();
       return;
     }
-    this.currentTable = table;
+    this.currentTable = table ? hostedTable(this.identityCrypto, table, host.id, () => normalizePlayerName(this.settings.getOnlineSettings().playerName) ?? 'GM') : null;
     this.currentHostId = host.id;
     let joinUrl: string;
     let linkWorks: boolean;
@@ -156,7 +156,7 @@ export class OnlineSessionService {
     const session = new GmSession(host, {
       title: this.app.vault.getName(),
       // A person admitted with an id who joins again on a new join gets a fresh table proof for its nonce.
-      ...(table ? { reissue: tableReissuer(this.identityCrypto, table, host.id, () => normalizePlayerName(this.settings.getOnlineSettings().playerName) ?? 'GM') } : {}),
+      ...(this.currentTable ? { reissue: tableReissuer(this.currentTable) } : {}),
       onJoinRequest: (player) => {
         this.notices.set(player.playerId, this.showRequest(player, (allow) => allow ? this.allow(player.playerId) : this.deny(player.playerId)));
       },

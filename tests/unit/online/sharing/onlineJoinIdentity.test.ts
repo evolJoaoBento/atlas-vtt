@@ -6,8 +6,8 @@ import { OnlineJoinService, type SessionIdentity } from '../../../../src/app/onl
 import { DEFAULT_ONLINE_SETTINGS, type OnlineSettings } from '../../../../src/app/online/onlineSettings';
 import type { DeviceProof } from '../../../../src/app/online/protocol';
 import { DeviceKeys, memoryKeyValueStore } from '../../../../src/app/online/sharing/identity/deviceKeys';
-import { checkDeviceProof, makeTableProof } from '../../../../src/app/online/sharing/identity/proofs';
-import { tableReissuer } from '../../../../src/app/online/sharing/identity/reissue';
+import { checkDeviceProof, makeTableProof, type TableBinding } from '../../../../src/app/online/sharing/identity/proofs';
+import { hostedTable, tableReissuer } from '../../../../src/app/online/sharing/identity/reissue';
 import { RECONNECT_DELAYS_MS } from '../../../../src/app/online/PlayerSession';
 import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
 import type { ClientTransport, PeerLink } from '../../../../src/app/online/transport/types';
@@ -29,7 +29,7 @@ async function world(client: (network: MemoryNetwork) => ClientTransport = (netw
   const requests: Array<{ player: SessionPlayer; device: DeviceProof | null }> = [];
   const gm = new GmSession(network.host('gm'), {
     title: 'Table', onJoinRequest: (player, device) => requests.push({ player, device }), onRequestClosed: () => {}, onPlayersChanged: () => {},
-    ...(reissue ? { reissue: tableReissuer(crypto, table, 'gm', () => 'Morgan') } : {}),
+    ...(reissue ? { reissue: tableReissuer(hostedTable(crypto, table, 'gm', () => 'Morgan')) } : {}),
   });
   gm.start();
   const identities: Array<SessionIdentity | null> = [];
@@ -40,6 +40,11 @@ async function world(client: (network: MemoryNetwork) => ClientTransport = (netw
   });
   service.onIdentity((identity) => identities.push(identity));
   return { gm, table, service, requests, identities };
+}
+
+/** The binding a GM at host `gm` signs for a verified device proof. */
+async function binding(device: DeviceProof, hostId = 'gm'): Promise<TableBinding> {
+  return { hostId, deviceId: await crypto.keyId(device.key), nonce: device.nonce };
 }
 
 describe('joining with an identity', () => {
@@ -55,7 +60,7 @@ describe('joining with an identity', () => {
     await vi.advanceTimersByTimeAsync(0);
     const device = requests[0]!.device!;
     expect(await checkDeviceProof(crypto, device, table.id, 'gm')).not.toBeNull();
-    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, device.nonce, 'ana_1', 'Morgan') });
+    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, await binding(device), 'ana_1', 'Morgan') });
     await vi.advanceTimersByTimeAsync(0);
     expect(service.identity).toEqual({ tableId: table.id, personId: 'ana_1', gmName: 'Morgan' });
     expect(identities.at(-1)).toEqual(service.identity);
@@ -69,8 +74,21 @@ describe('joining with an identity', () => {
     service.join(`https://example.org/#id=gm&table=${table.id}`, 'Ana');
     await vi.advanceTimersByTimeAsync(0);
     const fake = await testTable();
-    const forged = { ...(await makeTableProof(crypto, fake, requests[0]!.device!.nonce, 'ana_1', 'Morgan')), id: table.id };
+    const forged = { ...(await makeTableProof(crypto, fake, await binding(requests[0]!.device!), 'ana_1', 'Morgan')), id: table.id };
     gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: forged });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(service.state?.status).toBe('admitted');
+    expect(service.identity).toBeNull();
+  });
+
+  it.each(['device', 'host'] as const)('turns sharing off for a table proof signed for another %s, but plays on', async (kind) => {
+    const { gm, table, service, requests } = await world();
+    service.join(`https://example.org/#id=gm&table=${table.id}`, 'Ana');
+    await vi.advanceTimersByTimeAsync(0);
+    const device = requests[0]!.device!;
+    const own = await binding(device);
+    const other = kind === 'device' ? { ...own, deviceId: await crypto.keyId((await crypto.generate()).publicKey) } : { ...own, hostId: 'other-host' };
+    gm.allow(requests[0]!.player.playerId, { personId: 'mallory', table: await makeTableProof(crypto, table, other, 'mallory', 'Morgan') });
     await vi.advanceTimersByTimeAsync(0);
     expect(service.state?.status).toBe('admitted');
     expect(service.identity).toBeNull();
@@ -98,8 +116,7 @@ describe('joining with an identity', () => {
     }));
     service.join(`https://example.org/#id=gm&table=${table.id}`, 'Ana');
     await vi.advanceTimersByTimeAsync(0);
-    const nonce = requests[0]!.device!.nonce;
-    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, nonce, 'ana_1', 'Morgan') });
+    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, await binding(requests[0]!.device!), 'ana_1', 'Morgan') });
     await vi.advanceTimersByTimeAsync(0);
     links[0]!.close();
     await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
@@ -115,7 +132,7 @@ describe('joining with an identity', () => {
     service.join(link, 'Ana');
     await vi.advanceTimersByTimeAsync(0);
     const first = requests[0]!.device!;
-    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, first.nonce, 'ana_1', 'Morgan') });
+    gm.allow(requests[0]!.player.playerId, { personId: 'ana_1', table: await makeTableProof(crypto, table, await binding(first), 'ana_1', 'Morgan') });
     await vi.advanceTimersByTimeAsync(0);
     expect(service.identity?.personId).toBe('ana_1');
     service.leave();

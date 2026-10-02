@@ -31,21 +31,30 @@ describe('device proofs', () => {
 });
 
 describe('table proofs', () => {
-  it('check against the link table id and the player nonce', async () => {
+  const bound = { hostId: 'host-1', deviceId: 'D'.repeat(43), nonce: 'nonce-aaaaaaaaaaaaaaaa' };
+
+  it('check against the link table id, host, the player device and nonce', async () => {
     const table = await testTable();
-    const proof = await makeTableProof(crypto, table, 'nonce-aaaaaaaaaaaaaaaa', 'person-1', 'Morgan');
+    const proof = await makeTableProof(crypto, table, bound, 'person-1', 'Morgan');
     expect(proof).toMatchObject({ id: table.id, personId: 'person-1', gmName: 'Morgan' });
-    expect(await checkTableProof(crypto, proof, table.id, 'nonce-aaaaaaaaaaaaaaaa')).toBe(true);
-    expect(await checkTableProof(crypto, proof, table.id, 'nonce-bbbbbbbbbbbbbbbb')).toBe(false);
-    expect(await checkTableProof(crypto, { ...proof, personId: 'person-2' }, table.id, 'nonce-aaaaaaaaaaaaaaaa')).toBe(false);
+    expect(await checkTableProof(crypto, proof, table.id, bound)).toBe(true);
+    expect(await checkTableProof(crypto, proof, table.id, { ...bound, nonce: 'nonce-bbbbbbbbbbbbbbbb' })).toBe(false);
+    expect(await checkTableProof(crypto, { ...proof, personId: 'person-2' }, table.id, bound)).toBe(false);
+  });
+
+  it('fail when signed for another host or another device: a relayed proof is worthless', async () => {
+    const table = await testTable();
+    const proof = await makeTableProof(crypto, table, bound, 'person-1', 'Morgan');
+    expect(await checkTableProof(crypto, proof, table.id, { ...bound, hostId: 'host-2' })).toBe(false);
+    expect(await checkTableProof(crypto, proof, table.id, { ...bound, deviceId: 'E'.repeat(43) })).toBe(false);
   });
 
   it('fail for a key that does not hash to the table id, even when signed with it', async () => {
     const real = await testTable();
     const fake = await testTable();
     // A fake GM signs with its own key but claims the real table id.
-    const forged = { ...(await makeTableProof(crypto, fake, 'n-aaaaaaaaaaaaaaaaaaaa', 'p', 'GM')), id: real.id };
-    expect(await checkTableProof(crypto, forged, real.id, 'n-aaaaaaaaaaaaaaaaaaaa')).toBe(false);
+    const forged = { ...(await makeTableProof(crypto, fake, bound, 'p', 'GM')), id: real.id };
+    expect(await checkTableProof(crypto, forged, real.id, bound)).toBe(false);
   });
 });
 

@@ -9,6 +9,8 @@ export const SESSION_LIMITS = {
   maxPlayers: 12,
   maxPendingRequests: 12,
   maxInvalidMessages: 3,
+  /** How long a returning person's identity check may take before the join is denied. */
+  reissueTimeoutMs: 10_000,
 } as const;
 
 export type PlayerStatus = 'pending' | 'admitted' | 'gone';
