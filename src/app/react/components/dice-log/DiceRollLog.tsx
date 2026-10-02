@@ -7,6 +7,8 @@ import { DiceRollEntry } from './DiceRollEntry';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import type { DiceTool } from '../../../tools/DiceTool';
+import { rollOfResult } from '../../../online/obsidian/onlineDice';
+import type { DiceRollResult } from '../../../tools/diceRolling';
 
 interface DiceRollLogProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
   const diceLog = useAtlasStore(state => state.diceLog);
   const addDiceLogEntry = useAtlasStore(state => state.addDiceLogEntry);
   const clearDiceLog = useAtlasStore(state => state.clearDiceLog);
+  const remote = useAtlasStore(state => Boolean(state.remoteScene));
 
   const storeActions = useMemo(() => ({
     diceLog, addDiceLogEntry, clearDiceLog,
@@ -37,7 +40,17 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
     }
   }, [view]);
 
-  const { history, clearHistory, repeatRoll } = useDiceHistory(getDiceTool, storeActions);
+  const { history, clearHistory, repeatRoll } = useDiceHistory(getDiceTool, storeActions, { listen: !remote });
+
+  // The online scene's log is the GM's shared log: rolling again asks the GM to roll.
+  const repeat = useCallback((result: DiceRollResult): void => {
+    if (!remote) {
+      repeatRoll(result.formula, result.source);
+      return;
+    }
+    const roll = rollOfResult(result);
+    if (roll) view?.onlineControls()?.rollDice(roll.dice, roll.modifier);
+  }, [remote, repeatRoll, view]);
 
   const handleClose = useCallback((): void => {
     setIsPinned(false);
@@ -96,7 +109,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
       <div className="dice-roll-log__header">
         <span className="dice-roll-log__title">Dice Log</span>
         <div className="dice-roll-log__actions">
-          {history.length > 0 && (
+          {history.length > 0 && !remote && (
             <LabelTooltip label="Clear history">
               <button
                 className="btn btn--ghost btn--icon dice-roll-log__action-btn"
@@ -131,7 +144,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
               key={result.id}
               result={result}
               isNew={index === 0 && history.length > prevLengthRef.current}
-              onRepeat={() => repeatRoll(result.formula, result.source)}
+              onRepeat={() => repeat(result)}
             />
           ))
         )}

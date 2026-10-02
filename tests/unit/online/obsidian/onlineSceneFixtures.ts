@@ -10,6 +10,7 @@ import { OnlineSceneClient, type OnlineSceneService } from '../../../../src/app/
 import type { FollowViewport, Frames } from '../../../../src/app/online/obsidian/ViewportFollower';
 import type { PlayerSessionState } from '../../../../src/app/online/PlayerSession';
 import { GLIDE_MS } from '../../../../src/app/online/view/camera';
+import { LASER_PALETTE } from '../../../../src/app/online/tools/laserColors';
 import { LaserHub } from '../../../../src/app/pixi/laser/LaserHub';
 import { createViewAtlasStore } from '../../../../src/app/storeFactory';
 
@@ -41,6 +42,7 @@ export interface OnlineSceneSetupOptions {
   noSession?: boolean;
   /** Attach right away (the default); the end-to-end test attaches on admission. */
   attach?: boolean;
+  laserColor?: string;
 }
 
 export function onlineSceneSetup(options: OnlineSceneSetupOptions = {}) {
@@ -73,7 +75,7 @@ export function onlineSceneSetup(options: OnlineSceneSetupOptions = {}) {
   const closeTab = vi.fn();
   const parent = document.createElement('div');
   const client = new OnlineSceneClient({
-    store, service, viewport, backdrop, initiative, parent, eventBus, laserHub: hub, closeTab, frames, now: () => now,
+    store, service, viewport, backdrop, initiative, parent, eventBus, laserHub: hub, laserColor: () => options.laserColor ?? LASER_PALETTE[0]!, closeTab, frames, now: () => now,
   });
   const attached = options.attach === false ? false : client.attach();
   const runFrames = (): void => { const due = queue; queue = []; due.forEach((draw) => draw()); };

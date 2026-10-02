@@ -17,9 +17,13 @@ export interface DiceDropdownMenuProps {
   isOpen: boolean;
   onToggle: () => void;
   triggerRef?: React.RefObject<HTMLElement | null>;
+  /** Rolls the picks elsewhere instead of with `diceTool`: the online scene sends them to the GM. */
+  onRoll?: (selection: Readonly<Record<string, number>>) => void;
+  /** Atlas's dice toasts follow the document-wide dice event; the online scene shows none. */
+  showToasts?: boolean;
 }
 
-export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef }: DiceDropdownMenuProps): React.ReactElement {
+export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRoll, showToasts = true }: DiceDropdownMenuProps): React.ReactElement {
   const [selection, setSelection] = useState<DiceSelection>({});
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const portalRef = useRef<HTMLDivElement>(null);
@@ -53,9 +57,10 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef }: Dic
     const formula = diceFormula(selection);
     if (!formula) return;
 
-    diceTool.rollDice(formula);
+    if (onRoll) onRoll(selection);
+    else diceTool.rollDice(formula);
     onToggle();
-  }, [selection, diceTool, onToggle]);
+  }, [selection, diceTool, onToggle, onRoll]);
 
   const handleClear = useCallback((): void => {
     setSelection({});
@@ -115,7 +120,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef }: Dic
         )}
 
       {/* Global toast layer — listens for atlas-dice-rolled CustomEvent */}
-      <DiceToastContainer />
+      {showToasts && <DiceToastContainer />}
     </>
   );
 }

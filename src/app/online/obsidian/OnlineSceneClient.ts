@@ -1,8 +1,8 @@
 /**
  * The Online scene view's wiring, without PIXI: the joined session's sink. It feeds the remote
  * store (`RemoteSceneApplier`), the camera (`ViewportFollower`), the placeholder background, the
- * initiative panel and the status bar, draws other people's lasers through Atlas's laser hub, and
- * answers the view's controls.
+ * initiative panel and the status bar, sends the player's token drops and laser, draws other
+ * people's lasers through Atlas's laser hub, and answers the view's controls.
  */
 import type { EventEmitter } from 'events';
 import type { LaserHub } from '../../pixi/laser/LaserHub';
@@ -14,11 +14,13 @@ import type { PlayerScene } from '../scene/sceneTypes';
 import { laserColor } from '../tools/laserColors';
 import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
 import { diceLogResults } from './onlineDice';
+import { OnlineLaserLink } from './OnlineLaserLink';
 import type { OnlineJoinService, OnlineSceneSink } from './OnlineJoinService';
 import { onlineSceneStatus } from './onlineSceneStatus';
 import { updateRemoteScene, type OnlineSceneControls } from './remoteScene';
 import type { RemoteMapBackdrop } from './RemoteMapBackdrop';
 import { RemoteSceneApplier } from './RemoteSceneApplier';
+import { ONLINE_TOKEN_DROPPED, RemoteTokenMoves, type TokenDrop } from './remoteTokenMoves';
 import { ANIMATION_FRAMES, ViewportFollower, type FollowViewport, type Frames } from './ViewportFollower';
 
 export type OnlineSceneService = Pick<OnlineJoinService, 'attach' | 'images' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser'>;
@@ -33,7 +35,9 @@ export interface OnlineSceneClientOptions {
   parent: HTMLElement;
   /** The view's event bus: `background-sprite-updated` tells the map image moved the viewport. */
   eventBus: EventEmitter;
-  laserHub: Pick<LaserHub, 'showRemote'>;
+  laserHub: Pick<LaserHub, 'showRemote' | 'onLocal'>;
+  /** The player's Atlas laser colour, read for every batch sent. */
+  laserColor(): string;
   /** The session was left from elsewhere: close the tab. */
   closeTab(): void;
   /** Tests pass their own frames and clock. */
@@ -44,6 +48,8 @@ export interface OnlineSceneClientOptions {
 export class OnlineSceneClient implements OnlineSceneSink {
   readonly controls: OnlineSceneControls;
   private readonly applier: RemoteSceneApplier;
+  private readonly moves: RemoteTokenMoves;
+  private readonly laserLink: OnlineLaserLink;
   private readonly follower: ViewportFollower;
   private readonly frames: Frames;
   private state: PlayerSessionState | null = null;
@@ -55,7 +61,17 @@ export class OnlineSceneClient implements OnlineSceneSink {
   constructor(private readonly options: OnlineSceneClientOptions) {
     const { store } = options;
     this.frames = options.frames ?? ANIMATION_FRAMES;
-    this.applier = new RemoteSceneApplier({ store, images: options.service.images });
+    this.moves = new RemoteTokenMoves({
+      store,
+      send: (tokenId, x, y) => options.service.sendTokenMove(tokenId, x, y),
+      onChange: () => this.applier.refresh(),
+    });
+    this.applier = new RemoteSceneApplier({ store, images: options.service.images, positionOf: (tokenId) => this.moves.positionOf(tokenId) });
+    this.laserLink = new OnlineLaserLink({
+      hub: options.laserHub,
+      send: (points, lifted, dt, color) => options.service.sendLaser(points, lifted, dt, color),
+      color: () => options.laserColor(),
+    });
     this.follower = new ViewportFollower({
       viewport: options.viewport,
       onFollowingChange: (following) => updateRemoteScene(store, { following }),
@@ -71,6 +87,7 @@ export class OnlineSceneClient implements OnlineSceneSink {
     options.initiative.mount(options.parent);
     options.initiative.present(store);
     options.eventBus.on('background-sprite-updated', this.onBackgroundMoved);
+    options.eventBus.on(ONLINE_TOKEN_DROPPED, this.onDrop);
   }
 
   /** Attaches to the joined session; false when there is none. */
@@ -86,6 +103,7 @@ export class OnlineSceneClient implements OnlineSceneSink {
 
   scene(scene: PlayerScene | null): void {
     this.shown = scene;
+    this.moves.setScene(scene);
     this.applier.apply(scene);
     this.follower.setScene(scene);
     this.showBackdrop();
@@ -100,8 +118,8 @@ export class OnlineSceneClient implements OnlineSceneSink {
     updateRemoteScene(this.options.store, { movableTokenIds: [...tokenIds] });
   }
 
-  moveRefused(_tokenId: string): void {
-    // This view sends no token moves yet, so the GM refuses none.
+  moveRefused(tokenId: string): void {
+    this.moves.refused(tokenId);
   }
 
   diceLog(entries: readonly DiceLogEntry[]): void {
@@ -148,6 +166,9 @@ export class OnlineSceneClient implements OnlineSceneSink {
     if (this.imagesFrame !== null) this.frames.cancel(this.imagesFrame);
     this.imagesFrame = null;
     this.options.eventBus.off('background-sprite-updated', this.onBackgroundMoved);
+    this.options.eventBus.off(ONLINE_TOKEN_DROPPED, this.onDrop);
+    this.laserLink.dispose();
+    this.moves.dispose();
     this.follower.dispose();
     this.applier.dispose();
     this.options.backdrop.dispose();
@@ -156,6 +177,10 @@ export class OnlineSceneClient implements OnlineSceneSink {
 
   private readonly onBackgroundMoved = (): void => {
     this.follower.reapply();
+  };
+
+  private readonly onDrop = (drop: TokenDrop): void => {
+    if (!this.disposed) this.moves.drop(drop);
   };
 
   private showBackdrop(): void {

@@ -15,6 +15,7 @@ import { useOnlineSession } from "../../react/components/online/useOnlineState"
 import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
 import { Toggle } from "./primitives/Toggle"
 import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
+import { traySelection } from "../../online/obsidian/onlineDice"
 import { AMBIENT_AUDIO_ENABLED, WALLS_AND_LIGHTING_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
 import { ResponsiveToolbar } from "./toolbar/ResponsiveToolbar"
@@ -208,7 +209,13 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
         <div ref={diceButtonRef} className="relative flex items-center">
           <ToolButton icon={Dices} label="Roll Dice" shortcut={hotkeyLabel('diceTray')} isActive={isDiceTrayOpen} onClick={toggleDiceTray} />
           {diceTool && (
-            <DiceDropdownMenu diceTool={diceTool} isOpen={isDiceTrayOpen} onToggle={toggleDiceTray} triggerRef={diceButtonRef} />
+            <DiceDropdownMenu
+              diceTool={diceTool}
+              isOpen={isDiceTrayOpen}
+              onToggle={toggleDiceTray}
+              triggerRef={diceButtonRef}
+              {...(remote ? { onRoll: (selection: Readonly<Record<string, number>>) => { view?.onlineControls()?.rollDice(traySelection(selection), 0) }, showToasts: false } : {})}
+            />
           )}
         </div>
       ),

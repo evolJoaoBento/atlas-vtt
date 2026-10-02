@@ -33,6 +33,7 @@ import { runInBackground } from '../../utils/backgroundTask';
 import { tokenSizeSubmenu } from '../../react/components/context-menu/tokenSizeMenu';
 import { conditionsSubmenu } from '../../react/components/context-menu/conditionsMenu';
 import { controlledBySubmenu } from '../../online/ui/controlledByMenu';
+import { mayMoveAsOnlinePlayer, ONLINE_TOKEN_DROPPED } from '../../online/obsidian/remoteTokenMoves';
 
 interface DragState {
   isDragging: boolean;
@@ -139,6 +140,8 @@ export class InteractionController implements ITokenInteractionController {
     const token = this.store.getState().objects.tokens[tokenId];
     if (!token) return;
     if (this.isPlayerView) {
+      // An online player drags the tokens the GM gave them, one at a time; the local player window drags none.
+      if (mayMoveAsOnlinePlayer(this.store.getState(), tokenId)) this.prepareInteraction(token, e, { single: true });
       return;
     }
 
@@ -218,12 +221,14 @@ export class InteractionController implements ITokenInteractionController {
     return this.dragState.isDragging;
   }
 
-  private prepareInteraction(token: TokenEntity, e: FederatedPointerEvent): void {
+  /** `single`: the online scene drags only the pressed token: no Shift groups, no Alt copies. */
+  private prepareInteraction(token: TokenEntity, e: FederatedPointerEvent, options: { single?: boolean } = {}): void {
+    const single = options.single === true;
     const { selectedIds, setSelection } = this.store.getState();
     const isTokenSelected = selectedIds.includes(token.id);
 
     // Shift-click toggles membership; removing never starts a drag.
-    if (e.shiftKey && isTokenSelected) {
+    if (!single && e.shiftKey && isTokenSelected) {
       setSelection(selectedIds.filter((id) => id !== token.id));
       return;
     }
@@ -237,13 +242,13 @@ export class InteractionController implements ITokenInteractionController {
     // Store the token for potential click handling
     this.dragState.clickToken = token;
     this.dragState.hasMoved = false;
-    this.dragState.copyOnDrag = e.altKey;
+    this.dragState.copyOnDrag = !single && e.altKey;
     
     // Determine which tokens to potentially drag
-    if (e.shiftKey) {
+    if (!single && e.shiftKey) {
       this.dragState.dragIds = [...selectedIds, token.id];
       setSelection(this.dragState.dragIds);
-    } else if (isTokenSelected && selectedIds.length > 1) {
+    } else if (!single && isTokenSelected && selectedIds.length > 1) {
       this.dragState.dragIds = [...selectedIds];
     } else {
       this.dragState.dragIds = [token.id];
@@ -462,6 +467,8 @@ export class InteractionController implements ITokenInteractionController {
       } else if (tokenUpdates.length > 1) {
         this.store.getState().setTokenPositions(tokenUpdates);
       }
+      // The online scene sends each drop to the GM, who decides where the token stays.
+      if (this.isPlayerView) for (const update of tokenUpdates) this.eventBus.emit(ONLINE_TOKEN_DROPPED, update);
       
       // Update UI
       this.onSelectionUpdate?.();

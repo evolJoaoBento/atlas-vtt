@@ -3,8 +3,8 @@
  * roller's name. These rolls live only in the online scene's store, which is never saved, and
  * never go through Atlas's document-wide dice event, which every open map would record.
  */
-import type { DiceRollResult } from '../../tools/diceRolling';
-import type { DiceLogEntry } from '../tools/toolMessages';
+import { isDieType, type DiceRollResult, type DiceSelection } from '../../tools/diceRolling';
+import { DICE_LIMITS, isDiceModifier, type DiceLogEntry } from '../tools/toolMessages';
 
 export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult[] {
   return entries.map((entry) => ({
@@ -16,4 +16,23 @@ export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult
     total: entry.total,
     rolledBy: entry.name,
   }));
+}
+
+/** The dice and modifier a logged roll used, to send it again; null when the tray cannot roll it (another die, too many dice). */
+export function rollOfResult(result: DiceRollResult): { dice: DiceSelection; modifier: number } | null {
+  const dice: DiceSelection = {};
+  for (const roll of result.rolls) {
+    if (!isDieType(roll.die)) return null;
+    dice[roll.die] = (dice[roll.die] ?? 0) + 1;
+  }
+  const count = result.rolls.length;
+  if (count === 0 || count > DICE_LIMITS.dicePerRoll || !isDiceModifier(result.modifiers)) return null;
+  return { dice, modifier: result.modifiers };
+}
+
+/** The tray's picks as a roll's dice: Atlas's tray dice with a count above zero. */
+export function traySelection(selection: Readonly<Record<string, number>>): DiceSelection {
+  const dice: DiceSelection = {};
+  for (const [die, count] of Object.entries(selection)) if (isDieType(die) && count > 0) dice[die] = count;
+  return dice;
 }

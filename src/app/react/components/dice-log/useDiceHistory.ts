@@ -7,6 +7,7 @@ const MAX_HISTORY = 20;
  * Subscribes to dice roll events and provides a reactive history array.
  * Seeds from the store's persisted `diceLog` on mount, syncs new rolls
  * back to the store for persistence across map close/reopen.
+ * @param options.listen - false: show only the store's log (the online scene's shared log), never the document-wide dice event
  */
 export function useDiceHistory(
   getDiceTool: () => { rollDice: (formula: string, source?: DiceRollResult['source']) => DiceRollResult } | null,
@@ -15,11 +16,13 @@ export function useDiceHistory(
     addDiceLogEntry: (entry: DiceRollResult) => void;
     clearDiceLog: () => void;
   },
+  options: { listen?: boolean } = {},
 ): {
   history: DiceRollResult[];
   clearHistory: () => void;
   repeatRoll: (formula: string, source?: DiceRollResult['source']) => void;
 } {
+  const listen = options.listen !== false;
   const [history, setHistory] = useState<DiceRollResult[]>(() =>
     storeActions?.diceLog ?? [],
   );
@@ -33,6 +36,7 @@ export function useDiceHistory(
 
   // Listen for new rolls (DOM CustomEvent — same channel as toast system)
   useEffect(() => {
+    if (!listen) return;
     const handleRoll = (e: Event): void => {
       const result = (e as CustomEvent<DiceRollResult>).detail;
       setHistory(prev => {
@@ -53,7 +57,7 @@ export function useDiceHistory(
       document.removeEventListener('atlas-dice-rolled', handleRoll);
       document.removeEventListener('atlas-dice-history-cleared', handleClear);
     };
-  }, [storeActions]);
+  }, [storeActions, listen]);
 
   const clearHistory = useCallback((): void => {
     setHistory([]);

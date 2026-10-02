@@ -9,10 +9,11 @@ export function collectionGridDefaultsFor(assetService: AssetService, mapPath: s
   return (collectionId ? assetService.getCollectionSettings(collectionId).gridDefaults : undefined) ?? null;
 }
 
-/** Measurement settings for the map in `state`, read from its collection when it has one. */
+/** Measurement settings for the map in `state`: its collection's, or, in the online scene, the GM's. */
 export function mapMeasurementSettings(
   assetService: AssetService,
-  state: Pick<ViewAtlasState, 'mapPath' | 'grid'>,
+  state: Pick<ViewAtlasState, 'mapPath' | 'grid' | 'remoteScene'>,
 ): MeasurementSettings {
+  if (state.remoteScene) return state.remoteScene.measurement;
   return resolveMeasurementSettings(collectionGridDefaultsFor(assetService, state.mapPath) ?? undefined, state.grid);
 }

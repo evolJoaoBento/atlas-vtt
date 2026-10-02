@@ -118,6 +118,7 @@ export class OnlineSceneView extends AtlasView {
       parent: this.containerEl,
       eventBus: this.serviceManager.getEventBus(),
       laserHub: renderer.getLaserHub(),
+      laserColor: () => this.serviceManager.getSettingsService().getLaserPointerSettings().color,
       closeTab: () => this.leaf.detach(),
     });
     if (!client.attach()) {
