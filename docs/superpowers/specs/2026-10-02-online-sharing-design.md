@@ -40,9 +40,14 @@ people. No accounts: identity comes from the session and a player name.
   Obsidian players). Web players are unaffected.
 - Every Atlas keeps a **people list**: player id, table id, name (editable),
   last seen, managed in an Atlas **People** panel (rename, link, remove).
-  People are added automatically when admitted; a known player's join request
-  shows "(known)". A known player on a new device can be **linked** to the
-  existing person. Shares and `only`/`except` names refer to people in this
+  People are added automatically when admitted. The player id is a long random
+  secret kept on the player's device, presented on every join; it, not the
+  name, decides who someone is. Join requests show **(known)** for a known id
+  and **(new)** otherwise; a new id using a name already in the people list is
+  flagged ("Someone named Ana is already in your people list"), and the GM can
+  **Allow** as a new person, **Link to Ana** (a known person on a new device), or
+  **Deny**. Only the GM links; nobody can take over another person's shares by
+  typing their name. Shares and `only`/`except` names refer to people in this
   list; renaming keeps references by id.
 
 ## Sharing
