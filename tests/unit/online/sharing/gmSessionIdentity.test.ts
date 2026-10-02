@@ -150,4 +150,41 @@ describe('GmSession identity edge cases', () => {
     expect(stranger.received[0]).toEqual({ v: 1, type: 'denied', reason: 'denied' });
     expect(session.getPlayers()[0]).toMatchObject({ status: 'pending' });
   });
+
+  async function reissuing() {
+    const world = setup(() => new Promise<Admission | null>(() => {}));
+    const first = await player(world.network, 'k1', DEVICE);
+    world.session.allow(world.requests[0]!.player.playerId, { personId: 'ana_1', table: TABLE });
+    first.link.close();
+    const again = await player(world.network, 'k1', { ...DEVICE, nonce: 'M'.repeat(22), sig: 'R'.repeat(86) });
+    return { ...world, again };
+  }
+
+  it('clears the reissue timer when the connection closes, and sends nothing later', async () => {
+    const { again } = await reissuing();
+    const waiting = vi.getTimerCount();
+    again.link.close();
+    expect(vi.getTimerCount()).toBe(waiting - 1);
+    await vi.advanceTimersByTimeAsync(SESSION_LIMITS.reissueTimeoutMs);
+    expect(again.received).toEqual([]);
+  });
+
+  it('clears the reissue timer when the session stops', async () => {
+    const { session, again } = await reissuing();
+    session.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(SESSION_LIMITS.reissueTimeoutMs);
+    expect(again.received.filter((message) => message.type === 'denied')).toEqual([]);
+  });
+
+  it('knows the device proof of a waiting request after a takeover refreshed it', async () => {
+    const { network, session, requests } = setup();
+    await player(network, 'k1', DEVICE);
+    const playerId = requests[0]!.player.playerId;
+    expect(session.deviceOf(playerId)).toEqual(DEVICE);
+    const newer = { ...DEVICE, nonce: 'M'.repeat(22), sig: 'R'.repeat(86) };
+    await player(network, 'k1', newer);
+    expect(session.deviceOf(playerId)).toEqual(newer);
+    expect(session.deviceOf('nobody')).toBeNull();
+  });
 });

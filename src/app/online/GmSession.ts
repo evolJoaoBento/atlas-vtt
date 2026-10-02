@@ -1,8 +1,8 @@
 // src/app/online/GmSession.ts
-import { presenceOf, rejoinCheck, reissued, setClient, type Entry, type LinkState } from './gmSessionEntries';
+import { cancelReissue, presenceOf, rejoinCheck, runReissue, setClient, type Entry, type LinkState } from './gmSessionEntries';
 import { SESSION_LIMITS, type Admission, type GmSessionOptions, type PlayerStatus, type SessionHandler, type SessionPlayer } from './gmSessionTypes';
 import { randomId } from './ids';
-import { decodeControl, encodeControl, normalizePlayerName, PLAYER_MESSAGE_TYPES, type ControlMessage, type DenyReason } from './protocol';
+import { decodeControl, encodeControl, normalizePlayerName, PLAYER_MESSAGE_TYPES, type ControlMessage, type DenyReason, type DeviceProof } from './protocol';
 import { channelPort } from './transport/channelPort';
 import type { ChannelPort, HostTransport, PeerLink, Unsubscribe } from './transport/types';
 
@@ -61,6 +61,11 @@ export class GmSession {
     return this.entries.get(playerId)?.player.personId ?? null;
   }
 
+  /** The device proof of a player's latest join, which a takeover may have refreshed; null for web players and unknown ids. */
+  deviceOf(playerId: string): DeviceProof | null {
+    return this.entries.get(playerId)?.device ?? null;
+  }
+
   deny(playerId: string): void {
     const entry = this.entries.get(playerId);
     if (!entry || entry.player.status !== 'pending') return;
@@ -98,6 +103,7 @@ export class GmSession {
     if (this.pingTimer) window.clearInterval(this.pingTimer);
     this.stopTransport?.();
     for (const entry of this.entries.values()) this.closeRequest(entry);
+    this.links.forEach(cancelReissue);
     for (const link of [...this.links.keys()]) {
       link.send('control', encodeControl({ v: 1, type: 'bye', reason: 'ended' }));
       link.close();
@@ -114,7 +120,7 @@ export class GmSession {
       link.close();
       return;
     }
-    const state: LinkState = { entry: null, invalid: 0, warned: false, joinTimer: null, joining: false, unsubscribe: [] };
+    const state: LinkState = { entry: null, invalid: 0, warned: false, joinTimer: null, joining: false, reissueTimer: null, unsubscribe: [] };
     state.joinTimer = window.setTimeout(() => link.close(), SESSION_LIMITS.joinTimeoutMs);
     state.unsubscribe.push(
       link.onMessage((channel, data) => { if (channel === 'control') this.receive(link, state, data); else this.receiveAsset(link, state, data); }),
@@ -224,20 +230,7 @@ export class GmSession {
       this.refuse(link, 'denied');
       return;
     }
-    state.joining = true;
-    let settled = false;
-    const timeout = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      state.joining = false;
-      this.refuse(link, 'denied');
-    }, SESSION_LIMITS.reissueTimeoutMs);
-    void reissued(this.options, known, device).then((admission) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timeout);
-      state.joining = false;
-      if (this.stopped || !this.links.has(link)) return;
+    runReissue(this.options, state, known, device, () => !this.stopped && this.links.has(link), (admission) => {
       if (!admission || this.entries.get(known.player.playerId) !== known) {
         this.refuse(link, 'denied');
         return;
@@ -262,6 +255,7 @@ export class GmSession {
 
   private linkClosed(link: PeerLink, state: LinkState): void {
     if (state.joinTimer) window.clearTimeout(state.joinTimer);
+    cancelReissue(state);
     state.unsubscribe.forEach((unsubscribe) => unsubscribe());
     this.links.delete(link);
     const entry = state.entry;

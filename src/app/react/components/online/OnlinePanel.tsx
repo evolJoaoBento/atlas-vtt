@@ -103,7 +103,7 @@ function HostingView({ session, service }: { session: OnlineSessionState; servic
           </div>
         )}
       </section>
-      <OnlinePlayerList players={session.players} control={session.tokenControl} service={service} />
+      <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={service} />
       <OnlinePresenting />
     </>
   );

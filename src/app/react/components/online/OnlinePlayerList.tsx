@@ -5,13 +5,18 @@ import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import type { TokenControl } from '../../../online/control/TokenControl';
 import type { SessionPlayer } from '../../../online/GmSession';
 import type { OnlineSessionService } from '../../../online/OnlineSessionService';
-import { OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL } from '../../../online/ui/onlineCopy';
+import type { JoinIdentity } from '../../../online/sharing/people/IdentityDesk';
+import {
+  KNOWN_PERSON_MARK, NEW_PERSON_MARK, OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL, linkToLabel, sameNameWarning,
+} from '../../../online/ui/onlineCopy';
 import { usePresentedSceneSummary, useTokenControlVersion } from './useOnlineState';
 
 interface OnlinePlayerListProps {
   players: readonly SessionPlayer[];
+  /** Who each waiting Obsidian player is, by player id. */
+  requests: Readonly<Record<string, JoinIdentity>>;
   control: TokenControl | null;
-  service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick'>;
+  service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick' | 'link'>;
 }
 
 /** Marks a player who joined from Atlas in Obsidian. */
@@ -23,11 +28,29 @@ function ObsidianMark(): React.ReactElement {
   );
 }
 
+/** `(known)` or `(new)` for an Obsidian player whose device checked; nothing for web players. */
+function IdentityMark({ identity }: { identity: JoinIdentity | null }): React.ReactElement | null {
+  if (!identity) return null;
+  return <span className="atlas-online-panel__identity">{identity.kind === 'known' ? KNOWN_PERSON_MARK : NEW_PERSON_MARK}</span>;
+}
+
+/** The warning for a new device using a known name, with Link to that person. */
+function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLink: (personId: string) => void }): React.ReactElement | null {
+  const sameName = identity?.kind === 'new' ? identity.sameName : null;
+  if (!sameName) return null;
+  return (
+    <div className="atlas-online-panel__player-row atlas-online-panel__same-name">
+      <span className="atlas-online-panel__warning" role="note">{sameNameWarning(sameName.name)}</span>
+      <Button variant="outline" size="sm" onClick={() => onLink(sameName.personId)}>{linkToLabel(sameName.name)}</Button>
+    </div>
+  );
+}
+
 /**
  * Players waiting to join, and the players in the session with the tokens they control.
  * Tokens are given on the map, with a token's "Controlled by" menu.
  */
-export function OnlinePlayerList({ players, control, service }: OnlinePlayerListProps): React.ReactElement {
+export function OnlinePlayerList({ players, requests, control, service }: OnlinePlayerListProps): React.ReactElement {
   const scene = usePresentedSceneSummary();
   useTokenControlVersion(control);
 
@@ -46,9 +69,11 @@ export function OnlinePlayerList({ players, control, service }: OnlinePlayerList
                 <div className="atlas-online-panel__player-row">
                   <span className="atlas-online-panel__name">{player.name}</span>
                   {player.client === 'obsidian' && <ObsidianMark />}
+                  <IdentityMark identity={requests[player.playerId] ?? null} />
                   <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
                   <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
                 </div>
+                <SameNameRow identity={requests[player.playerId] ?? null} onLink={(personId) => service.link(player.playerId, personId)} />
               </li>
             ))}
           </ul>

@@ -9,3 +9,8 @@ export const OPEN_PLAYER_WINDOW_LABEL = 'Open player window';
 export const ONLINE_SECTION_TITLE = 'Online play';
 export const JOIN_SESSION_LABEL = 'Join online session…';
 export const OBSIDIAN_PLAYER_LABEL = 'Joined from Obsidian';
+export const KNOWN_PERSON_MARK = '(known)';
+export const NEW_PERSON_MARK = '(new)';
+export const sameNameWarning = (name: string): string => `Someone named ${name} is already in your people list`;
+export const linkToLabel = (name: string): string => `Link to ${name}`;
+export const PEOPLE_LABEL = 'People';

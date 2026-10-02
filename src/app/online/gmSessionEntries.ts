@@ -1,5 +1,5 @@
 /** What the GM's session keeps per player and per connection, and how a returning player's identity is judged. */
-import type { Admission, GmSessionOptions, SessionPlayer } from './gmSessionTypes';
+import { SESSION_LIMITS, type Admission, type GmSessionOptions, type SessionPlayer } from './gmSessionTypes';
 import type { DeviceProof, PresencePlayer, TableProof } from './protocol';
 import type { PeerLink, Unsubscribe } from './transport/types';
 
@@ -24,6 +24,8 @@ export interface LinkState {
   joinTimer: number | null;
   /** A returning player's identity is being checked: no second join is read meanwhile. */
   joining: boolean;
+  /** The time limit of that check; cleared with the connection. */
+  reissueTimer: number | null;
   unsubscribe: Unsubscribe[];
 }
 
@@ -65,4 +67,32 @@ export function presenceOf(entries: Iterable<Entry>): PresencePlayer[] {
     playerId: entry.player.playerId, name: entry.player.name, connected: entry.link !== null,
     ...(entry.player.personId ? { personId: entry.player.personId } : {}),
   }));
+}
+
+/** Ends a link's pending identity check (its connection closed or the session stopped): nothing more comes of it. */
+export function cancelReissue(state: LinkState): void {
+  if (state.reissueTimer !== null) window.clearTimeout(state.reissueTimer);
+  state.reissueTimer = null;
+}
+
+/**
+ * Has the owner check a returning person's new device proof, within a time limit. `done` gets the
+ * admission, or null to deny; it is never called once `isOpen` says the connection or the session
+ * is gone, nor twice.
+ */
+export function runReissue(
+  options: GmSessionOptions, state: LinkState, known: Entry, device: DeviceProof,
+  isOpen: () => boolean, done: (admission: Admission | null) => void,
+): void {
+  state.joining = true;
+  let settled = false;
+  const settle = (admission: Admission | null): void => {
+    if (settled) return;
+    settled = true;
+    cancelReissue(state);
+    state.joining = false;
+    if (isOpen()) done(admission);
+  };
+  state.reissueTimer = window.setTimeout(() => settle(null), SESSION_LIMITS.reissueTimeoutMs);
+  void reissued(options, known, device).then(settle);
 }

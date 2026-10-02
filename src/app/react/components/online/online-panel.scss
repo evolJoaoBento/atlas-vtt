@@ -197,3 +197,18 @@ $online-panel-padding: $spacing-m;
   justify-content: flex-end;
   gap: $spacing-s;
 }
+
+.atlas-online-panel__identity {
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
+.atlas-online-panel__same-name {
+  align-items: flex-start;
+}
+
+.atlas-online-panel__warning {
+  flex: 1;
+  color: var(--text-warning);
+  font-size: $font-ui-smaller;
+}

@@ -21,6 +21,8 @@ import { presentedScene } from './src/app/services/PresentedScene';
 import { OnlineJoinService } from './src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from './src/app/online/OnlineSessionService';
 import { registerOnline } from './src/app/online/registerOnline';
+import { PeopleBook } from './src/app/online/sharing/people/PeopleBook';
+import { registerSharing } from './src/app/online/sharing/registerSharing';
 import { AssetService } from './src/app/services/AssetService';
 import { SettingsService } from './src/app/services/SettingsService';
 import { addStarterTokens } from './src/app/services/starterTokens';
@@ -90,6 +92,7 @@ export default class AtlasVTTPlugin extends Plugin {
     await this.settingsService.initialize();
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
     registerOnline(this, onlineSessions);
+    registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), settings: this.settingsService });
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
       existingInstallation: await existingInstallation,

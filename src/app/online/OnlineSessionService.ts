@@ -25,7 +25,10 @@ import { SceneBroadcaster, type PresentedSceneSource } from './scene/SceneBroadc
 import { createPeerHost, type PeerServerOptions } from './transport/PeerTransport';
 import type { HostTransport } from './transport/types';
 import { isInSession, joinedSessionStore } from './obsidian/joinedSessionStore';
-import { showJoinRequestNotice } from './ui/joinRequestNotice';
+import { HostIdentity } from './sharing/people/hostIdentity';
+import { IdentityDesk } from './sharing/people/IdentityDesk';
+import { PeopleBook } from './sharing/people/PeopleBook';
+import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
 
 const BAD_PAGE_URL = "The player page address in Settings → Online play isn't a valid web address.";
 const HOSTING_WHILE_JOINED = 'Leave the online session you joined before hosting one.';
@@ -35,7 +38,9 @@ interface Deps {
   /** Whether this Atlas is in a session it joined; the joined session store unless a test passes its own. */
   isJoined?: () => boolean;
   createHost?: (options: PeerServerOptions) => Promise<HostTransport>;
-  showRequest?: (player: SessionPlayer, answer: (allow: boolean) => void) => { hide(): void };
+  showRequest?: (player: SessionPlayer, answer: (allow: boolean) => void, info?: JoinRequestInfo) => { hide(): void };
+  /** The people list; this vault's unless a test passes its own. */
+  people?: PeopleBook;
   /** Which scene players see; the plugin's `presentedScene` unless a test passes its own. */
   presented?: PresentedSceneSource;
   /** The vault's images; tests pass their own. */
@@ -74,7 +79,8 @@ export class OnlineSessionService {
   private readonly images: ImageFiles;
   private generation = 0;
   private unsubscribeErrors: (() => void) | null = null;
-  private readonly notices = new Map<string, { hide(): void }>();
+  private requests: HostIdentity | null = null;
+  private readonly people: PeopleBook;
   private readonly createHost: (options: PeerServerOptions) => Promise<HostTransport>;
   private readonly showRequest: NonNullable<Deps['showRequest']>;
   private readonly isJoined: () => boolean;
@@ -86,6 +92,7 @@ export class OnlineSessionService {
 
   constructor(private readonly app: App, private readonly settings: SettingsService, deps: Deps = {}) {
     this.createHost = deps.createHost ?? createPeerHost;
+    this.people = deps.people ?? PeopleBook.forApp(app);
     this.showRequest = deps.showRequest ?? showJoinRequestNotice;
     this.isJoined = deps.isJoined ?? ((): boolean => isInSession(joinedSessionStore.getState()));
     this.presented = deps.presented ?? presentedScene;
@@ -142,6 +149,12 @@ export class OnlineSessionService {
     }
     this.currentTable = table ? hostedTable(this.identityCrypto, table, host.id, () => normalizePlayerName(this.settings.getOnlineSettings().playerName) ?? 'GM') : null;
     this.currentHostId = host.id;
+    const requests = new HostIdentity({
+      desk: this.currentTable ? new IdentityDesk({ people: this.people, table: this.currentTable }) : null,
+      session: () => this.current,
+      showRequest: this.showRequest,
+    });
+    this.requests = requests;
     let joinUrl: string;
     let linkWorks: boolean;
     try {
@@ -157,13 +170,8 @@ export class OnlineSessionService {
       title: this.app.vault.getName(),
       // A person admitted with an id who joins again on a new join gets a fresh table proof for its nonce.
       ...(this.currentTable ? { reissue: tableReissuer(this.currentTable) } : {}),
-      onJoinRequest: (player) => {
-        this.notices.set(player.playerId, this.showRequest(player, (allow) => allow ? this.allow(player.playerId) : this.deny(player.playerId)));
-      },
-      onRequestClosed: (playerId) => {
-        this.notices.get(playerId)?.hide();
-        this.notices.delete(playerId);
-      },
+      onJoinRequest: (player, device) => requests.joinRequest(player, device),
+      onRequestClosed: (playerId) => requests.requestClosed(playerId),
       onPlayersChanged: (players) => {
         log.event('players', { players: players.map((player) => `${player.name}: ${player.status}`).join(', ') });
         // A kick reaches no handler: the host keeps only the players the session still knows.
@@ -250,11 +258,16 @@ export class OnlineSessionService {
     this.registry = null;
     this.current?.stop();
     this.current = null;
-    this.notices.forEach((notice) => notice.hide());
-    this.notices.clear();
+    this.requests?.stop();
+    this.requests = null;
+    this.currentTable = null;
+    this.currentHostId = null;
   }
 
-  allow(playerId: string): void { this.current?.allow(playerId); }
-  deny(playerId: string): void { this.current?.deny(playerId); }
+  /** Admits a waiting player: as who their device is for an Obsidian player, as before for a web player. */
+  allow(playerId: string): void { this.requests?.allow(playerId); }
+  /** Admits a new device as a known person: only the GM links. */
+  link(playerId: string, personId: string): void { this.requests?.link(playerId, personId); }
+  deny(playerId: string): void { this.requests?.deny(playerId); }
   kick(playerId: string): void { this.current?.kick(playerId); }
 }

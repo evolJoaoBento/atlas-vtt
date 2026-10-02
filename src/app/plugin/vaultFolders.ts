@@ -1,4 +1,4 @@
-import { App, TFolder, normalizePath } from 'obsidian';
+import { App, TFolder, normalizePath, type DataAdapter } from 'obsidian';
 
 /**
  * Returns the vault folder at `path`, creating it when missing.
@@ -34,7 +34,11 @@ export async function ensureFolder(app: App, path: string): Promise<TFolder> {
  * folders the vault API does not index. `known` remembers folders that already
  * exist, so many files in one folder check it only once.
  */
-export async function ensureAdapterFolder(app: App, path: string, known: Set<string> = new Set()): Promise<void> {
+export async function ensureAdapterFolder(
+  app: { vault: { adapter: Pick<DataAdapter, 'exists' | 'mkdir'> } },
+  path: string,
+  known: Set<string> = new Set(),
+): Promise<void> {
   let current = '';
   for (const segment of path.split('/').filter(Boolean)) {
     current = current ? `${current}/${segment}` : segment;
