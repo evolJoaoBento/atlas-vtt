@@ -93,6 +93,31 @@ describe('PeopleBook', () => {
     expect(parsePeopleData({ version: 1, people: [{ tableId: T, personId: 'bad id!', name: 'X' }, 7] }).people).toEqual([]);
   });
 
+  it('never writes before the list is read, and flushes only a waiting last-seen change', async () => {
+    const { app, files } = createInMemoryApp();
+    const path = `${SHARING_DATA_DIR}/people.json`;
+    const first = book(app);
+    await first.ready();
+    first.admit(T, 'Ana', D1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const stored = files.get(path);
+    // An unload before the list was ever read, or while it is being read, keeps the stored list.
+    const unread = book(app);
+    unread.flush();
+    const reading = book(app);
+    void reading.ready();
+    reading.flush();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(files.get(path)).toBe(stored);
+    // Nothing waiting: flush writes nothing.
+    const loaded = book(app);
+    await loaded.ready();
+    const writes = vi.spyOn(app.vault.adapter, 'write');
+    writes.mockClear();
+    loaded.flush();
+    expect(writes).not.toHaveBeenCalled();
+  });
+
   it('writes the file at once for changes, and a last-seen change only after a wait', async () => {
     vi.useFakeTimers();
     try {

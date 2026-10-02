@@ -31,6 +31,11 @@ function PersonRow({ person, others, people, confirmRemove }: {
   const [name, setName] = useState(person.name);
   const [problem, setProblem] = useState<string | null>(null);
   const commit = (): void => {
+    if (name.trim() === person.name) {
+      setName(person.name);
+      setProblem(null);
+      return;
+    }
     const result = people.rename(keyOf(person), name);
     setProblem(result);
     if (!result) setName(name.trim());

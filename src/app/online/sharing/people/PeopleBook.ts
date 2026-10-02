@@ -32,6 +32,8 @@ export class PeopleBook {
   private loading: Promise<void> | null = null;
   private readonly listeners = new Set<() => void>();
   private saveTimer: number | null = null;
+  /** The stored list has been read: nothing is written before, or the stored list would be replaced by an empty one. */
+  private loaded = false;
 
   constructor(private readonly file: JsonDataFile<PeopleData>, private readonly now: () => number = Date.now) {}
 
@@ -39,6 +41,7 @@ export class PeopleBook {
   ready(): Promise<void> {
     this.loading ??= this.file.load().then((data) => {
       this.people = data.people;
+      this.loaded = true;
       this.listeners.forEach((listener) => listener());
     });
     return this.loading;
@@ -159,15 +162,19 @@ export class PeopleBook {
   }
 
   private changed(persist: boolean): void {
-    if (persist) this.flush();
-    else this.saveTimer ??= window.setTimeout(() => this.flush(), LAST_SEEN_SAVE_DELAY_MS);
+    if (persist) this.save();
+    else if (this.loaded) this.saveTimer ??= window.setTimeout(() => this.save(), LAST_SEEN_SAVE_DELAY_MS);
     this.listeners.forEach((listener) => listener());
   }
 
-  /** Writes the list now, ending any wait for a last-seen save. */
+  /** Writes a waiting last-seen change now (on unload). Writes nothing when none is waiting or the list was never read. */
   flush(): void {
+    if (this.saveTimer !== null) this.save();
+  }
+
+  private save(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    void this.file.save({ version: 1, people: this.people });
+    if (this.loaded) void this.file.save({ version: 1, people: this.people });
   }
 }

@@ -14,6 +14,10 @@ export type JoinIdentity =
   | { kind: 'known'; personId: string; name: string }
   | { kind: 'new'; sameName: { personId: string; name: string } | null };
 
+/** Why a request could not be admitted: `proof` the player's current device proof fails (deny), `person` the person to link to is gone or the device belongs to another (ask again), `unknown` the desk holds no such request. */
+export type AdmissionRefusal = 'proof' | 'person' | 'unknown';
+export type AdmissionResult = { admission: Admission } | { refused: AdmissionRefusal };
+
 export interface IdentityDeskOptions {
   people: Pick<PeopleBook, 'ready' | 'byDevice' | 'byName' | 'admit' | 'linkDevice' | 'seen'>;
   /** The GM's table for this session: it checks device proofs for the current host id and signs table proofs. */
@@ -56,26 +60,28 @@ export class IdentityDesk {
    * Admits an identified player: as the person their device belongs to, as `linkTo` (a known
    * person on a new device), or as a new person. `device` is the player's current device proof
    * when it was refreshed since `identify` (a new join of the same device has a new nonce); the
-   * table proof is signed for it. Null for a request this desk does not hold, a proof of another
-   * device, or a `linkTo` nobody has any more. The request stays held until `closed`, so a failed
-   * or outdated admission can be made again.
+   * table proof is signed for it. Otherwise says why not (`AdmissionResult`). The request stays
+   * held until `closed`, so a refused or outdated admission can be made again.
    */
-  async admission(playerId: string, linkTo: string | null = null, device?: DeviceProof): Promise<Admission | null> {
+  async admission(playerId: string, linkTo: string | null = null, device?: DeviceProof): Promise<AdmissionResult> {
     const held = this.pending.get(playerId);
-    if (!held) return null;
+    if (!held) return { refused: 'unknown' };
     const { people, table } = this.options;
-    if (device && (await table.checkDevice(device)) !== held.deviceId) return null;
+    if (device && (await table.checkDevice(device)) !== held.deviceId) return { refused: 'proof' };
     const nonce = device?.nonce ?? held.nonce;
     let person: Person | null;
-    if (linkTo) person = people.linkDevice(table.id, linkTo, held.deviceId);
-    else {
+    if (linkTo) {
+      // A device belongs to one person: linking it to another would leave two owners.
+      const owner = people.byDevice(table.id, held.deviceId);
+      person = owner && owner.personId !== linkTo ? null : people.linkDevice(table.id, linkTo, held.deviceId);
+    } else {
       // The device decides, not what `identify` saw: the person may have been removed or added since.
       const owner = people.byDevice(table.id, held.deviceId);
       person = owner ? people.seen(table.id, owner.personId, owner.name) : people.admit(table.id, held.name, held.deviceId);
     }
-    if (!person) return null;
+    if (!person) return { refused: 'person' };
     const proof = await table.prove(held.deviceId, nonce, person.personId);
-    return { personId: person.personId, table: proof };
+    return { admission: { personId: person.personId, table: proof } };
   }
 
   closed(playerId: string): void {

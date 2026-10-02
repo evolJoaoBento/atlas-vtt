@@ -5,6 +5,7 @@ import { DEFAULT_ONLINE_SETTINGS } from '../../../../src/app/online/onlineSettin
 import { decodeControl, encodeControl, type ControlMessage } from '../../../../src/app/online/protocol';
 import { JsonDataFile, SHARING_DATA_DIR } from '../../../../src/app/online/sharing/dataFile';
 import { checkTableProof, makeDeviceProof } from '../../../../src/app/online/sharing/identity/proofs';
+import { personKey } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { parsePeopleData } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
@@ -37,7 +38,7 @@ async function hosting() {
   });
   await svc.start();
   const join = async (
-    name: string, keys?: Awaited<ReturnType<typeof crypto.generate>>, nonce = 'nonce-aaaaaaaaaaaaaaaa', hostId = 'gm-id', playerKey = `key-${name}-${nonce}`,
+    name: string, keys?: Awaited<ReturnType<typeof crypto.generate>>, nonce = 'nonce-aaaaaaaaaaaaaaaa', hostId = 'gm-id', playerKey = `key-${name}-${nonce}`, badSig = false,
   ) => {
     const link = await network.client().connect('gm-id');
     const received: ControlMessage[] = [];
@@ -46,7 +47,8 @@ async function hosting() {
       if (channel === 'control' && decoded.kind === 'message') received.push(decoded.message);
     });
     const deviceKeys = keys ?? await crypto.generate();
-    const device = await makeDeviceProof(crypto, deviceKeys, table.id, hostId, nonce);
+    const proof = await makeDeviceProof(crypto, deviceKeys, table.id, hostId, nonce);
+    const device = badSig ? { ...proof, sig: 'A'.repeat(86) } : proof;
     link.send('control', encodeControl({ v: 1, type: 'join', name, playerKey, client: { kind: 'obsidian', version: '1' }, device }));
     await flush();
     return { link, received, deviceKeys, deviceId: await crypto.keyId(deviceKeys.publicKey) };
@@ -111,6 +113,54 @@ describe('OnlineSessionService admitting by identity', () => {
     const binding = { hostId: 'gm-id', deviceId: second.deviceId };
     expect(admitted?.type === 'admitted' && admitted.table && await checkTableProof(crypto, admitted.table, table.id, { ...binding, nonce: 'nonce-bbbbbbbbbbbbbbbb' })).toBe(true);
     expect(admitted?.type === 'admitted' && admitted.table && await checkTableProof(crypto, admitted.table, table.id, { ...binding, nonce: 'nonce-aaaaaaaaaaaaaaaa' })).toBe(false);
+    svc.stop();
+  });
+
+  it('denies a waiting player whose refreshed device proof fails, when the GM answers', async () => {
+    const { svc, shown, join } = await hosting();
+    const first = await join('Ana', undefined, 'nonce-aaaaaaaaaaaaaaaa', 'gm-id', 'same-key');
+    const second = await join('Ana', first.deviceKeys, 'nonce-bbbbbbbbbbbbbbbb', 'gm-id', 'same-key', true);
+    shown[0]!.answer(true);
+    await flush();
+    expect(second.received).toContainEqual({ v: 1, type: 'denied', reason: 'denied' });
+    expect(onlineSessionStore.getState().players).toEqual([]);
+    svc.stop();
+  });
+
+  it('asks again, as new, when the person to link to is gone', async () => {
+    const { svc, people, shown, join } = await hosting();
+    await join('Ana');
+    shown[0]!.answer(true);
+    await flush();
+    await join('Ana', undefined, 'nonce-bbbbbbbbbbbbbbbb');
+    const ana = people.byName('Ana')!;
+    people.remove(personKey(ana.tableId, ana.personId));
+    shown[1]!.link!();
+    await flush();
+    expect(shown).toHaveLength(3);
+    expect(shown[2]).toMatchObject({ identity: { kind: 'new', sameName: null }, link: null });
+    const waiting = onlineSessionStore.getState().players.find((player) => player.status === 'pending')!;
+    expect(onlineSessionStore.getState().requests[waiting.playerId]).toEqual({ kind: 'new', sameName: null });
+    shown[2]!.answer(true);
+    await flush();
+    expect(onlineSessionStore.getState().players.filter((player) => player.status === 'admitted')).toHaveLength(2);
+    svc.stop();
+  });
+
+  it('asks again when admitting fails', async () => {
+    const { svc, shown, join } = await hosting();
+    await join('Ana');
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const signed = vi.spyOn(crypto, 'sign').mockRejectedValueOnce(new Error('no key'));
+    shown[0]!.answer(true);
+    await flush();
+    expect(shown).toHaveLength(2);
+    expect(onlineSessionStore.getState().players[0]?.status).toBe('pending');
+    shown[1]!.answer(true);
+    await flush();
+    expect(onlineSessionStore.getState().players[0]?.status).toBe('admitted');
+    signed.mockRestore();
+    error.mockRestore();
     svc.stop();
   });
 

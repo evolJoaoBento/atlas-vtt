@@ -70,6 +70,7 @@ export class HostIdentity {
 
   private show(player: SessionPlayer, identity: JoinIdentity | null): void {
     const sameName = identity?.kind === 'new' ? identity.sameName : null;
+    this.notices.get(player.playerId)?.hide();
     const info: JoinRequestInfo = { identity, link: sameName ? () => this.link(player.playerId, sameName.personId) : null };
     this.notices.set(player.playerId, this.options.showRequest(player, (allow) => (allow ? this.allow(player.playerId) : this.deny(player.playerId)), info));
   }
@@ -114,16 +115,38 @@ export class HostIdentity {
     }
     this.admitting.add(playerId);
     void this.admitIdentified(session, desk, playerId, linkTo)
-      .catch((error: unknown) => console.error('[Atlas online] Could not admit a player:', error))
+      .catch(async (error: unknown) => {
+        console.error('[Atlas online] Could not admit a player:', error);
+        await this.askAgain(session, desk, playerId);
+      })
+      .catch((error: unknown) => {
+        console.error('[Atlas online] Could not ask about a player again; denied:', error);
+        this.deny(playerId);
+      })
       .finally(() => this.admitting.delete(playerId));
+  }
+
+  /** Works the request's identity out again from its current device proof, and asks the GM again. */
+  private async askAgain(session: GmSession, desk: IdentityDesk, playerId: string): Promise<void> {
+    const player = session.getPlayers().find((other) => other.playerId === playerId && other.status === 'pending');
+    const device = session.deviceOf(playerId);
+    if (!player || !device || this.stopped) return;
+    await this.identify(player, device, desk);
   }
 
   /** Signs for the entry's current device proof: a takeover while waiting may have refreshed it. */
   private async admitIdentified(session: GmSession, desk: IdentityDesk, playerId: string, linkTo: string | null): Promise<void> {
     for (let attempt = 0; attempt < MAX_RESIGNS; attempt++) {
       const device = session.deviceOf(playerId);
-      const admission = await desk.admission(playerId, linkTo, device ?? undefined);
-      if (!admission || this.stopped || this.options.session() !== session) return;
+      const result = await desk.admission(playerId, linkTo, device ?? undefined);
+      if (this.stopped || this.options.session() !== session) return;
+      if ('refused' in result) {
+        // A failed proof is denied, like one on the first request; a missing person is asked about again.
+        if (result.refused === 'proof') this.deny(playerId);
+        else if (result.refused === 'person') await this.askAgain(session, desk, playerId);
+        return;
+      }
+      const { admission } = result;
       if (session.deviceOf(playerId)?.nonce !== device?.nonce && attempt < MAX_RESIGNS - 1) continue;
       session.allow(playerId, admission);
       return;
