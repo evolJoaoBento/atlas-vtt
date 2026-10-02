@@ -7,6 +7,7 @@ import { DiceRollEntry } from './DiceRollEntry';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import { CloseButton } from '../../../packages/components/primitives/CloseButton';
 import type { DiceTool } from '../../../tools/DiceTool';
+import { Notice } from 'obsidian';
 import { rollOfResult } from '../../../online/obsidian/onlineDice';
 import type { DiceRollResult } from '../../../tools/diceRolling';
 
@@ -49,7 +50,8 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
       return;
     }
     const roll = rollOfResult(result);
-    if (roll) view?.onlineControls()?.rollDice(roll.dice, roll.modifier);
+    if (!roll) new Notice("Can't roll that again.");
+    else if (!(view?.onlineControls()?.rollDice(roll.dice, roll.modifier) ?? false)) new Notice("Couldn't send the roll.");
   }, [remote, repeatRoll, view]);
 
   const handleClose = useCallback((): void => {

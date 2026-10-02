@@ -20,7 +20,7 @@ import { onlineSceneStatus } from './onlineSceneStatus';
 import { updateRemoteScene, type OnlineSceneControls } from './remoteScene';
 import type { RemoteMapBackdrop } from './RemoteMapBackdrop';
 import { RemoteSceneApplier } from './RemoteSceneApplier';
-import { ONLINE_TOKEN_DROPPED, RemoteTokenMoves, type TokenDrop } from './remoteTokenMoves';
+import { mayMoveAsOnlinePlayer, ONLINE_DRAG_CANCEL, ONLINE_TOKEN_DROPPED, RemoteTokenMoves, type TokenDrop } from './remoteTokenMoves';
 import { ANIMATION_FRAMES, ViewportFollower, type FollowViewport, type Frames } from './ViewportFollower';
 
 export type OnlineSceneService = Pick<OnlineJoinService, 'attach' | 'images' | 'reconnect' | 'sendDiceRoll' | 'sendTokenMove' | 'sendLaser'>;
@@ -99,10 +99,13 @@ export class OnlineSceneClient implements OnlineSceneSink {
   session(state: PlayerSessionState): void {
     this.state = state;
     this.showStatus();
+    this.cancelLostDrag(false);
   }
 
   scene(scene: PlayerScene | null): void {
+    const previous = this.shown;
     this.shown = scene;
+    this.cancelLostDrag(previous?.sceneId !== scene?.sceneId);
     this.moves.setScene(scene);
     this.applier.apply(scene);
     this.follower.setScene(scene);
@@ -116,6 +119,7 @@ export class OnlineSceneClient implements OnlineSceneSink {
 
   control(tokenIds: readonly string[]): void {
     updateRemoteScene(this.options.store, { movableTokenIds: [...tokenIds] });
+    this.cancelLostDrag(false);
   }
 
   moveRefused(tokenId: string): void {
@@ -186,6 +190,13 @@ export class OnlineSceneClient implements OnlineSceneSink {
   private showBackdrop(): void {
     const { background, grid } = this.options.store.getState();
     this.options.backdrop.show(this.shown, background, grid);
+  }
+
+  /** A drag in progress ends, unsent, when a new scene, the GM's control list or the connection took its token away. */
+  private cancelLostDrag(sceneChanged: boolean): void {
+    const state = this.options.store.getState();
+    const lost = sceneChanged || state.selectedIds.some((id) => !mayMoveAsOnlinePlayer(state, id) || !this.shown || !Object.hasOwn(this.shown.tokens, id));
+    if (lost) this.options.eventBus.emit(ONLINE_DRAG_CANCEL);
   }
 
   private showStatus(): void {

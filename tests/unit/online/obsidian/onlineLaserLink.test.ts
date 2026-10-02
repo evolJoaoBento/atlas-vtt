@@ -20,12 +20,21 @@ describe('OnlineLaserLink', () => {
     link.dispose();
   });
 
-  it('sends no colour that is not #rrggbb, so the GM gives one', () => {
+  it('sends no colour that is not a swatch, so the GM gives one', () => {
     const hub = new LaserHub();
     const send = vi.fn((): boolean => true);
     const link = new OnlineLaserLink({ hub, send, color: () => 'rebeccapurple', clock: () => 0 });
     hub.emitLocal({ kind: 'point', x: 1, y: 1 });
     expect(send).toHaveBeenLastCalledWith([{ x: 1, y: 1 }], false, [0], undefined);
+    link.dispose();
+  });
+
+  it('sends a swatch in the palette spelling, whatever its case', () => {
+    const hub = new LaserHub();
+    const send = vi.fn((): boolean => true);
+    const link = new OnlineLaserLink({ hub, send, color: () => LASER_PALETTE[1]!.toUpperCase(), clock: () => 0 });
+    hub.emitLocal({ kind: 'point', x: 1, y: 1 });
+    expect(send).toHaveBeenLastCalledWith([{ x: 1, y: 1 }], false, [0], LASER_PALETTE[1]);
     link.dispose();
   });
 

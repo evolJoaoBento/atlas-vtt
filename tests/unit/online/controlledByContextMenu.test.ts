@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TokenControl } from '../../../src/app/online/control/TokenControl';
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../src/app/online/onlineSessionStore';
@@ -25,7 +26,7 @@ function rightClickLabels(tokenId: string, isPlayerView = false): string[] {
       },
     }),
   } as never;
-  const controller = new InteractionController({} as never, store, {} as never, {} as never, {} as never, isPlayerView);
+  const controller = new InteractionController({} as never, store, {} as never, new EventEmitter(), {} as never, isPlayerView);
   controller.handleViewportTokenPointerDown(tokenId, { button: 2, stopPropagation: vi.fn(), clientX: 0, clientY: 0 } as never);
   const calls = vi.mocked(openContextMenuGlobal).mock.calls;
   const entries: ContextMenuEntry[] = calls.at(-1)?.[0] ?? [];

@@ -16,6 +16,7 @@ import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
 import { Toggle } from "./primitives/Toggle"
 import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
 import { traySelection } from "../../online/obsidian/onlineDice"
+import { DICE_LIMITS } from "../../online/tools/toolMessages"
 import { AMBIENT_AUDIO_ENABLED, WALLS_AND_LIGHTING_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
 import { ResponsiveToolbar } from "./toolbar/ResponsiveToolbar"
@@ -214,7 +215,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
               isOpen={isDiceTrayOpen}
               onToggle={toggleDiceTray}
               triggerRef={diceButtonRef}
-              {...(remote ? { onRoll: (selection: Readonly<Record<string, number>>) => { view?.onlineControls()?.rollDice(traySelection(selection), 0) }, showToasts: false } : {})}
+              {...(remote ? { onRoll: (selection: Readonly<Record<string, number>>) => { const dice = traySelection(selection); return dice !== null && (view?.onlineControls()?.rollDice(dice, 0) ?? false) }, maxDice: DICE_LIMITS.dicePerRoll, showToasts: false } : {})}
             />
           )}
         </div>

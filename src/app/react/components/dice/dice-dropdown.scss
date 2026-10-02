@@ -194,3 +194,11 @@
     @include atlas-panel-inset-radius($spacing-s, bottom-right);
   }
 }
+
+// ── Note (the online tray's limit or send failure) ──
+
+.atlas-dice-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+}

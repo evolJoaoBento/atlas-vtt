@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ONLINE_TOKEN_DROPPED } from '../../../../src/app/online/obsidian/remoteTokenMoves';
+import { ONLINE_DRAG_CANCEL, ONLINE_TOKEN_DROPPED } from '../../../../src/app/online/obsidian/remoteTokenMoves';
 import { applyPatch } from '../../../../src/app/online/scene/sceneDiff';
 import { LASER_PALETTE } from '../../../../src/app/online/tools/laserColors';
 import { CONFIRM_TIMEOUT_MS, REFUSED_NOTICE_MS } from '../../../../src/app/online/view/TokenMoves';
@@ -58,6 +58,32 @@ describe('player tools in the online scene', () => {
     t.eventBus.emit(ONLINE_TOKEN_DROPPED, { id: 't1', x: 210, y: 140 });
     expect(t.fake.sendTokenMove).not.toHaveBeenCalled();
     expect(t.token()).toMatchObject({ x: 100, y: 100 });
+  });
+
+  it('sends nothing for a token that has left the scene', () => {
+    const t = ready();
+    t.sink().scene(applyPatch(t.scene, { set: {}, upsert: {}, remove: { tokens: ['t1'] } }));
+    t.eventBus.emit(ONLINE_TOKEN_DROPPED, { id: 't1', x: 210, y: 140 });
+    expect(t.fake.sendTokenMove).not.toHaveBeenCalled();
+  });
+
+  it('ends a drag in progress when a new scene, lost control or a lost connection takes its token', () => {
+    const cancelled = vi.fn();
+    const t = ready();
+    t.eventBus.on(ONLINE_DRAG_CANCEL, cancelled);
+    t.store.setState({ selectedIds: ['t1'] });
+    t.sink().scene(applyPatch(t.scene, { set: {}, upsert: { tokens: { t2: playerToken({ x: 310 }) } }, remove: {} }));
+    expect(cancelled).not.toHaveBeenCalled();
+    t.sink().control([]);
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    t.sink().control(['t1']);
+    cancelled.mockClear();
+    t.sink().session({ ...admitted(), status: 'lost', reason: 'ended' });
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    cancelled.mockClear();
+    t.sink().session(admitted());
+    t.sink().scene(playerScene({ sceneId: 'other', tokens: { t1: playerToken({ name: 'Hero' }) } }));
+    expect(cancelled).toHaveBeenCalledTimes(1);
   });
 
   it("keeps a dragged token under the pointer through the GM's patches", () => {

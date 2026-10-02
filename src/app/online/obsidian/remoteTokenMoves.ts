@@ -15,6 +15,9 @@ import { updateRemoteScene } from './remoteScene';
 /** What Atlas's `InteractionController` emits on the view's event bus when an online player drops a token. */
 export const ONLINE_TOKEN_DROPPED = 'online-token-dropped';
 
+/** Emitted on the same bus to end a drag in progress: the player lost the right to it. */
+export const ONLINE_DRAG_CANCEL = 'online-drag-cancel';
+
 export interface TokenDrop {
   id: string;
   x: number;
@@ -78,7 +81,7 @@ export class RemoteTokenMoves {
   /** Atlas dropped a token the player dragged: one `token-move`, and the token waits there for the GM. */
   drop({ id, x, y }: TokenDrop): void {
     const scene = this.scene;
-    if (scene && mayMoveAsOnlinePlayer(this.options.store.getState(), id)) {
+    if (scene && tokenOf(scene, id) !== null && mayMoveAsOnlinePlayer(this.options.store.getState(), id)) {
       this.settle(id);
       // Registered before sending: a refusal delivered at once must find it to settle.
       const timer = window.setTimeout(() => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Notice } from 'obsidian';
 import { create } from 'zustand';
 
 const { ui } = vi.hoisted(() => ({ ui: { view: null as unknown } }));
@@ -8,6 +9,7 @@ vi.mock('../../../../src/app/react/root/AtlasUIContext', async (importOriginal) 
   ...await importOriginal<typeof import('../../../../src/app/react/root/AtlasUIContext')>(),
   useAtlasUI: () => ({ app: {}, view: ui.view }),
 }));
+vi.mock('obsidian', async (importOriginal) => ({ ...await importOriginal<typeof import('obsidian')>(), Notice: vi.fn() }));
 vi.mock('../../../../src/app/react/components/dice/DiceToastContainer', () => ({ DiceToastContainer: () => <div>toasts</div> }));
 
 import { diceLogResults, rollOfResult, traySelection } from '../../../../src/app/online/obsidian/onlineDice';
@@ -37,9 +39,30 @@ describe('rolling again and from the tray', () => {
     expect(traySelection({ d6: 2, d20: 0, x: 3 })).toEqual({ d6: 2 });
   });
 
+  it('sends nothing above the GM limit, and nothing empty', () => {
+    expect(traySelection({ d6: 20 })).toEqual({ d6: 20 });
+    expect(traySelection({ d6: 15, d8: 6 })).toBeNull();
+    expect(traySelection({ d6: 0 })).toBeNull();
+  });
+
+  it('stops adding dice at the limit, and keeps the tray open when the roll could not go', () => {
+    const onToggle = vi.fn();
+    const onRoll = vi.fn(() => false);
+    render(<DiceDropdownMenu diceTool={{ rollDice: vi.fn() } as never} isOpen onToggle={onToggle} onRoll={onRoll} maxDice={2} showToasts={false} />);
+    const d6 = document.querySelectorAll('.atlas-dice-btn')[1]!;
+    fireEvent.click(d6);
+    fireEvent.click(d6);
+    fireEvent.click(d6);
+    expect(screen.getByRole('status').textContent).toBe('A roll has at most 2 dice.');
+    fireEvent.click(screen.getByRole('button', { name: /Roll/ }));
+    expect(onRoll).toHaveBeenCalledWith({ d6: 2 });
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(screen.getByRole('status').textContent).toMatch(/send the roll/);
+  });
+
   it('sends the picked dice instead of rolling them, and shows no toasts', () => {
     const rollDice = vi.fn();
-    const onRoll = vi.fn();
+    const onRoll = vi.fn(() => true);
     render(<DiceDropdownMenu diceTool={{ rollDice } as never} isOpen onToggle={() => {}} onRoll={onRoll} showToasts={false} />);
     fireEvent.click(document.querySelectorAll('.atlas-dice-btn')[1]!);
     fireEvent.click(screen.getByRole('button', { name: /Roll/ }));
@@ -66,6 +89,20 @@ describe("the online scene's dice log", () => {
     expect(screen.queryByRole('button', { name: 'Clear history' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Roll again' }));
     expect(controls.rollDice).toHaveBeenCalledWith({ d6: 2 }, 1);
+  });
+
+  it('says so when an entry cannot be rolled again', () => {
+    const { controls } = renderLog();
+    ui.view = { onlineControls: () => controls };
+    cleanup();
+    const store = create(() => ({
+      diceLog: [{ ...diceLogResults([ENTRY])[0]!, rolls: [{ die: 'd7', value: 1, max: 7 }] }],
+      addDiceLogEntry: vi.fn(), clearDiceLog: vi.fn(), remoteScene: initialRemoteScene(),
+    }));
+    render(<ViewStoreProvider store={store as never}><DiceRollLog isOpen onClose={() => {}} /></ViewStoreProvider>);
+    fireEvent.click(screen.getByRole('button', { name: 'Roll again' }));
+    expect(controls.rollDice).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenCalledWith("Can't roll that again.");
   });
 
   it("does not take the player's own rolls from their other maps", () => {

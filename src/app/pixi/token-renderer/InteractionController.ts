@@ -33,7 +33,7 @@ import { runInBackground } from '../../utils/backgroundTask';
 import { tokenSizeSubmenu } from '../../react/components/context-menu/tokenSizeMenu';
 import { conditionsSubmenu } from '../../react/components/context-menu/conditionsMenu';
 import { controlledBySubmenu } from '../../online/ui/controlledByMenu';
-import { mayMoveAsOnlinePlayer, ONLINE_TOKEN_DROPPED } from '../../online/obsidian/remoteTokenMoves';
+import { mayMoveAsOnlinePlayer, ONLINE_DRAG_CANCEL, ONLINE_TOKEN_DROPPED } from '../../online/obsidian/remoteTokenMoves';
 
 interface DragState {
   isDragging: boolean;
@@ -100,6 +100,7 @@ export class InteractionController implements ITokenInteractionController {
     this.eventBus = eventBus;
     this.obsApp = obsApp;
     this.isPlayerView = isPlayerView;
+    if (isPlayerView) eventBus.on(ONLINE_DRAG_CANCEL, this.cancelDrag);
   }
 
   attachInteractionHandlers(_tokenId: string, _container: Container, _token: TokenEntity): void {
@@ -387,6 +388,35 @@ export class InteractionController implements ITokenInteractionController {
     
     // Trigger selection overlay update
     this.onSelectionUpdate?.();
+  };
+
+  /** The online scene took the token's right to move away mid-drag: the token goes back and nothing is dropped. */
+  public cancelDrag = (): void => {
+    if (!this.dragState.isDragging) return;
+    const wasDrag = this.dragState.hasMoved;
+    this.dragState.isDragging = false;
+    for (const [id, position] of Object.entries(this.dragState.initialPositions)) {
+      this.getTokenSprite?.(id)?.position.set(position.x, position.y);
+      this.updateUIPosition?.(id, position.x, position.y);
+    }
+    if (wasDrag) {
+      this.store.getState().setTokenPositions(
+        Object.entries(this.dragState.initialPositions).map(([id, position]) => ({ id, x: position.x, y: position.y })),
+      );
+      this.store.getState().setIsDragging(false);
+      endHistoryTransaction(this.store);
+    }
+    if (this.dragState.animationFrameId) window.cancelAnimationFrame(this.dragState.animationFrameId);
+    delete this.dragState.animationFrameId;
+    this.dragRuler?.end();
+    delete this.dragState.rulerTokenId;
+    this.cleanupDragListeners();
+    this.viewport.plugins.resume('drag');
+    this.dragState.pendingUpdate = false;
+    this.dragState.hasMoved = false;
+    this.lastDragStreamSentAt = 0;
+    delete this.dragState.clickToken;
+    this.onTokensHeldChange?.([]);
   };
 
   private cleanupDragListeners(): void {
@@ -832,6 +862,7 @@ export class InteractionController implements ITokenInteractionController {
   }
 
   destroyAll(): void {
+    this.eventBus.off(ONLINE_DRAG_CANCEL, this.cancelDrag);
     // Clean up all hover handlers
     for (const tokenId in this.hoverHandlers) {
       delete this.hoverHandlers[tokenId];

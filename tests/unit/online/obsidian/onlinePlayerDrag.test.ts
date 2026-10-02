@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { describe, expect, it, vi } from 'vitest';
 import { initialRemoteScene, type RemoteSceneState } from '../../../../src/app/online/obsidian/remoteScene';
-import { mayMoveAsOnlinePlayer, ONLINE_TOKEN_DROPPED } from '../../../../src/app/online/obsidian/remoteTokenMoves';
+import { mayMoveAsOnlinePlayer, ONLINE_DRAG_CANCEL, ONLINE_TOKEN_DROPPED } from '../../../../src/app/online/obsidian/remoteTokenMoves';
 import { InteractionController } from '../../../../src/app/pixi/token-renderer/InteractionController';
 
 const connected = (movable: string[]): RemoteSceneState => ({
@@ -40,7 +40,7 @@ function makeController(options: { player: boolean; remoteScene: RemoteSceneStat
     onMove({ global: { x, y } });
     onUp({ global: { x, y } });
   };
-  return { controller, viewport, setSelection, drops, press, dragTo, state };
+  return { controller, viewport, setSelection, drops, press, dragTo, state, eventBus, sprites };
 }
 
 describe('mayMoveAsOnlinePlayer', () => {
@@ -84,6 +84,19 @@ describe('dragging in the online scene', () => {
     const local = makeController({ player: true, remoteScene: null });
     local.press('a');
     expect(local.viewport.plugins.pause).not.toHaveBeenCalled();
+  });
+
+  it('cancels a drag in progress: the token goes back and nothing is dropped', () => {
+    const t = makeController({ player: true, remoteScene: connected(['a']) });
+    t.press('a');
+    const onMove = t.viewport.on.mock.calls.find(([name]: [string]) => name === 'pointermove')[1];
+    onMove({ global: { x: 175, y: 105 } });
+    t.eventBus.emit(ONLINE_DRAG_CANCEL);
+    expect(t.sprites.a!.position.set).toHaveBeenLastCalledWith(35, 35);
+    expect(t.controller.isDraggingTokens()).toBe(false);
+    expect(t.viewport.plugins.resume).toHaveBeenCalledWith('drag');
+    expect(t.viewport.off).toHaveBeenCalledWith('pointerup', expect.anything(), expect.anything());
+    expect(t.drops).toEqual([]);
   });
 
   it('GM view: keeps group drags and sends no drop', () => {

@@ -17,14 +17,17 @@ export interface DiceDropdownMenuProps {
   isOpen: boolean;
   onToggle: () => void;
   triggerRef?: React.RefObject<HTMLElement | null>;
-  /** Rolls the picks elsewhere instead of with `diceTool`: the online scene sends them to the GM. */
-  onRoll?: (selection: Readonly<Record<string, number>>) => void;
+  /** Rolls the picks elsewhere instead of with `diceTool`: the online scene sends them to the GM. False: it could not go, so the tray stays open. */
+  onRoll?: (selection: Readonly<Record<string, number>>) => boolean;
+  /** The most dice the tray lets the player pick; none when unset. */
+  maxDice?: number;
   /** Atlas's dice toasts follow the document-wide dice event; the online scene shows none. */
   showToasts?: boolean;
 }
 
-export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRoll, showToasts = true }: DiceDropdownMenuProps): React.ReactElement {
+export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRoll, maxDice, showToasts = true }: DiceDropdownMenuProps): React.ReactElement {
   const [selection, setSelection] = useState<DiceSelection>({});
+  const [note, setNote] = useState<string | null>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const portalRef = useRef<HTMLDivElement>(null);
   const keepInView = useKeepInView(portalRef, isOpen, 'top', `${position.left},${position.top}`);
@@ -34,12 +37,19 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
   const handleAdd = useCallback((die: string, event: React.MouseEvent): void => {
     event.stopPropagation();
     event.preventDefault();
+    const picked = Object.values(selection).reduce((sum, count) => sum + count, 0);
+    if (maxDice !== undefined && picked >= maxDice) {
+      setNote(`A roll has at most ${maxDice} dice.`);
+      return;
+    }
+    setNote(null);
     setSelection((prev) => ({ ...prev, [die]: (prev[die] ?? 0) + 1 }));
-  }, []);
+  }, [selection, maxDice]);
 
   const handleRemove = useCallback((die: string, event: React.MouseEvent): void => {
     event.preventDefault();
     event.stopPropagation();
+    setNote(null);
     setSelection((prev) => {
       const next = { ...prev };
       if (next[die] !== undefined && next[die] > 1) {
@@ -57,12 +67,17 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
     const formula = diceFormula(selection);
     if (!formula) return;
 
-    if (onRoll) onRoll(selection);
-    else diceTool.rollDice(formula);
+    if (onRoll) {
+      if (!onRoll(selection)) {
+        setNote("Couldn't send the roll. Check your connection.");
+        return;
+      }
+    } else diceTool.rollDice(formula);
     onToggle();
   }, [selection, diceTool, onToggle, onRoll]);
 
   const handleClear = useCallback((): void => {
+    setNote(null);
     setSelection({});
   }, []);
 
@@ -71,6 +86,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
   useEffect(() => {
     if (!isOpen) {
       setSelection({});
+      setNote(null);
       return;
     }
     if (triggerRef?.current) {
@@ -113,6 +129,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
           >
             <div className="atlas-dice-panel">
               <DiceGrid selection={selection} onAdd={handleAdd} onRemove={handleRemove} />
+              {note && <div className="atlas-dice-note" role="status">{note}</div>}
               <DiceFormulaBar selection={selection} onClear={handleClear} onRoll={handleRoll} />
             </div>
           </div>,

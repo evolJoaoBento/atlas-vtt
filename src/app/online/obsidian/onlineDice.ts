@@ -30,9 +30,14 @@ export function rollOfResult(result: DiceRollResult): { dice: DiceSelection; mod
   return { dice, modifier: result.modifiers };
 }
 
-/** The tray's picks as a roll's dice: Atlas's tray dice with a count above zero. */
-export function traySelection(selection: Readonly<Record<string, number>>): DiceSelection {
+/** The tray's picks as a roll's dice: Atlas's tray dice with a count above zero; null when empty or above the GM's limit. */
+export function traySelection(selection: Readonly<Record<string, number>>): DiceSelection | null {
   const dice: DiceSelection = {};
-  for (const [die, count] of Object.entries(selection)) if (isDieType(die) && count > 0) dice[die] = count;
-  return dice;
+  let total = 0;
+  for (const [die, count] of Object.entries(selection)) {
+    if (!isDieType(die) || count <= 0) continue;
+    dice[die] = count;
+    total += count;
+  }
+  return total >= 1 && total <= DICE_LIMITS.dicePerRoll ? dice : null;
 }
