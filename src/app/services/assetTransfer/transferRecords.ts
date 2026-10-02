@@ -2,6 +2,7 @@ import type { Asset, TagMetadata } from '../AssetService';
 import { remapPaths } from '../collectionBundle/pathRemap';
 import { hasAssetTag, tagGroupOf, tagKey, type TagGroup } from '../tagGroups';
 import { baseName } from '../../utils/pathUtils';
+import { withoutSharing } from '../../online/sharing/model/mapShare';
 import type { TransferPlan } from './transferPlan';
 
 export interface RecordContext {
@@ -51,6 +52,8 @@ export function transferredRecord(asset: Asset, { targetCollectionId, newIds, pl
     const from = asset.data?.mapPath;
     const to = record.data?.mapPath;
     if (from && to && from !== to && asset.name === sceneName(from)) record.name = sceneName(to);
+    // A copy is another map: the original's share stays with the original.
+    if (newId && record.data?.sharing) record.data = withoutSharing(record.data);
   }
   return record;
 }

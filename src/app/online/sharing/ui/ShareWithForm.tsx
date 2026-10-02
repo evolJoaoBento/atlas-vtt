@@ -1,0 +1,102 @@
+import React, { useState } from 'react';
+import { Button } from '../../../packages/components/primitives/button';
+import type { MapShareMode } from '../model/mapShare';
+import { LabelledCheck } from './LabelledCheck';
+
+/** A person to tick: a known person by key, or a name the note uses that the list does not know (`name:<name>`). */
+export interface ShareRow {
+  key: string;
+  name: string;
+  known: boolean;
+}
+
+export interface ShareFormResult {
+  everyone: boolean;
+  people: string[];
+  except: string[];
+  mode: MapShareMode;
+  notes: string[];
+}
+
+interface ShareWithFormProps {
+  rows: readonly ShareRow[];
+  initial: { everyone: boolean; people: string[]; except: string[] };
+  /** For maps: the mode, every linked note (`hidden`: offered only for full shares) and the ticked ones. */
+  map: { mode: MapShareMode; notes: ReadonlyArray<{ path: string; label: string; private: boolean; hidden?: boolean }>; ticked: string[] } | null;
+  /** The note as one person gets it; null for maps. */
+  preview: ((key: string) => Promise<string>) | null;
+  warnings: readonly string[];
+  onSave: (result: ShareFormResult) => void;
+  onCancel: () => void;
+}
+
+const toggled = (list: readonly string[], key: string): string[] => (list.includes(key) ? list.filter((item) => item !== key) : [...list, key]);
+const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': 'Player-safe', full: 'Full' };
+
+export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
+  const [everyone, setEveryone] = useState(initial.everyone);
+  const [people, setPeople] = useState(initial.people);
+  const [except, setExcept] = useState(initial.except);
+  const [mode, setMode] = useState<MapShareMode>(map?.mode ?? 'player-safe');
+  const [notes, setNotes] = useState(map?.ticked ?? []);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const known = rows.filter((row) => row.known);
+  // A player-safe share never offers notes only GM-only pins or hidden tokens link to.
+  const offered = map ? map.notes.filter((note) => mode === 'full' || !note.hidden) : [];
+  const save = (): void => onSave({
+    everyone, people, except: everyone ? except : [], mode,
+    notes: notes.filter((path) => offered.some((note) => note.path === path && !note.private)),
+  });
+  return (
+    <div className="atlas-share">
+      <section className="atlas-share__section">
+        <LabelledCheck label="Everyone in my sessions" checked={everyone} onChange={() => setEveryone(!everyone)} />
+        <ul className="atlas-share__people">
+          {(everyone ? known : rows).map((row) => (
+            <li key={row.key}>
+              {everyone
+                ? <LabelledCheck label={`Except ${row.name}`} checked={except.includes(row.key)} onChange={() => setExcept(toggled(except, row.key))} />
+                : <LabelledCheck label={row.name} checked={people.includes(row.key)} onChange={() => setPeople(toggled(people, row.key))} />}
+            </li>
+          ))}
+        </ul>
+        {warnings.map((warning) => <p key={warning} className="atlas-share__warning" role="note">{warning}</p>)}
+      </section>
+      {map && (
+        <section className="atlas-share__section" aria-label="Map">
+          <div className="atlas-share__modes" role="radiogroup" aria-label="What to share">
+            {(['player-safe', 'full'] as const).map((value) => (
+              <LabelledCheck key={value} radio="atlas-share-mode" label={MODE_LABELS[value]} checked={mode === value} onChange={() => setMode(value)} />
+            ))}
+          </div>
+          {offered.length > 0 && <h3 className="atlas-share__heading">Linked notes</h3>}
+          <ul className="atlas-share__people">
+            {offered.map((note) => (
+              <li key={note.path} className="atlas-share__note">
+                <LabelledCheck label={note.label} checked={notes.includes(note.path)} disabled={note.private} onChange={() => setNotes(toggled(notes, note.path))} />
+                {note.private && <span className="atlas-share__private">Private</span>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {preview && (
+        <section className="atlas-share__section">
+          <label className="atlas-share__preview-label">
+            <span>Preview as</span>
+            <select className="dropdown" aria-label="Preview as" defaultValue=""
+              onChange={(event) => { const key = event.target.value; if (key) void preview(key).then(setPreviewText); }}>
+              <option value="" disabled>Pick a person</option>
+              {known.map((row) => <option key={row.key} value={row.key}>{row.name}</option>)}
+            </select>
+          </label>
+          {previewText !== null && <pre className="atlas-share__preview">{previewText}</pre>}
+        </section>
+      )}
+      <div className="modal-button-container">
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="default" onClick={save}>Save</Button>
+      </div>
+    </div>
+  );
+}

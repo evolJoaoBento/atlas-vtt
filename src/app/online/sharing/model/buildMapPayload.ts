@@ -1,0 +1,134 @@
+/**
+ * Builds a map's payload on the sender's machine, from the saved map file. Images are hashed
+ * first (and the background's size read), so the payload never goes out without its art.
+ */
+import { imageDimensions } from '../../../imageProcessing/imageDimensions';
+import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
+import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
+import { mapStrings } from '../../../utils/mapStrings';
+import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
+import type { ImageFiles } from '../../scene/AssetRegistry';
+import { FogCoverage } from '../../scene/FogCoverage';
+import type { PlayerViewRules } from '../../scene/playerViewRules';
+import { projectForPlayers, type ProjectedState } from '../../scene/projectForPlayers';
+import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
+import { setOwn } from '../../scene/sceneDiff';
+import type { MapSize } from '../../scene/sceneTypes';
+import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
+
+/** A saved map: its file's map data, the state the projection reads, and the scene settings a full share carries. */
+export interface SharedMapSource {
+  map: MapFile;
+  state: ProjectedState;
+  extra: Record<string, unknown>;
+}
+
+export interface MapImages {
+  /** Vault path → fingerprint, for the background and token images that could be hashed. */
+  fingerprints: ReadonlyMap<string, string>;
+  size: MapSize;
+}
+
+export interface PayloadContext {
+  rules: PlayerViewRules;
+  collectionGrid: CollectionGridDefaults | null;
+  images: MapImages;
+  /** The item id of a ticked note this recipient gets; null for any other path. */
+  noteItem(path: string): string | null;
+  /** Item ids of every ticked note this recipient gets. */
+  linked: string[];
+  /** Whether a string is a path in the sender's vault (cleared from full shares unless it is an image or a ticked note). */
+  isFile(path: string): boolean;
+}
+
+const SHARED_SCENE_ID = 'shared-map';
+const FULL_FIELDS = ['widgetSettings', 'widgetValues', 'initiative', 'initiativeTrackerOpen', 'tokenSettings'] as const;
+
+/** Reads a map file: its envelope, migrated; null when it cannot be read. */
+export async function readSharedMap(read: (path: string) => Promise<string>, mapPath: string): Promise<SharedMapSource | null> {
+  try {
+    const envelope: unknown = JSON.parse(await read(mapPath));
+    if (!isPersistedMapEnvelope(envelope)) return null;
+    const stored = (envelope.state ?? {}) as Record<string, unknown>;
+    const map = migrateMapFile(stored);
+    // The projection checks every field it reads, as for a live store.
+    const state = {
+      background: map.background, grid: map.grid, objects: { ...map.objects, audios: {} },
+      widgetSettings: stored.widgetSettings, widgetValues: stored.widgetValues ?? {},
+      initiative: stored.initiative ?? null, initiativeTrackerOpen: stored.initiativeTrackerOpen === true,
+    } as unknown as ProjectedState;
+    const extra = Object.fromEntries(FULL_FIELDS.flatMap((key) => (stored[key] === undefined ? [] : [[key, stored[key]]])));
+    return { map, state, extra };
+  } catch {
+    return null;
+  }
+}
+
+/** The background and token images of a map. */
+export function imagePathsOf(map: MapFile): string[] {
+  const paths = new Set<string>();
+  if (map.background) paths.add(map.background);
+  for (const token of Object.values(map.objects.tokens)) if (token.imagePath) paths.add(token.imagePath);
+  return [...paths];
+}
+
+export async function hashMapImages(
+  map: MapFile, files: ImageFiles, hash: Hasher,
+  dimensions: (bytes: ArrayBuffer) => Promise<MapSize | null> = (bytes) => imageDimensions(new Blob([bytes])),
+): Promise<MapImages> {
+  const fingerprints = new Map<string, string>();
+  let size: MapSize = { width: 0, height: 0 };
+  for (const path of imagePathsOf(map)) {
+    const stat = files.stat(path);
+    if (!stat || stat.size > ASSET_LIMITS.fileBytes || !mimeForPath(path)) continue;
+    try {
+      const bytes = await files.read(path);
+      fingerprints.set(path, await hash(bytes));
+      if (path === map.background) size = (await dimensions(bytes)) ?? size;
+    } catch {
+      // an unreadable image is left out, as online play does
+    }
+  }
+  return { fingerprints, size };
+}
+
+export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload {
+  const memo = createProjectionMemo();
+  const coverage = FogCoverage.fromPlayerFog(projectFog(source.map.objects.fog, memo));
+  const scene = projectForPlayers(source.state, {
+    sceneId: SHARED_SCENE_ID, rules: context.rules, coverage, memo, mapSize: context.images.size,
+    assets: { idFor: (path) => (path ? context.images.fingerprints.get(path) ?? null : null) },
+    collectionGrid: context.collectionGrid,
+  });
+  // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
+  const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
+    if (pin.gmOnly || coverage.isCovered({ x: pin.x, y: pin.y, width: 1, height: 1 })) return [];
+    const note = context.noteItem(pin.notePath);
+    if (!note) return [];
+    return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];
+  });
+  const tokenNotes: Record<string, string> = {};
+  for (const id of Object.keys(scene.tokens)) {
+    const token = source.map.objects.tokens[id];
+    const path = token && 'notePath' in token && token.notePath ? token.notePath : token && 'statblockPath' in token ? token.statblockPath : undefined;
+    const note = path ? context.noteItem(path) : null;
+    if (note) setOwn(tokenNotes, id, note);
+  }
+  return { format: MAP_PAYLOAD_FORMAT, mode: 'player-safe', name, scene, pins, tokenNotes, notes: [...context.linked], images: sceneAssetIds(scene) };
+}
+
+export function fullPayload(source: SharedMapSource, name: string, context: PayloadContext): FullMapPayload {
+  const { map } = source;
+  const body = { background: map.background, grid: map.grid, objects: map.objects, camera: map.camera, ...source.extra };
+  const replaced = mapStrings(body, (text) => {
+    const image = context.images.fingerprints.get(text);
+    if (image) return `${IMAGE_REF_PREFIX}${image}`;
+    const note = context.noteItem(text);
+    if (note) return `${NOTE_REF_PREFIX}${note}`;
+    return context.isFile(text) ? '' : text;
+  });
+  return {
+    format: MAP_PAYLOAD_FORMAT, mode: 'full', name, map: replaced,
+    notes: [...context.linked], images: [...new Set(context.images.fingerprints.values())],
+  };
+}

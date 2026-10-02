@@ -36,6 +36,8 @@ export interface OnlineSettings {
   keepImages: boolean;
   /** The GM's table key (sharing between Obsidian clients): made the first time this Atlas hosts; null before. */
   table: StoredTable | null;
+  /** Note properties that shared notes keep (all others are stripped; `atlas-share` always). */
+  shareableProperties: string[];
 }
 
 export const DEFAULT_STUN = 'stun:stun.l.google.com:19302';
@@ -48,6 +50,7 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   playerName: '',
   keepImages: true,
   table: null,
+  shareableProperties: ['tags', 'aliases'],
 };
 
 /** PeerJS options for these settings: the PeerJS cloud unless a custom server is set. */
@@ -109,5 +112,9 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
     playerName: typeof source.playerName === 'string' ? source.playerName.slice(0, 200) : defaults.playerName,
     keepImages: source.keepImages !== false,
     table: validStoredTable(source.table),
+    shareableProperties: Array.isArray(source.shareableProperties)
+      ? source.shareableProperties.filter((key): key is string => typeof key === 'string' && key.trim().length > 0 && key.length <= 64)
+        .map((key) => key.trim()).slice(0, 50)
+      : [...defaults.shareableProperties],
   };
 }

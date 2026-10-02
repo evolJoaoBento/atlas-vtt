@@ -52,6 +52,7 @@ describe('online settings', () => {
       playerName: '',
       keepImages: true,
       table: null,
+      shareableProperties: ['tags', 'aliases'],
     });
   });
 
@@ -65,5 +66,13 @@ describe('online settings', () => {
     expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true, table: null });
     expect(resolveOnlineSettings({ playerName: 'Anna', keepImages: false })).toMatchObject({ playerName: 'Anna', keepImages: false });
     expect(resolveOnlineSettings({ playerName: 4, keepImages: 'no' })).toMatchObject({ playerName: '', keepImages: true });
+  });
+
+  it('shares the tags and aliases of a note unless the list says otherwise', () => {
+    expect(DEFAULT_ONLINE_SETTINGS.shareableProperties).toEqual(['tags', 'aliases']);
+    expect(resolveOnlineSettings({ shareableProperties: [' cr ', 'tags', '', 4, 'x'.repeat(65), '  '] }).shareableProperties).toEqual(['cr', 'tags']);
+    expect(resolveOnlineSettings({ shareableProperties: [] }).shareableProperties).toEqual([]);
+    expect(resolveOnlineSettings({ shareableProperties: 'tags' }).shareableProperties).toEqual(['tags', 'aliases']);
+    expect(resolveOnlineSettings({ shareableProperties: Array.from({ length: 80 }, (_, index) => `p${index}`) }).shareableProperties).toHaveLength(50);
   });
 });

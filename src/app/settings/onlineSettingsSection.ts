@@ -78,6 +78,19 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         },
       },
       {
+        name: 'Shared note properties',
+        desc: 'Properties that notes you share keep, separated by commas. All other properties are removed before sending; atlas-share always is.',
+        aliases: ['sharing', 'frontmatter', 'atlas-share'],
+        render: (setting) => {
+          setting.addText((text) => text
+            .setPlaceholder('Tags, aliases')
+            .setValue(settings.getOnlineSettings().shareableProperties.join(', '))
+            .onChange((value) => settings.setOnlineSettings({
+              shareableProperties: value.split(',').map((key) => key.trim()).filter((key) => key && key !== 'atlas-share'),
+            })));
+        },
+      },
+      {
         name: 'Keep online images on this device',
         desc: 'When you join a session from Atlas, keep its images outside your vault so the next session loads faster. Switching it off deletes them.',
         aliases: ['cache', 'images', 'join', 'online'],

@@ -17,6 +17,7 @@ import { assetFilePath, groupTokenRefs } from './vault-sync/assetFiles';
 import { reconcileIndex, type VaultReconciliation } from './vault-sync/reconcileIndex';
 import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
+import type { MapShare } from '../online/sharing/model/mapShare';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 
@@ -82,6 +83,8 @@ export type EncounterDifficulty = 'easy' | 'medium' | 'hard' | 'deadly';
 export interface SceneAssetData {
   /** Vault path of the scene's .atlasmap file. */
   mapPath?: string;
+  /** Who the map is shared with in online sessions (`online/sharing/model/mapShare.ts`); copies drop it. */
+  sharing?: MapShare;
 }
 
 export interface EncounterAssetData {

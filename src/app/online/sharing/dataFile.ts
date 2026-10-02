@@ -8,7 +8,7 @@ import { ensureAdapterFolder } from '../../plugin/vaultFolders';
 
 export const SHARING_DATA_DIR = 'atlas-vtt/.atlas-data/sharing';
 
-export type DataAdapterLike = Pick<DataAdapter, 'exists' | 'read' | 'write' | 'mkdir' | 'remove'>;
+export type DataAdapterLike = Pick<DataAdapter, 'exists' | 'read' | 'write' | 'mkdir' | 'remove' | 'copy'>;
 
 const parentOf = (path: string): string => path.slice(0, Math.max(0, path.lastIndexOf('/')));
 
@@ -30,19 +30,32 @@ export async function removeFile(adapter: DataAdapterLike, path: string): Promis
   if (await adapter.exists(path)) await adapter.remove(path);
 }
 
+/** Where an unreadable file is kept before its first save replaces it: `people.json` becomes `people.broken.json`. */
+export const brokenCopyPath = (path: string): string => path.replace(/\.json$/, '') + '.broken.json';
+
 export class JsonDataFile<T> {
   private queue: Promise<void> = Promise.resolve();
+  /** Set when the stored file could not be read, until it is copied aside once: its text, or null when even reading it failed. */
+  private unreadable: { text: string | null } | null = null;
 
   /** `parse` turns whatever is stored (null for nothing) into a value, dropping what it cannot read. */
   constructor(private readonly adapter: DataAdapterLike, readonly path: string, private readonly parse: (value: unknown) => T) {}
 
   async load(): Promise<T> {
-    const text = await readText(this.adapter, this.path);
+    let text: string | null;
+    try {
+      text = (await this.adapter.exists(this.path)) ? await this.adapter.read(this.path) : null;
+    } catch (error) {
+      console.error(`[Atlas sharing] ${this.path} could not be read; starting from empty, a copy is kept next to it.`, error);
+      this.unreadable = { text: null };
+      return this.parse(null);
+    }
     if (text === null) return this.parse(null);
     try {
       return this.parse(JSON.parse(text));
     } catch (error) {
-      console.error(`[Atlas sharing] ${this.path} is not readable; starting from empty.`, error);
+      console.error(`[Atlas sharing] ${this.path} is not readable; starting from empty, a copy is kept next to it.`, error);
+      this.unreadable = { text };
       return this.parse(null);
     }
   }
@@ -50,8 +63,26 @@ export class JsonDataFile<T> {
   save(value: T): Promise<void> {
     const text = JSON.stringify(value, null, 2);
     this.queue = this.queue
-      .then(() => writeText(this.adapter, this.path, text))
+      .then(async () => {
+        await this.keepUnreadable();
+        await writeText(this.adapter, this.path, text);
+      })
       .catch((error: unknown) => console.error(`[Atlas sharing] Could not save ${this.path}:`, error));
     return this.queue;
+  }
+
+  /**
+   * Before the first save replaces an unreadable file, once: it is copied to `<name>.broken.json`,
+   * which is never overwritten. When the copy fails the save fails too, and is tried again next time.
+   */
+  private async keepUnreadable(): Promise<void> {
+    const unreadable = this.unreadable;
+    if (unreadable === null) return;
+    const copy = brokenCopyPath(this.path);
+    if (!(await this.adapter.exists(copy))) {
+      if (unreadable.text !== null) await writeText(this.adapter, copy, unreadable.text);
+      else await this.adapter.copy(this.path, copy);
+    }
+    this.unreadable = null;
   }
 }
