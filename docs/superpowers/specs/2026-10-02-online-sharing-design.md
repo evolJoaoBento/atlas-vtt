@@ -24,7 +24,8 @@ people. No accounts: identity comes from the session and a player name.
 | Question | Decision |
 | --- | --- |
 | Who shares | Anyone with anyone in the session. |
-| Identity | A stable player id per table, shown with an editable name in a people list. |
+| Identity | A stable player id per table, shown with an editable name in a people list; no passwords (the room link and GM approval are the gate). |
+| Where shares live | Notes: the `atlas-share` property (written by the dialog, editable by hand); maps: the scene's data. |
 | Private parts | `> [!private]` and `%% %%` never shared; `> [!only|names]` only those people; `> [!except|names]` everyone but those. |
 | Updates | Per note: keep both, pick one, resolve conflicts (merge page), or auto merge. |
 | Maps | Sender picks per share: player-safe (as online play filters) or full (co-GM). |
@@ -38,12 +39,28 @@ people. No accounts: identity comes from the session and a player name.
   the GM's session maps it to the player (replacing the session-only keys for
   Obsidian players). Web players are unaffected.
 - Every Atlas keeps a **people list**: player id, table id, name (editable),
-  last seen. Shares and `only`/`except` names refer to people in this list;
-  renaming keeps references by id.
+  last seen, managed in an Atlas **People** panel (rename, link, remove).
+  People are added automatically when admitted; a known player's join request
+  shows "(known)". A known player on a new device can be **linked** to the
+  existing person. Shares and `only`/`except` names refer to people in this
+  list; renaming keeps references by id.
 
 ## Sharing
 
-- Right-click a note or map → **Share with…** → tick people. For maps: **Player-
+- Notes carry their sharing in the `atlas-share` property:
+
+  ```yaml
+  atlas-share: public                 # everyone in a session with me (Obsidian)
+  atlas-share: private                # nobody — also the default without the property
+  atlas-share: [Ana, Ben]             # only Ana and Ben (same as [only Ana, only Ben])
+  atlas-share: [public, except Cara]  # everyone except Cara
+  ```
+
+  `private` wins over everything and `except` over a name. The property itself
+  is never sent.
+- Right-click a note or map → **Share with…** → tick people, or "Everyone in my
+  sessions" (`public`); the dialog writes the property and reads it back, so the
+  two always agree. For maps: **Player-
   safe** (default) or **Full** (confirmed the first time), and the linked notes
   of pins and tokens to include (player-safe shares never offer notes behind
   hidden pins).
