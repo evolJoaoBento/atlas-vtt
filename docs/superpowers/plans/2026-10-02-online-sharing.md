@@ -252,7 +252,9 @@ Context:
 2. **The GM sees relayed items.** Player-to-player items are encrypted on each hop, but the GM's Atlas handles them in clear while forwarding. The privacy note says so. End-to-end encryption between players is not in the spec.
 3. **Seven tasks, not six.** Identity on the wire and the people list are split, because each is a reviewable unit with its own tests.
 4. **Map merges** (ruling 9) and **plain-text previews** are simplifications that a later piece could revisit. The share preview shows the filtered Markdown as text, not rendered.
-5. **The manual test (Task 7, step 6)** needs three vaults (GM and two players), run by the user.
+5. **The manual test (Task 7, step 7)** needs three vaults (GM and two players), run by the user.
+6. **Image hashing on the sender**: `SenderCatalogue` reads and hashes a map's images on every list and every open, a single image pull included. A fingerprint cache by path and mtime (as `AssetRegistry` keeps per session) would help large maps; it is left out to keep the catalogue stateless.
+7. **Ask to pull…** was added as the sending side of push requests, which the spec implies but does not name.
 
 ## File Structure
 
@@ -5151,6 +5153,21 @@ describe('ShareNode', () => {
     expect(pushes).toEqual([{ from: 'gm', item: 'i'.repeat(22), kind: 'note', title: 'Cave' }]);
   });
 
+  it('pulls a map’s many images one after another without being told busy', async () => {
+    const { add } = network();
+    const image = new TextEncoder().encode('png').buffer;
+    const version = await nodeHash(image);
+    const images: Catalogue = {
+      list: async () => [],
+      open: async (_person, ref): Promise<SharePayload | null> => (ref.includes('/') ? { kind: 'image', bytes: image, version, mime: 'image/png' } : null),
+    };
+    add('gm', images);
+    const player = add('ana', none);
+    for (let index = 0; index < 12; index++) {
+      await expect(player.pull('gm', `${'m'.repeat(22)}/${version}`, 'image')).resolves.toMatchObject({ kind: 'image', version });
+    }
+  });
+
   it('answers busy past the rate limit', async () => {
     const { add } = network();
     add('gm', none);
@@ -6012,7 +6029,9 @@ export class ShareNode {
 
   private queuePull(from: string, req: string, item: string): void {
     const queue = this.queues.get(from) ?? { tail: Promise.resolve(), size: 0 };
-    if (!this.limit.allow(from, Date.now()) || queue.size >= SHARE_LIMITS.queuedPerPeer) {
+    // A map's images (`<map>/<fingerprint>`) come one after another with it: the queue bounds them, not the rate.
+    const limited = !item.includes('/') && !this.limit.allow(from, Date.now());
+    if (limited || queue.size >= SHARE_LIMITS.queuedPerPeer) {
       this.deny(from, req, 'busy');
       return;
     }
@@ -6246,7 +6265,13 @@ export class GmShareHost implements SessionHandler {
       return;
     }
     if (decoded.kind !== 'message') return;
-    if (ASKS.has(decoded.message.type) && !this.limit.allow(person, Date.now())) return;
+    const asked = decoded.message;
+    const imagePull = asked.type === 'share-pull' && asked.item.includes('/');
+    if (ASKS.has(asked.type) && !imagePull && !this.limit.allow(person, Date.now())) {
+      // Answered, not dropped, so the asker does not wait out the timeout.
+      if ('req' in asked) this.portOf(person)?.send(encodeShare({ v: 1, type: 'share-denied', to: person, from: asked.to, req: asked.req, reason: 'busy' }));
+      return;
+    }
     // Who sent it is the GM's to say: a player's own `from` is replaced.
     const message = { ...decoded.message, from: person };
     if (message.to === GM_PERSON_ID) this.node.receive(person, message);
@@ -6791,6 +6816,17 @@ describe('pulling a map', () => {
     const state = JSON.parse(text).state;
     expect(Object.keys(state.objects.pins)).toEqual(['p']);
     expect(state.objects.tokens.t.imagePath).toBe('');
+  });
+
+  it('writes no image whose bytes are not the fingerprint it was asked for', async () => {
+    const { files, images, deps } = await setup();
+    images.mockImplementation(async (): Promise<PulledItem> => ({
+      kind: 'image', version: fingerprintOf('other-bytes'), mime: 'image/png', bytes: new TextEncoder().encode('other-bytes').buffer,
+    }));
+    await pullMap(deps({}), input(playerSafe));
+    expect([...files.keys()].some((path) => path.includes('/files/'))).toBe(false);
+    const state = JSON.parse(files.get(`atlas-vtt/collections/${SHARED_COLLECTION}/scenes/Ana/Inn.atlasmap`)!).state;
+    expect(state.background).toBeNull();
   });
 
   it('replaces the received map on a re-pull, never adding a second scene', async () => {
@@ -7366,7 +7402,8 @@ export async function pullMap(deps: MapPullDeps, input: MapPullInput): Promise<P
       continue;
     }
     const image = await deps.pullImage(fingerprint);
-    if (!image.mime) continue;
+    // The transfer checked the bytes against the version the sender announced; it must also be the fingerprint asked for.
+    if (!image.mime || image.version !== fingerprint) continue;
     const path = `${imageFolder}/${fingerprint}.${EXTENSION[image.mime]}`;
     if (!isInside(path, imageFolder)) continue;
     await ensureFolder(app, imageFolder);
