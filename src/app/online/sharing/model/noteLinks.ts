@@ -11,7 +11,6 @@
 /** The title the receiver knows a link target by; null when they do not get it. */
 export type LinkResolver = (linkpath: string) => string | null;
 
-const WIKI_LINK = /(!?)\[\[([^\]|]*?)(?:\|([^\]]*))?\]\]/g;
 const LABEL = String.raw`((?:\\.|[^\[\]\\]|\[[^\[\]]*\])*)`;
 const MARKDOWN_LINK = new RegExp(String.raw`(!?)\[${LABEL}\]\(([^)]*)\)`, 'g');
 const REFERENCE_LINK = new RegExp(String.raw`(!?)\[${LABEL}\]\[([^\]]*)\]`, 'g');
@@ -55,13 +54,66 @@ function rewriteTarget(bang: string, label: string, rawTarget: string, resolve: 
   return bang ? `![[${title}${sub}]]` : `[[${title}${sub}|${label}]]`;
 }
 
+/** What a wiki link that is not kept shows: its alias, or the file name (an embed's size alias is not text). */
+function wikiText(bang: string, raw: string, alias: string | undefined): string {
+  const { path, sub } = splitTarget(raw.trim());
+  if (alias !== undefined && !(bang && isSize(alias))) return alias;
+  return path ? nameOf(path) : sub.replace(/^[#^]/, '');
+}
+
+/** Where the `]]` that closes the `[[` at `from` is, counting nested `[[`; -1 when it never closes. */
+function wikiEnd(text: string, from: number): number {
+  let depth = 0;
+  for (let at = from; at < text.length - 1; at++) {
+    const pair = text.slice(at, at + 2);
+    if (pair === '[[') {
+      depth++;
+      at++;
+    } else if (pair === ']]') {
+      if (--depth === 0) return at;
+      at++;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Calls `decide` for every wiki link, from the outside in. A link nested inside another link's alias (or target)
+ * is flattened to its text first, so `decide` never sees brackets inside what it is given and no inner path survives.
+ */
+function mapWiki(text: string, decide: (bang: string, raw: string, alias: string | undefined) => string): string {
+  let out = '';
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('[[', at);
+    if (open < 0) return out + text.slice(at);
+    const close = wikiEnd(text, open);
+    if (close < 0) {
+      out += text.slice(at, open + 2); // an unclosed opener is plain text; links after it still count
+      at = open + 2;
+      continue;
+    }
+    const bang = open > at && text[open - 1] === '!' ? '!' : '';
+    out += text.slice(at, open - bang.length);
+    const content = text.slice(open + 2, close);
+    const bar = content.indexOf('|');
+    const target = bar < 0 ? content : content.slice(0, bar);
+    if (target.includes('[[')) {
+      out += mapWiki(content, wikiText);
+    } else {
+      const alias = bar < 0 ? undefined : mapWiki(content.slice(bar + 1), wikiText);
+      out += decide(bang, target, alias);
+    }
+    at = close + 2;
+  }
+}
+
 function rewriteWiki(text: string, resolve: LinkResolver): string {
-  return text.replace(WIKI_LINK, (_all: string, bang: string, raw: string, alias: string | undefined): string => {
+  return mapWiki(text, (bang, raw, alias) => {
     const { path, sub } = splitTarget(raw.trim());
     const title = path ? resolve(path) : null;
     if (title) return `${bang}[[${title}${sub}${alias !== undefined ? `|${alias}` : ''}]]`;
-    if (alias !== undefined && !(bang && isSize(alias))) return alias;
-    return path ? nameOf(path) : sub.replace(/^[#^]/, '');
+    return wikiText(bang, raw, alias);
   });
 }
 
@@ -128,11 +180,10 @@ const sweep = (text: string): string =>
 
 /** The last net for wiki links: one whose target is not a title this pass wrote becomes its text (an embed, only its file name). */
 function wikiSweep(text: string, titles: ReadonlySet<string>): string {
-  return text.replace(WIKI_LINK, (all: string, bang: string, raw: string, alias: string | undefined): string => {
-    const { path, sub } = splitTarget(raw.trim());
-    if (path && titles.has(path)) return all;
-    if (alias !== undefined && !bang) return alias;
-    return path ? nameOf(path) : sub.replace(/^[#^]/, '');
+  return mapWiki(text, (bang, raw, alias) => {
+    const { path } = splitTarget(raw.trim());
+    if (path && titles.has(path)) return `${bang}[[${raw}${alias !== undefined ? `|${alias}` : ''}]]`;
+    return alias !== undefined && !bang ? alias : wikiText(bang, raw, undefined);
   });
 }
 

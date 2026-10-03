@@ -1,4 +1,5 @@
 /** A note's frontmatter, split off and reduced to the properties that may be shared. Text only, never parsed as YAML. */
+import { stripCommentsChecked } from './commentFilter';
 import { SHARE_PROPERTY } from './shareRule';
 
 /** Frontmatter opens at the first line (after a byte order mark) and ends at the next `---`, as in Obsidian. */
@@ -13,21 +14,27 @@ export function splitFrontmatter(source: string): { frontmatter: string[] | null
 
 const TOP_LEVEL_KEY = /^("[^"]+"|'[^']+'|[^\s#:'"-][^:]*?):(?:\s|$)/;
 
+/** Comments (`%% %%`, `<!-- -->`) are removed from a kept property; one that stays open drops the whole property (fail closed). */
+function withoutComments(block: readonly string[]): string[] {
+  const { lines, open } = stripCommentsChecked(block);
+  return open ? [] : lines;
+}
+
 /** The lines of the top-level properties named in `keep` (case-insensitive), never `atlas-share`; comments and unreadable lines go. */
 export function keepProperties(lines: readonly string[], keep: readonly string[]): string[] {
   const wanted = new Set(keep.map((key) => key.trim().toLowerCase()).filter((key) => key && key !== SHARE_PROPERTY));
-  const out: string[] = [];
+  const blocks: string[][] = [];
   let keeping = false;
   for (const line of lines) {
     const key = TOP_LEVEL_KEY.exec(line)?.[1];
     if (key !== undefined) {
       keeping = wanted.has(key.replace(/^["']|["']$/g, '').trim().toLowerCase());
-      if (keeping) out.push(line);
+      if (keeping) blocks.push([line]);
     } else if (/^\S/.test(line) && !/^-(\s|$)/.test(line)) {
       keeping = false; // a comment or a line we cannot read at the top level
     } else if (keeping) {
-      out.push(line);
+      blocks[blocks.length - 1]?.push(line);
     }
   }
-  return out;
+  return blocks.flatMap(withoutComments);
 }

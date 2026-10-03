@@ -37,6 +37,11 @@ function withoutComments(line: string, open: string | null): { kept: string; ope
  * blank line appears where there was none.
  */
 export function stripComments(lines: readonly string[]): string[] {
+  return stripCommentsChecked(lines).lines;
+}
+
+/** Like `stripComments`, and says whether a comment was still open at the end (everything after it was hidden). */
+export function stripCommentsChecked(lines: readonly string[]): { lines: string[]; open: boolean } {
   const out: string[] = [];
   let open: string | null = null;
   for (const line of lines) {
@@ -45,5 +50,5 @@ export function stripComments(lines: readonly string[]): string[] {
     if (!result.touched) out.push(line);
     else if (lenientQuote(result.kept).content.trim() !== '') out.push(result.kept.trimEnd());
   }
-  return out;
+  return { lines: out, open: open !== null };
 }

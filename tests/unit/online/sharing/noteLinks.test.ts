@@ -61,7 +61,7 @@ describe('links in shared notes', () => {
     const swept = rewriteLinks('![[GM/a.png|![i](x)]] and [[GM/Secret|![j](y)]] and [[Cave]]', shared);
     expect(swept).not.toContain('GM/');
     expect(swept).not.toContain('![[');
-    expect(swept).toBe('a.png and j and [[Cave]]');
+    expect(swept).toBe('i and j and [[Cave]]'); // an embed's alias is its text, as in the first pass
   });
 
   it('only web links stay: Obsidian, app and file links become their text', () => {
@@ -72,5 +72,19 @@ describe('links in shared notes', () => {
   it('sees a definition whose target is on the next line, and a tag whose attribute holds a ">"', () => {
     expect(rewriteLinks('see [r]\n\n[r]:\n  GM/Secret.md\n"title"\nend', shared)).toBe('see r\n\nend');
     expect(rewriteLinks('<a title=">" href="GM/Secret.md">x</a>', shared)).toBe('<a title=">">x</a>');
+  });
+});
+
+describe('wiki links nested in the alias of a kept link (I1)', () => {
+  it('flattens an inner link to its text so no vault path survives', () => {
+    expect(rewriteLinks('body [[Cave|see [[Private/Secret]]]] end', shared)).toBe('body [[Cave|see Secret]] end');
+    expect(rewriteLinks('[[Cave|see [[Private/Secret|s]] ok]]', shared)).toBe('[[Cave|see s ok]]');
+    expect(rewriteLinks('[[Cave|a ![[GM/map.png]] b [[Places/Cave.md|c]]]]', shared)).toBe('[[Cave|a map.png b c]]');
+  });
+
+  it('leaves links after an unclosed opener working', () => {
+    const out = rewriteLinks('x [[ then [[Private/Secret]] and [[Cave]]', shared);
+    expect(out).not.toContain('Private/');
+    expect(out).toContain('[[Cave]]');
   });
 });

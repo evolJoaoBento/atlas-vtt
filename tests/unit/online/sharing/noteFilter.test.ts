@@ -144,3 +144,15 @@ describe('HTML comments and a byte order mark', () => {
     expect(forPerson('ana', '---\ntags: [a]\n...\nsecret: x\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
   });
 });
+
+describe('comments inside kept properties (I2)', () => {
+  it('removes them from a property value and a list item', () => {
+    expect(forPerson('ana', '---\ntags: [a] %% secret %%\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
+    expect(forPerson('ana', '---\ntags:\n  - a\n  - "%% secret %%"\n  - <!-- gm --> b\n---\nBody')).toBe('---\ntags:\n  - a\n  - ""\n  -  b\n---\nBody');
+  });
+
+  it('drops a kept property whose comment never closes', () => {
+    expect(forPerson('ana', '---\ntags: [a] %% secret\nsecret: x\n---\nBody')).toBe('Body');
+    expect(forPerson('ana', '---\ntags:\n  - a\n  - <!-- open\n---\nBody')).toBe('Body');
+  });
+});
