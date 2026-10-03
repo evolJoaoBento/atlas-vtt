@@ -1,0 +1,172 @@
+/**
+ * What this Atlas pulled from whom, in `pulled.json`, with the last pulled text of each note
+ * (the merge base) in `bases/<key>.md`. All in Atlas's sharing data, never in the vault.
+ * Follows renames of the pulled files.
+ */
+import type { App } from 'obsidian';
+import { randomId } from '../../ids';
+import { JsonDataFile, readText, SHARING_DATA_DIR, writeText, type DataAdapterLike } from '../dataFile';
+import { pathWithin } from '../pathRenames';
+
+export const PULLED_FILE = `${SHARING_DATA_DIR}/pulled.json`;
+const BASES_DIR = `${SHARING_DATA_DIR}/bases`;
+
+export type UpdateChoice = 'both' | 'mine' | 'theirs' | 'resolve' | 'auto';
+export type ConflictDefault = 'mine' | 'theirs' | 'both';
+
+export interface PulledRecord {
+  /** `<tableId>/<from>/<item>`. */
+  key: string;
+  tableId: string;
+  from: string;
+  item: string;
+  kind: 'note' | 'map';
+  /** The vault file it was written to. */
+  path: string;
+  /** The sender's version last pulled. */
+  version: string;
+  baseKey: string;
+  pulledAt: number;
+  sceneId?: string;
+  /** "Remember for this note". */
+  choice?: UpdateChoice;
+  conflictDefault?: ConflictDefault;
+  /** Auto merges are saved without showing them. */
+  silent?: boolean;
+}
+
+interface PulledData {
+  version: 1;
+  records: PulledRecord[];
+}
+
+const CHOICES: readonly UpdateChoice[] = ['both', 'mine', 'theirs', 'resolve', 'auto'];
+const DEFAULTS: readonly ConflictDefault[] = ['mine', 'theirs', 'both'];
+
+function parseRecord(value: unknown): PulledRecord | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const r = value as Record<string, unknown>;
+  const strings = ['key', 'tableId', 'from', 'item', 'path', 'version', 'baseKey'] as const;
+  const text = (field: string): boolean => {
+    const v = r[field];
+    return typeof v === 'string' && v.length > 0 && v.length <= 1024;
+  };
+  if (!strings.every(text)) return null;
+  if (r.kind !== 'note' && r.kind !== 'map') return null;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(r.baseKey as string)) return null;
+  return {
+    key: r.key as string, tableId: r.tableId as string, from: r.from as string, item: r.item as string, kind: r.kind,
+    path: r.path as string, version: r.version as string, baseKey: r.baseKey as string,
+    pulledAt: typeof r.pulledAt === 'number' ? r.pulledAt : 0,
+    ...(typeof r.sceneId === 'string' ? { sceneId: r.sceneId } : {}),
+    ...(CHOICES.includes(r.choice as UpdateChoice) ? { choice: r.choice as UpdateChoice } : {}),
+    ...(DEFAULTS.includes(r.conflictDefault as ConflictDefault) ? { conflictDefault: r.conflictDefault as ConflictDefault } : {}),
+    ...(r.silent === true ? { silent: true } : {}),
+  };
+}
+
+function parsePulled(value: unknown): PulledData {
+  const records = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).records : null;
+  return { version: 1, records: Array.isArray(records) ? records.flatMap((entry) => parseRecord(entry) ?? []) : [] };
+}
+
+export class PulledItems {
+  private static readonly instances = new WeakMap<App, PulledItems>();
+  static forApp(app: App): PulledItems {
+    let items = this.instances.get(app);
+    if (!items) {
+      items = PulledItems.create(app.vault.adapter);
+      this.instances.set(app, items);
+    }
+    return items;
+  }
+
+  static create(adapter: DataAdapterLike): PulledItems {
+    return new PulledItems(adapter, new JsonDataFile(adapter, PULLED_FILE, parsePulled));
+  }
+
+  static keyOf(tableId: string, from: string, item: string): string {
+    return `${tableId}/${from}/${item}`;
+  }
+
+  private records: PulledRecord[] = [];
+  /** Records put or renamed before the stored file was read are applied on top of it. */
+  private loading: Promise<void> | null = null;
+  private loaded = false;
+  private unsaved = false;
+  private readonly listeners = new Set<() => void>();
+
+  constructor(private readonly adapter: DataAdapterLike, private readonly file: JsonDataFile<PulledData>) {}
+
+  ready(): Promise<void> {
+    this.loading ??= this.file.load().then((data) => {
+      const known = new Set(this.records.map((record) => record.key));
+      this.records = [...data.records.filter((record) => !known.has(record.key)), ...this.records];
+      this.loaded = true;
+      if (this.unsaved) void this.file.save({ version: 1, records: this.records });
+    });
+    return this.loading;
+  }
+
+  get(tableId: string, from: string, item: string): PulledRecord | null {
+    const key = PulledItems.keyOf(tableId, from, item);
+    return this.records.find((record) => record.key === key) ?? null;
+  }
+
+  byPath(path: string): PulledRecord | null {
+    return this.records.find((record) => record.path === path) ?? null;
+  }
+
+  list(): readonly PulledRecord[] {
+    return this.records;
+  }
+
+  /** A new record (or one replacing the record with the same key); a new base key when it has none. */
+  put(record: Omit<PulledRecord, 'key' | 'baseKey'> & { baseKey?: string }): PulledRecord {
+    const key = PulledItems.keyOf(record.tableId, record.from, record.item);
+    const full: PulledRecord = { ...record, key, baseKey: record.baseKey ?? randomId() };
+    this.records = [...this.records.filter((known) => known.key !== key), full];
+    this.changed();
+    return full;
+  }
+
+  update(key: string, changes: Partial<Omit<PulledRecord, 'key' | 'baseKey'>>): PulledRecord | null {
+    const record = this.records.find((known) => known.key === key);
+    if (!record) return null;
+    const updated = { ...record, ...changes };
+    this.records = this.records.map((known) => (known === record ? updated : known));
+    this.changed();
+    return updated;
+  }
+
+  readBase(record: PulledRecord): Promise<string | null> {
+    return readText(this.adapter, `${BASES_DIR}/${record.baseKey}.md`);
+  }
+
+  writeBase(record: PulledRecord, text: string): Promise<void> {
+    return writeText(this.adapter, `${BASES_DIR}/${record.baseKey}.md`, text);
+  }
+
+  /** The pulled files at or below `from` now live at `to`. */
+  renamed(from: string, to: string): void {
+    let changed = false;
+    this.records = this.records.map((record) => {
+      if (!pathWithin(record.path, from)) return record;
+      changed = true;
+      return { ...record, path: to + record.path.slice(from.length) };
+    });
+    if (changed) this.changed();
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => { this.listeners.delete(listener); };
+  }
+
+  /** Saves only once the stored file was read, so a save never replaces records not yet loaded. */
+  private changed(): void {
+    if (this.loaded) void this.file.save({ version: 1, records: this.records });
+    else this.unsaved = true;
+    this.listeners.forEach((listener) => listener());
+  }
+}

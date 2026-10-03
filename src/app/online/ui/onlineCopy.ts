@@ -8,6 +8,7 @@ export const REMOVE_PLAYER_LABEL = 'Remove player';
 export const OPEN_PLAYER_WINDOW_LABEL = 'Open player window';
 export const ONLINE_SECTION_TITLE = 'Online play';
 export const JOIN_SESSION_LABEL = 'Join online session…';
+export const SHARED_WITH_ME_BUTTON = 'Shared with me…';
 export const OBSIDIAN_PLAYER_LABEL = 'Joined from Obsidian';
 export const KNOWN_PERSON_MARK = '(known)';
 export const NEW_PERSON_MARK = '(new)';

@@ -117,10 +117,10 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
 }
 
 /** Keys that hold vault paths (`notePath`, `imagePath`, `notePaths`, an audio's `path`, the `background`), and everything nested under them. A new `*Path` field is covered by its name. */
-const PATH_KEY = /paths?$|^background$/i;
+export const PATH_KEY = /paths?$|^background$/i;
 
 /** `value` with `replace` applied to every string in it, told whether the string sits under a path key. */
-function replaceStrings(value: unknown, replace: (text: string, underPathKey: boolean) => string, underPathKey = false): unknown {
+export function replaceStrings(value: unknown, replace: (text: string, underPathKey: boolean) => string, underPathKey = false): unknown {
   if (typeof value === 'string') return replace(value, underPathKey);
   if (Array.isArray(value)) return value.map((item: unknown) => replaceStrings(item, replace, underPathKey));
   if (typeof value === 'object' && value !== null) {

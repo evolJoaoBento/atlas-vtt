@@ -11,7 +11,9 @@ import { isInSession, joinedSessionStore } from '../../../online/obsidian/joined
 import { openJoinSessionModal } from '../../../online/obsidian/ui/JoinSessionModal';
 import { OnlineSessionService } from '../../../online/OnlineSessionService';
 import type { OnlineSessionState } from '../../../online/onlineSessionStore';
-import { JOIN_SESSION_LABEL, ONLINE_SESSION_LABEL, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../../../online/ui/onlineCopy';
+import { openSharedFromView } from '../../../online/sharing/sharedFromView';
+import { shareSessionStore } from '../../../online/sharing/shareSessionStore';
+import { JOIN_SESSION_LABEL, ONLINE_SESSION_LABEL, SHARED_WITH_ME_BUTTON, START_SESSION_LABEL, STOP_SESSION_LABEL } from '../../../online/ui/onlineCopy';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { useAtlasStore } from '../../ViewStoreContext';
 import { OnlinePlayerList } from './OnlinePlayerList';
@@ -79,6 +81,8 @@ function StartView({ session, service, app }: { session: OnlineSessionState; ser
 
 function HostingView({ session, service }: { session: OnlineSessionState; service: OnlineSessionService }): React.ReactElement {
   const url = session.joinUrl;
+  const { app } = useAtlasUI();
+  const sharing = useStore(shareSessionStore, (state) => state.session !== null);
   return (
     <>
       <section className="atlas-online-panel__section" aria-label="Session status">
@@ -105,6 +109,13 @@ function HostingView({ session, service }: { session: OnlineSessionState; servic
       </section>
       <OnlinePlayerList players={session.players} requests={session.requests} control={session.tokenControl} service={service} />
       <OnlinePresenting />
+      {sharing && (
+        <section className="atlas-online-panel__section">
+          <div className="atlas-online-panel__footer">
+            <Button variant="outline" onClick={() => openSharedFromView(app)}>{SHARED_WITH_ME_BUTTON}</Button>
+          </div>
+        </section>
+      )}
     </>
   );
 }

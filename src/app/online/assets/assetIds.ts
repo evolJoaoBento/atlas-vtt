@@ -65,6 +65,15 @@ export function mimeForPath(path: string): AssetMime | null {
   return Object.hasOwn(MIME_BY_EXTENSION, extension) ? MIME_BY_EXTENSION[extension] ?? null : null;
 }
 
+const EXTENSION_BY_MIME: Readonly<Record<AssetMime, string>> = {
+  'image/webp': 'webp', 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/avif': 'avif', 'image/svg+xml': 'svg',
+};
+
+/** The file extension an image type is saved under (the inverse of `mimeForPath`). */
+export function extensionForMime(mime: AssetMime): string {
+  return EXTENSION_BY_MIME[mime];
+}
+
 /** The fingerprint of `bytes`, with Web Crypto (Obsidian and every browser have it). */
 export async function sha256Id(bytes: ArrayBuffer): Promise<string> {
   return base64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));

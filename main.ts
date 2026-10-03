@@ -24,6 +24,7 @@ import { registerOnline } from './src/app/online/registerOnline';
 import { PeopleBook } from './src/app/online/sharing/people/PeopleBook';
 import { ShareItems } from './src/app/online/sharing/model/ShareItems';
 import { registerSharing } from './src/app/online/sharing/registerSharing';
+import { PulledItems } from './src/app/online/sharing/receive/PulledItems';
 import { AssetService } from './src/app/services/AssetService';
 import { SettingsService } from './src/app/services/SettingsService';
 import { addStarterTokens } from './src/app/services/starterTokens';
@@ -93,7 +94,7 @@ export default class AtlasVTTPlugin extends Plugin {
     await this.settingsService.initialize();
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
     registerOnline(this, onlineSessions);
-    registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), settings: this.settingsService, sessions: onlineSessions });
+    registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), pulled: PulledItems.forApp(this.app), settings: this.settingsService, sessions: onlineSessions });
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
       existingInstallation: await existingInstallation,
