@@ -34,7 +34,7 @@ export class PlayerShareLink implements PlayerShareHandler {
     this.current?.node.stop();
     const node = new ShareNode({
       self: identity.personId,
-      catalogue: forTable(this.options.catalogue, identity.tableId),
+      catalogue: forTable(this.options.catalogue, identity.tableId, identity.personId),
       send: (_to, data) => this.port?.send(data),
       ...(this.options.onPush ? { onPush: this.options.onPush } : {}),
       ...(this.options.hash ? { hash: this.options.hash } : {}),

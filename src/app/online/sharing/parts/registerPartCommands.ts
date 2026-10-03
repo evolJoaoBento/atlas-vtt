@@ -1,0 +1,95 @@
+/**
+ * Share part on a selection in a Markdown note: the editor's right-click menu (flat "Share part: …" items,
+ * since the Obsidian API has no public submenus) and the same four actions as commands, for hotkeys.
+ * Each edit is one editor transaction, so one undo step, and the selection stays on the text.
+ */
+import { Notice, type Editor, type MarkdownFileInfo, type MarkdownView, type Plugin } from 'obsidian';
+import type { PeopleBook } from '../people/PeopleBook';
+import type { PartRule } from '../model/privateTags';
+import { shareSessionStore } from '../shareSessionStore';
+import { shareWithEveryone, wrapSelection, type PartEdit } from './partEdits';
+import { openPartPeopleModal, type PartPeopleChoice, type PartPeopleKind } from './PartPeopleModal';
+
+interface PartAction {
+  id: string;
+  command: string;
+  menu: string;
+  icon: string;
+  run(editor: Editor): void;
+}
+
+const NOTE_CHANGED = 'The note changed meanwhile, so nothing was marked. Select the text again.';
+
+function selectionOffsets(editor: Editor): { from: number; to: number } {
+  const anchor = editor.posToOffset(editor.getCursor('from'));
+  const head = editor.posToOffset(editor.getCursor('to'));
+  return { from: Math.min(anchor, head), to: Math.max(anchor, head) };
+}
+
+function apply(editor: Editor, edit: PartEdit | null): void {
+  if (!edit) return;
+  const { change, selection } = edit;
+  editor.transaction({ changes: [{ from: editor.offsetToPos(change.from), to: editor.offsetToPos(change.to), text: change.text }] });
+  editor.setSelection(editor.offsetToPos(selection.from), editor.offsetToPos(selection.to));
+}
+
+function wrap(editor: Editor, rule: PartRule): void {
+  const { from, to } = selectionOffsets(editor);
+  apply(editor, wrapSelection(editor.getValue(), from, to, rule));
+}
+
+/** Everyone in the session by their names in this Atlas's people list; the people list when there is no session. */
+function partPeople(people: PeopleBook): PartPeopleChoice {
+  const { session, people: present } = shareSessionStore.getState();
+  if (session) return { names: present.map((person) => person.name), inSession: true };
+  return { names: people.list().map((person) => person.name), inSession: false };
+}
+
+function pickAndWrap(plugin: Plugin, people: PeopleBook, editor: Editor, kind: PartPeopleKind): void {
+  const before = editor.getValue();
+  const { from, to } = selectionOffsets(editor);
+  void people.ready().then(() => openPartPeopleModal(plugin.app, kind, partPeople(people), (names) => {
+    if (editor.getValue() !== before) {
+      new Notice(NOTE_CHANGED);
+      return;
+    }
+    apply(editor, wrapSelection(before, from, to, { kind, names }));
+  }));
+}
+
+function actions(plugin: Plugin, people: PeopleBook): PartAction[] {
+  return [
+    { id: 'part-private', command: 'Mark selection as private', menu: 'Share part: Private', icon: 'eye-off', run: (editor) => wrap(editor, { kind: 'private' }) },
+    { id: 'part-only', command: 'Share selection only with…', menu: 'Share part: Only…', icon: 'user-check', run: (editor) => pickAndWrap(plugin, people, editor, 'only') },
+    { id: 'part-except', command: 'Share selection with everyone except…', menu: 'Share part: Except…', icon: 'user-x', run: (editor) => pickAndWrap(plugin, people, editor, 'except') },
+    {
+      id: 'part-everyone', command: 'Share selection with everyone', menu: 'Share part: Everyone', icon: 'users',
+      run: (editor) => {
+        const { from, to } = selectionOffsets(editor);
+        apply(editor, shareWithEveryone(editor.getValue(), from, to));
+      },
+    },
+  ];
+}
+
+const inMarkdownNote = (info: MarkdownView | MarkdownFileInfo): boolean => info.file?.extension === 'md';
+
+export function registerPartCommands(plugin: Plugin, people: PeopleBook): void {
+  const list = actions(plugin, people);
+  for (const action of list) {
+    plugin.addCommand({
+      id: action.id, name: action.command, icon: action.icon,
+      editorCheckCallback: (checking, editor, info) => {
+        if (!editor.somethingSelected() || !inMarkdownNote(info)) return false;
+        if (!checking) action.run(editor);
+        return true;
+      },
+    });
+  }
+  plugin.registerEvent(plugin.app.workspace.on('editor-menu', (menu, editor, info) => {
+    if (!editor.somethingSelected() || !inMarkdownNote(info)) return;
+    for (const action of list) {
+      menu.addItem((item) => item.setTitle(action.menu).setIcon(action.icon).setSection('selection').onClick(() => action.run(editor)));
+    }
+  }));
+}

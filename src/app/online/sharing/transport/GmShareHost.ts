@@ -51,7 +51,7 @@ export class GmShareHost implements SessionHandler {
   constructor(private readonly options: GmShareHostOptions) {
     this.node = new ShareNode({
       self: GM_PERSON_ID,
-      catalogue: forTable(options.catalogue, options.tableId),
+      catalogue: forTable(options.catalogue, options.tableId, GM_PERSON_ID),
       send: (to, data) => this.portOf(to)?.send(data),
       ...(options.onPush ? { onPush: options.onPush } : {}),
       ...(options.hash ? { hash: options.hash } : {}),

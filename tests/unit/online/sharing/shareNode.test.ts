@@ -40,7 +40,7 @@ describe('ShareNode', () => {
   it('lists and pulls a note, and sends only the filtered text', async () => {
     const { add, frames } = network();
     const notes = noteCatalogue({ 'Notes/Cave.md': { text: 'A cave.\n> [!private]\n> Dragon gold.\n\nEnd.', share: ['Ana'] } }, [ana]);
-    add('gm', forTable(notes, TABLE_ID));
+    add('gm', forTable(notes, TABLE_ID, 'gm'));
     const player = add('ana', none);
     const items = await player.requestList('gm');
     expect(items.map((item: CatalogueItem) => item.title)).toEqual(['Cave']);

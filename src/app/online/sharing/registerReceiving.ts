@@ -5,6 +5,7 @@ import { chooseAction, confirmAction } from '../../ui/confirmDialog';
 import { MergeHistory, undoLastMerge, type UndoOutcome } from './merge/MergeHistory';
 import { createUpdatePolicy } from './merge/noteUpdate';
 import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
+import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems, PulledRecord } from './receive/PulledItems';
 import { pushPromptListener } from './receive/pushPrompts';
 import { SharedWithMe } from './receive/SharedWithMe';
@@ -26,7 +27,10 @@ const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => c
 });
 
 /** One service per share session: a new session (a new node) gets a fresh one. */
-function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory): () => SharedWithMe | null {
+const sessionName = (personId: string): string | null =>
+  shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
+
+function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, people: PeopleBook): () => SharedWithMe | null {
   // Choices and the merge page run only inside a pull the receiver started.
   const policy = createUpdatePolicy({ pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request) });
   const replaced = (record: PulledRecord, before: string, after: string): Promise<void> => history.add(record, { at: Date.now(), before, after });
@@ -39,7 +43,8 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory): 
         node: session.node,
         service: new SharedWithMe({
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
-          nameOf: (personId) => shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? 'Someone',
+          nameOf: (personId) => sessionName(personId) ?? 'Someone',
+          nameAt: (personId) => people.get(session.tableId, personId)?.name ?? sessionName(personId),
           assets: AssetService.getInstance(app), confirmMapUpdate,
         }),
       };
@@ -48,10 +53,10 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory): 
   };
 }
 
-export function registerReceiving(plugin: Plugin, pulled: PulledItems): void {
+export function registerReceiving(plugin: Plugin, pulled: PulledItems, people: PeopleBook): void {
   void pulled.ready();
   const history = new MergeHistory(plugin.app.vault.adapter);
-  const sharedWithMe = sharedWithMeFor(plugin.app, pulled, history);
+  const sharedWithMe = sharedWithMeFor(plugin.app, pulled, history, people);
   const open = (app: App): void => openSharedWithMeModal(app, sharedWithMe());
   plugin.addCommand({ id: 'shared-with-me', name: 'Shared with me…', callback: () => open(plugin.app) });
   plugin.addCommand({

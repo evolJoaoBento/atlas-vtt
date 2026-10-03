@@ -40,9 +40,13 @@ async function table() {
   const gm = new GmSession(network.host('gm'), { title: 'Vault', onJoinRequest: (player) => requests.push(player), onRequestClosed: () => {}, onPlayersChanged: () => {} });
   gm.start();
   // The GM's notes are read from its vault, so the spies on that vault see anything the GM's side would write.
-  const realm = 'The realm.\n> [!only|Ben]\n> Ben is the heir.';
+  const realm = 'The realm.\n%%[!only|Ben]%%\nBen is the heir.\n%%[!end]%%';
   const gmVault = createInMemoryApp({ files: { 'Lore/Realm.md': realm } });
-  const gmNotes: Notes = { 'Lore/Realm.md': { get text(): string { return gmVault.files.get('Lore/Realm.md') ?? ''; }, share: 'public' } };
+  const gmNotes: Notes = {
+    'Lore/Realm.md': { get text(): string { return gmVault.files.get('Lore/Realm.md') ?? ''; }, share: 'public' },
+    // Shared with Ana once a test writes it.
+    'Lore/Secret.md': { get text(): string { return gmVault.files.get('Lore/Secret.md') ?? ''; }, get share(): unknown { return gmVault.files.has('Lore/Secret.md') ? ['Ana'] : undefined; } },
+  };
   const host = new GmShareHost({ session: gm, tableId: TABLE_ID, catalogue: noteCatalogue(gmNotes, people), hash: nodeHash });
   host.start();
   const anaNotes: Notes = {
@@ -71,6 +75,7 @@ async function table() {
 function receiver(vault: InMemoryApp, pulled: PulledItems, node: Pick<ShareNode, 'requestList' | 'pull'>): SharedWithMe {
   return new SharedWithMe({
     app: vault.app, pulled, node, tableId: TABLE_ID, nameOf: (id) => people.find((person) => person.personId === id)?.name ?? 'Someone',
+    nameAt: (id) => people.find((person) => person.personId === id)?.name ?? null,
     policy: createUpdatePolicy({ pulled, ask: async () => ({ choice: 'auto', remember: true, silent: true }), merge: async () => null }),
     assets: {} as never, confirmMapUpdate: async () => 'theirs',
   });
@@ -95,7 +100,25 @@ describe('sharing between three Atlases', () => {
     await pull(ana.service, 'gm', 'Realm');
     await pull(ben.service, 'gm', 'Realm');
     expect(ana.vault.files.get('Shared/Morgan/Realm.md')).toBe('The realm.');
-    expect(ben.vault.files.get('Shared/Morgan/Realm.md')).toBe('The realm.\n> [!only|Ben]\n> Ben is the heir.');
+    // Ben's part arrives still marked: shared on, it reaches only the GM (and Ben, who has it).
+    expect(ben.vault.files.get('Shared/Morgan/Realm.md')).toBe('The realm.\n%%[!only|Morgan]%%\nBen is the heir.\n%%[!end]%%');
+    host.stop();
+    gm.stop();
+  });
+
+  it('a part meant only for Ana stays with Ana and the GM when Ana shares the note on', async () => {
+    const { gm, host, gmVault, ana, ben } = await table();
+    gmVault.files.set('Lore/Secret.md', 'Open.\n%%[!only|Ana]%%\nFor Ana.\n%%[!end]%%');
+    await pull(ana.service, 'gm', 'Secret');
+    const copy = 'Shared/Morgan/Secret.md';
+    expect(ana.vault.files.get(copy)).toBe('Open.\n%%[!only|Morgan]%%\nFor Ana.\n%%[!end]%%');
+    // Ana shares her copy on, with Ben and back to the GM.
+    ana.notes[copy] = { get text(): string { return ana.vault.files.get(copy) ?? ''; }, share: ['Ben', 'Morgan'] };
+    await pull(ben.service, 'ana', 'Secret');
+    expect(ben.vault.files.get('Shared/Ana/Secret.md')).toBe('Open.');
+    const gmService = receiver(gmVault, PulledItems.create(gmVault.app.vault.adapter), host.node);
+    await pull(gmService, 'ana', 'Secret');
+    expect(gmVault.files.get('Shared/Ana/Secret.md')).toBe('Open.\n%%[!only|Ana]%%\nFor Ana.\n%%[!end]%%');
     host.stop();
     gm.stop();
   });

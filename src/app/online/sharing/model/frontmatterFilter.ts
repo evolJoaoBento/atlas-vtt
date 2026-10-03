@@ -1,5 +1,6 @@
 /** A note's frontmatter, split off and reduced to the properties that may be shared. Text only, never parsed as YAML. */
 import { stripCommentsChecked } from './commentFilter';
+import { looksLikeTag } from './privateTags';
 import { SHARE_PROPERTY } from './shareRule';
 
 /** Frontmatter opens at the first line (after a byte order mark) and ends at the next `---`, as in Obsidian. */
@@ -14,8 +15,12 @@ export function splitFrontmatter(source: string): { frontmatter: string[] | null
 
 const TOP_LEVEL_KEY = /^("[^"]+"|'[^']+'|[^\s#:'"-][^:]*?):(?:\s|$)/;
 
-/** Comments (`%% %%`, `<!-- -->`) are removed from a kept property; one that stays open drops the whole property (fail closed). */
+/**
+ * Comments (`%% %%`, `<!-- -->`) are removed from a kept property; one that stays open drops the whole property,
+ * and so does part tag text (tags are not read in properties; old callout text counts too). Fail closed.
+ */
 function withoutComments(block: readonly string[]): string[] {
+  if (block.some((line) => looksLikeTag(line))) return [];
   const { lines, open } = stripCommentsChecked(block);
   return open ? [] : lines;
 }

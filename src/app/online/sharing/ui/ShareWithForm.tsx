@@ -31,6 +31,8 @@ interface ShareWithFormProps {
   } | null;
   /** The note as one person gets it; null for maps. */
   preview: ((key: string) => Promise<string>) | null;
+  /** A line of help under the preview (notes: how to keep a part back). */
+  hint?: string;
   warnings: readonly string[];
   onSave: (result: ShareFormResult) => void;
   onCancel: () => void;
@@ -39,7 +41,7 @@ interface ShareWithFormProps {
 const toggled = (list: readonly string[], key: string): string[] => (list.includes(key) ? list.filter((item) => item !== key) : [...list, key]);
 const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': 'Player-safe', full: 'Full' };
 
-export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
+export function ShareWithForm({ rows, initial, map, preview, hint, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
   const [everyone, setEveryone] = useState(initial.everyone);
   const [people, setPeople] = useState(initial.people);
   const [except, setExcept] = useState(initial.except);
@@ -100,6 +102,7 @@ export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, o
             </select>
           </label>
           {previewText !== null && <pre className="atlas-share__preview">{previewText}</pre>}
+          {hint && <p className="atlas-share__hint">{hint}</p>}
         </section>
       )}
       <div className="modal-button-container">

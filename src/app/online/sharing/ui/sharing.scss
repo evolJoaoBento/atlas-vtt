@@ -36,6 +36,12 @@
   font-size: $font-ui-smaller;
 }
 
+.atlas-share__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: $font-ui-smaller;
+}
+
 .atlas-share__warning {
   margin: 0;
   color: var(--text-warning);

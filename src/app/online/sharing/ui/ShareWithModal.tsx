@@ -15,8 +15,9 @@ import { keyOf } from '../people/peopleTypes';
 import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMap } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
-import { unknownNamesIn, unreadablePrivateTextIn } from '../model/noteFilter';
+import { partProblemsInNote, unknownNamesIn } from '../model/noteFilter';
 import type { SenderCatalogue } from '../model/SenderCatalogue';
+import { END_TAG } from '../model/privateTags';
 import { formatShareRule, parseShareRule, SHARE_PROPERTY, unknownRuleNames } from '../model/shareRule';
 import { writeNoteShare } from '../model/shareWriting';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
@@ -28,11 +29,15 @@ const FULL_CONFIRM = {
   confirmLabel: 'Share full map',
 };
 const MAX_UNREADABLE_WARNINGS = 3;
+const OLD_CALLOUTS_WARNING = 'This note still uses the old > [!private] callouts; they are kept back. Use Mark as private on the selection instead.';
+export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
 
 export interface ShareWithDeps {
   people: PeopleBook;
   catalogue: Pick<SenderCatalogue, 'previewNote'>;
   assets: Pick<AssetService, 'updateAsset' | 'getAssets'>;
+  /** This Atlas's person id at a table (`gm` at its own), for the preview's tags; undefined when unknown. */
+  selfAt: (tableId: string) => string | undefined;
 }
 
 const nameKey = (name: string): string => `name:${name}`;
@@ -64,15 +69,19 @@ class ShareWithModal extends Modal {
     else await this.renderMap(known);
   }
 
-  /** What the sender should know before saving: names the list lacks, and private text that could not be read. */
+  /** What the sender should know before saving: names the list lacks, and parts that could not be read. */
   private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<string[]> {
     const text = await this.app.vault.cachedRead(this.file);
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
-    const unreadable = [...new Set(unreadablePrivateTextIn(text))].slice(0, MAX_UNREADABLE_WARNINGS);
+    const problems = partProblemsInNote(text);
     return [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
-      ...unreadable.map((start) => `Could not read the private part that starts with "${start}". It is hidden from everyone.`),
+      ...(problems.oldSyntax.length ? [OLD_CALLOUTS_WARNING] : []),
+      ...[...new Set(problems.malformed)].slice(0, MAX_UNREADABLE_WARNINGS)
+        .map((start) => `Could not read the private part tag "${start}". What it marks is hidden from everyone.`),
+      ...(problems.unclosed ? [`A private part tag is never closed with ${END_TAG}, so everything after it is hidden from everyone.`] : []),
+      ...(problems.strayEnds ? [`An ${END_TAG} tag closes no part; it is ignored.`] : []),
     ];
   }
 
@@ -90,9 +99,12 @@ class ShareWithModal extends Modal {
         initial={{ everyone: rule.public && !rule.private, people: rule.private ? [] : rule.only.map(keyFor), except: rule.except.map(keyFor) }}
         map={null}
         warnings={warnings}
+        hint={PART_HINT}
         preview={(key) => {
           const person = people.byKey(key);
-          return person ? this.deps.catalogue.previewNote({ tableId: person.tableId, personId: person.personId }, this.file.path) : Promise.resolve('');
+          return person
+            ? this.deps.catalogue.previewNote({ tableId: person.tableId, personId: person.personId }, this.file.path, this.deps.selfAt(person.tableId))
+            : Promise.resolve('');
         }}
         onCancel={() => this.close()}
         onSave={(result) => { void this.saveNote(result, nameFor); }}

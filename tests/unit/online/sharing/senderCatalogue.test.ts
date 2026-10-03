@@ -11,6 +11,8 @@ const list = [person('ana', 'Ana'), person('ben', 'Ben')];
 const people = {
   byName: (name: string): Person | null => list.find((p) => p.name === name) ?? null,
   byKey: (key: string): Person | null => list.find((p) => `${p.tableId}/${p.personId}` === key) ?? null,
+  get: (tableId: string, personId: string): Person | null => list.find((p) => p.tableId === tableId && p.personId === personId) ?? null,
+  list: (): readonly Person[] => list,
   ready: async (): Promise<void> => {},
 };
 const ana = { tableId: T, personId: 'ana' };

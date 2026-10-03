@@ -1,0 +1,90 @@
+/**
+ * The people for Share part: Only… or Except…: the people in the current session, or the people list when
+ * there is none (labelled so), with tick boxes and Apply. Names are written as the people list has them;
+ * a name a tag cannot hold is shown but cannot be ticked.
+ */
+import React, { useState } from 'react';
+import { Modal, type App } from 'obsidian';
+import { createRoot, type Root } from 'react-dom/client';
+import { Button } from '../../../packages/components/primitives/button';
+import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
+import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
+import { writableName } from '../model/forwardedParts';
+import { LabelledCheck } from '../ui/LabelledCheck';
+
+export type PartPeopleKind = 'only' | 'except';
+
+export interface PartPeopleChoice {
+  names: readonly string[];
+  /** Whether they are the people in the session (else the people list). */
+  inSession: boolean;
+}
+
+const TITLES: Record<PartPeopleKind, string> = {
+  only: 'Share selection only with',
+  except: 'Share selection with everyone except',
+};
+export const UNWRITABLE_NAME_HINT = 'This name has a character a tag cannot hold (, | [ ] %). Rename them in People… to pick them.';
+
+interface PartPeopleFormProps {
+  choice: PartPeopleChoice;
+  onApply: (names: string[]) => void;
+  onCancel: () => void;
+}
+
+export function PartPeopleForm({ choice, onApply, onCancel }: PartPeopleFormProps): React.ReactElement {
+  const [ticked, setTicked] = useState<string[]>([]);
+  const toggle = (name: string): void => setTicked(ticked.includes(name) ? ticked.filter((other) => other !== name) : [...ticked, name]);
+  return (
+    <div className="atlas-share">
+      <section className="atlas-share__section">
+        <h3 className="atlas-share__heading">{choice.inSession ? 'People in this session' : 'Not in a session: your people list'}</h3>
+        {choice.names.length === 0 && <p className="atlas-share__hint">Nobody yet. People are added when you share a session with them.</p>}
+        <ul className="atlas-share__people">
+          {choice.names.map((name) => (
+            <li key={name}>
+              {writableName(name)
+                ? <LabelledCheck label={name} checked={ticked.includes(name)} onChange={() => toggle(name)} />
+                : (
+                  <LabelTooltip label={UNWRITABLE_NAME_HINT} multiline>
+                    <span><LabelledCheck label={name} checked={false} disabled onChange={() => undefined} /></span>
+                  </LabelTooltip>
+                )}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <div className="modal-button-container">
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button variant="default" disabled={ticked.length === 0} onClick={() => onApply(choice.names.filter((name) => ticked.includes(name)))}>Apply</Button>
+      </div>
+    </div>
+  );
+}
+
+class PartPeopleModal extends Modal {
+  private root: Root | null = null;
+
+  constructor(app: App, private readonly kind: PartPeopleKind, private readonly choice: PartPeopleChoice, private readonly onApply: (names: string[]) => void) {
+    super(app);
+    this.modalEl.addClass(...ATLAS_NATIVE_MODAL_CLASSES, 'atlas-share-modal');
+  }
+
+  onOpen(): void {
+    this.setTitle(TITLES[this.kind]);
+    this.root = createRoot(this.contentEl);
+    this.root.render(
+      <PartPeopleForm choice={this.choice} onCancel={() => this.close()} onApply={(names) => { this.close(); this.onApply(names); }} />,
+    );
+  }
+
+  onClose(): void {
+    this.root?.unmount();
+    this.root = null;
+    this.contentEl.empty();
+  }
+}
+
+export function openPartPeopleModal(app: App, kind: PartPeopleKind, choice: PartPeopleChoice, onApply: (names: string[]) => void): void {
+  new PartPeopleModal(app, kind, choice, onApply).open();
+}

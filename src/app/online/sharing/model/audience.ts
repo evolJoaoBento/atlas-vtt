@@ -1,6 +1,6 @@
-/** Who a rule or a callout reaches. A recipient is a person at a table; names resolve through the people list. */
+/** Who a rule or a part of a note reaches. A recipient is a person at a table; names resolve through the people list. */
 import { keyOf, personKey, type Person } from '../people/peopleTypes';
-import type { CalloutRule } from './noteFilter';
+import type { PartRule } from './privateTags';
 import type { ShareRule } from './shareRule';
 
 export interface Recipient {
@@ -41,7 +41,8 @@ export function ruleReaches(rule: ShareRule, recipient: Recipient, people: NameR
   return resolve(rule.only, people).known.some((person) => isPerson(person, recipient));
 }
 
-export function calloutAllows(rule: CalloutRule, recipient: Recipient, people: NameResolver): boolean {
+/** Whether a part tag lets the recipient in: unknown names in `only` match nobody, in `except` hide from everyone. */
+export function partAllows(rule: PartRule, recipient: Recipient, people: NameResolver): boolean {
   if (rule.kind === 'private') return false;
   const names = resolve(rule.names, people, rule.kind === 'except');
   if (rule.kind === 'only') return names.known.some((person) => isPerson(person, recipient));

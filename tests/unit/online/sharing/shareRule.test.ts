@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calloutAllows, ruleReaches } from '../../../../src/app/online/sharing/model/audience';
+import { partAllows, ruleReaches } from '../../../../src/app/online/sharing/model/audience';
 import { formatShareRule, parseShareRule, unknownRuleNames } from '../../../../src/app/online/sharing/model/shareRule';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
 
@@ -46,12 +46,12 @@ describe('atlas-share', () => {
   });
 
   it('checks callouts: private never, only those, except all but those, unknown names fail closed', () => {
-    expect(calloutAllows({ kind: 'private' }, as(ana), people)).toBe(false);
-    expect(calloutAllows({ kind: 'only', names: ['Ana', 'Zed'] }, as(ana), people)).toBe(true);
-    expect(calloutAllows({ kind: 'only', names: ['Zed'] }, as(ana), people)).toBe(false);
-    expect(calloutAllows({ kind: 'except', names: ['Cara'] }, as(ana), people)).toBe(true);
-    expect(calloutAllows({ kind: 'except', names: ['Cara'] }, as(cara), people)).toBe(false);
-    expect(calloutAllows({ kind: 'except', names: ['Zed'] }, as(ana), people)).toBe(false);
+    expect(partAllows({ kind: 'private' }, as(ana), people)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Ana', 'Zed'] }, as(ana), people)).toBe(true);
+    expect(partAllows({ kind: 'only', names: ['Zed'] }, as(ana), people)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Cara'] }, as(ana), people)).toBe(true);
+    expect(partAllows({ kind: 'except', names: ['Cara'] }, as(cara), people)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Zed'] }, as(ana), people)).toBe(false);
   });
 
   it('reads the mapping entries YAML makes of `except Cara` and `only Ana` (I2)', () => {
@@ -89,9 +89,9 @@ describe('atlas-share', () => {
     const both = { byName: (name: string): Person | null => (name === 'Ana' ? newAna : name === 'Ana Silva' ? renamed : null), allByName: (name: string): Person[] => [renamed, newAna].filter((p) => p.name === name || p.formerNames.includes(name)) };
     expect(ruleReaches(parseShareRule(['public', 'except Ana']), as(renamed), both)).toBe(false);
     expect(ruleReaches(parseShareRule(['public', 'except Ana']), as(newAna), both)).toBe(false);
-    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(renamed), both)).toBe(false);
-    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(newAna), both)).toBe(false);
-    expect(calloutAllows({ kind: 'except', names: ['Ana'] }, as(ben), both)).toBe(true);
+    expect(partAllows({ kind: 'except', names: ['Ana'] }, as(renamed), both)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Ana'] }, as(newAna), both)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Ana'] }, as(ben), both)).toBe(true);
     expect(many.allByName('Ana')).toHaveLength(2);
   });
 });

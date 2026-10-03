@@ -45,14 +45,16 @@ export function testPerson(personId: string, name: string, tableId = TABLE_ID): 
   return { tableId, personId, name, formerNames: [], devices: [], aliases: [], lastSeen: 0 };
 }
 
-/** `byName`/`byKey` over a fixed list, as the people book answers them. */
+/** `byName`/`byKey`/`get` over a fixed list, as the people book answers them. */
 export function testPeople(list: readonly Person[]): {
   byName(name: string): Person | null;
   byKey(key: string): Person | null;
+  get(tableId: string, personId: string): Person | null;
   list(): readonly Person[];
   ready(): Promise<void>;
 } {
   return {
+    get: (tableId, personId) => list.find((person) => person.tableId === tableId && person.personId === personId) ?? null,
     byName: (name) => list.find((person) => person.name.toLowerCase() === name.toLowerCase()) ?? null,
     byKey: (key) => list.find((person) => `${person.tableId}/${person.personId}` === key || person.aliases.includes(key)) ?? null,
     list: () => list,

@@ -2,9 +2,11 @@
  * The receiver's side of one share session: lists what each person shares with this Atlas,
  * marks items new, updated or up to date against what was pulled, and pulls on request.
  * Listing writes nothing; only `pull` (and `pullPushed`, from a push the receiver accepted) do.
- * Every pull passes the version it listed, so the bytes must be what the receiver was shown.
+ * Every pull passes the version it listed, so the bytes must be what the receiver was shown. A note's
+ * forwarded tags are then written with this Atlas's names for those people, before anything is saved.
  */
 import type { App } from 'obsidian';
+import { localizeForwardedTags } from '../model/forwardedParts';
 import { parseMapPayload } from '../model/mapPayload';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PushRequest } from '../shareSessionStore';
@@ -32,6 +34,11 @@ export interface SharedWithMeDeps {
   policy: NoteUpdatePolicy;
   /** The name of a person in this Atlas's people list (their folder's name). */
   nameOf: (personId: string) => string;
+  /**
+   * The name this Atlas knows a person of this table by (its people list, else the session), null when it
+   * does not know them: what the tags of a pulled note name them as (`forwardedParts.ts`).
+   */
+  nameAt: (personId: string) => string | null;
   assets: MapPullDeps['assets'];
   confirmMapUpdate: (title: string) => Promise<'both' | 'theirs' | null>;
   replaced?: (record: PulledRecord, before: string, after: string) => Promise<void>;
@@ -90,7 +97,8 @@ export class SharedWithMe {
     return this.pull(push.from, listed);
   }
 
-  private writeNote(personId: string, personName: string, item: CatalogueItem, text: string): Promise<PullOutcome> {
+  private writeNote(personId: string, personName: string, item: CatalogueItem, received: string): Promise<PullOutcome> {
+    const text = localizeForwardedTags(received, this.deps.tableId, (person) => this.deps.nameAt(person));
     return pullNote(
       {
         app: this.deps.app, pulled: this.deps.pulled, policy: this.deps.policy,

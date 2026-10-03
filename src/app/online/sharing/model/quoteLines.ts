@@ -1,5 +1,5 @@
 /**
- * How note lines are read for callouts and comments. Two readings, on purpose:
+ * How note lines are read for the old callouts (`oldCallouts.ts`) and comments. Two readings, on purpose:
  * - `lenientQuote` finds where a callout header may sit: it strips any run of spaces or tabs,
  *   list markers (`-`, `*`, `+`, `N.`, `N)`) and further `>`, so a header nested in a list or
  *   behind a tab is still found. Depth is the count of `>`.

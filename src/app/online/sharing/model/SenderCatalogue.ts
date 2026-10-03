@@ -1,7 +1,8 @@
 /**
  * The sender's side of sharing: what a recipient may list and open, built fresh from the vault
  * each time, filtered for them before it is hashed. A version is the SHA-256 of exactly what
- * would be sent, so an edit to a part they never get never shows them an update.
+ * would be sent, so an edit to a part they never get never shows them an update. Calls name `self`, this
+ * Atlas's person id at the recipient's table, so parts meant for some people arrive marked for the sender too.
  */
 import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
 import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
@@ -10,11 +11,14 @@ import type { ImageFiles } from '../../scene/AssetRegistry';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
 import type { MapSize } from '../../scene/sceneTypes';
 import type { PeopleBook } from '../people/PeopleBook';
-import type { Recipient } from './audience';
+import { keyOf, personKey } from '../people/peopleTypes';
+import { isPerson, partAllows, type Recipient } from './audience';
 import { fullPayload, hashMapImages, playerSafePayload, type MapImages } from './buildMapPayload';
 import { accessFor, type Access, type AccessSources, type MapAccess } from './catalogueAccess';
 import type { MapShareMode } from './mapShare';
+import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES } from './forwardedParts';
 import { filterNoteFor } from './noteFilter';
+import type { PartMarks } from './privateParts';
 import type { ShareItems } from './ShareItems';
 
 export const MAX_CATALOGUE_ITEMS = 500;
@@ -63,7 +67,7 @@ export class SenderCatalogue {
   constructor(
     private readonly sources: CatalogueSources,
     private readonly items: Pick<ShareItems, 'idFor' | 'pathOf' | 'ready'>,
-    private readonly people: Pick<PeopleBook, 'byName' | 'byKey' | 'ready'>,
+    private readonly people: Pick<PeopleBook, 'byName' | 'byKey' | 'ready' | 'list' | 'get'>,
     private readonly hash: Hasher = sha256Id,
     private readonly dimensions?: (bytes: ArrayBuffer) => Promise<MapSize | null>,
   ) {}
@@ -74,12 +78,12 @@ export class SenderCatalogue {
     return accessFor(this.sources, recipient, this.people);
   }
 
-  async list(recipient: Recipient): Promise<CatalogueItem[]> {
+  async list(recipient: Recipient, self?: string): Promise<CatalogueItem[]> {
     const access = await this.access(recipient);
     const items: CatalogueItem[] = [];
     for (const note of access.notes.values()) {
       if (items.length >= MAX_CATALOGUE_ITEMS) break;
-      const payload = await this.notePayload(note.path, recipient, access);
+      const payload = await this.notePayload(note.path, recipient, access, self);
       items.push({ item: this.items.idFor(note.path), kind: 'note', title: note.title, version: payload.version, size: payload.bytes.byteLength });
     }
     for (const map of access.maps) {
@@ -97,24 +101,38 @@ export class SenderCatalogue {
   }
 
   /** A note, a map, or a map's image (`<map item>/<fingerprint>`), when this recipient may have it; null otherwise. */
-  async open(recipient: Recipient, ref: string): Promise<SharePayload | null> {
+  async open(recipient: Recipient, ref: string, self?: string): Promise<SharePayload | null> {
     const access = await this.access(recipient);
     const slash = ref.indexOf('/');
     if (slash >= 0) return this.image(access, ref.slice(0, slash), ref.slice(slash + 1));
     const map = access.maps.find((candidate) => candidate.entry.share.item === ref);
     if (map) return (await this.mapPayload(map))?.payload ?? null;
     const path = this.items.pathOf(ref);
-    return path && access.notes.has(path) ? this.notePayload(path, recipient, access) : null;
+    return path && access.notes.has(path) ? this.notePayload(path, recipient, access, self) : null;
   }
 
-  /** The note as this person would get it, whatever its rule says now (the dialog's preview). */
-  async previewNote(recipient: Recipient, path: string): Promise<string> {
-    return this.noteText(path, recipient, await this.access(recipient));
+  /** The note as this person would get it, whatever its rule says now (the dialog's preview), its tags naming people as this list does. */
+  async previewNote(recipient: Recipient, path: string, self?: string): Promise<string> {
+    const text = await this.noteText(path, recipient, await this.access(recipient), self);
+    return localizeForwardedTags(text, recipient.tableId, (personId) => (personId === self ? 'you' : this.people.get(recipient.tableId, personId)?.name ?? null));
   }
 
-  private async noteText(path: string, recipient: Recipient, access: Access): Promise<string> {
+  /** Restricted parts the recipient gets name the sender and everyone else at their table the part lets in. */
+  private marksFor(recipient: Recipient, self: string | undefined): PartMarks {
+    return {
+      openTag: (rule) => {
+        const others = this.people.list()
+          .filter((person) => person.tableId === recipient.tableId && person.personId !== self && !isPerson(person, recipient))
+          .filter((person) => partAllows(rule, { tableId: person.tableId, personId: person.personId }, this.people))
+          .map(keyOf);
+        return forwardedOpenTag([...(self ? [personKey(recipient.tableId, self)] : []), ...others].slice(0, MAX_FORWARD_NAMES));
+      },
+    };
+  }
+
+  private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<string> {
     return filterNoteFor(await this.sources.read(path), {
-      recipient, people: this.people, shareable: this.sources.shareable(),
+      recipient, people: this.people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self),
       links: (linkpath) => {
         const target = this.sources.resolveLink(linkpath, path);
         return target ? access.notes.get(target)?.title ?? null : null;
@@ -122,8 +140,8 @@ export class SenderCatalogue {
     });
   }
 
-  private async notePayload(path: string, recipient: Recipient, access: Access): Promise<SharePayload> {
-    const bytes = utf8(await this.noteText(path, recipient, access));
+  private async notePayload(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<SharePayload> {
+    const bytes = utf8(await this.noteText(path, recipient, access, self));
     return { kind: 'note', bytes, version: await this.hash(bytes) };
   }
 

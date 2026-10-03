@@ -22,7 +22,7 @@ async function setup() {
     pull: vi.fn(async (_to: string, _item: string, _kind: string, _version?: string) => ({ kind: 'note' as const, version, bytes: bytes('cave') })),
   };
   const service = new SharedWithMe({
-    app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana',
+    app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', nameAt: () => 'Ana',
     assets: {} as never, confirmMapUpdate: async () => 'theirs',
   });
   return { files, service, node, bump: (next: string) => { version = next; } };
@@ -91,7 +91,7 @@ describe('Shared with me', () => {
       getCollections: vi.fn(async () => [{ id: 'Shared with me', name: 'Shared with me' }]),
       createCollection: vi.fn(),
     };
-    const service = new SharedWithMe({ app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', assets: assets as never, confirmMapUpdate: async () => 'theirs' });
+    const service = new SharedWithMe({ app, pulled, node: node as never, tableId: TABLE_ID, policy: keepBothPolicy, nameOf: () => 'Ana', nameAt: () => 'Ana', assets: assets as never, confirmMapUpdate: async () => 'theirs' });
     const [map] = (await service.refresh('ana')).items;
     await service.pull('ana', map!, [NOTE]);
     expect(files.get('Shared/Ana/Cave.md')).toBe(`text of ${NOTE}`);

@@ -7,6 +7,8 @@ import { obsidianCatalogueSources } from './model/catalogueSources';
 import { SenderCatalogue } from './model/SenderCatalogue';
 import type { ShareItems } from './model/ShareItems';
 import type { PeopleBook } from './people/PeopleBook';
+import { GM_PERSON_ID } from './people/peopleTypes';
+import { shareSessionStore } from './shareSessionStore';
 import { openPeopleModal } from './people/ui/PeopleModal';
 import { openShareWithModal } from './ui/ShareWithModal';
 
@@ -28,7 +30,12 @@ export function registerShareCommands(plugin: Plugin, { people, items, settings 
   });
   void items.ready();
   const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings), items, people);
-  const share = (file: TFile): void => openShareWithModal(plugin.app, file, { people, catalogue, assets: AssetService.getInstance(plugin.app) });
+  const selfAt = (tableId: string): string | undefined => {
+    if (settings.getOnlineSettings().table?.id === tableId) return GM_PERSON_ID;
+    const session = shareSessionStore.getState().session;
+    return session?.tableId === tableId ? session.self : undefined;
+  };
+  const share = (file: TFile): void => openShareWithModal(plugin.app, file, { people, catalogue, assets: AssetService.getInstance(plugin.app), selfAt });
   plugin.addCommand({
     id: 'share-with', name: 'Share with…',
     checkCallback: (checking) => {
