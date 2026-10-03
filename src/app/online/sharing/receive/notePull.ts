@@ -8,6 +8,7 @@ import type { App } from 'obsidian';
 import { ensureFolder } from '../../../plugin/vaultFolders';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PulledItems, PulledRecord } from './PulledItems';
+import { toLf } from './lineEndings';
 import { freePath, isInside, safeFileName, sharedNoteFolder } from './safePaths';
 import { fileAt, folderOf, pathTaken } from './vaultFiles';
 
@@ -18,6 +19,8 @@ export interface UpdateContext {
   base: string;
   mine: string;
   theirs: string;
+  /** The last pulled text could not be read: base is empty, and nothing here may be saved unseen. */
+  baseMissing?: boolean;
 }
 
 /** `write`: replace the note with `text`; `keep`: leave it; `both`: save theirs beside it; `cancel`: change nothing. */
@@ -81,18 +84,21 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
     return { kind: 'created', path };
   }
   const mine = await app.vault.read(file);
-  const base = (await pulled.readBase(known)) ?? mine;
+  const stored = await pulled.readBase(known);
+  // Without a base nobody can tell who changed what: the receiver's text is never taken for unchanged.
+  const base = stored ?? '';
   const theirs = input.text;
   const settle = async (kind: 'updated' | 'unchanged' | 'kept' | 'both', path = known.path): Promise<PullOutcome> => {
     await pulled.writeBase(record(known.path), theirs);
     return { kind, path };
   };
-  if (theirs === base || theirs === mine) return settle('unchanged');
-  if (mine === base) {
+  // Line endings alone are no change.
+  if (toLf(theirs) === toLf(mine) || (stored !== null && toLf(theirs) === toLf(base))) return settle('unchanged');
+  if (stored !== null && toLf(mine) === toLf(base)) {
     await app.vault.process(file, () => theirs);
     return settle('updated');
   }
-  const result = await deps.policy.resolve({ record: known, title: input.item.title, personName: input.personName, base, mine, theirs });
+  const result = await deps.policy.resolve({ record: known, title: input.item.title, personName: input.personName, base, mine, theirs, ...(stored === null ? { baseMissing: true } : {}) });
   switch (result.kind) {
     case 'cancel':
       return { kind: 'cancelled' };

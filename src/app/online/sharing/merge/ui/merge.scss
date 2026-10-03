@@ -2,7 +2,8 @@
 @use '../../../../../../styles/tokens' as *;
 @use '../../../../../../styles/mixins' as *;
 
-.atlas-merge-modal {
+// The modal element carries `atlas-vtt-plugin` itself, so this must join the scope's class, not sit below it.
+&.atlas-merge-modal {
   width: min(960px, 92vw);
 }
 

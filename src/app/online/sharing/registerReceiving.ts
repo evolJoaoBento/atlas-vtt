@@ -2,7 +2,7 @@
 import { Notice, type App, type Plugin } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
 import { chooseAction, confirmAction } from '../../ui/confirmDialog';
-import { MergeHistory, undoLastMerge } from './merge/MergeHistory';
+import { MergeHistory, undoLastMerge, type UndoOutcome } from './merge/MergeHistory';
 import { createUpdatePolicy } from './merge/noteUpdate';
 import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
 import type { PulledItems, PulledRecord } from './receive/PulledItems';
@@ -12,6 +12,12 @@ import { showPushPrompt } from './receive/ui/pushPrompt';
 import { openSharedWithMeModal } from './receive/ui/SharedWithMeModal';
 import { setSharedOpener } from './sharedFromView';
 import { shareSessionStore, type ShareSession } from './shareSessionStore';
+
+const UNDO_NOTICE: Record<UndoOutcome, string> = {
+  undone: 'Merge undone.',
+  declined: 'Undo cancelled.',
+  nothing: 'There is no merge to undo for this note.',
+};
 
 const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction({
   title: `${title} changed here and was shared again`,
@@ -59,7 +65,7 @@ export function registerReceiving(plugin: Plugin, pulled: PulledItems): void {
           title: 'Undo the last merge?',
           message: ['This note changed after that merge. Undoing replaces it with the text from before the merge.'],
           confirmLabel: 'Undo', destructive: true,
-        })).then((undone) => new Notice(undone ? 'Merge undone.' : 'There is no merge to undo for this note.'));
+        })).then((outcome) => new Notice(UNDO_NOTICE[outcome]));
       }
       return true;
     },

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { MergeHistory, undoLastMerge } from '../../../../src/app/online/sharing/merge/MergeHistory';
+import { MAX_DIFF_LINES } from '../../../../src/app/online/sharing/merge/diffLines';
+import { SHARING_DATA_DIR } from '../../../../src/app/online/sharing/dataFile';
+import { MAX_HISTORY_CHARS, MergeHistory, undoLastMerge } from '../../../../src/app/online/sharing/merge/MergeHistory';
 import { createUpdatePolicy, type AskResult } from '../../../../src/app/online/sharing/merge/noteUpdate';
 import type { CatalogueItem } from '../../../../src/app/online/sharing/model/SenderCatalogue';
 import { pullNote } from '../../../../src/app/online/sharing/receive/notePull';
@@ -39,7 +41,7 @@ describe('updating a note changed on both sides', () => {
     expect(files.get(PATH)).toBe('theirs text');
     const record = pulled.byPath(PATH)!;
     expect(await history.entries(record)).toEqual([{ at: 1, before: 'a\nMINE\nc\nd\ne', after: 'theirs text' }]);
-    expect(await undoLastMerge(app, history, record, async () => true)).toBe(true);
+    expect(await undoLastMerge(app, history, record, async () => true)).toBe('undone');
     expect(files.get(PATH)).toBe('a\nMINE\nc\nd\ne');
     expect(await history.entries(record)).toEqual([]);
   });
@@ -109,6 +111,49 @@ describe('updating a note changed on both sides', () => {
   });
 });
 
+describe('updates that must never be saved unseen', () => {
+  const basePath = (pulled: PulledItems): string => `${SHARING_DATA_DIR}/bases/${pulled.byPath(PATH)!.baseKey}.md`;
+
+  it('a missing base is changed on both sides: it asks and never overwrites the receiver text', async () => {
+    const { files, pulled, ask, pull } = await setup({ choice: 'mine', remember: false, silent: false });
+    files.delete(basePath(pulled));
+    expect(await pull('2', 'a\nb\nc\nTHEIRS\ne')).toMatchObject({ kind: 'kept' });
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(files.get(PATH)).toBe('a\nMINE\nc\nd\ne');
+  });
+
+  it('a missing base shows the merge page even for a remembered silent auto merge', async () => {
+    const { files, pulled, merge, pull } = await setup({ choice: 'auto', remember: true, silent: true }, 'seen and saved');
+    await pull('2', 'a\nb\nc\nTHEIRS\ne');
+    files.set(PATH, 'a\nMINE2\nc\nTHEIRS\ne');
+    files.delete(basePath(pulled));
+    await pull('3', 'a\nb\nc\nTHEIRS\nE');
+    expect(merge).toHaveBeenCalledTimes(1);
+    expect(files.get(PATH)).toBe('seen and saved');
+  });
+
+  it('when the diff gives up on a very long note, a silent auto merge shows the merge page instead', async () => {
+    const { files, merge, pull } = await setup({ choice: 'auto', remember: true, silent: true }, 'seen and saved');
+    await pull('2', Array.from({ length: MAX_DIFF_LINES + 1 }, (_, i) => `line ${i}`).join('\n'));
+    expect(merge).toHaveBeenCalledTimes(1);
+    expect(files.get(PATH)).toBe('seen and saved');
+  });
+
+  it('remember is kept only once confirmed, not when the merge page is cancelled', async () => {
+    const { pulled, pull } = await setup({ choice: 'resolve', remember: true, silent: false }, null);
+    expect(await pull('2', 'a\nTHEIRS\nc\nd\ne')).toEqual({ kind: 'cancelled' });
+    expect(pulled.byPath(PATH)?.choice).toBeUndefined();
+  });
+
+  it('merges on LF and writes the note back in its own line ending', async () => {
+    const { files, merge, pull } = await setup({ choice: 'auto', remember: true, silent: true });
+    files.set(PATH, 'a\r\nMINE\r\nc\r\nd\r\ne');
+    await pull('2', 'a\nb\nc\nTHEIRS\ne');
+    expect(merge).not.toHaveBeenCalled();
+    expect(files.get(PATH)).toBe('a\r\nMINE\r\nc\r\nTHEIRS\r\ne');
+  });
+});
+
 describe('the merge history', () => {
   it('keeps at most 20 entries per note, the newest last', async () => {
     const { app, pulled } = await setup(null);
@@ -121,15 +166,24 @@ describe('the merge history', () => {
     expect(entries.at(-1)?.at).toBe(24);
   });
 
+  it('drops the oldest entries past its size cap, and keeps the newest', async () => {
+    const { app, pulled } = await setup(null);
+    const history = new MergeHistory(app.vault.adapter);
+    const record = pulled.byPath(PATH)!;
+    const half = 'x'.repeat(Math.floor(MAX_HISTORY_CHARS / 4));
+    for (let i = 0; i < 5; i++) await history.add(record, { at: i, before: half, after: half });
+    expect((await history.entries(record)).map((entry) => entry.at)).toEqual([3, 4]);
+  });
+
   it('asks before undoing over a note that changed since, and declining leaves it alone', async () => {
     const { app, files, pulled, history, pull } = await setup({ choice: 'theirs', remember: false, silent: false });
     await pull('2', 'theirs text');
     const record = pulled.byPath(PATH)!;
     files.set(PATH, 'edited after');
-    expect(await undoLastMerge(app, history, record, async () => false)).toBe(false);
+    expect(await undoLastMerge(app, history, record, async () => false)).toBe('declined');
     expect(files.get(PATH)).toBe('edited after');
     expect(await history.entries(record)).toHaveLength(1);
-    expect(await undoLastMerge(app, history, record, async () => true)).toBe(true);
+    expect(await undoLastMerge(app, history, record, async () => true)).toBe('undone');
     expect(files.get(PATH)).toBe('a\nMINE\nc\nd\ne');
   });
 
@@ -141,7 +195,7 @@ describe('the merge history', () => {
     pulled.deleted(PATH);
     files.set(PATH, 'a stranger at the same path');
     const confirm = vi.fn(async () => true);
-    expect(await undoLastMerge(app, history, pulled.get(record.tableId, record.from, record.item)!, confirm)).toBe(false);
+    expect(await undoLastMerge(app, history, pulled.get(record.tableId, record.from, record.item)!, confirm)).toBe('nothing');
     expect(files.get(PATH)).toBe('a stranger at the same path');
     expect(confirm).not.toHaveBeenCalled();
   });

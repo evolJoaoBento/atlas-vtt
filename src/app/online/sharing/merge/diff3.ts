@@ -17,16 +17,25 @@ export function splitLines(text: string): string[] {
 
 const same = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((line, index) => line === b[index]);
 
-function matches(base: readonly string[], other: readonly string[]): Map<number, number> {
-  return new Map(commonLines(base, other) ?? []);
+/** The pairs of lines that match; `aligned` goes false when the diff gave up on this pair of texts. */
+function matches(base: readonly string[], other: readonly string[], aligned: { value: boolean }): Map<number, number> {
+  const pairs = commonLines(base, other);
+  if (pairs === null) aligned.value = false;
+  return new Map(pairs ?? []);
 }
 
 export function diff3(base: string, mine: string, theirs: string): MergeChunk[] {
+  return diff3Checked(base, mine, theirs).chunks;
+}
+
+/** `aligned` is false when a diff gave up (too different or too long): the chunks are then not a real merge, and must never be saved unseen. */
+export function diff3Checked(base: string, mine: string, theirs: string): { chunks: MergeChunk[]; aligned: boolean } {
   const b = splitLines(base);
   const a = splitLines(mine);
   const c = splitLines(theirs);
-  const toMine = matches(b, a);
-  const toTheirs = matches(b, c);
+  const aligned = { value: true };
+  const toMine = matches(b, a, aligned);
+  const toTheirs = matches(b, c, aligned);
   const chunks: MergeChunk[] = [];
   const push = (chunk: MergeChunk): void => {
     const last = chunks[chunks.length - 1];
@@ -58,5 +67,5 @@ export function diff3(base: string, mine: string, theirs: string): MergeChunk[] 
     ic = kc + 1;
   }
   region(b.length, a.length, c.length);
-  return chunks;
+  return { chunks, aligned: aligned.value };
 }

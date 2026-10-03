@@ -1,13 +1,16 @@
 /**
  * A longest common subsequence of two line lists, by Myers' O(ND) greedy algorithm. Each
  * round's frontier is kept (only its own diagonals) to walk the path back. Past `MAX_EDITS`
- * the texts are too different to align: null, and the merge treats them as one conflict.
+ * the texts are too different (or too long) to align: null, and the merge treats them as one conflict.
  */
 const MAX_EDITS = 2000;
+/** Longer texts are not aligned at all: the diff runs on the UI thread, and 100k lines already take a good fraction of a second. */
+export const MAX_DIFF_LINES = 100_000;
 
 export function commonLines(a: readonly string[], b: readonly string[]): Array<[number, number]> | null {
   const n = a.length;
   const m = b.length;
+  if (n > MAX_DIFF_LINES || m > MAX_DIFF_LINES) return null;
   const max = n + m;
   const offset = max + 1;
   const v = new Int32Array(2 * max + 3);

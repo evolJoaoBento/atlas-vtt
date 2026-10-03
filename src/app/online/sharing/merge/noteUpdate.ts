@@ -6,7 +6,8 @@
  */
 import type { NoteUpdatePolicy, UpdateContext, UpdateResult } from '../receive/notePull';
 import type { ConflictDefault, PulledItems, UpdateChoice } from '../receive/PulledItems';
-import { diff3, type MergeChunk } from './diff3';
+import { toLf, usesCrlf, withEnding } from '../receive/lineEndings';
+import { diff3Checked, type MergeChunk } from './diff3';
 import { mergedText } from './mergeResult';
 
 export interface AskResult {
@@ -37,29 +38,36 @@ export interface UpdatePolicyDeps {
 }
 
 export function createUpdatePolicy(deps: UpdatePolicyDeps): NoteUpdatePolicy {
+  /** The result for a choice. Merges run on LF text and are written back in the receiver's line ending. */
+  async function decide(context: UpdateContext, choice: UpdateChoice, silent: boolean): Promise<UpdateResult> {
+    if (choice === 'both') return { kind: 'both' };
+    if (choice === 'mine') return { kind: 'keep' };
+    if (choice === 'theirs') return { kind: 'write', text: context.theirs };
+    const { record } = context;
+    const crlf = usesCrlf(context.mine);
+    const conflictDefault = record.conflictDefault ?? 'both';
+    const { chunks, aligned } = diff3Checked(toLf(context.base), toLf(context.mine), toLf(context.theirs));
+    const automatic = mergedText(chunks, [], conflictDefault);
+    // Only a real merge is saved unseen: with no base, or when the diff gave up, the receiver sees the merge page.
+    if (choice === 'auto' && silent && aligned && !context.baseMissing) return { kind: 'write', text: withEnding(automatic, crlf) };
+    const answer = await deps.merge({ context, chunks, preview: choice === 'auto' ? automatic : null, conflictDefault });
+    if (!answer) return { kind: 'cancel' };
+    if (answer.conflictDefault !== conflictDefault) deps.pulled.update(record.key, { conflictDefault: answer.conflictDefault });
+    return { kind: 'write', text: withEnding(answer.text, crlf) };
+  }
+
   return {
     async resolve(context: UpdateContext): Promise<UpdateResult> {
       const { record } = context;
-      let choice = record.choice;
-      let silent = record.silent === true;
-      if (!choice) {
-        const answer = await deps.ask(context);
-        if (!answer) return { kind: 'cancel' };
-        choice = answer.choice;
-        silent = answer.silent;
-        if (answer.remember) deps.pulled.update(record.key, { choice, ...(silent ? { silent: true } : {}) });
-      }
-      if (choice === 'both') return { kind: 'both' };
-      if (choice === 'mine') return { kind: 'keep' };
-      if (choice === 'theirs') return { kind: 'write', text: context.theirs };
-      const conflictDefault = record.conflictDefault ?? 'both';
-      const chunks = diff3(context.base, context.mine, context.theirs);
-      const automatic = mergedText(chunks, [], conflictDefault);
-      if (choice === 'auto' && silent) return { kind: 'write', text: automatic };
-      const answer = await deps.merge({ context, chunks, preview: choice === 'auto' ? automatic : null, conflictDefault });
+      if (record.choice) return decide(context, record.choice, record.silent === true);
+      const answer = await deps.ask(context);
       if (!answer) return { kind: 'cancel' };
-      if (answer.conflictDefault !== conflictDefault) deps.pulled.update(record.key, { conflictDefault: answer.conflictDefault });
-      return { kind: 'write', text: answer.text };
+      const result = await decide(context, answer.choice, answer.silent);
+      // "Remember for this note" is kept only once the receiver confirmed, not when they cancelled the merge page.
+      if (answer.remember && result.kind !== 'cancel') {
+        deps.pulled.update(record.key, { choice: answer.choice, ...(answer.silent ? { silent: true } : {}) });
+      }
+      return result;
     },
   };
 }
