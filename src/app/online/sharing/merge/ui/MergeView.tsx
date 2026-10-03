@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../../packages/components/primitives/button';
 import type { ConflictDefault } from '../../receive/PulledItems';
 import type { MergeChunk } from '../diff3';
@@ -11,6 +11,8 @@ interface MergeViewProps {
   conflictDefault: ConflictDefault;
   onSave: (answer: MergeAnswer) => void;
   onCancel: () => void;
+  /** Tells the dialog whether the result was edited by hand, so closing it can ask first. */
+  onEdited?: (edited: boolean) => void;
 }
 
 const CHOICE_LABEL: Record<ConflictChoice, string> = { mine: 'Keep mine', theirs: 'Take theirs', both: 'Keep both' };
@@ -21,7 +23,7 @@ function Lines({ lines }: { lines: readonly string[] }): React.ReactElement {
 }
 
 /** Side by side per conflict, one-sided changes taken; the result follows the choices until edited by hand. */
-export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel }: MergeViewProps): React.ReactElement {
+export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel, onEdited }: MergeViewProps): React.ReactElement {
   const [choices, setChoices] = useState<Array<ConflictChoice | undefined>>([]);
   const [nextDefault, setNextDefault] = useState<ConflictDefault>(conflictDefault);
   const [edited, setEdited] = useState<string | null>(preview);
@@ -29,6 +31,7 @@ export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel }
   const result = edited ?? generated;
   // Typed changes are never thrown away by a click: the conflict buttons wait until the receiver discards them.
   const byHand = edited !== null && edited !== generated;
+  useEffect(() => { onEdited?.(byHand); }, [byHand, onEdited]);
   let conflict = -1;
   return (
     <div className="atlas-merge">

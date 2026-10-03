@@ -15,8 +15,11 @@ function moved(paths: readonly string[], change: VaultChange): string[] {
 }
 
 /** Brings the ticked notes of every shared map in step with `change`. */
-export async function followVaultChange(assets: Pick<AssetService, 'getAssets' | 'updateAsset'>, change: VaultChange): Promise<void> {
-  for (const scene of await assets.getAssets(undefined, 'scene')) {
+export async function followVaultChange(assets: Pick<AssetService, 'getAssets' | 'getAssetById' | 'updateAsset'>, change: VaultChange): Promise<void> {
+  for (const listed of await assets.getAssets(undefined, 'scene')) {
+    // Read again right before writing: a rename also updates the scene's map path (FileReferenceService), and the write must not undo it.
+    const scene = await assets.getAssetById(listed.id);
+    if (scene?.type !== 'scene') continue;
     const share = mapShareOf(scene);
     if (!share) continue;
     const notes = moved(share.notes, change);

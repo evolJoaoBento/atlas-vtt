@@ -73,10 +73,26 @@ describe('linked notes of a map', () => {
 });
 
 describe('ticked notes follow the vault (I3)', () => {
-  const sceneWith = (id: string, notes: string[]): SceneAsset => scene({ mapPath: `${id}.atlasmap`, sharing: { ...share, notes } });
+  const sceneWith = (id: string, notes: string[]): SceneAsset => ({ ...scene({ mapPath: `${id}.atlasmap`, sharing: { ...share, notes } }), id });
   const fakeAssets = (scenes: SceneAsset[]) => ({
-    getAssets: vi.fn(async () => scenes) as never,
+    getAssets: vi.fn(async () => [...scenes]) as never,
+    getAssetById: vi.fn(async (id: string) => scenes.find((candidate) => candidate.id === id) ?? null) as never,
     updateAsset: vi.fn(async () => {}),
+  });
+
+  it('re-reads each scene before writing, so a concurrent map path update is not undone (F-b)', async () => {
+    const live = sceneWith('a', ['Notes/Inn.md']);
+    const store = new Map<string, SceneAsset>([[live.id, live]]);
+    const assets = {
+      // The list was read before FileReferenceService moved the map.
+      getAssets: vi.fn(async () => { const stale = [{ ...live }]; store.set(live.id, { ...live, data: { ...live.data, mapPath: 'moved/a.atlasmap' } }); return stale; }) as never,
+      getAssetById: vi.fn(async (id: string) => store.get(id) ?? null) as never,
+      updateAsset: vi.fn(async (id: string, updates: { data?: SceneAsset['data'] }) => { store.set(id, { ...store.get(id)!, ...updates } as SceneAsset); }),
+    };
+    await followVaultChange(assets, { rename: ['Notes', 'Archive'] });
+    const written = store.get(live.id)!.data!;
+    expect(written.mapPath).toBe('moved/a.atlasmap');
+    expect(mapShareOf(store.get(live.id)!)?.notes).toEqual(['Archive/Inn.md']);
   });
 
   it('keeps a renamed or moved note ticked under its new path, folders included', async () => {

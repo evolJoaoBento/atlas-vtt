@@ -178,6 +178,61 @@ function untilStable(text: string, pass: (text: string) => string): string {
 const sweep = (text: string): string =>
   untilStable(text, (current) => current.replace(MARKDOWN_LINK, (all: string, _bang: string, label: string, raw: string) => (WEB.test(cleanTarget(raw)) ? all : label)));
 
+/** Where the `)` closing the destination that starts at `from` is (balanced parentheses, `<…>` skipped); -1 when the line ends first. */
+function destinationEnd(text: string, from: number): number {
+  let depth = 1;
+  for (let at = from; at < text.length && text[at] !== '\n'; at++) {
+    const char = text[at];
+    if (char === '<' && at === from) {
+      const close = text.indexOf('>', at);
+      if (close < 0 || text.slice(at, close).includes('\n')) return -1;
+      at = close;
+    } else if (char === '(') depth++;
+    else if (char === ')' && --depth === 0) return at;
+  }
+  return -1;
+}
+
+/**
+ * The net that does not depend on how the label nests: every `](destination)` that is not the web loses its
+ * destination, however many brackets the label holds. A destination that never closes on its line is dropped to the line's end.
+ */
+function stripDestinations(text: string): string {
+  let out = '';
+  let at = 0;
+  for (;;) {
+    const open = text.indexOf('](', at);
+    if (open < 0) return out + text.slice(at);
+    const end = destinationEnd(text, open + 2);
+    const lineEnd = text.indexOf('\n', open);
+    const stop = end >= 0 ? end + 1 : lineEnd < 0 ? text.length : lineEnd;
+    if (end >= 0 && WEB.test(cleanTarget(text.slice(open + 2, end)))) {
+      out += text.slice(at, stop);
+    } else {
+      out += text.slice(at, open + 1);
+    }
+    at = stop;
+  }
+}
+
+const ANY_DEFINITION = /^(?:[ \t]*(?:>|[-*+]|\d{1,9}[.)]))*[ \t]*\[(?!\^).*\]:[ \t]*(.*)$/;
+
+/** Reference definitions whatever their label's brackets: a line `[…]: target` (or `[…]:` with the target on the next line) that is not the web is dropped. */
+function stripDefinitions(text: string): string {
+  const lines = text.split('\n');
+  const kept: string[] = [];
+  for (let at = 0; at < lines.length; at++) {
+    const rest = ANY_DEFINITION.exec(lines[at] ?? '')?.[1];
+    const target = rest === undefined ? undefined : rest.trim() === '' ? TARGET_LINE.exec(lines[at + 1] ?? '')?.[1] : rest.trim().split(/\s+/)[0];
+    if (rest === undefined || target === undefined || WEB.test(cleanTarget(target))) {
+      kept.push(lines[at] ?? '');
+      continue;
+    }
+    if (rest.trim() === '') at += TITLE_LINE.test(lines[at + 2] ?? '') ? 2 : 1;
+  }
+  return kept.join('\n');
+}
+
 /** The last net for wiki links: one whose target is not a title this pass wrote becomes its text (an embed, only its file name). */
 function wikiSweep(text: string, titles: ReadonlySet<string>): string {
   return mapWiki(text, (bang, raw, alias) => {
@@ -196,5 +251,6 @@ export function rewriteLinks(text: string, resolve: LinkResolver): string {
   };
   const { kept, targets } = takeDefinitions(rewriteWiki(text, tracked).split('\n'));
   const rewritten = untilStable(kept.join('\n'), (current) => rewriteSpans(current, targets, tracked));
-  return stripHtmlUrls(untilStable(rewritten, (current) => sweep(wikiSweep(current, titles))));
+  const swept = untilStable(rewritten, (current) => sweep(wikiSweep(current, titles)));
+  return stripHtmlUrls(stripDefinitions(stripDestinations(swept)));
 }

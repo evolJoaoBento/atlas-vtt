@@ -88,3 +88,25 @@ describe('wiki links nested in the alias of a kept link (I1)', () => {
     expect(out).toContain('[[Cave]]');
   });
 });
+
+describe('labels that nest brackets deeply keep no path (F-a)', () => {
+  const leaks = (text: string): void => {
+    const out = rewriteLinks(text, shared);
+    expect(out).not.toMatch(/Private|Secret|GM\//);
+  };
+
+  it('strips the destination whatever the nesting', () => {
+    leaks('[a [b [c]]](Private/Secret.md)');
+    leaks('[see [[Cave]]](Private/Secret.md)');
+    leaks('[a [b [c [d [e [f]]]]]](Private/Secret.md) and ![x [y [z]]](GM/Secret.png)');
+    leaks('[a [b [c]]](<Private/Secret (1).md>) [p [q [r]]](Private/Secret (1).md)');
+    leaks('[a [b [c]]](Private/Secret.md "t")');
+    leaks('[a [b [c]]](Private/Secret.md');
+  });
+
+  it('keeps web destinations and strips definitions with deep labels', () => {
+    expect(rewriteLinks('[a [b [c]]](https://example.org/x)', shared)).toBe('[a [b [c]]](https://example.org/x)');
+    leaks('see\n\n[a [b [c]]]: Private/Secret.md\n> [x [y [z]]]:\nPrivate/Secret.md\n"t"\nend');
+    expect(rewriteLinks('[a [b [c]]]: https://example.org\n[^1]: Note', shared)).toBe('[a [b [c]]]: https://example.org\n[^1]: Note');
+  });
+});
