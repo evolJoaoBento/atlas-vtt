@@ -93,7 +93,7 @@ export default class AtlasVTTPlugin extends Plugin {
     await this.settingsService.initialize();
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
     registerOnline(this, onlineSessions);
-    registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), settings: this.settingsService });
+    registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), settings: this.settingsService, sessions: onlineSessions });
     const changelogService = new ChangelogService(this.app, this.settingsService, {
       installedVersion: this.manifest.version,
       existingInstallation: await existingInstallation,

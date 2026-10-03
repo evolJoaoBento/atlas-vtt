@@ -4,6 +4,10 @@
  */
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } from 'node:crypto';
 import type { IdentityCrypto, KeyPairJwk } from '../../../../src/app/online/sharing/identity/identityCrypto';
+import { SenderCatalogue, type CatalogueSources } from '../../../../src/app/online/sharing/model/SenderCatalogue';
+import { parseShareRule } from '../../../../src/app/online/sharing/model/shareRule';
+import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
+import { memoryImageFiles, nodeHash } from '../assetFixtures';
 
 export const nodeIdentityCrypto: IdentityCrypto = {
   generate: (): Promise<KeyPairJwk> => {
@@ -33,4 +37,54 @@ export const nodeIdentityCrypto: IdentityCrypto = {
 export async function testTable(): Promise<{ id: string; keys: KeyPairJwk }> {
   const keys = await nodeIdentityCrypto.generate();
   return { id: await nodeIdentityCrypto.keyId(keys.publicKey), keys };
+}
+
+export const TABLE_ID = 'T'.repeat(43);
+
+export function testPerson(personId: string, name: string, tableId = TABLE_ID): Person {
+  return { tableId, personId, name, formerNames: [], devices: [], aliases: [], lastSeen: 0 };
+}
+
+/** `byName`/`byKey` over a fixed list, as the people book answers them. */
+export function testPeople(list: readonly Person[]): {
+  byName(name: string): Person | null;
+  byKey(key: string): Person | null;
+  list(): readonly Person[];
+  ready(): Promise<void>;
+} {
+  return {
+    byName: (name) => list.find((person) => person.name.toLowerCase() === name.toLowerCase()) ?? null,
+    byKey: (key) => list.find((person) => `${person.tableId}/${person.personId}` === key || person.aliases.includes(key)) ?? null,
+    list: () => list,
+    ready: async () => {},
+  };
+}
+
+/** A catalogue of notes only: path → text, each with its `atlas-share` value. */
+export function noteCatalogue(notes: Record<string, { text: string; share: unknown }>, people: readonly Person[]): SenderCatalogue {
+  const ids = new Map<string, string>();
+  const items = {
+    idFor: (path: string): string => {
+      if (!ids.has(path)) ids.set(path, `n${ids.size}`.padEnd(22, 'x'));
+      return ids.get(path)!;
+    },
+    pathOf: (item: string): string | null => [...ids].find(([, id]) => id === item)?.[0] ?? null,
+    ready: async (): Promise<void> => {},
+  };
+  const title = (path: string): string => (path.split('/').pop() ?? path).replace(/\.md$/, '');
+  const sources: CatalogueSources = {
+    notes: () => Object.entries(notes).filter(([, note]) => note.share !== undefined)
+      .map(([path, note]) => ({ path, title: title(path), rule: parseShareRule(note.share) })),
+    note: (path) => (notes[path] ? { path, title: title(path), rule: parseShareRule(notes[path]!.share) } : null),
+    read: async (path) => notes[path]?.text ?? '',
+    maps: async () => [],
+    readMap: async () => null,
+    images: memoryImageFiles({}).source,
+    isFile: (path) => path in notes,
+    resolveLink: (linkpath) => Object.keys(notes).find((path) => title(path) === linkpath) ?? null,
+    shareable: () => [],
+    rules: () => ({ showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
+    collectionGrid: () => null,
+  };
+  return new SenderCatalogue(sources, items, testPeople(people), nodeHash, async () => null);
 }

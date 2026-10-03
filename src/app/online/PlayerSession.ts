@@ -9,7 +9,8 @@ import { PlayerSceneMirror } from './scene/PlayerSceneMirror';
 import { cameraOfMessage, type SceneCamera } from './scene/sceneCamera';
 import type { PlayerScene, ScenePoint } from './scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from './tools/toolMessages';
-import type { ClientTransport, PeerLink } from './transport/types';
+import { channelPort } from './transport/channelPort';
+import type { ChannelPort, ClientTransport, PeerLink } from './transport/types';
 
 export type PlayerStatus = 'connecting' | 'waiting' | 'admitted' | 'denied' | 'lost';
 
@@ -32,6 +33,13 @@ export const RECONNECT_GIVE_UP_MS = 300_000;
 export interface PlayerAssetHandler {
   /** Admitted on a link: `send` reaches the GM's assets channel on that link until `disconnected`. */
   connected(send: (data: string) => void): void;
+  receive(data: unknown): void;
+  disconnected(): void;
+}
+
+/** Sharing between Obsidian clients: gets the assets channel while admitted, beside the image loader. */
+export interface PlayerShareHandler {
+  connected(port: ChannelPort): void;
   receive(data: unknown): void;
   disconnected(): void;
 }
@@ -61,6 +69,8 @@ export interface PlayerSessionOptions {
   device?: DeviceProof;
   /** Gets the assets channel while admitted (the join page's image loader). */
   assets?: PlayerAssetHandler;
+  /** Sharing's end of the assets channel (Obsidian clients only). */
+  share?: PlayerShareHandler;
 }
 
 export class PlayerSession {
@@ -159,7 +169,10 @@ export class PlayerSession {
     this.link = link;
     link.onMessage((channel, data) => {
       if (channel === 'control') this.receive(link, data);
-      else if (this.assetLink === link && !this.finished) this.options.assets?.receive(data);
+      else if (this.assetLink === link && !this.finished) {
+        this.options.assets?.receive(data);
+        this.options.share?.receive(data);
+      }
     });
     link.onClose(() => {
       if (this.assetLink === link) this.leaveAssets();
@@ -190,6 +203,7 @@ export class PlayerSession {
           // A repeated admission on the same link must not start the handler over.
           this.assetLink = link;
           this.options.assets?.connected((data) => link.send('assets', data));
+          this.options.share?.connected(channelPort(link, 'assets'));
         }
         break;
       case 'denied':
@@ -270,6 +284,7 @@ export class PlayerSession {
     if (!this.assetLink) return;
     this.assetLink = null;
     this.options.assets?.disconnected();
+    this.options.share?.disconnected();
   }
 
   /** Keeps the GM's list; an empty list after an empty one tells nobody. */

@@ -30,6 +30,11 @@ import { IdentityDesk } from './sharing/people/IdentityDesk';
 import { PeopleBook } from './sharing/people/PeopleBook';
 import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
 
+/** Sharing joins a hosted session that has a table; `started` returns what stops it. */
+export interface HostedSharingHooks {
+  started(context: { session: GmSession; table: HostedTable }): () => void;
+}
+
 const BAD_PAGE_URL = "The player page address in Settings → Online play isn't a valid web address.";
 const HOSTING_WHILE_JOINED = 'Leave the online session you joined before hosting one.';
 const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
@@ -89,6 +94,8 @@ export class OnlineSessionService {
   private readonly identityCrypto: IdentityCrypto;
   private currentTable: HostedTable | null = null;
   private currentHostId: string | null = null;
+  private sharingHooks: HostedSharingHooks | null = null;
+  private stopSharing: (() => void) | null = null;
 
   constructor(private readonly app: App, private readonly settings: SettingsService, deps: Deps = {}) {
     this.createHost = deps.createHost ?? createPeerHost;
@@ -103,6 +110,11 @@ export class OnlineSessionService {
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
     this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.settings, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
+  }
+
+  /** Sharing's hooks for every session hosted from now on (`registerSharing`). */
+  useSharingHooks(hooks: HostedSharingHooks | null): void {
+    this.sharingHooks = hooks;
   }
 
   get session(): GmSession | null {
@@ -220,6 +232,7 @@ export class OnlineSessionService {
       tokenControlHost.start();
       diceHost.start();
       laserRelay.start();
+      if (this.currentTable && this.sharingHooks) this.stopSharing = this.sharingHooks.started({ session, table: this.currentTable });
     } catch (error) {
       // No session may keep running without its broadcaster; `start` reports the error.
       this.teardown();
@@ -238,6 +251,8 @@ export class OnlineSessionService {
 
   /** Releases everything a hosted session holds; the store is left to the caller. */
   private teardown(): void {
+    this.stopSharing?.();
+    this.stopSharing = null;
     this.unsubscribeErrors?.();
     this.unsubscribeErrors = null;
     this.assetServer?.stop();

@@ -12,11 +12,10 @@ import { AssetCache, type ImageStore } from '../assets/AssetCache';
 import { AssetLoader, type ImageDecoder } from '../assets/AssetLoader';
 import type { Hasher } from '../assets/assetIds';
 import { openIndexedDbImageStore } from '../assets/indexedDbImageStore';
-import { randomId } from '../ids';
 import { parseJoinLink, type JoinTarget } from '../joinLink';
 import { onlineSessionStore } from '../onlineSessionStore';
 import { mergeDiceLog } from '../page/diceLogModel';
-import type { PlayerSession, PlayerSessionState } from '../PlayerSession';
+import type { PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
 import { normalizePlayerName } from '../protocol';
 import { DeviceKeys, obsidianLocalStore } from '../sharing/identity/deviceKeys';
@@ -28,6 +27,7 @@ import type { DiceLogEntry } from '../tools/toolMessages';
 import { createPeerClient } from '../transport/PeerTransport';
 import type { ClientTransport } from '../transport/types';
 import { isInSession, joinedSessionStore } from './joinedSessionStore';
+import { keyPerHost } from './keyPerHost';
 import { JOIN_PROBLEM_TEXT, type JoinProblem, type OnlineSceneSink } from './onlineJoinTypes';
 import { decodeToObjectUrls, urlsOf } from './objectUrlImages';
 import { openOnlineSceneTab } from './onlineSceneTab';
@@ -79,7 +79,7 @@ export class OnlineJoinService {
   private cache: AssetCache | null = null;
   /** The last "Keep online images" setting seen: other settings changing must not touch the storage. */
   private keepImages: boolean;
-  private readonly keys = new Map<string, string>();
+  private shareHandler: PlayerShareHandler | null = null;
   private readonly createClient: NonNullable<OnlineJoinDeps['createClient']>;
   private readonly openStore: NonNullable<OnlineJoinDeps['openStore']>;
   private readonly decode: ImageDecoder;
@@ -224,12 +224,11 @@ export class OnlineJoinService {
   }
 
   /** One key per GM host for this plugin's lifetime, so the GM recognises a reconnect. Piece 6b replaces it with stable per-table ids. */
-  playerKeyFor(hostId: string): string {
-    const known = this.keys.get(hostId);
-    if (known) return known;
-    const key = randomId();
-    this.keys.set(hostId, key);
-    return key;
+  readonly playerKeyFor = keyPerHost();
+
+  /** Sharing's handler for the assets channel of every join from now on (`registerSharing`). */
+  useShare(handler: PlayerShareHandler | null): void {
+    this.shareHandler = handler;
   }
 
   /** The images belong to the session: memory is freed and the storage closed when it is left. */
@@ -265,6 +264,7 @@ export class OnlineJoinService {
       playerKey: joined.playerKey,
       clientVersion: this.clientVersion,
       clientKind: 'obsidian',
+      ...(this.shareHandler ? { share: this.shareHandler } : {}),
       ...(joined.ids.device ? { device: joined.ids.device } : {}),
       transport: this.createClient(joined.target.server),
       onChange: (state) => { if (current()) this.changed(joined, state); },

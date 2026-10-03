@@ -26,6 +26,8 @@ export type DecodedAsset =
   | { kind: 'invalid'; reason: string };
 
 export const MAX_HANDLE = 0xffff_ffff;
+/** Image transfers use handles up to this one; sharing (Obsidian clients) uses the ones above, so the two never collide. */
+export const IMAGE_HANDLE_MAX = 0x7fff_ffff;
 const HANDLE_BYTES = 4;
 
 type Fields = Record<string, unknown>;

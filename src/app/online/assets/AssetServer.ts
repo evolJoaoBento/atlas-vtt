@@ -10,7 +10,7 @@ import type { AssetFile } from '../scene/AssetRegistry';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { ChannelPort } from '../transport/types';
 import { ASSET_LIMITS, sceneAssetIds } from './assetIds';
-import { decodeAsset, encodeAsset, encodeChunk, MAX_HANDLE } from './assetProtocol';
+import { decodeAsset, encodeAsset, encodeChunk, IMAGE_HANDLE_MAX } from './assetProtocol';
 import { SharedReads } from './SharedReads';
 
 export interface AssetServerOptions {
@@ -178,7 +178,7 @@ export class AssetServer implements SessionHandler {
       const id = queue.pending.shift();
       if (id === undefined) return false;
       const next: Transfer = { id, handle: queue.nextHandle, file: null, offset: 0 };
-      queue.nextHandle = queue.nextHandle >= MAX_HANDLE ? 1 : queue.nextHandle + 1;
+      queue.nextHandle = queue.nextHandle >= IMAGE_HANDLE_MAX ? 1 : queue.nextHandle + 1;
       queue.current = next;
       this.reads.hold(id); // bytes are kept only while a transfer sends them
       void this.reads.file(id).then((file) => this.fileRead(playerId, queue, next, file));
