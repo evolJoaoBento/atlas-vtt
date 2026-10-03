@@ -41,7 +41,13 @@ function entriesOf(value: unknown): { entries: string[]; bad: boolean } {
   let bad = false;
   for (const item of items) {
     if (typeof item === 'string') {
-      entries.push(...split(item));
+      for (const entry of split(item)) {
+        // `except:Cara` (no space) is one string to YAML, not a mapping: read it like `except Cara`. Any other `word:` is unreadable.
+        const labelled = /^([^\s:]+):\s*(.*)$/.exec(entry);
+        if (!labelled) entries.push(entry);
+        else if (/^(?:except|only)$/i.test(labelled[1] ?? '') && labelled[2]) entries.push(`${(labelled[1] ?? '').toLowerCase()} ${labelled[2]}`);
+        else bad = true;
+      }
       continue;
     }
     const keys = isRecord(item) ? Object.keys(item) : [];

@@ -146,6 +146,12 @@ describe('a code fence ends with its container (I1)', () => {
     expect(forPerson('ana', '1. item\n   ```\n   code\n\n%% gm secret %%\nafter')).not.toContain('gm secret');
   });
 
+  it('a top-level fence indented one to three spaces ends only at its closing fence (R2-1)', () => {
+    expect(forPerson('ana', ' ```\ncode\n ```\n %% S %%')).toBe(' ```\ncode\n ```');
+    expect(forPerson('ana', 'text\n  ~~~\ncode\n%% in code %%\n  ~~~\n%% S %%\nz')).toBe('text\n  ~~~\ncode\n%% in code %%\n  ~~~\nz');
+    expect(forPerson('ana', '- item\n  ```\n  code\nPara\n\n%% S %%')).not.toContain('S %%');
+  });
+
   it('still keeps comments inside a fence that is still open', () => {
     expect(forPerson('ana', '> ```\n> %% in code %%\n> ```\nafter')).toBe('> ```\n> %% in code %%\n> ```\nafter');
     expect(forPerson('ana', '- item\n  ```\n  %% in code %%\n  ```')).toBe('- item\n  ```\n  %% in code %%\n  ```');

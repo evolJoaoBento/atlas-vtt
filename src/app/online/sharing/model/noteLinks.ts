@@ -110,7 +110,25 @@ function stripHtmlUrls(text: string): string {
   }));
 }
 
+const MAX_PASSES = 8;
+
+/** Runs `pass` until it changes nothing, at most `MAX_PASSES` times. */
+function untilStable(text: string, pass: (text: string) => string): string {
+  let current = text;
+  for (let count = 0; count < MAX_PASSES; count++) {
+    const next = pass(current);
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
+/** The last net: any inline link or image still aimed at something that is not the web becomes its text, however deeply nested. */
+const sweep = (text: string): string =>
+  untilStable(text, (current) => current.replace(MARKDOWN_LINK, (all: string, _bang: string, label: string, raw: string) => (WEB.test(cleanTarget(raw)) ? all : label)));
+
 export function rewriteLinks(text: string, resolve: LinkResolver): string {
   const { kept, targets } = takeDefinitions(rewriteWiki(text, resolve).split('\n'));
-  return stripHtmlUrls(rewriteSpans(kept.join('\n'), targets, resolve));
+  const rewritten = untilStable(kept.join('\n'), (current) => rewriteSpans(current, targets, resolve));
+  return stripHtmlUrls(sweep(rewritten));
 }

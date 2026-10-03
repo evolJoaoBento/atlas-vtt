@@ -76,6 +76,13 @@ describe('map payloads', () => {
     expect(text).not.toMatch(/GM\/|art\/|maps\/|sounds\/|atlas-vtt\//);
   });
 
+  it('clears plural *Paths keys and values nested under a path key (R2-4)', () => {
+    const map = migrateMapFile({ background: 'maps/inn.png', objects: { tokens: {}, pins: {} } });
+    const extra = { notePaths: ['Secret/a.md', 'Secret/b.md'], imagePath: { src: 'Secret/c.png', deeper: [{ url: 'Secret/d.png' }] }, other: { paths: { x: 'Secret/e.md' } } };
+    const text = JSON.stringify(fullPayload({ ...source(), map, extra }, 'Inn', { ...context([]), isFile: () => false }));
+    expect(text).not.toContain('Secret/');
+  });
+
   it('every *Path field of the map types is covered by that test (a new one must be added)', () => {
     const types = readFileSync(resolve(__dirname, '../../../../src/app/types.ts'), 'utf8');
     const fields = [...new Set([...types.matchAll(/\b(\w*Path)\??:/g)].map((match) => match[1]))].sort();

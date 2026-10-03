@@ -51,6 +51,12 @@ describe('links in shared notes', () => {
     expect(rewriteLinks('[![i](https://example.org/a.png)](https://example.org)', shared)).toBe('[![i](https://example.org/a.png)](https://example.org)');
   });
 
+  it('two levels of nested image links leak nothing (R2-2)', () => {
+    expect(rewriteLinks('[![![i](GM/a.png)](GM/b.md)](GM/c.md)', shared)).toBe('i');
+    expect(rewriteLinks('[[![![i](GM/a.png)](GM/b.md)](GM/c.md)](GM/d.md)', shared)).not.toMatch(/GM\//);
+    expect(rewriteLinks('[![![i](GM/a.png)](GM/b.md)](https://example.org)', shared)).not.toMatch(/GM\//);
+  });
+
   it('only web links stay: Obsidian, app and file links become their text', () => {
     expect(rewriteLinks('[x](obsidian://open?vault=V&file=GM%2FSecret%20plan) [m](mailto:a@b.c)', shared)).toBe('x [m](mailto:a@b.c)');
     expect(rewriteLinks('<img src="app://abc/C:/Users/x/a.png"> <img src="file:///C:/a.png"> <a href="javascript:alert(1)">j</a>', shared)).toBe('<img> <img> <a>j</a>');

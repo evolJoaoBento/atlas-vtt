@@ -116,15 +116,15 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
   return { format: MAP_PAYLOAD_FORMAT, mode: 'player-safe', name, scene, pins, tokenNotes, notes: [...context.linked], images: sceneAssetIds(scene) };
 }
 
-/** Keys that hold a vault path: `notePath`, `imagePath`, `statblockPath`, an audio's `path`, the `background`. A new `*Path` field is covered by its name. */
-const PATH_KEY = /path$|^background$/i;
+/** Keys that hold vault paths (`notePath`, `imagePath`, `notePaths`, an audio's `path`, the `background`), and everything nested under them. A new `*Path` field is covered by its name. */
+const PATH_KEY = /paths?$|^background$/i;
 
 /** `value` with `replace` applied to every string in it, told whether the string sits under a path key. */
 function replaceStrings(value: unknown, replace: (text: string, underPathKey: boolean) => string, underPathKey = false): unknown {
   if (typeof value === 'string') return replace(value, underPathKey);
   if (Array.isArray(value)) return value.map((item: unknown) => replaceStrings(item, replace, underPathKey));
   if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([key, item]): [string, unknown] => [key, replaceStrings(item, replace, PATH_KEY.test(key))]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]): [string, unknown] => [key, replaceStrings(item, replace, underPathKey || PATH_KEY.test(key))]));
   }
   return value;
 }

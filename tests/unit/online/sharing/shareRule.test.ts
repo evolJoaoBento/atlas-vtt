@@ -72,6 +72,15 @@ describe('atlas-share', () => {
     expect(parseShareRule(['public', { except: 'Cara' }])).not.toHaveProperty('unreadable');
   });
 
+  it('reads `except:Cara` without a space, and refuses any other `word:` entry (R2-3)', () => {
+    expect(parseShareRule(['public', 'except:Cara'])).toMatchObject({ public: true, except: ['Cara'], private: false });
+    expect(parseShareRule(['ONLY:Ana', 'except:  Ben'])).toMatchObject({ only: ['Ana'], except: ['Ben'] });
+    expect(ruleReaches(parseShareRule(['public', 'except:Cara']), as(cara), people)).toBe(false);
+    for (const value of [['public', 'excpet:Cara'], ['public', 'except:'], 'colour:red']) {
+      expect(parseShareRule(value), JSON.stringify(value)).toMatchObject({ private: true, unreadable: true });
+    }
+  });
+
   it('except excludes every person any of its names matches, current or former (I3)', () => {
     const newAna = person('ana2', 'Ana');
     const many = { byName: people.byName, allByName: (name: string): Person[] => [ana, newAna, ben].filter((p) => p.name === name || p.formerNames.includes(name)) };

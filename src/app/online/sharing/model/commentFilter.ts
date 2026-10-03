@@ -8,22 +8,25 @@ interface OpenFence {
   marker: string;
   /** Quote depth of the line that opened it. */
   depth: number;
-  /** Indentation of that line after its quote markers: a list item's fence ends at less. */
-  indent: number;
+  /** The content indent of the list item it sits in, when it sits in one: the fence ends at a text line indented less. Null at top level. */
+  listIndent: number | null;
 }
 
 const indentOf = (content: string): number => content.length - content.trimStart().length;
 
 /**
  * A fence ends with its container: a quoted fence when a line has fewer quote markers (a blank
- * line included), an indented one when a text line is indented less than it. When unsure the
- * fence counts as ended, which only removes more comments.
+ * line included), one in a list item when a text line is indented less than the item's content.
+ * Otherwise only its closing fence ends it: ending it early would turn its closing line into an
+ * opener and flip every fence after it.
  */
 function endedByContainer(fence: OpenFence, line: string): boolean {
   const { depth, content } = strictQuote(line);
   if (depth < fence.depth) return true;
-  return content.trim() !== '' && indentOf(content) < fence.indent;
+  return fence.listIndent !== null && content.trim() !== '' && indentOf(content) < fence.listIndent;
 }
+
+const LIST_ITEM = /^( *)([-*+]|\d{1,9}[.)])( +)\S/;
 
 const OPENERS = ['%%', '<!--'] as const;
 const CLOSERS: Record<string, string> = { '%%': '%%', '<!--': '-->' };
@@ -61,6 +64,8 @@ export function stripComments(lines: readonly string[]): string[] {
   const out: string[] = [];
   let open: string | null = null;
   let fence: OpenFence | null = null;
+  // The content indent of the list item the text is in, until a text line at the margin ends the list.
+  let listIndent: number | null = null;
   for (const line of lines) {
     if (open === null) {
       if (fence !== null && endedByContainer(fence, line)) fence = null;
@@ -72,10 +77,16 @@ export function stripComments(lines: readonly string[]): string[] {
       }
       const marker = fenceOpened(content);
       if (marker) {
-        fence = { marker, depth, indent: indentOf(content) };
+        fence = { marker, depth, listIndent: listIndent !== null && indentOf(content) >= listIndent ? listIndent : null };
         out.push(line);
         continue;
       }
+    }
+    if (open === null) {
+      const { content } = strictQuote(line);
+      const item = LIST_ITEM.exec(content);
+      if (item) listIndent = (item[1] ?? '').length + (item[2] ?? '').length + 1;
+      else if (content.trim() !== '' && indentOf(content) === 0) listIndent = null;
     }
     const result = withoutComments(line, open);
     open = result.open;
