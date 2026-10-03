@@ -27,6 +27,7 @@
 }
 
 .atlas-merge__choices,
+.atlas-merge__edited,
 .atlas-merge__default {
   @include atlas-flex-row($spacing-s);
 }

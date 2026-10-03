@@ -8,7 +8,7 @@ import type { App } from 'obsidian';
 import { ensureFolder } from '../../../plugin/vaultFolders';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PulledItems, PulledRecord } from './PulledItems';
-import { toLf } from './lineEndings';
+import { toLf, usesCrlf, withEnding } from './lineEndings';
 import { freePath, isInside, safeFileName, sharedNoteFolder } from './safePaths';
 import { fileAt, folderOf, pathTaken } from './vaultFiles';
 
@@ -42,6 +42,8 @@ export interface NotePullDeps {
   policy: NoteUpdatePolicy;
   /** The text a merge or Take theirs replaced goes to the note's merge history. */
   replaced?(record: PulledRecord, before: string, after: string): Promise<void>;
+  /** The record is written to a new file: what its merge history holds belongs to the old one. */
+  rehomed?(record: PulledRecord): Promise<void>;
   now?: () => number;
 }
 
@@ -79,6 +81,7 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
       ?? pulled.put({ tableId: input.tableId, from: input.from, item: input.item.item, kind: 'note', ...changes });
   };
   if (!known || !file) {
+    if (known) await deps.rehomed?.(known);
     const path = await create(deps, folder, stem, input.text);
     await pulled.writeBase(record(path), input.text);
     return { kind: 'created', path };
@@ -95,7 +98,7 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
   // Line endings alone are no change.
   if (toLf(theirs) === toLf(mine) || (stored !== null && toLf(theirs) === toLf(base))) return settle('unchanged');
   if (stored !== null && toLf(mine) === toLf(base)) {
-    await app.vault.process(file, () => theirs);
+    await app.vault.process(file, () => withEnding(theirs, usesCrlf(mine)));
     return settle('updated');
   }
   const result = await deps.policy.resolve({ record: known, title: input.item.title, personName: input.personName, base, mine, theirs, ...(stored === null ? { baseMissing: true } : {}) });

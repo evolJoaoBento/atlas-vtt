@@ -35,6 +35,19 @@ describe('the merge page', () => {
     expect(save).toHaveBeenCalledWith({ text: 'a\nby hand\nc', conflictDefault: 'mine' });
   });
 
+  it('keeps typed edits when a conflict button is clicked: the buttons wait until the edits are discarded (M3)', () => {
+    render(<MergeView chunks={diff3('a\nb\nc', 'a\nmine\nc', 'a\ntheirs\nc')} preview={null} conflictDefault="both" onSave={() => {}} onCancel={() => {}} />);
+    const result = screen.getByLabelText('Result') as HTMLTextAreaElement;
+    fireEvent.change(result, { target: { value: 'typed by hand' } });
+    const take = screen.getByRole('button', { name: 'Take theirs' }) as HTMLButtonElement;
+    expect(take.disabled).toBe(true);
+    fireEvent.click(take);
+    expect(result.value).toBe('typed by hand');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard my edits' }));
+    expect(result.value).toBe('a\nmine\ntheirs\nc');
+    expect((screen.getByRole('button', { name: 'Take theirs' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('starts from an auto merge preview', () => {
     render(<MergeView chunks={diff3('a', 'a', 'b')} preview="b" conflictDefault="both" onSave={() => {}} onCancel={() => {}} />);
     expect((screen.getByLabelText('Result') as HTMLTextAreaElement).value).toBe('b');

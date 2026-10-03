@@ -3,6 +3,7 @@ import type { AssetMetadata, SceneAsset } from '../../../../src/app/services/Ass
 import { transferredRecord } from '../../../../src/app/services/assetTransfer/transferRecords';
 import { adoptUnindexedFiles } from '../../../../src/app/services/vault-sync/assetAdoption';
 import { mapShareOf, mapShareReaches, parseMapShare, writeMapShare, type MapShare } from '../../../../src/app/online/sharing/model/mapShare';
+import { followVaultChange } from '../../../../src/app/online/sharing/model/mapShareRenames';
 import { linkedNotesOf, offeredNotes } from '../../../../src/app/online/sharing/model/linkedNotes';
 import { migrateMapFile } from '../../../../src/app/services/MapPersistence';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
@@ -68,5 +69,35 @@ describe('linked notes of a map', () => {
     ]);
     expect(offeredNotes(map, 'player-safe').map((note) => note.path)).toEqual(['Notes/Inn.md', 'Notes/Hero.md']);
     expect(offeredNotes(map, 'full')).toHaveLength(4);
+  });
+});
+
+describe('ticked notes follow the vault (I3)', () => {
+  const sceneWith = (id: string, notes: string[]): SceneAsset => scene({ mapPath: `${id}.atlasmap`, sharing: { ...share, notes } });
+  const fakeAssets = (scenes: SceneAsset[]) => ({
+    getAssets: vi.fn(async () => scenes) as never,
+    updateAsset: vi.fn(async () => {}),
+  });
+
+  it('keeps a renamed or moved note ticked under its new path, folders included', async () => {
+    const assets = fakeAssets([sceneWith('a', ['Notes/Inn.md', 'Other/Keep.md']), sceneWith('b', ['Other/Keep.md'])]);
+    await followVaultChange(assets, { rename: ['Notes', 'Archive/Notes'] });
+    expect(assets.updateAsset).toHaveBeenCalledTimes(1);
+    const data = (assets.updateAsset.mock.calls[0] as unknown as [string, { data: { sharing: MapShare } }])[1].data;
+    expect(data.sharing.notes).toEqual(['Archive/Notes/Inn.md', 'Other/Keep.md']);
+  });
+
+  it('unticks a deleted note, so a new file at its path is not shared', async () => {
+    const assets = fakeAssets([sceneWith('a', ['Notes/Inn.md', 'Other/Keep.md'])]);
+    await followVaultChange(assets, { removed: 'Notes/Inn.md' });
+    const data = (assets.updateAsset.mock.calls[0] as unknown as [string, { data: { sharing: MapShare } }])[1].data;
+    expect(data.sharing.notes).toEqual(['Other/Keep.md']);
+  });
+
+  it('writes nothing when no ticked note is affected', async () => {
+    const assets = fakeAssets([sceneWith('a', ['Notes/Inn.md']), scene({ mapPath: 'm.atlasmap' })]);
+    await followVaultChange(assets, { rename: ['Notes/Inn.md.bak', 'x'] });
+    await followVaultChange(assets, { removed: 'Elsewhere' });
+    expect(assets.updateAsset).not.toHaveBeenCalled();
   });
 });

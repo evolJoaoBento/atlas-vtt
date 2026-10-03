@@ -139,7 +139,8 @@ export async function pullMap(deps: MapPullDeps, input: MapPullInput): Promise<P
     } catch (error) {
       // No record without a file and no file without a record: the vault check would adopt it as a second scene.
       const orphan = fileAt(app, path);
-      if (orphan) await app.fileManager.trashFile(orphan);
+      // A failing cleanup must not hide the error that made it necessary.
+      if (orphan) await app.fileManager.trashFile(orphan).catch((trashError: unknown) => console.error('Atlas: could not remove a shared map that was not added', trashError));
       throw error;
     }
   });

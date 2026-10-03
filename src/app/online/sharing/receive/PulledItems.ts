@@ -146,6 +146,16 @@ export class PulledItems {
     return updated;
   }
 
+  /** Clears "Remember for this note" (the choice and the silent flag), so the next update asks again; false when nothing was remembered. */
+  forgetChoice(key: string): boolean {
+    const record = this.records.find((known) => known.key === key);
+    if (!record || (record.choice === undefined && record.silent === undefined)) return false;
+    const { choice: _choice, silent: _silent, ...rest } = record;
+    this.records = this.records.map((known) => (known === record ? rest : known));
+    this.changed();
+    return true;
+  }
+
   readBase(record: PulledRecord): Promise<string | null> {
     return readText(this.adapter, `${BASES_DIR}/${record.baseKey}.md`);
   }

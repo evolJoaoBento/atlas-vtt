@@ -27,6 +27,8 @@ export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel }
   const [edited, setEdited] = useState<string | null>(preview);
   const generated = useMemo(() => mergedText(chunks, choices, conflictDefault), [chunks, choices, conflictDefault]);
   const result = edited ?? generated;
+  // Typed changes are never thrown away by a click: the conflict buttons wait until the receiver discards them.
+  const byHand = edited !== null && edited !== generated;
   let conflict = -1;
   return (
     <div className="atlas-merge">
@@ -57,7 +59,7 @@ export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel }
               </div>
               <div className="atlas-merge__choices">
                 {(['mine', 'theirs', 'both'] as const).map((choice) => (
-                  <Button key={choice} size="sm" variant={(choices[at] ?? conflictDefault) === choice ? 'default' : 'outline'} onClick={() => choose(choice)}>
+                  <Button key={choice} size="sm" disabled={byHand} variant={(choices[at] ?? conflictDefault) === choice ? 'default' : 'outline'} onClick={() => choose(choice)}>
                     {CHOICE_LABEL[choice]}
                   </Button>
                 ))}
@@ -70,6 +72,12 @@ export function MergeView({ chunks, preview, conflictDefault, onSave, onCancel }
         <span className="atlas-merge__label">Result</span>
         <textarea aria-label="Result" value={result} onChange={(event) => setEdited(event.target.value)} rows={12} />
       </label>
+      {byHand && (
+        <div className="atlas-merge__edited">
+          <span>You edited the result, so the conflict buttons are off.</span>
+          <Button size="sm" variant="outline" onClick={() => setEdited(null)}>Discard my edits</Button>
+        </div>
+      )}
       <label className="atlas-merge__default">
         <span>For conflicts next time</span>
         <select className="dropdown" aria-label="For conflicts next time" value={nextDefault} onChange={(event) => setNextDefault(event.target.value as ConflictDefault)}>

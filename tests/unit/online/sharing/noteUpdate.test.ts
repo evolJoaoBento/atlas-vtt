@@ -67,6 +67,19 @@ describe('updating a note changed on both sides', () => {
     expect(pulled.byPath(PATH)?.choice).toBe('both');
   });
 
+  it('forgets a remembered choice, so the next update asks again (I5)', async () => {
+    const { ask, pull, pulled } = await setup({ choice: 'mine', remember: true, silent: true });
+    await pull('2', 'one');
+    expect(ask).toHaveBeenCalledTimes(1);
+    const key = pulled.byPath(PATH)?.key ?? '';
+    expect(pulled.forgetChoice(key)).toBe(true);
+    expect(pulled.byPath(PATH)).not.toHaveProperty('choice');
+    expect(pulled.byPath(PATH)).not.toHaveProperty('silent');
+    expect(pulled.forgetChoice(key)).toBe(false);
+    await pull('3', 'two');
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
   it('auto merge applies one-sided changes and shows the result unless silent', async () => {
     const shown = await setup({ choice: 'auto', remember: false, silent: false }, 'edited result');
     await shown.pull('2', 'a\nb\nc\nTHEIRS\ne');
@@ -152,9 +165,37 @@ describe('updates that must never be saved unseen', () => {
     expect(merge).not.toHaveBeenCalled();
     expect(files.get(PATH)).toBe('a\r\nMINE\r\nc\r\nTHEIRS\r\ne');
   });
+
+  it('a one-sided update and Take theirs also keep a CRLF note CRLF (M1)', async () => {
+    const one = await setup({ choice: 'mine', remember: false, silent: false });
+    one.files.set(PATH, 'a\r\nb\r\nc\r\nd\r\ne');
+    await one.pull('2', 'a\nb\nc\nTHEIRS\ne');
+    expect(one.files.get(PATH)).toBe('a\r\nb\r\nc\r\nTHEIRS\r\ne');
+    const theirs = await setup({ choice: 'theirs', remember: false, silent: false });
+    theirs.files.set(PATH, 'a\r\nMINE\r\nc\r\nd\r\ne');
+    await theirs.pull('2', 'x\ny');
+    expect(theirs.files.get(PATH)).toBe('x\r\ny');
+  });
 });
 
 describe('the merge history', () => {
+  it('is cleared when a pulled record is written to a fresh file (M4)', async () => {
+    const { app, files, pulled, history } = await setup({ choice: 'theirs', remember: false, silent: false });
+    const policy = createUpdatePolicy({ pulled, ask: async () => ({ choice: 'theirs', remember: false, silent: false }), merge: async () => null });
+    const deps = {
+      app, pulled, policy,
+      replaced: (record: Parameters<MergeHistory['add']>[0], before: string, after: string) => history.add(record, { at: 1, before, after }),
+      rehomed: (record: Parameters<MergeHistory['add']>[0]) => history.clear(record),
+    };
+    const pull = (version: string, text: string) => pullNote(deps, { tableId: TABLE_ID, from: 'ana', personName: 'Ana', item: item(version), text });
+    const record = pulled.byPath(PATH)!;
+    await pull('2', 'theirs text');
+    expect(await history.entries(record)).toHaveLength(1);
+    files.delete(PATH);
+    expect(await pull('3', 'fresh')).toMatchObject({ kind: 'created' });
+    expect(await history.entries(record)).toEqual([]);
+  });
+
   it('keeps at most 20 entries per note, the newest last', async () => {
     const { app, pulled } = await setup(null);
     const history = new MergeHistory(app.vault.adapter);

@@ -55,6 +55,11 @@ export class MergeHistory {
     return last;
   }
 
+  /** Forgets the whole history of `record`. */
+  async clear(record: PulledRecord): Promise<void> {
+    await removeFile(this.adapter, this.path(record));
+  }
+
   private path(record: PulledRecord): string {
     return `${SHARING_DATA_DIR}/history/${record.baseKey}.json`;
   }

@@ -38,7 +38,7 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory): 
       current = {
         node: session.node,
         service: new SharedWithMe({
-          app, pulled, node: session.node, tableId: session.tableId, policy, replaced,
+          app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? 'Someone',
           assets: AssetService.getInstance(app), confirmMapUpdate,
         }),
@@ -70,12 +70,25 @@ export function registerReceiving(plugin: Plugin, pulled: PulledItems): void {
       return true;
     },
   });
+  plugin.addCommand({
+    id: 'forget-shared-choice', name: 'Forget remembered choice',
+    checkCallback: (checking) => {
+      const file = plugin.app.workspace.getActiveFile();
+      const record = file ? pulled.byPath(file.path) : null;
+      if (!record || record.kind !== 'note' || (record.choice === undefined && record.silent === undefined)) return false;
+      if (!checking) {
+        pulled.forgetChoice(record.key);
+        new Notice('Forgot the remembered choice. The next update of this note asks again.');
+      }
+      return true;
+    },
+  });
   setSharedOpener(open);
   plugin.register(() => setSharedOpener(null));
   // A push shows a prompt; only Pull writes anything.
-  plugin.register(shareSessionStore.subscribe(pushPromptListener({
-    show: showPushPrompt, service: sharedWithMe, notify: (text) => new Notice(text),
-  })));
+  const prompts = pushPromptListener({ show: showPushPrompt, service: sharedWithMe, notify: (text) => new Notice(text) });
+  plugin.register(shareSessionStore.subscribe(prompts));
+  plugin.register(() => prompts.dispose());
   plugin.registerEvent(plugin.app.vault.on('rename', (file, oldPath) => pulled.renamed(oldPath, file.path)));
   // A deleted pulled file leaves its record without a path, so no later file is taken for it.
   plugin.registerEvent(plugin.app.vault.on('delete', (file) => pulled.deleted(file.path)));

@@ -35,6 +35,7 @@ export interface SharedWithMeDeps {
   assets: MapPullDeps['assets'];
   confirmMapUpdate: (title: string) => Promise<'both' | 'theirs' | null>;
   replaced?: (record: PulledRecord, before: string, after: string) => Promise<void>;
+  rehomed?: (record: PulledRecord) => Promise<void>;
 }
 
 const decode = (bytes: ArrayBuffer): string => new TextDecoder().decode(bytes);
@@ -90,7 +91,11 @@ export class SharedWithMe {
 
   private writeNote(personId: string, personName: string, item: CatalogueItem, text: string): Promise<PullOutcome> {
     return pullNote(
-      { app: this.deps.app, pulled: this.deps.pulled, policy: this.deps.policy, ...(this.deps.replaced ? { replaced: (record: PulledRecord, before: string, after: string) => this.deps.replaced!(record, before, after) } : {}) },
+      {
+        app: this.deps.app, pulled: this.deps.pulled, policy: this.deps.policy,
+        ...(this.deps.replaced ? { replaced: (record: PulledRecord, before: string, after: string) => this.deps.replaced!(record, before, after) } : {}),
+        ...(this.deps.rehomed ? { rehomed: (record: PulledRecord) => this.deps.rehomed!(record) } : {}),
+      },
       { tableId: this.deps.tableId, from: personId, personName, item, text },
     );
   }

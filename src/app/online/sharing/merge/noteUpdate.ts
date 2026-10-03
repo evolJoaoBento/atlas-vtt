@@ -42,7 +42,7 @@ export function createUpdatePolicy(deps: UpdatePolicyDeps): NoteUpdatePolicy {
   async function decide(context: UpdateContext, choice: UpdateChoice, silent: boolean): Promise<UpdateResult> {
     if (choice === 'both') return { kind: 'both' };
     if (choice === 'mine') return { kind: 'keep' };
-    if (choice === 'theirs') return { kind: 'write', text: context.theirs };
+    if (choice === 'theirs') return { kind: 'write', text: withEnding(context.theirs, usesCrlf(context.mine)) };
     const { record } = context;
     const crlf = usesCrlf(context.mine);
     const conflictDefault = record.conflictDefault ?? 'both';

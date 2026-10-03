@@ -2,6 +2,7 @@
 import { TFile, type Plugin, type TAbstractFile } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
 import type { SettingsService } from '../../services/SettingsService';
+import { followVaultChange, type VaultChange } from './model/mapShareRenames';
 import { obsidianCatalogueSources } from './model/catalogueSources';
 import { SenderCatalogue } from './model/SenderCatalogue';
 import type { ShareItems } from './model/ShareItems';
@@ -41,8 +42,19 @@ export function registerShareCommands(plugin: Plugin, { people, items, settings 
     if (!shareable(file)) return;
     menu.addItem((item) => item.setTitle('Share with…').setIcon('share-2').onClick(() => share(file)));
   }));
-  // Note item ids follow the vault, so a renamed note keeps its updates and no path is ever sent.
-  plugin.registerEvent(plugin.app.vault.on('rename', (file, oldPath) => items.renamed(oldPath, file.path)));
-  plugin.registerEvent(plugin.app.vault.on('delete', (file) => items.deleted(file.path)));
+  // Note item ids and ticked map notes follow the vault, so a renamed note keeps its updates and its place on a map, and no path is ever sent.
+  const assets = AssetService.getInstance(plugin.app);
+  let following: Promise<void> = Promise.resolve();
+  const follow = (change: VaultChange): void => {
+    following = following.then(() => followVaultChange(assets, change)).catch((error: unknown) => console.error('Atlas: could not update a map share after a vault change', error));
+  };
+  plugin.registerEvent(plugin.app.vault.on('rename', (file, oldPath) => {
+    items.renamed(oldPath, file.path);
+    follow({ rename: [oldPath, file.path] });
+  }));
+  plugin.registerEvent(plugin.app.vault.on('delete', (file) => {
+    items.deleted(file.path);
+    follow({ removed: file.path });
+  }));
   return catalogue;
 }

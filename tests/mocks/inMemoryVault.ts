@@ -27,7 +27,7 @@ export function parseFrontmatter(content: string): Record<string, unknown> | und
   return frontmatter;
 }
 
-const parentOf = (path: string): string => path.slice(0, path.lastIndexOf('/'));
+const parentOf = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
 
 /** Obsidian does not index dot-folders, so they are only reachable through the adapter. */
 const isHiddenPath = (path: string): boolean => path.split('/').some((segment) => segment.startsWith('.'));
@@ -129,6 +129,7 @@ export function createInMemoryApp(seed: InMemoryVaultSeed = {}): InMemoryApp {
     }),
     getFileByPath: vi.fn((path: string): TFile | null => (files.has(path) && !isHiddenPath(path) ? new TFile(path) : null)),
     getFolderByPath: vi.fn((path: string): TFolder | null => (folders.has(path) && !isHiddenPath(path) ? folderAt(path) : null)),
+    getRoot: vi.fn((): TFolder => folderAt('')),
     rename: vi.fn(moveFile),
     createFolder: vi.fn(async (path: string) => {
       assertFree(path);

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathTaken } from '../../../../src/app/online/sharing/receive/vaultFiles';
+import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { freePath, isInside, safeFileName, sharedNoteFolder } from '../../../../src/app/online/sharing/receive/safePaths';
 
 describe('safe paths for shared items', () => {
@@ -46,5 +48,16 @@ describe('safe paths for shared items', () => {
     const taken = new Set(['Shared/Ana/Cave.md', 'Shared/Ana/Cave (2).md']);
     expect(freePath('Shared/Ana', 'Cave', 'md', (path) => taken.has(path))).toBe('Shared/Ana/Cave (3).md');
     expect(freePath('', 'Cave', 'md', () => false)).toBe('Cave.md');
+  });
+});
+
+describe('a free name beside files that differ only by case', () => {
+  it('also looks in the vault root (M7)', () => {
+    const { app } = createInMemoryApp({ files: { 'Cave.md': 'mine', 'Notes/Inn.md': 'mine' } });
+    const none = { holds: (): boolean => false };
+    expect(pathTaken(app, none, 'cave.md')).toBe(true);
+    expect(pathTaken(app, none, 'notes/inn.md')).toBe(false);
+    expect(pathTaken(app, none, 'Notes/inn.md')).toBe(true);
+    expect(pathTaken(app, none, 'Other.md')).toBe(false);
   });
 });

@@ -21,5 +21,7 @@ export function folderOf(path: string): string {
 export function pathTaken(app: App, pulled: Pick<PulledItems, 'holds'>, path: string): boolean {
   if (app.vault.getAbstractFileByPath(path) !== null || pulled.holds(path)) return true;
   const lower = path.toLowerCase();
-  return (app.vault.getFolderByPath(folderOf(path))?.children ?? []).some((child) => child.path.toLowerCase() === lower);
+  const folder = folderOf(path);
+  // The vault root has no path of its own to look up.
+  return ((folder === '' ? app.vault.getRoot() : app.vault.getFolderByPath(folder))?.children ?? []).some((child) => child.path.toLowerCase() === lower);
 }

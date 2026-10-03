@@ -57,4 +57,20 @@ describe('push prompts', () => {
     expect(hide).toHaveBeenCalledTimes(1);
     stop();
   });
+
+  it('disposing the listener (the plugin unloads) takes every open prompt down (M5)', () => {
+    const hide = vi.fn();
+    const deps: PushPromptDeps = { show: vi.fn(() => ({ hide })), service: () => null, notify: vi.fn() };
+    shareSessionStore.setState({ people: [{ personId: 'ana', name: 'Ana' }], pushes: [] });
+    const listener = pushPromptListener(deps);
+    const stop = shareSessionStore.subscribe(listener);
+    addPush(PUSH);
+    addPush({ ...PUSH, item: 'd'.repeat(22) });
+    expect(deps.show).toHaveBeenCalledTimes(2);
+    listener.dispose();
+    expect(hide).toHaveBeenCalledTimes(2);
+    listener.dispose();
+    expect(hide).toHaveBeenCalledTimes(2);
+    stop();
+  });
 });

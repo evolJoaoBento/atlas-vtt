@@ -173,6 +173,16 @@ describe('pulling a map', () => {
     expect(files.has(`${SCENES}/Inn.atlasmap`)).toBe(false);
   });
 
+  it('a failing cleanup does not hide the error that made it necessary (M6)', async () => {
+    const { app, assets, deps } = await setup();
+    assets.addAsset.mockRejectedValueOnce(new Error('no scene'));
+    vi.mocked(app.fileManager.trashFile).mockRejectedValueOnce(new Error('cannot trash'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(pullMap(deps({}), input(playerSafe))).rejects.toThrow('no scene');
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it('skips an image that cannot be pulled and still brings the map', async () => {
     const { files, images, deps } = await setup();
     images.mockRejectedValue(new Error('gone'));
