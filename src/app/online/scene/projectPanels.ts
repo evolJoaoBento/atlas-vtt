@@ -6,6 +6,7 @@ import { DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
 import { listedBySides, sideOf } from '../../initiative/sides';
 import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { ViewAtlasState } from '../../storeFactory';
+import type { TokenEntity } from '../../types';
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import { isSteppedWidget, readCounterValue } from '../../utils/counterWidget';
 import { isWidgetOn } from '../../utils/widgetActivation';
@@ -13,8 +14,9 @@ import { finiteOr, oneOf, textOr, textOrNull } from './coerce';
 import type { PlayerViewRules } from './playerViewRules';
 import { initiativeShare } from './projectResources';
 import {
-  PLAYER_SIDES, PLAYER_WIDGET_TYPES, SCENE_LIMITS, type PlayerInitiative, type PlayerInitiativeSides, type PlayerSide, type PlayerWidget,
+  PLAYER_SIDES, PLAYER_WIDGET_TYPES, SCENE_LIMITS, type PlayerInitiative, type PlayerInitiativeSides, type PlayerToken, type PlayerWidget,
 } from './sceneTypes';
+import { setOwn } from './sceneDiff';
 import { isSceneId } from './sceneValidation';
 
 type WidgetState = Pick<ViewAtlasState, 'widgetSettings' | 'widgetValues'>;
@@ -55,17 +57,19 @@ export function projectSides(state: InitiativeState, rules: PlayerViewRules, ini
 }
 
 /**
- * The side of every token that has an initiative entry, as the window files it
- * (`sideOf`); empty unless the list is by sides, since only then is a side shown.
+ * `tokens` with the side of every combatant in the list `initiative` that players receive, as the window
+ * files it (`sideOf`, from the GM's own token). Only a list by sides shows sides, and only a token that has
+ * a sent entry gets one.
  */
-export function combatantSides(state: InitiativeState & Partial<Pick<ViewAtlasState, 'objects'>>, sides: PlayerInitiativeSides | null): ReadonlyMap<string, PlayerSide> {
-  const result = new Map<string, PlayerSide>();
-  const entries = state.initiative?.entries;
-  if (!sides || !Array.isArray(entries)) return result;
-  const tokens = state.objects?.tokens ?? {};
-  for (const entry of entries.slice(0, SCENE_LIMITS.initiativeEntries * 4)) {
-    const tokenId: unknown = isRecord(entry) ? entry.tokenId : undefined;
-    if (typeof tokenId === 'string' && Object.hasOwn(tokens, tokenId)) result.set(tokenId, sideOf(tokens[tokenId]));
+export function withCombatantSides(
+  tokens: Readonly<Record<string, PlayerToken>>,
+  initiative: PlayerInitiative | null,
+  source: Readonly<Record<string, TokenEntity>> | undefined,
+): Record<string, PlayerToken> {
+  const result = { ...tokens };
+  if (!initiative?.sides) return result;
+  for (const { tokenId } of initiative.entries) {
+    if (Object.hasOwn(result, tokenId) && source && Object.hasOwn(source, tokenId)) setOwn(result, tokenId, { ...result[tokenId]!, side: sideOf(source[tokenId]) });
   }
   return result;
 }

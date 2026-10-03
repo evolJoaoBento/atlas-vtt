@@ -139,6 +139,29 @@ describe('the online initiative list is the player window\'s list', () => {
     expect(labels(online)).toEqual(['Opponents']);
   });
 
+  it('is not redrawn when something else in the scene changes: a condition, the measurement, a resource', () => {
+    const { app } = createInMemoryApp();
+    const remote = createViewAtlasStore(app, 'online-initiative-3', undefined, false, { remote: true });
+    const applier = new RemoteSceneApplier({ store: remote, images: IMAGES });
+    const send = (tokens: Record<string, Character>): void => applier.apply(projectForPlayers({ ...gmState({ entries: ENTRIES }), objects: { ...gmState({}).objects, tokens } }, {
+      sceneId: 's', rules: { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
+      coverage: coverageOfFog({}), assets: fakeAssetIds(), mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(), initiativeRules: SIDES,
+    }));
+    const { app: panelApp } = createInMemoryApp();
+    const panel = new PlayerInitiativePanel(panelApp, SETTINGS);
+    const parent = document.body.appendChild(document.createElement('div'));
+    panel.mount(parent);
+    panel.present(remote);
+    send(TOKENS);
+    const list = parent.querySelector('.atlas-player-initiative');
+    expect(list).not.toBeNull();
+    // A condition on a token changes `remoteScene.conditions`; the list keeps its element, and so its scroll position
+    send({ ...TOKENS, orc: token('orc', { conditions: ['prone'] }) });
+    expect(remote.getState().remoteScene?.conditions).toHaveLength(1);
+    expect(parent.querySelector('.atlas-player-initiative')).toBe(list);
+    panel.destroy();
+  });
+
   it('draws nothing when the GM has no list, and follows the GM back to turn order', () => {
     const { app } = createInMemoryApp();
     const remote = createViewAtlasStore(app, 'online-initiative-2', undefined, false, { remote: true });

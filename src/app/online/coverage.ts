@@ -90,7 +90,7 @@ export const TOKEN_FIELD_COVERAGE: CoverageTable<KeysOfUnion<TokenEntity>> = {
   playerCharacterId: LOCAL_PLAYER_LINK,
   vision: LIGHTING,
   light: LIGHTING,
-  // Sent as `PlayerToken.side` only for a combatant while the player window lists by sides (`combatantSides`); the window files it by `sideOf`.
+  // Sent as `PlayerToken.side` only for a combatant while the player window lists by sides (`withCombatantSides`); the window files it by `sideOf`.
   side: SENT,
   instanceNumber: notYet('instance badges, with the scene\'s Show instance badges setting (a later piece)'),
 };

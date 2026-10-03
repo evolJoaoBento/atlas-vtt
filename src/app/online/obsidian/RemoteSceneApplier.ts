@@ -150,7 +150,10 @@ export class RemoteSceneApplier {
     const remote = state.remoteScene;
     const { measurement, conditions, resources, initiativeHealth, initiativeRules } = parts;
     const scene = { measurement, conditions, resources, initiativeHealth, initiativeRules };
-    if (remote && REMOTE_PARTS.some((key) => !sameValue(remote[key], scene[key]))) update.remoteScene = { ...remote, ...scene };
+    // Only the parts that changed are replaced: the rest keep their reference, so a panel that reads one
+    // (the initiative list reads the rules) is not redrawn, and scrolled back to the top, by an edit to another.
+    const changed = REMOTE_PARTS.filter((key) => !sameValue(remote?.[key], scene[key]));
+    if (remote && changed.length > 0) update.remoteScene = { ...remote, ...Object.fromEntries(changed.map((key) => [key, scene[key]])) };
     return update;
   }
 }

@@ -20,12 +20,12 @@ import type { FogCoverage } from './FogCoverage';
 import type { LightingFrame } from './LiveLighting';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
-import { combatantSides, projectInitiative, projectSides, projectWidgets } from './projectPanels';
+import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
-  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerSide, type PlayerToken,
+  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 
 export type ProjectedState = Pick<
@@ -79,8 +79,9 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
   const lighting = context.lighting ?? null;
   const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
-  const sides = combatantSides(state, projectSides(state, context.rules, initiativeRules));
-  const tokens = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize, sides.get(id))));
+  const seen = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
+  const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules);
+  const tokens = withCombatantSides(seen, initiative, objects?.tokens);
   const fog = projectFog(objects?.fog, context.memo);
   return {
     sceneId: context.sceneId,
@@ -92,7 +93,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
     drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),
-    initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules),
+    initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
   };
 }
@@ -144,7 +145,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
   };
 }
 
-function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: number, side?: PlayerSide): PlayerToken | null {
+function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: number): PlayerToken | null {
   // Any truthy value hides, as in the local window (`playerSafeFrame`, `PlayerInitiativePanel`).
   if (token.isHidden) return null;
   const x = finiteOrNull(token.x);
@@ -171,7 +172,6 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     stress: null,
     resources: character ? projectBars(character, definitions) : [],
     downed: isDowned(token, definitions),
-    ...(side && { side }),
   };
 }
 
