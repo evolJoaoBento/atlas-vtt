@@ -1,9 +1,11 @@
 /** Receiving: the Shared with me command and buttons, push prompts, and pulled files that follow renames. */
 import { Notice, type App, type Plugin } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
-import { chooseAction } from '../../ui/confirmDialog';
-import { keepBothPolicy } from './receive/notePull';
-import type { PulledItems } from './receive/PulledItems';
+import { chooseAction, confirmAction } from '../../ui/confirmDialog';
+import { MergeHistory, undoLastMerge } from './merge/MergeHistory';
+import { createUpdatePolicy } from './merge/noteUpdate';
+import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
+import type { PulledItems, PulledRecord } from './receive/PulledItems';
 import { pushPromptListener } from './receive/pushPrompts';
 import { SharedWithMe } from './receive/SharedWithMe';
 import { showPushPrompt } from './receive/ui/pushPrompt';
@@ -18,7 +20,10 @@ const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => c
 });
 
 /** One service per share session: a new session (a new node) gets a fresh one. */
-function sharedWithMeFor(app: App, pulled: PulledItems): () => SharedWithMe | null {
+function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory): () => SharedWithMe | null {
+  // Choices and the merge page run only inside a pull the receiver started.
+  const policy = createUpdatePolicy({ pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request) });
+  const replaced = (record: PulledRecord, before: string, after: string): Promise<void> => history.add(record, { at: Date.now(), before, after });
   let current: { node: ShareSession['node']; service: SharedWithMe } | null = null;
   return () => {
     const session = shareSessionStore.getState().session;
@@ -27,7 +32,7 @@ function sharedWithMeFor(app: App, pulled: PulledItems): () => SharedWithMe | nu
       current = {
         node: session.node,
         service: new SharedWithMe({
-          app, pulled, node: session.node, tableId: session.tableId, policy: keepBothPolicy,
+          app, pulled, node: session.node, tableId: session.tableId, policy, replaced,
           nameOf: (personId) => shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? 'Someone',
           assets: AssetService.getInstance(app), confirmMapUpdate,
         }),
@@ -39,9 +44,26 @@ function sharedWithMeFor(app: App, pulled: PulledItems): () => SharedWithMe | nu
 
 export function registerReceiving(plugin: Plugin, pulled: PulledItems): void {
   void pulled.ready();
-  const sharedWithMe = sharedWithMeFor(plugin.app, pulled);
+  const history = new MergeHistory(plugin.app.vault.adapter);
+  const sharedWithMe = sharedWithMeFor(plugin.app, pulled, history);
   const open = (app: App): void => openSharedWithMeModal(app, sharedWithMe());
   plugin.addCommand({ id: 'shared-with-me', name: 'Shared with me…', callback: () => open(plugin.app) });
+  plugin.addCommand({
+    id: 'undo-shared-merge', name: 'Undo last merge',
+    checkCallback: (checking) => {
+      const file = plugin.app.workspace.getActiveFile();
+      const record = file ? pulled.byPath(file.path) : null;
+      if (!record || record.kind !== 'note') return false;
+      if (!checking) {
+        void undoLastMerge(plugin.app, history, record, () => confirmAction({
+          title: 'Undo the last merge?',
+          message: ['This note changed after that merge. Undoing replaces it with the text from before the merge.'],
+          confirmLabel: 'Undo', destructive: true,
+        })).then((undone) => new Notice(undone ? 'Merge undone.' : 'There is no merge to undo for this note.'));
+      }
+      return true;
+    },
+  });
   setSharedOpener(open);
   plugin.register(() => setSharedOpener(null));
   // A push shows a prompt; only Pull writes anything.

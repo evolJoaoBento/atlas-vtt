@@ -2,7 +2,7 @@
  * Writes a pulled note. A first pull goes to `Shared/<person>/<title>.md` (free name, checked
  * to stay inside). A later pull compares three texts: the base (last pulled), mine (the file
  * now) and theirs (just pulled). One-sided changes resolve themselves; when both changed, the
- * update policy decides (Task 6 adds the per-note choices and the merge page).
+ * update policy decides (merge/noteUpdate.ts: the note's choice, or the receiver's answer).
  */
 import type { App } from 'obsidian';
 import { ensureFolder } from '../../../plugin/vaultFolders';
@@ -37,7 +37,7 @@ export interface NotePullDeps {
   app: App;
   pulled: PulledItems;
   policy: NoteUpdatePolicy;
-  /** Replaced text goes to the note's merge history (Task 6). */
+  /** The text a merge or Take theirs replaced goes to the note's merge history. */
   replaced?(record: PulledRecord, before: string, after: string): Promise<void>;
   now?: () => number;
 }
@@ -99,10 +99,11 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
     case 'keep':
       return settle('kept');
     case 'both':
-      // Beside the note, in its person's folder, so it stays inside `Shared/<person>/`.
+      // Beside the note wherever it is now, so it follows the receiver's own moves (the vault root when the note sits there).
       return settle('both', await create(deps, folderOf(known.path), safeFileName(`${input.item.title} (from ${input.personName})`), theirs));
     case 'write':
-      await deps.replaced?.(known, mine, result.text);
+      // The merge may have taken a while: what is in the file now is what gets replaced, so it is what the history keeps.
+      await deps.replaced?.(known, await app.vault.read(file), result.text);
       await app.vault.process(file, () => result.text);
       return settle('updated');
   }
