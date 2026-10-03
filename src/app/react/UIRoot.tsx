@@ -1,4 +1,5 @@
 import { OnlineSceneBar } from './components/online/OnlineSceneBar';
+import { OnlineOwnRolls } from './components/online/OnlineOwnRolls';
 import React, { useMemo, useState, useEffect } from 'react';
 import { LightPopoverHost } from '../pixi/lighting/LightPopover';
 import { LightZonePopoverHost } from '../pixi/lighting/LightZonePopover';
@@ -185,6 +186,8 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
                 <ResponsiveWidgetBar isPlayerView={isPlayerView} store={store} viewId={view?.viewId} />
               </PanelBoundary>
               {!isPlayerView && <PanelBoundary name="the dice rolls"><DiceRollDisplay /></PanelBoundary>}
+              {/* The online scene is a player view: it throws only this player's own rolls */}
+              {remote && <PanelBoundary name="your dice rolls"><OnlineOwnRolls /></PanelBoundary>}
             </div>
           </div>
 

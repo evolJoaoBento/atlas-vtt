@@ -73,6 +73,16 @@ describe('OnlineSceneClient', () => {
     expect(t.pendingFrames()).toBe(1);
   });
 
+  it("hands the player's own roll to the view's roll display, never to Atlas's dice event", () => {
+    const t = setup();
+    const heard = vi.fn();
+    document.addEventListener('atlas-dice-rolled', heard);
+    t.sink().ownRoll({ id: 'r9', name: 'Anna', formula: 'd20', dice: [{ die: 'd20', value: 20 }], modifier: 0, total: 20, crit: 'high', mine: true, at: 5 });
+    document.removeEventListener('atlas-dice-rolled', heard);
+    expect(t.store.getState().remoteScene?.ownRoll).toMatchObject({ id: 'r9', total: 20, crit: 'high', rolls: [{ die: 'd20', value: 20, max: 20 }] });
+    expect(heard).not.toHaveBeenCalled();
+  });
+
   it("shows the shared dice log in Atlas's dice log, newest first, under each roller's name", () => {
     const t = setup();
     t.sink().diceLog([
