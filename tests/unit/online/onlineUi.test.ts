@@ -81,3 +81,48 @@ describe('player page setting', () => {
     expect(saved.at(-1)).toBe('https://example.org/join/');
   });
 });
+
+describe('own server settings', () => {
+  function ownServerRows() {
+    let current = { ...DEFAULT_ONLINE_SETTINGS };
+    const listeners = new Set<() => void>();
+    const settings = {
+      getOnlineSettings: () => current,
+      setOnlineSettings: (partial: Partial<typeof current>) => {
+        current = { ...current, ...partial };
+        listeners.forEach((listener) => listener());
+      },
+      onChange: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); },
+    } as unknown as Settings;
+    const container = document.createElement('div');
+    const section = onlineSettingsSection(settings);
+    const cleanups = section.rows.map((row) => row.render(new Setting(container).setName(row.name)));
+    const row = (name: string): HTMLElement => [...container.querySelectorAll<HTMLElement>('.setting-item')]
+      .find((el) => el.querySelector('.setting-item-name')?.textContent === name)!;
+    return { container, row, cleanups, listeners, select: container.querySelector('select')! };
+  }
+
+  it('puts the address fields on their own row under the text, and lets other wide rows wrap', () => {
+    const { row } = ownServerRows();
+    expect(row('Own server address').classList).toContain('atlas-setting-wrap--below');
+    expect([...row('Own server address').querySelectorAll('input')].map((input) => input.getAttribute('aria-label'))).toEqual(['Host', 'Port', 'Path']);
+    for (const name of ['Own server key and TLS', 'Relay (TURN) servers', 'Player page', 'Shared note properties']) {
+      expect(row(name).classList).toContain('atlas-setting-wrap');
+    }
+  });
+
+  it('shows the own server fields disabled while the PeerJS cloud is chosen, in place', () => {
+    const { row, select, cleanups, listeners } = ownServerRows();
+    const address = row('Own server address');
+    const key = row('Own server key and TLS');
+    expect([...address.querySelectorAll('input')].every((input) => input.disabled)).toBe(true);
+    expect(key.querySelector('input')!.disabled).toBe(true);
+    expect(key.classList).toContain('is-disabled');
+    select.value = 'custom';
+    select.dispatchEvent(new Event('change'));
+    expect([...address.querySelectorAll('input')].some((input) => input.disabled)).toBe(false);
+    expect(key.classList).not.toContain('is-disabled');
+    cleanups.forEach((cleanup) => cleanup?.());
+    expect(listeners.size).toBe(0);
+  });
+});

@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, type Setting, type TextComponent, type ToggleComponent } from 'obsidian';
 import type { SettingsService } from '../services/SettingsService';
 import { DEFAULT_ONLINE_SETTINGS, formatTurnServers, parseTurnServers } from '../online/onlineSettings';
 import type { AtlasSettingSection } from './settingSections';
@@ -12,10 +12,25 @@ function isHttpUrl(text: string): boolean {
   }
 }
 
+/** Rows with several controls keep their text readable: the controls wrap below it (`settings-rows.scss`). */
+const WRAP_CLASS = 'atlas-setting-wrap';
+/** Controls too wide to sit beside the text take their own full-width row under it. */
+const BELOW_CLASS = 'atlas-setting-wrap--below';
+
 export function onlineSettingsSection(settings: SettingsService): AtlasSettingSection {
   const signaling = (): ReturnType<SettingsService['getOnlineSettings']>['signaling'] => settings.getOnlineSettings().signaling;
   const setSignaling = (partial: Partial<ReturnType<typeof signaling>>): void =>
     settings.setOnlineSettings({ signaling: { ...signaling(), ...partial } });
+  /** The own server's fields stay in place, shown disabled, while the PeerJS cloud is chosen. */
+  const ownServerFields = (setting: Setting, fields: Array<TextComponent | ToggleComponent>): () => void => {
+    const sync = (): void => {
+      const off = signaling().mode !== 'custom';
+      setting.settingEl.toggleClass('is-disabled', off);
+      for (const field of fields) field.setDisabled(off);
+    };
+    sync();
+    return settings.onChange(sync);
+  };
 
   return {
     heading: 'Online play',
@@ -36,18 +51,52 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         name: 'Own server address',
         desc: 'Host, port and path of your peerjs-server, used when "My own server" is chosen.',
         render: (setting) => {
-          setting
-            .addText((text) => text.setPlaceholder('peer.example.org').setValue(signaling().host).onChange((host) => setSignaling({ host: host.trim() })))
-            .addText((text) => text.setPlaceholder('443').setValue(String(signaling().port)).onChange((port) => { const value = Number(port); if (Number.isInteger(value) && value >= 1 && value <= 65535) setSignaling({ port: value }); }))
-            .addText((text) => text.setPlaceholder('/').setValue(signaling().path).onChange((path) => setSignaling({ path: path.trim() || '/' })));
+          const host = (text: TextComponent): TextComponent => text
+            .setPlaceholder('peer.example.org')
+            .setValue(signaling().host)
+            .onChange((value) => setSignaling({ host: value.trim() }));
+          const port = (text: TextComponent): TextComponent => text
+            .setPlaceholder('443')
+            .setValue(String(signaling().port))
+            .onChange((value) => {
+              const number = Number(value);
+              if (Number.isInteger(number) && number >= 1 && number <= 65535) setSignaling({ port: number });
+            });
+          const path = (text: TextComponent): TextComponent => text
+            .setPlaceholder('/')
+            .setValue(signaling().path)
+            .onChange((value) => setSignaling({ path: value.trim() || '/' }));
+          const fields: TextComponent[] = [];
+          setting.setClass(WRAP_CLASS).setClass(BELOW_CLASS);
+          for (const [label, build] of [['Host', host], ['Port', port], ['Path', path]] as const) {
+            setting.addText((text) => {
+              fields.push(build(text));
+              text.inputEl.setAttribute('aria-label', label);
+              if (label === 'Host') text.inputEl.addClass('atlas-setting-wrap__wide');
+            });
+          }
+          return ownServerFields(setting, fields);
         },
       },
       {
         name: 'Own server key and TLS',
+        desc: 'The key your peerjs-server expects, and whether it uses TLS (https).',
         render: (setting) => {
+          const fields: Array<TextComponent | ToggleComponent> = [];
           setting
-            .addText((text) => text.setPlaceholder(DEFAULT_ONLINE_SETTINGS.signaling.key).setValue(signaling().key).onChange((key) => setSignaling({ key: key.trim() || 'peerjs' })))
-            .addToggle((toggle) => toggle.setValue(signaling().secure).onChange((secure) => setSignaling({ secure })));
+            .setClass(WRAP_CLASS)
+            .addText((text) => {
+              fields.push(text
+                .setPlaceholder(DEFAULT_ONLINE_SETTINGS.signaling.key)
+                .setValue(signaling().key)
+                .onChange((key) => setSignaling({ key: key.trim() || 'peerjs' })));
+              text.inputEl.setAttribute('aria-label', 'Key');
+            })
+            .addToggle((toggle) => {
+              fields.push(toggle.setValue(signaling().secure).onChange((secure) => setSignaling({ secure })));
+              toggle.toggleEl.setAttribute('aria-label', 'Use TLS');
+            });
+          return ownServerFields(setting, fields);
         },
       },
       {
@@ -55,7 +104,7 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         desc: 'For players whose network blocks direct connections. One per line: turn:host:port username password. Players receive these in the join link.',
         aliases: ['turn', 'relay', 'nat', 'firewall'],
         render: (setting) => {
-          setting.addTextArea((area) => area
+          setting.setClass(WRAP_CLASS).addTextArea((area) => area
             .setPlaceholder(formatTurnServers([{ urls: 'turn:relay.example.org:3478', username: 'user', credential: 'password' }]))
             .setValue(formatTurnServers(settings.getOnlineSettings().turnServers))
             .onChange((text) => settings.setOnlineSettings({ turnServers: parseTurnServers(text) })));
@@ -65,7 +114,7 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         name: 'Player page',
         desc: 'The web page players open to join. Change it if you publish the page yourself.',
         render: (setting) => {
-          setting.addText((text) => {
+          setting.setClass(WRAP_CLASS).addText((text) => {
             text
               .setValue(settings.getOnlineSettings().playerPageUrl)
               .onChange((url) => { if (isHttpUrl(url.trim())) settings.setOnlineSettings({ playerPageUrl: url.trim() }); });
@@ -82,7 +131,7 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         desc: 'Properties that notes you share keep, separated by commas. All other properties are removed before sending; atlas-share always is.',
         aliases: ['sharing', 'frontmatter', 'atlas-share'],
         render: (setting) => {
-          setting.addText((text) => text
+          setting.setClass(WRAP_CLASS).addText((text) => text
             .setPlaceholder('Tags, aliases')
             .setValue(settings.getOnlineSettings().shareableProperties.join(', '))
             .onChange((value) => settings.setOnlineSettings({

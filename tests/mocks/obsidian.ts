@@ -300,6 +300,7 @@ class InputBacked<E extends HTMLInputElement | HTMLTextAreaElement | HTMLSelectE
     inputEl.addEventListener('change', () => this.changed?.(inputEl.value));
   }
   setValue(value: string): this { this.inputEl.value = value; return this; }
+  setDisabled(disabled: boolean): this { this.inputEl.disabled = disabled; return this; }
   setPlaceholder(text: string): this { this.inputEl.setAttribute('placeholder', text); return this; }
 }
 
@@ -307,6 +308,7 @@ export class TextComponent extends InputBacked<HTMLInputElement> {}
 export class TextAreaComponent extends InputBacked<HTMLTextAreaElement> {}
 
 export class DropdownComponent extends InputBacked<HTMLSelectElement> {
+  addOption(value: string, display: string): this { return this.addOptions({ [value]: display }); }
   addOptions(options: Record<string, string>): this {
     for (const [value, display] of Object.entries(options)) {
       const option = this.inputEl.ownerDocument.createElement('option');
@@ -326,6 +328,7 @@ export class ToggleComponent extends ValueComponent<boolean> {
     this.toggleEl.classList.toggle('is-enabled', value);
     return this;
   }
+  setDisabled(disabled: boolean): this { this.toggleEl.classList.toggle('is-disabled', disabled); return this; }
 }
 
 export class ButtonComponent {
