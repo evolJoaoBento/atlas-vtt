@@ -7,11 +7,10 @@
  */
 import type { PresentedSceneInfo } from '../../services/PresentedScene';
 import type { ViewAtlasState } from '../../storeFactory';
-import type { FogOperation } from '../../types/fogTypes';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import { randomId } from '../ids';
 import type { ControlMessage } from '../protocol';
-import type { FogCoverage } from './FogCoverage';
+import { LiveLighting, type LightingFrame } from './LiveLighting';
 import { PlayerChannels } from './PlayerChannels';
 import { pickPlayerViewRules, samePlayerViewRules, type PlayerViewRules } from './playerViewRules';
 import { projectForPlayers } from './projectForPlayers';
@@ -40,6 +39,8 @@ export class SceneBroadcaster implements SessionHandler {
   private lastSent: PlayerScene | null = null;
   private snapshot: { scene: PlayerScene; messages: SceneOutgoing[] | null } | null = null;
   private readonly fogCache = new FogCoverageCache();
+  /** The presented view's lighting, while a scene is shown. */
+  private lighting: LiveLighting | null = null;
   private tickTimer: number | null = null;
   /** The presentation whose oversize the GM was told about, so the notice shows once. */
   private noticeShownFor: string | null = null;
@@ -113,6 +114,7 @@ export class SceneBroadcaster implements SessionHandler {
       unsubscribe: scene.store.subscribe((state) => this.storeChanged(live, state)),
     };
     this.live = live;
+    this.lighting = new LiveLighting(scene, () => { if (this.live === live && !live.loading) this.scheduleTick(); });
     if (!live.loading) this.broadcastSnapshot(live);
   }
 
@@ -158,6 +160,8 @@ export class SceneBroadcaster implements SessionHandler {
     this.cancelTick();
     this.live?.unsubscribe();
     this.live = null;
+    this.lighting?.dispose();
+    this.lighting = null;
   }
 
   private clearScene(): void {
@@ -231,7 +235,13 @@ export class SceneBroadcaster implements SessionHandler {
    * what is covered: like an oversized scene, they get a clear until the fog fits again.
    */
   private fogTruncated(live: LiveScene): boolean {
-    return this.fogCache.get(live.scene.store.getState().objects?.fog ?? {}, this.memo).truncated;
+    const state = live.scene.store.getState();
+    return this.fogCache.get(state.objects?.fog ?? {}, this.memo, this.lightingOf(live, state)?.darkness).truncated;
+  }
+
+  /** What the view's lighting hides from players now; null while the scene is unlit. */
+  private lightingOf(live: LiveScene, state: ViewAtlasState): LightingFrame | null {
+    return this.lighting?.frame(state, live.scene.mapSize()) ?? null;
   }
 
   private clearForTruncatedFog(live: LiveScene): void {
@@ -249,19 +259,17 @@ export class SceneBroadcaster implements SessionHandler {
   private project(live: LiveScene): PlayerScene {
     const state = live.scene.store.getState();
     live.slice = sliceOf(state);
+    const lighting = this.lightingOf(live, state);
     return projectForPlayers(state, {
       sceneId: live.sceneId,
       rules: this.rules,
-      coverage: this.coverageOf(state.objects?.fog ?? {}),
+      // Rebuilt only when the fog operations or the darkness change.
+      coverage: this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness).coverage,
+      lighting,
       assets: this.options.assets,
       ...sceneContext(live.scene, this.options),
       memo: this.memo,
     });
-  }
-
-  /** Rebuilt only when the fog operations change. */
-  private coverageOf(fog: Readonly<Record<string, FogOperation>>): FogCoverage {
-    return this.fogCache.get(fog, this.memo).coverage;
   }
 
   /** What players have, or a clear when they have nothing: never a new projection. */

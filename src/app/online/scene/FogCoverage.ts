@@ -33,9 +33,13 @@ export class FogCoverage {
     readonly cellSize: number,
   ) {}
 
-  /** From exactly the fog players receive, so what the GM withholds matches what players can see. */
-  static fromPlayerFog(fog: Readonly<Record<string, PlayerFogOp>>): FogCoverage {
-    return FogCoverage.fromShapes(sortedByOrder(fog, (op) => op.order).map(([, op]) => shapeOfPlayerOp(op)));
+  /**
+   * From exactly the fog players receive, so what the GM withholds matches what players can see.
+   * `covered`: what covers the fog's area after every operation, as rectangles (a lit scene's darkness).
+   */
+  static fromPlayerFog(fog: Readonly<Record<string, PlayerFogOp>>, covered: readonly WorldBounds[] = []): FogCoverage {
+    const shapes = sortedByOrder(fog, (op) => op.order).map(([, op]) => shapeOfPlayerOp(op));
+    return FogCoverage.fromShapes([...shapes, ...covered.map((rect): FogShape => ({ type: 'rectangle', erase: false, ...rect }))]);
   }
 
   private static fromShapes(shapes: readonly FogShape[]): FogCoverage {

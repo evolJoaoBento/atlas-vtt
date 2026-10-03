@@ -14,6 +14,7 @@ import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes
 import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
+import type { LightingFrame } from './LiveLighting';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets } from './projectPanels';
@@ -31,8 +32,13 @@ export type ProjectedState = Pick<
 export interface ProjectionContext {
   sceneId: string;
   rules: PlayerViewRules;
-  /** Rebuilt by the caller only when the fog operations change. */
+  /** Rebuilt by the caller only when the fog operations, or the darkness of `lighting`, change. */
   coverage: FogCoverage;
+  /**
+   * With dynamic lighting on and the scene lit: which tokens the player window shows and the
+   * darkness over the map, which `coverage` must include. Unset or null, nothing is lit.
+   */
+  lighting?: LightingFrame | null;
   assets: AssetIds;
   mapSize: MapSize;
   memo: ProjectionMemo;
@@ -47,13 +53,17 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
   const objects = state.objects;
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
   const cellSize = positiveOr(state.grid?.size, DEFAULT_GRID_SIZE);
-  const tokens = projectRecord(objects?.tokens, (token) => projectToken(token, context, cellSize));
+  const lighting = context.lighting ?? null;
+  // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
+  const tokens = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
+  const fog = projectFog(objects?.fog, context.memo);
   return {
     sceneId: context.sceneId,
     map: projectMap(state.background, cellSize, context),
     grid: projectGrid(state.grid, context.rules),
     tokens,
-    fog: projectFog(objects?.fog, context.memo),
+    // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
+    fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
     texts: projectTexts(objects?.texts, context.coverage),
     drawings: projectDrawings(objects?.drawings, context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),

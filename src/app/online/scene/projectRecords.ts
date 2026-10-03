@@ -35,13 +35,13 @@ function memoized<K extends object, V>(memo: WeakMap<K, V>, key: K, project: (ke
 }
 
 /** Up to `SCENE_LIMITS.records` records with safe ids, each projected; `null` drops a record. */
-export function projectRecord<G, P>(records: Readonly<Record<string, G>> | undefined, project: (record: G) => P | null): Record<string, P> {
+export function projectRecord<G, P>(records: Readonly<Record<string, G>> | undefined, project: (record: G, id: string) => P | null): Record<string, P> {
   const result: Record<string, P> = {};
   let count = 0;
   for (const [id, record] of Object.entries(records ?? {})) {
     if (count >= SCENE_LIMITS.records) break;
     if (!isSceneId(id) || typeof record !== 'object' || record === null) continue;
-    const projected = project(record);
+    const projected = project(record, id);
     if (projected === null) continue;
     result[id] = projected;
     count++;

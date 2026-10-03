@@ -171,7 +171,7 @@ function cellInsideCapsule(left: number, top: number, size: number, a: ScenePoin
 }
 
 /** The x ranges of a horizontal line at `y` that lie inside the polygon, by nonzero winding. */
-function insideSpans(points: readonly ScenePoint[], y: number): Array<[number, number]> {
+export function insideSpans(points: readonly ScenePoint[], y: number): Array<[number, number]> {
   const crossings: Array<{ x: number; winding: number }> = [];
   for (let index = 0; index < points.length; index++) {
     const a = points[index]!;

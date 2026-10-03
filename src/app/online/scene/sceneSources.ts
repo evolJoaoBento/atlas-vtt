@@ -6,6 +6,7 @@ import type { ViewAtlasState } from '../../storeFactory';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
 import type { FogOperation } from '../../types/fogTypes';
 import type { AssetRegistry } from './AssetRegistry';
+import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import type { ProjectionContext } from './projectForPlayers';
@@ -43,11 +44,16 @@ export interface SceneBroadcasterOptions {
 
 export type Slice = readonly unknown[];
 
-/** The store fields the projection reads; changes elsewhere (camera, selection, tools) send nothing. */
+/**
+ * The store fields the projection reads, and those the view's lighting reads besides (the scene's
+ * lighting options, its explored memory, the tokens held while sight waits for the drop); changes
+ * elsewhere (camera, selection, tools) send nothing.
+ */
 export function sliceOf(state: ViewAtlasState): Slice {
   return [
     state.background, state.grid, state.objects, state.widgetSettings,
     state.widgetValues, state.initiative, state.initiativeTrackerOpen,
+    state.lighting, state.exploredMask, state.heldTokens,
   ];
 }
 
@@ -70,18 +76,19 @@ export interface LiveScene {
   readonly unsubscribe: () => void;
 }
 
-/** Coverage rasterised from the fog players receive, rebuilt only when the fog reference changes. */
+/** Coverage rasterised from the fog players receive and the darkness over it, rebuilt only when either changes. */
 export class FogCoverageCache {
-  private entry: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage; truncated: boolean } | null = null;
+  private entry: { fog: Readonly<Record<string, FogOperation>>; darkness: Darkness; coverage: FogCoverage; truncated: boolean } | null = null;
 
-  /** `truncated`: the GM's fog has more operations than the limit, so some are not sent. */
-  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo): { coverage: FogCoverage; truncated: boolean } {
-    if (this.entry?.fog !== fog) {
+  /** `truncated`: the GM's fog and the darkness have more operations than the limit, so some would not be sent. */
+  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): { coverage: FogCoverage; truncated: boolean } {
+    if (this.entry?.fog !== fog || this.entry.darkness !== darkness) {
       const sent = projectFog(fog, memo);
       this.entry = {
         fog,
-        coverage: FogCoverage.fromPlayerFog(sent),
-        truncated: Object.keys(fog).length > SCENE_LIMITS.records,
+        darkness,
+        coverage: FogCoverage.fromPlayerFog(sent, darkness.covered),
+        truncated: Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records,
       };
     }
     return this.entry;

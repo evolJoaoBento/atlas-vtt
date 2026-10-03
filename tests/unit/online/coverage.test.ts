@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, MEASUREMENT_FIELD_COVERAGE, OBJECT_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE,
-  TOKEN_FIELD_COVERAGE, type CoverageTable, type KeysOfUnion,
+  DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
+  OBJECT_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type CoverageTable, type KeysOfUnion,
 } from '../../../src/app/online/coverage';
 import { projectForPlayers, type ProjectedState } from '../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo, projectDrawings, projectFog, projectTexts } from '../../../src/app/online/scene/projectRecords';
@@ -11,13 +11,13 @@ import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import type { Character, DrawingStroke, TextElement } from '../../../src/app/types';
 import type { CollectionGridDefaults } from '../../../src/app/types/collectionSettingsTypes';
 import type { FogBrushStroke, FogOperation, FogRectangleFill } from '../../../src/app/types/fogTypes';
-import { createDefaultInitiativeState, type InitiativeEntry } from '../../../src/app/types/initiativeTypes';
+import { createDefaultInitiativeState, type InitiativeEntry, type InitiativeState } from '../../../src/app/types/initiativeTypes';
 import type { AnyWidget } from '../../../src/app/types/widgetTypes';
 import { coverageOfFog, fakeAssetIds } from './sceneFixtures';
 
 type Variants<K extends PropertyKey, T> = Record<K, (base: T) => T>;
 
-/** A `sent` field changes the projection; a `gm-only` or `not-yet` field never does. */
+/** A `sent` field changes the projection; a `lighting`, `gm-only` or `not-yet` field never does without lighting (`lightingCoverage.test.ts`). */
 function expectCoverage<K extends string, T>(table: CoverageTable<K>, variants: Variants<K, T>, base: T, project: (value: T) => unknown): void {
   expect(Object.keys(variants).sort()).toEqual(Object.keys(table).sort());
   const before = project(base);
@@ -215,5 +215,31 @@ describe('coverage of the measurement', () => {
       sceneId: 'scene-1', rules: RULES, coverage: coverageOfFog({}), assets, mapSize: { width: 1000, height: 800 },
       memo: createProjectionMemo(), collectionGrid,
     }).measurement);
+  });
+});
+
+describe('coverage of the initiative', () => {
+  const withInitiative = (initiative: InitiativeState): ProjectedState => sceneState({ initiative });
+  const base = sceneState().initiative;
+
+  it('sends every field of the tracker marked sent', () => {
+    const set = (patch: Partial<InitiativeState>) => (state: InitiativeState): InitiativeState => ({ ...state, ...patch });
+    const variants: Variants<keyof InitiativeState, InitiativeState> = {
+      entries: set({ entries: [] }), currentIndex: set({ currentIndex: 3 }), round: set({ round: 5 }), isActive: set({ isActive: false }),
+      config: set({ config: { autoSort: false } }), sides: set({ sides: { first: 'opponents', active: 'players' } }),
+    };
+    expectCoverage(INITIATIVE_COVERAGE, variants, base, (initiative) => project(withInitiative(initiative)));
+  });
+
+  it('sends every field of an entry marked sent', () => {
+    const second: InitiativeEntry = { ...ENTRY, id: 'e2', initiative: 9, isActive: false, order: 1 };
+    const set = (patch: Partial<InitiativeEntry>) => (entry: InitiativeEntry): InitiativeEntry => ({ ...entry, ...patch });
+    const variants: Variants<keyof InitiativeEntry, InitiativeEntry> = {
+      id: set({ id: 'e9' }), tokenId: set({ tokenId: 'gone' }), name: set({ name: 'Bob' }), initiative: set({ initiative: 3 }),
+      initiativeModifier: set({ initiativeModifier: 4 }), imagePath: set({ imagePath: 'art/other.png' }),
+      statblockPath: set({ statblockPath: 'statblocks/other.md' }), isActive: set({ isActive: false }), isNPC: set({ isNPC: true }),
+      order: set({ order: 2 }), sitsOut: set({ sitsOut: true }),
+    };
+    expectCoverage(INITIATIVE_ENTRY_COVERAGE, variants, ENTRY, (entry) => project(withInitiative({ ...base, entries: [entry, second] })));
   });
 });

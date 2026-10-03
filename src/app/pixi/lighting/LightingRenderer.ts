@@ -3,8 +3,9 @@ import type { Viewport } from 'pixi-viewport';
 import type { ViewAtlasState, ViewAtlasStore } from '../../storeFactory';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
-import { sceneLook, type SceneLook } from '../../lighting/sceneLightingOptions';
+import { exploredMemoryOn, sceneLook, type SceneLook } from '../../lighting/sceneLightingOptions';
 import type { SceneLighting } from '../../types/lightingTypes';
+import type { SeenSpot } from '../../vision/perception';
 import { SEES_ALL, type AmbientLight, type AmbientZone, type LightReach, type Sight } from '../../vision/sight';
 import type { SightRules } from '../../vision/sightRules';
 import type { MapBounds } from '../../vision/visibility';
@@ -75,6 +76,9 @@ export class LightingRenderer implements SceneLightingView {
   private readonly spots = new SceneSpots();
   private reaches: LightReach[] = [];
   private sight: Sight = SEES_ALL;
+  private spotsNow: readonly SeenSpot[] = [];
+  /** Sight, reaches and spots belong to the scene the store holds (`sightReady`). */
+  private fresh = false;
   /** The zones of the scene as the rules read them, and the ambient light made of them and the scene's lighting. */
   private zones: readonly AmbientZone[] = [];
   private ambient: { lighting: SceneLighting; zones: readonly AmbientZone[]; light: AmbientLight } | null = null;
@@ -120,6 +124,9 @@ export class LightingRenderer implements SceneLightingView {
 
   currentSight(): Sight { return this.sight; }
   lightReaches(): LightReach[] { return this.reaches; }
+  seenSpots(): readonly SeenSpot[] { return this.spotsNow; }
+  showsExplored(): boolean { return exploredMemoryOn(this.deps.store.getState().lighting); }
+  sightReady(): boolean { return this.fresh && !this.stopped; }
   /** The scene's lighting as the rules read it: with its zones when it has any, the same object while both stay. */
   ambientLight(): AmbientLight {
     const { lighting } = this.deps.store.getState();
@@ -154,6 +161,7 @@ export class LightingRenderer implements SceneLightingView {
   beforeMapUnload(): void {
     this.run(() => this.memory.beforeMapUnload());
     this.model.reset();
+    this.fresh = false;
     this.endAttempt();
   }
 
@@ -166,7 +174,11 @@ export class LightingRenderer implements SceneLightingView {
   private run(work: () => void): void {
     if (this.stopped) return;
     try {
-      if (contextLost(this.deps.app.renderer)) return;
+      // What changes meanwhile is not worked out: until the restore rebuilds, sight is stale.
+      if (contextLost(this.deps.app.renderer)) {
+        this.fresh = false;
+        return;
+      }
       if (this.engine.takeRestored()) this.afterContextRestored();
       if (!this.stopped) work();
     } catch (error) {
@@ -198,6 +210,7 @@ export class LightingRenderer implements SceneLightingView {
       this.engine.setEnabled(false);
       this.model.reset();
       this.endAttempt();
+      this.fresh = false;
       return;
     }
     if (!this.beginAttempt()) {
@@ -210,6 +223,8 @@ export class LightingRenderer implements SceneLightingView {
     const { model, rebuilt } = this.model.update(state, bounds, this.deps.measurement, this.deps.rules);
     const base = rebuilt || !this.lastScene ? (this.lastScene = this.takeModel(model, state, bounds)) : this.lastScene;
     const spots = this.spots.update(model, state, this.deps.measurement, this.deps.rules);
+    this.spotsNow = spots;
+    this.fresh = true;
     this.engine.update({ ...base, spots, ...sceneLook(lighting) });
     requestRender(this.deps.app);
   }

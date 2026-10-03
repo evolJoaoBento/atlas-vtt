@@ -7,14 +7,27 @@ Online players see the presented scene through a projection on the GM's side and
 `src/app/online/coverage.ts` has a table per Atlas type: map objects, token fields, text fields, drawing fields, fog fields, grid fields, and the store fields the projection reads. The tables are typed over Atlas's own types, so a new field or object kind fails `npx tsc --noEmit` until it has an entry:
 
 - `sent`: players receive it, or what it decides (`isHidden` keeps a token from them).
+- `lighting`: never sent; with dynamic lighting on it decides what players receive, through the lighting the player window is drawn by (walls, lights, light zones, token vision and light, the scene's lighting options and explored memory). See step 2a.
 - `gm-only` with a reason: it never changes what players receive.
 - `not-yet` with the piece expected to add it.
 
-Then add a variant for the field in `tests/unit/online/coverage.test.ts`. It changes the field and checks that the projection changes for `sent` and stays the same otherwise.
+Then add a variant for the field in `tests/unit/online/coverage.test.ts`. It changes the field and checks that the projection changes for `sent` and stays the same otherwise. A `lighting` field also gets a pair in `tests/unit/online/lightingCoverage.test.ts`, which projects with the lighting upstream's CPU code works out from the store and checks that the field changes what players get there.
 
 ## 2. Project it on the GM's side
 
 `src/app/online/scene/projectForPlayers.ts` (map, grid, tokens), `projectRecords.ts` (fog, texts, drawings) and `projectPanels.ts` (widgets, initiative) build every sent object field by field, never by spreading a GM record. Read values through `coerce.ts` and clamp numbers into `SCENE_RANGES`, so the output always validates. Follow the player view settings (`playerViewRules.ts`) and the fog (`FogCoverage`) as the local player window does. If the projection reads a new store field, add it to `sliceOf` in `sceneSources.ts`, to `ProjectedState` in `projectForPlayers.ts` (a hand-written `Pick` of the store state), and to `SCENE_FIELD_COVERAGE` in `coverage.ts`.
+
+## 2a. Dynamic lighting
+
+With dynamic lighting on (an experimental feature) and the presented scene lit, online players get exactly what the player window shows, read from the presented view's own lighting, never worked out again: `LightingController.playerLighting()` (`PlayerLighting`: the sight, ambient light, light reaches and seen spots of the view's `SceneLightingView`, and `playerSight()`, the perception the player window hides tokens by). `PresentedSceneInfo.lighting()` reaches it through the view's renderer, `watchLighting` tells when it changed outside the store, and `LiveLighting` (`src/app/online/scene/`) turns it into a `LightingFrame` for each projection:
+
+- **Tokens** the window does not show (perception other than `seen`, also tokens players only sense, which the window outlines) are not sent, with their nameplates, bars and initiative entries.
+- **The map**: `darknessRaster.ts` marks every cell of the map (8 px or more, at most 384 across) whose centre the window shows: where a precise sense that shows the map perceives it in the light there, a seen spot, or the explored memory the window shows (decoded from the scene's saved `exploredMask` by `exploredImage.ts`). `darknessFog.ts` sends the rest as one fog paint lasso, id `atlas-lighting-darkness`, ordered after every GM fog operation: its outline follows the cell edges and its loops are joined by zero-width bridges, so both clients fill exactly the dark cells with their nonzero fill and need no change. The GM side covers the same cells as rectangles in `FogCoverage`, so texts and drawings in the dark are left out like those under fog.
+- Until the view's sight belongs to the scene the store holds (`sightReady`: a map loading, no bounds yet, a lost graphics device), nothing is seen: no tokens, all dark.
+- The darkness is worked out at most every `DARKNESS_INTERVAL_MS`; a token players stop seeing goes at the next tick.
+- Walls, lights and vision are never sent; `lightingProjection.test.ts` searches every message for them.
+
+A new lighting input that changes what the player window shows must reach `PlayerLighting` (or the store fields `sliceOf` watches), never the wire.
 
 ## 3. Wire type and validation
 

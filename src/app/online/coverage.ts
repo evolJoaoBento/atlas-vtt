@@ -5,6 +5,9 @@
  *
  * - `sent`: changes what players receive: the value itself, or what it decides
  *   (a hidden token never reaches players).
+ * - `lighting`: never sent, in any message; with dynamic lighting on and the scene lit it
+ *   decides what players receive, through the lighting the GM's player window is drawn by
+ *   (`PlayerLighting`): which tokens they see and the darkness over the map. Off, it changes nothing.
  * - `gm-only`: never changes what players receive; `reason` says why.
  * - `not-yet`: not sent yet; `piece` names the work expected to add it.
  *
@@ -15,10 +18,13 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
 import type { CollectionGridDefaults } from '../types/collectionSettingsTypes';
 import type { FogOperation } from '../types/fogTypes';
+import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
+import type { SceneLighting } from '../types/lightingTypes';
 import type { ProjectedState } from './scene/projectForPlayers';
 
 export type Coverage =
   | { readonly status: 'sent' }
+  | { readonly status: 'lighting' }
   | { readonly status: 'gm-only'; readonly reason: string }
   | { readonly status: 'not-yet'; readonly piece: string };
 
@@ -28,13 +34,16 @@ export type CoverageTable<K extends PropertyKey> = Readonly<Record<K, Coverage>>
 export type KeysOfUnion<T> = T extends unknown ? keyof T : never;
 
 const SENT: Coverage = { status: 'sent' };
+const LIGHTING: Coverage = { status: 'lighting' };
 const gmOnly = (reason: string): Coverage => ({ status: 'gm-only', reason });
 const notYet = (piece: string): Coverage => ({ status: 'not-yet', piece });
 
 const KIND = gmOnly('the record kind; players get each kind in its own list');
-const DYNAMIC_LIGHTING = notYet('dynamic lighting and vision (an experimental feature since Atlas 0.5)');
 const TOKEN_RESOURCES = notYet('token resources (Atlas 0.5), shown to players by their visibleToPlayers');
 const LOCAL_PLAYER_LINK = gmOnly('links the token to a local player character, not to an online player');
+const INITIATIVE_SIDES = notYet('initiative by sides (Atlas 0.5)');
+/** Only how the player window draws what it shows (tints, looks): never what it shows or hides. */
+const LIGHTING_LOOK = gmOnly('the look of the lit picture; players get what it shows, not how it is tinted');
 
 export const OBJECT_COVERAGE: CoverageTable<keyof ViewAtlasState['objects']> = {
   tokens: SENT,
@@ -42,9 +51,9 @@ export const OBJECT_COVERAGE: CoverageTable<keyof ViewAtlasState['objects']> = {
   texts: SENT,
   drawings: SENT,
   pins: gmOnly('note pins link GM notes; the player window hides them'),
-  walls: DYNAMIC_LIGHTING,
-  lights: DYNAMIC_LIGHTING,
-  lightZones: DYNAMIC_LIGHTING,
+  walls: LIGHTING,
+  lights: LIGHTING,
+  lightZones: LIGHTING,
   audios: notYet('ambient audio (behind AMBIENT_AUDIO_ENABLED)'),
 };
 
@@ -74,9 +83,9 @@ export const TOKEN_FIELD_COVERAGE: CoverageTable<KeysOfUnion<TokenEntity>> = {
   playerLinked: LOCAL_PLAYER_LINK,
   playerId: LOCAL_PLAYER_LINK,
   playerCharacterId: LOCAL_PLAYER_LINK,
-  vision: DYNAMIC_LIGHTING,
-  light: DYNAMIC_LIGHTING,
-  side: notYet('initiative by sides (Atlas 0.5)'),
+  vision: LIGHTING,
+  light: LIGHTING,
+  side: INITIATIVE_SIDES,
   instanceNumber: notYet('instance badges, with the scene\'s Show instance badges setting (a later piece)'),
 };
 
@@ -154,7 +163,7 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   measurementType: SENT,
 };
 
-/** The store fields the projection reads (`sliceOf` in `sceneSources.ts` watches the same ones). */
+/** The store fields the projection reads (`sliceOf` in `sceneSources.ts` watches them, and those of `LIGHTING_STATE_COVERAGE`). */
 export const SCENE_FIELD_COVERAGE: CoverageTable<keyof ProjectedState> = {
   background: SENT,
   grid: SENT,
@@ -173,4 +182,55 @@ export const MEASUREMENT_FIELD_COVERAGE: CoverageTable<keyof CollectionGridDefau
   abstractRangeBands: SENT,
   diagonalRule: SENT,
   coneAngle: notYet("the game system's cone angle (Atlas 0.5); players' cones open 90 degrees"),
+};
+
+/**
+ * The store fields the view's lighting reads besides `objects`; `sliceOf` watches them with
+ * the projected ones, so a change projects again.
+ */
+export const LIGHTING_STATE_COVERAGE: CoverageTable<'lighting' | 'exploredMask' | 'exploredEdits' | 'heldTokens'> = {
+  lighting: LIGHTING,
+  // Players see the explored memory (undimmed) where the window shows it, as part of the darkness's outline.
+  exploredMask: LIGHTING,
+  exploredEdits: gmOnly('counts the edits of the explored memory by hand, for undo; the saved mask they lead to decides'),
+  heldTokens: LIGHTING,
+};
+
+/** A scene's lighting options (`SceneLighting`). */
+export const SCENE_LIGHTING_COVERAGE: CoverageTable<keyof SceneLighting> = {
+  enabled: LIGHTING,
+  ambient: LIGHTING,
+  ambientColor: LIGHTING_LOOK,
+  tokenVision: LIGHTING,
+  exploredMemory: LIGHTING,
+  exploredColor: LIGHTING_LOOK,
+  unexploredColor: LIGHTING_LOOK,
+  litThreshold: LIGHTING,
+  sightOnDrop: LIGHTING,
+  brightThreshold: LIGHTING,
+  darkSightLook: LIGHTING_LOOK,
+  darkSightTint: LIGHTING_LOOK,
+};
+
+export const INITIATIVE_COVERAGE: CoverageTable<keyof InitiativeState> = {
+  entries: SENT,
+  currentIndex: gmOnly('the cursor of the tracker; players see whose turn it is by isActive on each entry'),
+  round: SENT,
+  isActive: SENT,
+  config: gmOnly('how the tracker of the GM sorts'),
+  sides: INITIATIVE_SIDES,
+};
+
+export const INITIATIVE_ENTRY_COVERAGE: CoverageTable<keyof InitiativeEntry> = {
+  id: SENT,
+  tokenId: SENT,
+  name: SENT,
+  initiative: SENT,
+  initiativeModifier: gmOnly('the statblock modifier the GM rolls with'),
+  imagePath: gmOnly('players see the image of the token itself, by its id'),
+  statblockPath: gmOnly('note links stay on the GM\'s machine'),
+  isActive: SENT,
+  isNPC: gmOnly('players see every entry alike'),
+  order: SENT,
+  sitsOut: INITIATIVE_SIDES,
 };

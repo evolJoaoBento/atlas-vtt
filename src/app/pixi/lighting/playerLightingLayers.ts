@@ -4,7 +4,7 @@ import { doorsInSight } from '../../vision/doorSight';
 import { wallList } from '../../vision/wallList';
 import { movedWhileHeld } from '../../lighting/sightOnDrop';
 import { lightLevelAt } from '../../vision/lightLevels';
-import { perceive, targetOf, withinReach, type Perception, type PerceptionOptions } from '../../vision/perception';
+import { perceive, targetOf, withinReach, type Perception, type PerceptionOptions, type SeenSpot } from '../../vision/perception';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import { tokenEffects } from '../../vision/sightRules';
 import type { HideableLayer, LayerVisibility } from '../playerSafeFrame';
@@ -134,4 +134,29 @@ export function playerDoorSight(
 ): ReadonlySet<string> {
   if (!lighting.isEnabled()) return NO_DOORS;
   return doorsInSight(wallList(walls), lighting.currentSight(), lighting.ambientLight(), lighting.lightReaches());
+}
+
+/**
+ * What the players' window decides what they see by, for those who are not at it (online
+ * players): how they perceive each token, and what the lit scene shows them of the map.
+ */
+export interface PlayerLighting {
+  /** False while `sight`, `reaches` and `spots` may still be another scene's (`SceneLightingView.sightReady`). */
+  ready: boolean;
+  perception: TokenPerception;
+  sight: Sight;
+  ambient: AmbientLight;
+  reaches: readonly LightReach[];
+  spots: readonly SeenSpot[];
+  /** The view shows the scene's explored memory where no token sees. */
+  showsExplored: boolean;
+}
+
+/** The players' lighting of a lit scene, `perception` as `playerTokenSight` gave it; undefined while the scene is unlit. */
+export function playerLightingOf(lighting: SceneLightingView, perception: TokenPerception | undefined): PlayerLighting | undefined {
+  if (!perception) return undefined;
+  return {
+    ready: lighting.sightReady(), perception, sight: lighting.currentSight(), ambient: lighting.ambientLight(),
+    reaches: lighting.lightReaches(), spots: lighting.seenSpots(), showsExplored: lighting.showsExplored(),
+  };
 }

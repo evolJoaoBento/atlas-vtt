@@ -2,7 +2,7 @@ import type { AssetIds } from '../../../src/app/online/scene/AssetRegistry';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
-import type { PlayerFogOp, PlayerScene, PlayerSceneBody, PlayerToken } from '../../../src/app/online/scene/sceneTypes';
+import type { PlayerFogOp, PlayerScene, PlayerSceneBody, PlayerToken, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
 
 export function playerToken(overrides: Partial<PlayerToken> = {}): PlayerToken {
   return {
@@ -76,4 +76,17 @@ export function fakeAssetIds(): AssetIds {
       return ids.get(path) ?? null;
     },
   };
+}
+
+/** Whether `point` lies inside the ring by nonzero winding, as both clients' canvases fill a fog lasso. */
+export function insideByNonzero(ring: readonly ScenePoint[], point: ScenePoint): boolean {
+  let winding = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    if ((a.y <= point.y) === (b.y <= point.y)) continue;
+    const x = a.x + ((point.y - a.y) / (b.y - a.y)) * (b.x - a.x);
+    if (x > point.x) winding += b.y > a.y ? 1 : -1;
+  }
+  return winding !== 0;
 }
