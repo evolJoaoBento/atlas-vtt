@@ -14,14 +14,24 @@ export interface PushPromptDeps {
   notify(text: string): void;
 }
 
+/** Pulls a push the receiver accepted, telling them where it landed or why it did not. */
+export function pullAcceptedPush(
+  service: Pick<SharedWithMe, 'pullPushed'> | null,
+  push: PushRequest,
+  report: { pulled(path: string): void; failed(text: string): void },
+): void {
+  void service?.pullPushed(push).then(
+    (outcome: PullOutcome) => { if ('path' in outcome) report.pulled(outcome.path); },
+    (error: unknown) => report.failed(shareErrorText(error)),
+  );
+}
+
 const keyOf = (push: Pick<PushRequest, 'from' | 'item'>): string => `${push.from}/${push.item}`;
 
 /** A listener for `shareSessionStore`: prompts for new pushes, takes the prompt of a dismissed one down. */
 export function pushPromptListener(deps: PushPromptDeps): (state: ShareSessionState) => void {
   const prompts = new Map<string, { hide(): void }>();
-  const pulled = (outcome: PullOutcome): void => {
-    if ('path' in outcome) deps.notify(`Pulled into ${outcome.path}`);
-  };
+  const report = { pulled: (path: string): void => deps.notify(`Pulled into ${path}`), failed: (text: string): void => deps.notify(text) };
   return (state) => {
     for (const push of state.pushes) {
       const key = keyOf(push);
@@ -29,7 +39,7 @@ export function pushPromptListener(deps: PushPromptDeps): (state: ShareSessionSt
       const name = state.people.find((person) => person.personId === push.from)?.name ?? 'Someone';
       prompts.set(key, deps.show(push, name, (pull) => {
         dismissPush(push.from, push.item);
-        if (pull) void deps.service()?.pullPushed(push).then(pulled, (error: unknown) => deps.notify(shareErrorText(error)));
+        if (pull) pullAcceptedPush(deps.service(), push, report);
       }));
     }
     for (const [key, prompt] of [...prompts]) {

@@ -15,6 +15,23 @@ describe('safe paths for shared items', () => {
     expect(safeFileName('name. ')).toBe('name');
   });
 
+  it('rename reserved names with any extension, and the superscript and console forms', () => {
+    expect(safeFileName('CON.backup')).toBe('CON_.backup');
+    expect(safeFileName('nul.txt')).toBe('nul_.txt');
+    expect(safeFileName('COM¹')).toBe('COM¹_');
+    expect(safeFileName('LPT³.log')).toBe('LPT³_.log');
+    expect(safeFileName('CONIN$')).toBe('CONIN$_');
+    expect(safeFileName('console')).toBe('console');
+  });
+
+  it('never split a grapheme when cutting, and drop invisible characters', () => {
+    const cut = safeFileName(`a${'😀'.repeat(60)}`);
+    expect(cut.length).toBeLessThanOrEqual(100);
+    expect(cut).not.toMatch(/[\ud800-\udbff]$/);
+    expect(safeFileName('​')).toBe('Untitled');
+    expect(safeFileName('gob‮lin')).toBe('goblin');
+  });
+
   it('put each person in their own folder under Shared', () => {
     expect(sharedNoteFolder('Ana')).toBe('Shared/Ana');
     expect(sharedNoteFolder('../Ana')).toBe('Shared/Ana');
@@ -28,5 +45,6 @@ describe('safe paths for shared items', () => {
     expect(isInside('Shared/Ana', 'Shared/Ana')).toBe(false);
     const taken = new Set(['Shared/Ana/Cave.md', 'Shared/Ana/Cave (2).md']);
     expect(freePath('Shared/Ana', 'Cave', 'md', (path) => taken.has(path))).toBe('Shared/Ana/Cave (3).md');
+    expect(freePath('', 'Cave', 'md', () => false)).toBe('Cave.md');
   });
 });

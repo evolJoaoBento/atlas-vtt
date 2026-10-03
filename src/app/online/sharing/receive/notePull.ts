@@ -9,7 +9,7 @@ import { ensureFolder } from '../../../plugin/vaultFolders';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PulledItems, PulledRecord } from './PulledItems';
 import { freePath, isInside, safeFileName, sharedNoteFolder } from './safePaths';
-import { fileAt, folderOf } from './vaultFiles';
+import { fileAt, folderOf, pathTaken } from './vaultFiles';
 
 export interface UpdateContext {
   record: PulledRecord;
@@ -50,10 +50,12 @@ export interface NotePullInput {
   text: string;
 }
 
-async function create(app: App, folder: string, stem: string, text: string): Promise<string> {
-  const path = freePath(folder, stem, 'md', (candidate) => app.vault.getAbstractFileByPath(candidate) !== null);
-  if (!isInside(path, folder)) throw new Error('A shared note would land outside its folder');
-  await ensureFolder(app, folder);
+/** A new note in `folder` (the vault root when empty, where the receiver moved a pulled note themselves). */
+async function create(deps: NotePullDeps, folder: string, stem: string, text: string): Promise<string> {
+  const { app, pulled } = deps;
+  const path = freePath(folder, stem, 'md', (candidate) => pathTaken(app, pulled, candidate));
+  if (folder && !isInside(path, folder)) throw new Error('A shared note would land outside its folder');
+  if (folder) await ensureFolder(app, folder);
   await app.vault.create(path, text);
   return path;
 }
@@ -74,7 +76,7 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
       ?? pulled.put({ tableId: input.tableId, from: input.from, item: input.item.item, kind: 'note', ...changes });
   };
   if (!known || !file) {
-    const path = await create(app, folder, stem, input.text);
+    const path = await create(deps, folder, stem, input.text);
     await pulled.writeBase(record(path), input.text);
     return { kind: 'created', path };
   }
@@ -98,7 +100,7 @@ export async function pullNote(deps: NotePullDeps, input: NotePullInput): Promis
       return settle('kept');
     case 'both':
       // Beside the note, in its person's folder, so it stays inside `Shared/<person>/`.
-      return settle('both', await create(app, folderOf(known.path), safeFileName(`${input.item.title} (from ${input.personName})`), theirs));
+      return settle('both', await create(deps, folderOf(known.path), safeFileName(`${input.item.title} (from ${input.personName})`), theirs));
     case 'write':
       await deps.replaced?.(known, mine, result.text);
       await app.vault.process(file, () => result.text);

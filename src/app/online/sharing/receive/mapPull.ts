@@ -18,7 +18,7 @@ import type { PullOutcome } from './notePull';
 import type { PulledItems } from './PulledItems';
 import { receivedMapState } from './receivedMap';
 import { freePath, isInside, safeFileName } from './safePaths';
-import { fileAt } from './vaultFiles';
+import { fileAt, pathTaken } from './vaultFiles';
 
 export const SHARED_COLLECTION = 'Shared with me';
 
@@ -43,12 +43,20 @@ export interface MapPullInput {
   payload: MapPayload;
 }
 
-async function sharedCollectionId(assets: MapPullDeps['assets']): Promise<string> {
+async function findOrCreateCollection(assets: MapPullDeps['assets']): Promise<string> {
   const known = (await assets.getCollections()).find((collection) => collection.id === SHARED_COLLECTION || collection.name === SHARED_COLLECTION);
   if (known) return known.id;
   const problem = collectionNameProblem(SHARED_COLLECTION);
   if (problem) throw new Error(problem);
   return (await assets.createCollection(SHARED_COLLECTION)).id;
+}
+
+let creatingCollection: Promise<string> | null = null;
+
+/** The collection's id; two pulls at once share one creation. */
+function sharedCollectionId(assets: MapPullDeps['assets']): Promise<string> {
+  creatingCollection ??= findOrCreateCollection(assets).finally(() => { creatingCollection = null; });
+  return creatingCollection;
 }
 
 /** Notes of the map the receiver pulled in earlier pulls, whose files are still there; this pull's ticked notes win. */
@@ -71,13 +79,18 @@ async function writeImages(deps: MapPullDeps, folder: string, fingerprints: read
       images.set(fingerprint, existing);
       continue;
     }
-    const image = await deps.pullImage(fingerprint);
+    // An image that cannot be pulled is skipped like one with the wrong bytes: the map still arrives, without it.
+    const image = await deps.pullImage(fingerprint).catch(() => null);
+    if (!image) continue;
     // The transfer checked the bytes against the fingerprint asked for; it is checked here again, since this is what names the file.
     if (!image.mime || image.version !== fingerprint) continue;
     const path = `${folder}/${fingerprint}.${extensionForMime(image.mime)}`;
     if (!isInside(path, folder)) continue;
     await ensureFolder(app, folder);
-    await app.vault.createBinary(path, image.bytes);
+    // A pull running at the same time may have written the same image first: the file is then the one wanted.
+    await app.vault.createBinary(path, image.bytes).catch((error: unknown) => {
+      if (!fileAt(app, path)) throw error;
+    });
     images.set(fingerprint, path);
   }
   return images;
@@ -108,21 +121,29 @@ export async function pullMap(deps: MapPullDeps, input: MapPullInput): Promise<P
     }
   }
   const sceneFolder = `${root}/scenes/${person}`;
-  const path = freePath(sceneFolder, safeFileName(input.payload.name), 'atlasmap', (candidate) => app.vault.getAbstractFileByPath(candidate) !== null);
-  if (!isInside(path, sceneFolder)) throw new Error('A shared map would land outside its folder');
-  const scene = await assets.runExclusive(async () => {
+  // The name is chosen inside the lock, so two pulls at once never pick the same one. Keep both makes a second
+  // scene that later pulls do not follow; only the first is recorded, in the lock too, so its path is held at once.
+  const written = await assets.runExclusive(async () => {
+    const path = freePath(sceneFolder, safeFileName(input.payload.name), 'atlasmap', (candidate) => pathTaken(app, pulled, candidate));
+    if (!isInside(path, sceneFolder)) throw new Error('A shared map would land outside its folder');
     await ensureFolder(app, sceneFolder);
     await app.vault.create(path, text);
-    return assets.addAsset({ type: 'scene', name: input.payload.name, collection, tags: [], data: { mapPath: path } });
+    try {
+      const scene = await assets.addAsset({ type: 'scene', name: input.payload.name, collection, tags: [], data: { mapPath: path } });
+      if (known && knownFile) return { path, record: null };
+      const record = pulled.put({
+        tableId: input.tableId, from: input.from, item: input.item.item, kind: 'map', path, version: input.item.version, pulledAt: now(), sceneId: scene.id,
+        ...(known ? { baseKey: known.baseKey } : {}),
+      });
+      return { path, record };
+    } catch (error) {
+      // No record without a file and no file without a record: the vault check would adopt it as a second scene.
+      const orphan = fileAt(app, path);
+      if (orphan) await app.fileManager.trashFile(orphan);
+      throw error;
+    }
   });
-  // Keep both makes a second scene that is not followed by later pulls; only the first is.
-  if (!known || !knownFile) {
-    const record = pulled.put({
-      tableId: input.tableId, from: input.from, item: input.item.item, kind: 'map', path, version: input.item.version, pulledAt: now(), sceneId: scene.id,
-      ...(known ? { baseKey: known.baseKey } : {}),
-    });
-    await pulled.writeBase(record, text);
-    return { kind: 'created', path };
-  }
-  return { kind: 'both', path };
+  if (!written.record) return { kind: 'both', path: written.path };
+  await pulled.writeBase(written.record, text);
+  return { kind: 'created', path: written.path };
 }

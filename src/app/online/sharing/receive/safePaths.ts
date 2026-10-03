@@ -8,14 +8,29 @@ import { normalizePath } from 'obsidian';
 export const SHARED_ROOT = 'Shared';
 
 const INVALID = /[\\/:*?"<>|#^[\]\p{Cc}]/gu;
-const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+/** Bidi overrides, zero-width characters and other invisible format characters. */
+const INVISIBLE = /\p{Cf}/gu;
+/** Windows reserves these names with any extension (`CON.backup`) and with superscript digits (`COM¹`). */
+const RESERVED = /^(con|prn|aux|nul|conin\$|conout\$|clock\$|com[1-9¹²³]|lpt[1-9¹²³])$/i;
 const MAX_NAME = 100;
 
+/** `text` cut to at most `max` UTF-16 units without splitting a grapheme. */
+function truncated(text: string, max: number): string {
+  let out = '';
+  for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)) {
+    if (out.length + segment.length > max) break;
+    out += segment;
+  }
+  return out;
+}
+
 export function safeFileName(name: string, fallback = 'Untitled'): string {
-  let cleaned = name.normalize('NFC').replace(INVALID, ' ').replace(/\s+/g, ' ').trim().replace(/^[.\s]+|[.\s]+$/g, '');
-  if (cleaned.length > MAX_NAME) cleaned = cleaned.slice(0, MAX_NAME).replace(/[.\s]+$/g, '');
+  let cleaned = name.normalize('NFC').replace(INVISIBLE, '').replace(INVALID, ' ').replace(/\s+/g, ' ').trim().replace(/^[.\s]+|[.\s]+$/g, '');
+  if (cleaned.length > MAX_NAME) cleaned = truncated(cleaned, MAX_NAME).replace(/[.\s]+$/g, '');
   if (!cleaned) return fallback;
-  return RESERVED.test(cleaned) ? `${cleaned}_` : cleaned;
+  const dot = cleaned.indexOf('.');
+  const base = dot < 0 ? cleaned : cleaned.slice(0, dot);
+  return RESERVED.test(base.trim()) ? `${base}_${cleaned.slice(base.length)}` : cleaned;
 }
 
 /** `Shared/<person>`, the folder of everything pulled from that person. */
@@ -30,9 +45,10 @@ export function isInside(path: string, folder: string): boolean {
   return normalized.startsWith(`${normalizePath(folder)}/`);
 }
 
-/** `folder/stem.extension`, or `stem (2)`, `stem (3)`, … while `taken` says the path is used. */
+/** `folder/stem.extension` (no folder: at the vault root), or `stem (2)`, `stem (3)`, … while `taken` says the path is used. */
 export function freePath(folder: string, stem: string, extension: string, taken: (path: string) => boolean): string {
-  let path = `${folder}/${stem}.${extension}`;
-  for (let n = 2; taken(path); n++) path = `${folder}/${stem} (${n}).${extension}`;
+  const prefix = folder ? `${folder}/` : '';
+  let path = `${prefix}${stem}.${extension}`;
+  for (let n = 2; taken(path); n++) path = `${prefix}${stem} (${n}).${extension}`;
   return path;
 }

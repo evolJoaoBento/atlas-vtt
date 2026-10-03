@@ -49,4 +49,6 @@ export function registerReceiving(plugin: Plugin, pulled: PulledItems): void {
     show: showPushPrompt, service: sharedWithMe, notify: (text) => new Notice(text),
   })));
   plugin.registerEvent(plugin.app.vault.on('rename', (file, oldPath) => pulled.renamed(oldPath, file.path)));
+  // A deleted pulled file leaves its record without a path, so no later file is taken for it.
+  plugin.registerEvent(plugin.app.vault.on('delete', (file) => pulled.deleted(file.path)));
 }

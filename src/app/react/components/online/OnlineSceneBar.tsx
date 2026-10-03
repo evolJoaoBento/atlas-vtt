@@ -22,7 +22,7 @@ export function OnlineSceneBar(): React.ReactElement | null {
       {status.message && <span className="atlas-online-scene-bar__message">{status.message}</span>}
       {notice && <span className="atlas-online-scene-bar__notice">{notice}</span>}
       {sharing && (
-        <Button variant="outline" size="sm" className="atlas-online-scene-bar__action" onClick={() => openSharedFromView(app)}>
+        <Button variant="outline" size="sm" onClick={() => openSharedFromView(app)}>
           {SHARED_WITH_ME_BUTTON}
         </Button>
       )}

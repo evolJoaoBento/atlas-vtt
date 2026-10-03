@@ -21,7 +21,7 @@ export interface PulledRecord {
   from: string;
   item: string;
   kind: 'note' | 'map';
-  /** The vault file it was written to. */
+  /** The vault file it was written to; empty once that file was deleted. */
   path: string;
   /** The sender's version last pulled. */
   version: string;
@@ -46,17 +46,18 @@ const DEFAULTS: readonly ConflictDefault[] = ['mine', 'theirs', 'both'];
 function parseRecord(value: unknown): PulledRecord | null {
   if (typeof value !== 'object' || value === null) return null;
   const r = value as Record<string, unknown>;
-  const strings = ['key', 'tableId', 'from', 'item', 'path', 'version', 'baseKey'] as const;
+  const strings = ['key', 'tableId', 'from', 'item', 'version', 'baseKey'] as const;
   const text = (field: string): boolean => {
     const v = r[field];
     return typeof v === 'string' && v.length > 0 && v.length <= 1024;
   };
-  if (!strings.every(text)) return null;
+  // A path is empty once its file was deleted: the record stays for its base, but owns no file.
+  if (!strings.every(text) || typeof r.path !== 'string' || r.path.length > 1024) return null;
   if (r.kind !== 'note' && r.kind !== 'map') return null;
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(r.baseKey as string)) return null;
   return {
     key: r.key as string, tableId: r.tableId as string, from: r.from as string, item: r.item as string, kind: r.kind,
-    path: r.path as string, version: r.version as string, baseKey: r.baseKey as string,
+    path: r.path, version: r.version as string, baseKey: r.baseKey as string,
     pulledAt: typeof r.pulledAt === 'number' ? r.pulledAt : 0,
     ...(typeof r.sceneId === 'string' ? { sceneId: r.sceneId } : {}),
     ...(CHOICES.includes(r.choice as UpdateChoice) ? { choice: r.choice as UpdateChoice } : {}),
@@ -117,6 +118,12 @@ export class PulledItems {
     return this.records.find((record) => record.path === path) ?? null;
   }
 
+  /** Whether some record owns `path` (compared without case, as file systems do). */
+  holds(path: string): boolean {
+    const lower = path.toLowerCase();
+    return this.records.some((record) => record.path !== '' && record.path.toLowerCase() === lower);
+  }
+
   list(): readonly PulledRecord[] {
     return this.records;
   }
@@ -154,6 +161,17 @@ export class PulledItems {
       if (!pathWithin(record.path, from)) return record;
       changed = true;
       return { ...record, path: to + record.path.slice(from.length) };
+    });
+    if (changed) this.changed();
+  }
+
+  /** The files at or below `path` were deleted: their records keep their bases but own no file, so no later file is taken for theirs. */
+  deleted(path: string): void {
+    let changed = false;
+    this.records = this.records.map((record) => {
+      if (record.path === '' || !pathWithin(record.path, path)) return record;
+      changed = true;
+      return { ...record, path: '' };
     });
     if (changed) this.changed();
   }

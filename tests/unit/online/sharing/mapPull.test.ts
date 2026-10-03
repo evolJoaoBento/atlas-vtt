@@ -29,7 +29,13 @@ async function setup() {
   const { app, files } = createInMemoryApp({ files: { 'Private/secret.md': 'mine', 'atlas-vtt/assets/mine.png': 'png' } });
   const pulled = PulledItems.create(app.vault.adapter);
   await pulled.ready();
-  const exclusive = vi.fn(async <T>(task: () => Promise<T>): Promise<T> => task());
+  // Like the real lock: one task at a time.
+  let tail: Promise<unknown> = Promise.resolve();
+  const exclusive = vi.fn(<T>(task: () => Promise<T>): Promise<T> => {
+    const run = tail.then(task);
+    tail = run.catch(() => undefined);
+    return run;
+  });
   const assets = {
     runExclusive: exclusive,
     addAsset: vi.fn(async (asset: object) => ({ ...asset, id: 'scene-1' })),
@@ -145,5 +151,42 @@ describe('pulling a map', () => {
     expect(await pullMap(deps({}), { ...input(playerSafe), item: { ...input(playerSafe).item, version: 'W'.repeat(43) } }))
       .toMatchObject({ kind: 'updated' });
     expect(assets.addAsset).toHaveBeenCalledTimes(1);
+  });
+
+  it('never overwrites another map that took a deleted map’s path, and writes the deleted one anew', async () => {
+    const { files, pulled, deps } = await setup();
+    const other = { ...input(playerSafe), item: { ...input(playerSafe).item, item: 'x'.repeat(22) } };
+    await pullMap(deps({}), input(playerSafe));
+    files.delete(`${SCENES}/Inn.atlasmap`);
+    pulled.deleted(`${SCENES}/Inn.atlasmap`);
+    expect(await pullMap(deps({}), other)).toEqual({ kind: 'created', path: `${SCENES}/Inn.atlasmap` });
+    const second = files.get(`${SCENES}/Inn.atlasmap`);
+    expect(await pullMap(deps({}), { ...input(playerSafe), item: { ...input(playerSafe).item, version: 'W'.repeat(43) } }))
+      .toEqual({ kind: 'created', path: `${SCENES}/Inn (2).atlasmap` });
+    expect(files.get(`${SCENES}/Inn.atlasmap`)).toBe(second);
+  });
+
+  it('removes the map file again when its scene record cannot be added', async () => {
+    const { files, assets, deps } = await setup();
+    assets.addAsset.mockRejectedValueOnce(new Error('no'));
+    await expect(pullMap(deps({}), input(playerSafe))).rejects.toThrow('no');
+    expect(files.has(`${SCENES}/Inn.atlasmap`)).toBe(false);
+  });
+
+  it('skips an image that cannot be pulled and still brings the map', async () => {
+    const { files, images, deps } = await setup();
+    images.mockRejectedValue(new Error('gone'));
+    expect(await pullMap(deps({}), input(playerSafe))).toMatchObject({ kind: 'created' });
+    expect(JSON.parse(files.get(`${SCENES}/Inn.atlasmap`)!).state.background).toBeNull();
+  });
+
+  it('creates the collection once when two first pulls run together', async () => {
+    const { assets, deps } = await setup();
+    assets.createCollection.mockImplementation(async (name: string) => { await Promise.resolve(); return { id: name, name }; });
+    await Promise.all([
+      pullMap(deps({}), input(playerSafe)),
+      pullMap(deps({}), { ...input(playerSafe), item: { ...input(playerSafe).item, item: 'x'.repeat(22) } }),
+    ]);
+    expect(assets.createCollection).toHaveBeenCalledTimes(1);
   });
 });

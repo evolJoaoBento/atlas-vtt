@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../../packages/components/primitives/button';
 import type { PushRequest, SessionPerson } from '../../shareSessionStore';
 import { LabelledCheck } from '../../ui/LabelledCheck';
+import { pullAcceptedPush } from '../pushPrompts';
 import { shareErrorText } from '../shareErrors';
 import type { ItemState, ListedItem, SharedWithMe } from '../SharedWithMe';
 
@@ -16,6 +17,7 @@ interface ListProps {
   pushes: readonly PushRequest[];
   dismissPush: (push: PushRequest) => void;
   onPulled: (path: string) => void;
+  onProblem: (text: string) => void;
 }
 
 function ItemRow({ item, onPull, titles }: { item: ListedItem; onPull: (linked: string[]) => Promise<void>; titles: ReadonlyMap<string, string> }): React.ReactElement {
@@ -80,7 +82,7 @@ function PersonSection({ person, service, onPulled }: { person: SessionPerson; s
 }
 
 /** Push requests first, then everyone in the session with what they share. */
-export function SharedWithMeList({ service, people, pushes, dismissPush, onPulled }: ListProps): React.ReactElement {
+export function SharedWithMeList({ service, people, pushes, dismissPush, onPulled, onProblem }: ListProps): React.ReactElement {
   const nameOf = (personId: string): string => people.find((person) => person.personId === personId)?.name ?? 'Someone';
   return (
     <div className="atlas-shared">
@@ -93,7 +95,7 @@ export function SharedWithMeList({ service, people, pushes, dismissPush, onPulle
                 <span className="atlas-shared__title">{`${nameOf(push.from)} asks you to pull ${push.title}.`}</span>
                 <Button variant="default" size="sm" onClick={() => {
                   dismissPush(push);
-                  void service.pullPushed(push).then((outcome) => { if ('path' in outcome) onPulled(outcome.path); });
+                  pullAcceptedPush(service, push, { pulled: onPulled, failed: onProblem });
                 }}>Pull</Button>
                 <Button variant="outline" size="sm" onClick={() => dismissPush(push)}>Not now</Button>
               </li>

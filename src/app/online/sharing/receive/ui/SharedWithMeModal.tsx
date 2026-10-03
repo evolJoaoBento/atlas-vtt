@@ -10,10 +10,10 @@ import { SharedWithMeList } from './SharedWithMeList';
 export const SHARED_WITH_ME_LABEL = 'Shared with me';
 export const NO_SHARE_SESSION_TEXT = 'Join or host an online session to see what people share with you.';
 
-function Live({ service, onPulled }: { service: SharedWithMe; onPulled: (path: string) => void }): React.ReactElement {
+function Live({ service, onPulled, onProblem }: { service: SharedWithMe; onPulled: (path: string) => void; onProblem: (text: string) => void }): React.ReactElement {
   const people = useStore(shareSessionStore, (state) => state.people);
   const pushes = useStore(shareSessionStore, (state) => state.pushes);
-  return <SharedWithMeList service={service} people={people} pushes={pushes} dismissPush={(push) => dismissPush(push.from, push.item)} onPulled={onPulled} />;
+  return <SharedWithMeList service={service} people={people} pushes={pushes} dismissPush={(push) => dismissPush(push.from, push.item)} onPulled={onPulled} onProblem={onProblem} />;
 }
 
 class SharedWithMeModal extends Modal {
@@ -27,7 +27,7 @@ class SharedWithMeModal extends Modal {
   onOpen(): void {
     this.setTitle(SHARED_WITH_ME_LABEL);
     this.root = createRoot(this.contentEl);
-    this.root.render(<Live service={this.service} onPulled={(path) => new Notice(`Pulled into ${path}`)} />);
+    this.root.render(<Live service={this.service} onPulled={(path) => new Notice(`Pulled into ${path}`)} onProblem={(text) => new Notice(text)} />);
   }
 
   onClose(): void {

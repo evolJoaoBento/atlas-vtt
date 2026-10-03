@@ -60,10 +60,57 @@ describe('pulling a note', () => {
   });
 
   it('writes a new copy when the pulled note was deleted', async () => {
-    const { files, pull } = await setup();
+    const { files, pulled, pull } = await setup();
     await pull(item('Cave', V1), 'one');
     files.delete('Shared/Ana/Cave.md');
+    pulled.deleted('Shared/Ana/Cave.md');
     expect(await pull(item('Cave', V2), 'two')).toEqual({ kind: 'created', path: 'Shared/Ana/Cave.md' });
+  });
+
+  it('never gives a deleted note’s path to another item, and never takes the file there for its own', async () => {
+    const { files, pulled, pull } = await setup();
+    await pull(item('Cave', V1, 'a'.repeat(22)), 'a text');
+    files.delete('Shared/Ana/Cave.md');
+    pulled.deleted('Shared/Ana/Cave.md');
+    expect(pulled.get(TABLE_ID, 'ana', 'a'.repeat(22))?.path).toBe('');
+    expect(await pull(item('Cave', V1, 'b'.repeat(22)), 'b text')).toEqual({ kind: 'created', path: 'Shared/Ana/Cave.md' });
+    // A's next pull writes a fresh file; B's is untouched.
+    expect(await pull(item('Cave', V2, 'a'.repeat(22)), 'a again')).toEqual({ kind: 'created', path: 'Shared/Ana/Cave (2).md' });
+    expect(files.get('Shared/Ana/Cave.md')).toBe('b text');
+  });
+
+  it('counts the path of a record as taken even when its deletion was not seen', async () => {
+    const { files, pull } = await setup();
+    await pull(item('Cave', V1, 'a'.repeat(22)), 'a text');
+    files.delete('Shared/Ana/Cave.md');
+    expect(await pull(item('Cave', V1, 'b'.repeat(22)), 'b text')).toEqual({ kind: 'created', path: 'Shared/Ana/Cave (2).md' });
+  });
+
+  it('does not take a note the receiver made at an old path for the pulled one', async () => {
+    const { files, pulled, pull } = await setup();
+    await pull(item('Cave', V1), 'one');
+    files.delete('Shared/Ana/Cave.md');
+    pulled.deleted('Shared/Ana/Cave.md');
+    files.set('Shared/Ana/Cave.md', 'one');
+    expect(await pull(item('Cave', V2), 'two')).toEqual({ kind: 'created', path: 'Shared/Ana/Cave (2).md' });
+    expect(files.get('Shared/Ana/Cave.md')).toBe('one');
+  });
+
+  it('is not fooled by a title that differs only by case', async () => {
+    const { pull } = await setup();
+    await pull(item('Cave', V1, 'a'.repeat(22)), 'a');
+    expect(await pull(item('cave', V1, 'b'.repeat(22)), 'b')).toEqual({ kind: 'created', path: 'Shared/Ana/cave (2).md' });
+  });
+
+  it('Keep both after a move to the vault root writes beside the note, at the root', async () => {
+    const { files, pulled, pull } = await setup();
+    await pull(item('Cave', V1), 'one');
+    files.delete('Shared/Ana/Cave.md');
+    files.set('Cave.md', 'mine');
+    pulled.renamed('Shared/Ana/Cave.md', 'Cave.md');
+    expect(await pull(item('Cave', V2), 'theirs')).toEqual({ kind: 'both', path: 'Cave (from Ana).md' });
+    expect(files.get('Cave (from Ana).md')).toBe('theirs');
+    expect([...files.keys()].some((path) => path.startsWith('Cave.m/'))).toBe(false);
   });
 
   it('follows a renamed or moved pulled note', async () => {
