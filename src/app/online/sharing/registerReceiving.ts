@@ -2,6 +2,7 @@
 import { Notice, type App, type Plugin } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
 import { chooseAction, confirmAction } from '../../ui/confirmDialog';
+import { peopleListNames } from './model/forwardedParts';
 import { MergeHistory, undoLastMerge, type UndoOutcome } from './merge/MergeHistory';
 import { createUpdatePolicy } from './merge/noteUpdate';
 import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
@@ -26,10 +27,10 @@ const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => c
   choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const, style: 'warning' }],
 });
 
-/** One service per share session: a new session (a new node) gets a fresh one. */
 const sessionName = (personId: string): string | null =>
   shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
 
+/** One service per share session: a new session (a new node) gets a fresh one. */
 function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, people: PeopleBook): () => SharedWithMe | null {
   // Choices and the merge page run only inside a pull the receiver started.
   const policy = createUpdatePolicy({ pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request) });
@@ -44,7 +45,7 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, p
         service: new SharedWithMe({
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => sessionName(personId) ?? 'Someone',
-          nameAt: (personId) => people.get(session.tableId, personId)?.name ?? sessionName(personId),
+          nameAt: peopleListNames(people, session.tableId),
           assets: AssetService.getInstance(app), confirmMapUpdate,
         }),
       };
@@ -55,6 +56,7 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, p
 
 export function registerReceiving(plugin: Plugin, pulled: PulledItems, people: PeopleBook): void {
   void pulled.ready();
+  void people.ready();
   const history = new MergeHistory(plugin.app.vault.adapter);
   const sharedWithMe = sharedWithMeFor(plugin.app, pulled, history, people);
   const open = (app: App): void => openSharedWithMeModal(app, sharedWithMe());

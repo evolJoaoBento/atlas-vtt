@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES } from '../../../../src/app/online/sharing/model/forwardedParts';
+import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES, peopleListNames } from '../../../../src/app/online/sharing/model/forwardedParts';
 import { filterNoteFor } from '../../../../src/app/online/sharing/model/noteFilter';
 import type { SenderCatalogue } from '../../../../src/app/online/sharing/model/SenderCatalogue';
 import type { Recipient } from '../../../../src/app/online/sharing/model/audience';
@@ -99,6 +99,24 @@ describe('the receiver writes the marks with its own names', () => {
     expect(written).toContain(`P${MAX_FORWARD_NAMES - 1}]`);
     expect(written).not.toContain(`P${MAX_FORWARD_NAMES},`);
     expect(forwardedOpenTag(keys).split('@').length - 1).toBe(MAX_FORWARD_NAMES);
+  });
+});
+
+describe('the receiver’s names come from its own people list only', () => {
+  it('a person of the table by their people-list name; nobody else, and no session name', () => {
+    // Ana's list knows another table's Ben, so this table's Ben is "Ben (2)" there.
+    const anaBook = testPeople([testPerson('ben', 'Ben', OTHER), testPerson('ben', 'Ben (2)'), testPerson('gm', 'Morgan')]);
+    const names = peopleListNames(anaBook, T);
+    expect(names('ben')).toBe('Ben (2)');
+    expect(names('gm')).toBe('Morgan');
+    expect(names('cara')).toBeNull();
+    expect(asAnaWrites(`%%[!only|@${T}/gm, @${T}/ben, @${T}/cara]%%x%%[!end]%%`, { gm: names('gm')!, ben: names('ben')! })).toBe('%%[!only|Morgan, Ben (2)]%%x%%[!end]%%');
+  });
+
+  it('a name that reads back as someone else is dropped', () => {
+    // Older data: two people called Ben; the list reads "Ben" as the other table's.
+    const book = testPeople([testPerson('ben', 'Ben', OTHER), testPerson('ben', 'Ben')]);
+    expect(peopleListNames(book, T)('ben')).toBeNull();
   });
 });
 

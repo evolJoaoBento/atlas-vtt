@@ -35,8 +35,8 @@ export interface SharedWithMeDeps {
   /** The name of a person in this Atlas's people list (their folder's name). */
   nameOf: (personId: string) => string;
   /**
-   * The name this Atlas knows a person of this table by (its people list, else the session), null when it
-   * does not know them: what the tags of a pulled note name them as (`forwardedParts.ts`).
+   * The name this Atlas's people list has for a person of this table, null when it does not know them:
+   * what the tags of a pulled note name them as (`peopleListNames` in `forwardedParts.ts`).
    */
   nameAt: (personId: string) => string | null;
   assets: MapPullDeps['assets'];

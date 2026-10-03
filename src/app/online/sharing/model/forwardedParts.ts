@@ -7,6 +7,7 @@
  * Private parts are never sent at all.
  */
 import { isKeyId, isPersonId } from '../../protocol';
+import { keyOf, type Person } from '../people/peopleTypes';
 import { END_TAG, openTag, scanTags } from './privateTags';
 
 /** At most this many people in one forwarded tag; the receiver reads no more than that either. */
@@ -25,6 +26,20 @@ export function writableName(name: string): boolean {
 export function forwardedOpenTag(keys: readonly string[]): string {
   const unique = [...new Set(keys)].slice(0, MAX_FORWARD_NAMES);
   return unique.length > 0 ? openTag({ kind: 'only', names: unique.map((key) => `${KEY_PREFIX}${key}`) }) : PRIVATE_TAG;
+}
+
+/**
+ * The receiver's names for people of `tableId`: only its own people list, and only a name that reads back
+ * as that same person there, since a re-share resolves names through that list (never a session's name).
+ */
+export function peopleListNames(
+  people: { get(tableId: string, personId: string): Person | null; byName(name: string): Person | null }, tableId: string,
+): (personId: string) => string | null {
+  return (personId) => {
+    const person = people.get(tableId, personId);
+    const named = person ? people.byName(person.name) : null;
+    return person && named && keyOf(named) === keyOf(person) ? person.name : null;
+  };
 }
 
 /** The person id a forwarded name stands for, when it is a valid key at `tableId`. */

@@ -197,4 +197,18 @@ describe('sharing between three Atlases', () => {
     host.stop();
     gm.stop();
   });
+
+  it('an auto merge keeps the marks of a part meant for the receiver', async () => {
+    const { gm, host, gmVault, ana } = await table();
+    gmVault.files.set('Lore/Secret.md', 'Top\n%%[!only|Ana]%%\nFor Ana.\n%%[!end]%%\nmiddle\nbottom');
+    await pull(ana.service, 'gm', 'Secret');
+    const copy = 'Shared/Morgan/Secret.md';
+    ana.vault.files.set(copy, 'Top, by Ana\n%%[!only|Morgan]%%\nFor Ana.\n%%[!end]%%\nmiddle\nbottom');
+    gmVault.files.set('Lore/Secret.md', 'Top\n%%[!only|Ana]%%\nFor Ana.\n%%[!end]%%\nmiddle\nbottom, by the GM');
+    const { outcome } = await pull(ana.service, 'gm', 'Secret');
+    expect(outcome).toMatchObject({ kind: 'updated' });
+    expect(ana.vault.files.get(copy)).toBe('Top, by Ana\n%%[!only|Morgan]%%\nFor Ana.\n%%[!end]%%\nmiddle\nbottom, by the GM');
+    host.stop();
+    gm.stop();
+  });
 });
