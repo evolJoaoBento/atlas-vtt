@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { fullPayload, playerSafePayload, type PayloadContext, type SharedMapSource } from '../../../../src/app/online/sharing/model/buildMapPayload';
+import { fullPayload, playerSafePayload, readSharedMap, type PayloadContext, type SharedMapSource } from '../../../../src/app/online/sharing/model/buildMapPayload';
 import { IMAGE_REF_PREFIX, NOTE_REF_PREFIX, parseMapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
 import { migrateMapFile } from '../../../../src/app/services/MapPersistence';
 
@@ -24,7 +24,7 @@ const state = {
 
 function source(): SharedMapSource {
   const map = migrateMapFile(state);
-  return { map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetSettings: undefined, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: { dmNotePath: 'GM/Prep.md' } };
+  return { map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetSettings: undefined, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: { dmNotePath: 'GM/Prep.md' }, lit: false };
 }
 
 const context = (ticked: string[]): PayloadContext => ({
@@ -38,7 +38,7 @@ const context = (ticked: string[]): PayloadContext => ({
 
 describe('map payloads', () => {
   it('player-safe: what players see, pins that are not GM-only, notes only when ticked', () => {
-    const payload = playerSafePayload(source(), 'Inn', context(['Notes/Inn.md', 'Notes/Plot.md', 'Notes/Hero.md']));
+    const payload = playerSafePayload(source(), 'Inn', context(['Notes/Inn.md', 'Notes/Plot.md', 'Notes/Hero.md']))!;
     expect(Object.keys(payload.scene.tokens)).toEqual(['hero']);
     expect(payload.scene.map.asset).toBe('M'.repeat(43));
     expect(payload.pins.map((pin) => pin.x)).toEqual([10]);
@@ -49,7 +49,17 @@ describe('map payloads', () => {
   });
 
   it('player-safe: a pin whose note is not ticked is left out (N-4)', () => {
-    expect(playerSafePayload(source(), 'Inn', context([])).pins).toEqual([]);
+    expect(playerSafePayload(source(), 'Inn', context([]))?.pins).toEqual([]);
+  });
+
+  it('refuses a player-safe payload of a map saved with dynamic lighting on, whatever this device’s toggle', async () => {
+    const lit = await readSharedMap(async () => JSON.stringify({ version: 1, state: { ...state, lighting: { enabled: true, ambient: 0 } } }), 'm.atlasmap');
+    expect(lit?.lit).toBe(true);
+    expect(playerSafePayload(lit!, 'Inn', context([]))).toBeNull();
+    expect(fullPayload(lit!, 'Inn', context([])).mode).toBe('full');
+    const unlit = await readSharedMap(async () => JSON.stringify({ version: 1, state: { ...state, lighting: { enabled: false, ambient: 0 } } }), 'm.atlasmap');
+    expect(unlit?.lit).toBe(false);
+    expect(playerSafePayload(unlit!, 'Inn', context([]))?.mode).toBe('player-safe');
   });
 
   it('full: everything, with images and ticked notes as references and every other path cleared', () => {

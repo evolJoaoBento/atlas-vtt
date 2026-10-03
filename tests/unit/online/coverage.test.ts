@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
-  OBJECT_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type CoverageTable, type KeysOfUnion,
+  OBJECT_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, TOKEN_SETTINGS_COVERAGE, type CoverageTable, type KeysOfUnion,
 } from '../../../src/app/online/coverage';
 import { projectForPlayers, type ProjectedState } from '../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo, projectDrawings, projectFog, projectTexts } from '../../../src/app/online/scene/projectRecords';
@@ -241,5 +241,18 @@ describe('coverage of the initiative', () => {
       order: set({ order: 2 }), sitsOut: set({ sitsOut: true }),
     };
     expectCoverage(INITIATIVE_ENTRY_COVERAGE, variants, ENTRY, (entry) => project(withInitiative({ ...base, entries: [entry, second] })));
+  });
+});
+
+describe('coverage of the token display settings', () => {
+  it('sends nothing of them yet', () => {
+    type Settings = ViewAtlasState['tokenSettings'];
+    const base: Settings = { showNameplates: true, hiddenResources: [], showInstanceBadges: true, tokenRingSize: 1 };
+    const set = (patch: Partial<Settings>) => (settings: Settings): Settings => ({ ...settings, ...patch });
+    const variants: Variants<keyof Settings, Settings> = {
+      showNameplates: set({ showNameplates: false }), hiddenResources: set({ hiddenResources: ['hp'] }),
+      showInstanceBadges: set({ showInstanceBadges: false }), tokenRingSize: set({ tokenRingSize: 2 }),
+    };
+    expectCoverage(TOKEN_SETTINGS_COVERAGE, variants, base, (tokenSettings) => project({ ...sceneState(), tokenSettings } as ProjectedState));
   });
 });

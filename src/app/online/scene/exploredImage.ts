@@ -30,7 +30,7 @@ export async function decodeExploredMask(dataUrl: string): Promise<ExploredImage
 /**
  * The decoded memory of the scene's current mask. A new mask is decoded once; until it is, the
  * last one decoded stands in (the memory mostly grows, so it shows no more than a moment ago),
- * except after the memory was cleared, which takes effect at once. A mask that cannot be
+ * except after the memory was cleared or the scene reloaded (`reset`). A mask that cannot be
  * decoded counts as no memory: players see less, never more.
  */
 export class ExploredImages {
@@ -52,6 +52,12 @@ export class ExploredImages {
       () => this.settle(mask, null),
     );
     return this.image;
+  }
+
+  /** Forgets the masks: the next one has no stand-in while it decodes. */
+  reset(): void {
+    this.mask = null;
+    this.image = null;
   }
 
   dispose(): void {

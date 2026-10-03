@@ -18,13 +18,19 @@ import { createProjectionMemo, type ProjectionMemo } from './projectRecords';
 import { diffScenes } from './sceneDiff';
 import { patchMessage, snapshotMessages, type SceneOutgoing } from './sceneMessages';
 import {
-  FOG_TRUNCATED_NOTICE, FogCoverageCache, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, sameSlice, sceneContext, sliceOf,
+  FOG_TRUNCATED_NOTICE, FogCoverageCache, type FogCoverages, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, sameSlice, sceneContext, sliceOf,
   type LiveScene, type SceneBroadcasterOptions,
 } from './sceneSources';
 import type { PlayerScene } from './sceneTypes';
 
 export type { PlayerViewSettingsSource, PresentedSceneSource, SceneBroadcasterOptions, SceneSession } from './sceneSources';
 export { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE } from './sceneSources';
+
+interface Prepared {
+  state: ViewAtlasState;
+  lighting: LightingFrame | null;
+  fog: FogCoverages;
+}
 
 export class SceneBroadcaster implements SessionHandler {
   private readonly stops: Array<() => void> = [];
@@ -141,6 +147,8 @@ export class SceneBroadcaster implements SessionHandler {
     }
     if (live.loading) {
       live.loading = false;
+      // The store may hold the scene reloaded in place: nothing of the lighting worked out before stands in.
+      this.lighting?.restart();
       this.broadcastSnapshot(live);
       return;
     }
@@ -204,12 +212,13 @@ export class SceneBroadcaster implements SessionHandler {
     const live = this.live;
     if (!live || live.loading) return;
     const previous = this.lastSent;
+    const prepared = this.prepare(live);
     // Players who got a clear instead of an oversized scene need a snapshot, not a patch.
-    if (!previous || previous.sceneId !== live.sceneId || this.snapshotFailed(previous) || this.fogTruncated(live)) {
-      this.broadcastSnapshot(live);
+    if (!previous || previous.sceneId !== live.sceneId || this.snapshotFailed(previous) || prepared.fog.truncated) {
+      this.broadcastSnapshot(live, prepared);
       return;
     }
-    const next = this.project(live);
+    const next = this.project(live, prepared);
     const patch = diffScenes(previous, next);
     if (!patch) return;
     this.setSent(next);
@@ -220,28 +229,26 @@ export class SceneBroadcaster implements SessionHandler {
     }
   }
 
-  private broadcastSnapshot(live: LiveScene): void {
+  /**
+   * A truncated fog (`prepared.fog.truncated`): the GM's fog has more operations than players can be sent, so
+   * what they would see is not what is covered. Like an oversized scene, they get a clear until it fits again.
+   */
+  private broadcastSnapshot(live: LiveScene, prepared: Prepared = this.prepare(live)): void {
     this.cancelTick();
-    if (this.fogTruncated(live)) {
+    if (prepared.fog.truncated) {
       this.clearForTruncatedFog(live);
       return;
     }
-    this.setSent(this.project(live));
+    this.setSent(this.project(live, prepared));
     for (const playerId of this.channels.admitted()) this.sendSnapshot(playerId);
   }
 
-  /**
-   * The GM's fog has more operations than players can be sent, so what they would see is not
-   * what is covered: like an oversized scene, they get a clear until the fog fits again.
-   */
-  private fogTruncated(live: LiveScene): boolean {
+  /** The store, what the view's lighting hides now (null while unlit) and the coverage, worked out once per projection. */
+  private prepare(live: LiveScene): Prepared {
     const state = live.scene.store.getState();
-    return this.fogCache.get(state.objects?.fog ?? {}, this.memo, this.lightingOf(live, state)?.darkness).truncated;
-  }
-
-  /** What the view's lighting hides from players now; null while the scene is unlit. */
-  private lightingOf(live: LiveScene, state: ViewAtlasState): LightingFrame | null {
-    return this.lighting?.frame(state, live.scene.mapSize()) ?? null;
+    const lighting = this.lighting?.frame(state, live.scene.mapSize()) ?? null;
+    // Rebuilt only when the fog operations or the darkness change.
+    return { state, lighting, fog: this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness) };
   }
 
   private clearForTruncatedFog(live: LiveScene): void {
@@ -256,17 +263,13 @@ export class SceneBroadcaster implements SessionHandler {
     if (hadScene) this.clearPlayers();
   }
 
-  private project(live: LiveScene): PlayerScene {
-    const state = live.scene.store.getState();
+  private project(live: LiveScene, { state, lighting, fog }: Prepared): PlayerScene {
     live.slice = sliceOf(state);
-    const lighting = this.lightingOf(live, state);
-    // Rebuilt only when the fog operations or the darkness change.
-    const { coverage, darkCoverage } = this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness);
     return projectForPlayers(state, {
       sceneId: live.sceneId,
       rules: this.rules,
-      coverage,
-      darkCoverage,
+      coverage: fog.coverage,
+      darkCoverage: fog.darkCoverage,
       lighting,
       assets: this.options.assets,
       ...sceneContext(live.scene, this.options),

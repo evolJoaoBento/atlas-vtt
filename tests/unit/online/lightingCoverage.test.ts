@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   LIGHTING_STATE_COVERAGE, OBJECT_COVERAGE, SCENE_LIGHTING_COVERAGE, TOKEN_FIELD_COVERAGE, type Coverage, type CoverageTable,
 } from '../../../src/app/online/coverage';
+import { sameSlice, sliceOf } from '../../../src/app/online/scene/sceneSources';
 import type { PlayerScene } from '../../../src/app/online/scene/sceneTypes';
+import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import { GENERIC_SENSES } from '../../../src/app/gameSystems/senses/generic';
 import { seeing } from '../../../src/app/gameSystems/senses/senseHelpers';
 import type { SenseDefinition } from '../../../src/app/types/senseTypes';
@@ -101,4 +103,13 @@ describe('coverage of dynamic lighting', () => {
     });
   });
 
+
+  it('projects again when a store field marked lighting changes, and only then', () => {
+    const base = night() as unknown as ViewAtlasState;
+    const changed = (patch: Partial<ViewAtlasState>): boolean => !sameSlice(sliceOf(base), sliceOf({ ...base, ...patch }));
+    expect(changed({ lighting: { ...base.lighting, ambient: 1 } })).toBe(true);
+    expect(changed({ exploredMask: 'data:image/png;base64,BB' })).toBe(true);
+    expect(changed({ heldTokens: { hero: { x: 1, y: 1 } } })).toBe(true);
+    expect(changed({ exploredEdits: 3 })).toBe(false);
+  });
 });

@@ -105,7 +105,7 @@ export function project(state: Scene, lighting: LightingFrame | null): PlayerSce
   const memo = createProjectionMemo();
   const fog = projectFog(state.objects.fog, memo);
   return projectForPlayers(state, {
-    sceneId: 'scene-1', rules: RULES, coverage: FogCoverage.fromPlayerFog(fog), darkCoverage: FogCoverage.fromPlayerFog(fog, lighting?.darkness.covered ?? []),
+    sceneId: 'scene-1', rules: RULES, coverage: FogCoverage.fromPlayerFog(fog), darkCoverage: FogCoverage.fromPlayerFog(fog).covering(lighting?.darkness.covered ?? []),
     lighting, assets, mapSize: MAP, memo,
   });
 }

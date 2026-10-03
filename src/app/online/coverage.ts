@@ -184,16 +184,32 @@ export const MEASUREMENT_FIELD_COVERAGE: CoverageTable<keyof CollectionGridDefau
   coneAngle: notYet("the game system's cone angle (Atlas 0.5); players' cones open 90 degrees"),
 };
 
+/** The store fields the view's lighting reads besides `objects`. */
+export type LightingStoreField = Extract<keyof ViewAtlasState, 'lighting' | 'exploredMask' | 'exploredEdits' | 'heldTokens'>;
+
 /**
- * The store fields the view's lighting reads besides `objects`; `sliceOf` watches them with
- * the projected ones, so a change projects again.
+ * The store fields the view's lighting reads besides `objects`. `sliceOf` watches every one marked
+ * `lighting` (`LIGHTING_SLICE_FIELDS`), so the table and what projects again cannot drift apart; a
+ * new store field the lighting reads must be added here by hand (the store's saved state is untyped).
  */
-export const LIGHTING_STATE_COVERAGE: CoverageTable<'lighting' | 'exploredMask' | 'exploredEdits' | 'heldTokens'> = {
+export const LIGHTING_STATE_COVERAGE: CoverageTable<LightingStoreField> = {
   lighting: LIGHTING,
   // Players see the explored memory (undimmed) where the window shows it, as part of the darkness's outline.
   exploredMask: LIGHTING,
   exploredEdits: gmOnly('counts the edits of the explored memory by hand, for undo; the saved mask they lead to decides'),
   heldTokens: LIGHTING,
+};
+
+/** The fields of `LIGHTING_STATE_COVERAGE` that decide what players see. */
+export const LIGHTING_SLICE_FIELDS: readonly LightingStoreField[] = (Object.keys(LIGHTING_STATE_COVERAGE) as LightingStoreField[])
+  .filter((field) => LIGHTING_STATE_COVERAGE[field].status === 'lighting');
+
+/** A map's token display settings (`tokenSettings`), saved with the map; the projection reads none of them yet. */
+export const TOKEN_SETTINGS_COVERAGE: CoverageTable<keyof ViewAtlasState['tokenSettings']> = {
+  showNameplates: gmOnly('players see nameplates by the Show nameplates player view setting, as in the player window'),
+  hiddenResources: TOKEN_RESOURCES,
+  showInstanceBadges: notYet('instance badges, with the Show instance badges setting (a later piece)'),
+  tokenRingSize: notYet('the token ring size of the scene (a later piece); players draw rings at the default size'),
 };
 
 /** A scene's lighting options (`SceneLighting`). */

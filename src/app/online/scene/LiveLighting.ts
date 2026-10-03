@@ -15,8 +15,10 @@ import type { MapSize } from './sceneTypes';
 /**
  * The darkness is worked out anew at most this often. Each new darkness makes both clients
  * repaint their fog, so a drag with live sight would otherwise repaint it twenty times a
- * second. A darkness that lags shows the map a moment longer where the party saw it a moment
- * ago. Tokens never wait for it: they follow the window's perception at every tick, and only texts
+ * second. Every change to it waits, also one that hides more (a light put out, a door closed,
+ * the explored memory cleared or switched off): only a view whose sight stops or starts being the
+ * scene's darkens or lights at once. A darkness that lags shows, for up to this long plus a tick,
+ * map art the window showed that long ago, never another scene's. Tokens never wait for it: they follow the window's perception at every tick, and only texts
  * and drawings are checked against the darkness (`ProjectionContext.darkCoverage`).
  */
 export const DARKNESS_INTERVAL_MS = 200;
@@ -31,6 +33,14 @@ export interface LightingFrame {
 export function darknessFor(lighting: PlayerLighting, explored: ExploredImage | null, map: MapSize): Darkness {
   if (!(map.width > 0) || !(map.height > 0)) return NO_DARKNESS;
   return darknessOf(darknessRaster(lighting, explored, map));
+}
+
+/** Every token left out and the whole map dark: what players get while the view's lighting cannot be read. */
+export function closedFrame(map: MapSize): LightingFrame {
+  const darkness = map.width > 0 && map.height > 0
+    ? darknessOf({ cols: 1, rows: 1, cellSize: Math.max(map.width, map.height), map, dark: Uint8Array.of(1) })
+    : NO_DARKNESS;
+  return { seen: () => false, darkness };
 }
 
 /** Before the window's sight belongs to the scene nothing is seen: every token is left out and the map is dark. */
@@ -52,32 +62,49 @@ interface Built {
  */
 export class LiveLighting {
   private readonly explored: ExploredImages;
-  private readonly stopWatching: () => void;
+  /** Null until the view could be watched: it may have no renderer yet. */
+  private stopWatching: (() => void) | null = null;
   private built: Built | null = null;
   private timer: number | null = null;
 
   constructor(private readonly scene: PresentedSceneInfo, private readonly onDue: () => void, decode?: ExploredDecoder) {
     this.explored = new ExploredImages(onDue, decode);
-    this.stopWatching = scene.watchLighting?.(onDue) ?? ((): void => {});
+    this.watch();
   }
 
-  /** Null while the presented scene is unlit, or dynamic lighting is off: the projection is then as without lighting. */
-  frame(state: Pick<ViewAtlasState, 'exploredMask'>, map: MapSize, now = Date.now()): LightingFrame | null {
+  /**
+   * Null while the view shows the scene unlit, or dynamic lighting is off: the projection is then as
+   * without lighting. Where the view cannot tell (no renderer, no lighting state) and the scene is
+   * saved lit, nothing is seen (`closedFrame`).
+   */
+  frame(state: Pick<ViewAtlasState, 'exploredMask' | 'lighting'>, map: MapSize, now = Date.now()): LightingFrame | null {
+    this.watch();
     const lighting = this.scene.lighting?.();
     if (!lighting) {
       this.built = null;
-      return null;
+      return lighting === undefined && state.lighting?.enabled ? closedFrame(map) : null;
     }
     const explored = lighting.showsExplored ? this.explored.of(state.exploredMask) : null;
     const inputs = [lighting.ready, lighting.sight, lighting.ambient, lighting.reaches, lighting.spots, explored, map.width, map.height];
     return lightingFrame(lighting, this.darkness(inputs, now, () => darknessFor(lighting, explored, map)));
   }
 
+  /** The store holds the scene anew (reloaded in place): what was worked out or decoded for it before stands in no more. */
+  restart(): void {
+    this.built = null;
+    this.explored.reset();
+  }
+
   dispose(): void {
-    this.stopWatching();
+    this.stopWatching?.();
+    this.stopWatching = null;
     this.explored.dispose();
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
+  }
+
+  private watch(): void {
+    this.stopWatching ??= this.scene.watchLighting?.(this.onDue) ?? null;
   }
 
   /** The darkness of `inputs`; while the last one is younger than the interval, it stays and the new one is due later. */

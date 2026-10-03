@@ -52,4 +52,16 @@ describe('Share with form', () => {
     fireEvent.click(screen.getByLabelText('Full'));
     expect(screen.getByLabelText('Plot')).toBeTruthy();
   });
+
+  it('offers only Full for a lit map, and says why', () => {
+    const save = vi.fn();
+    render(<ShareWithForm rows={rows} initial={{ everyone: true, people: [], except: [] }}
+      map={{ mode: 'player-safe', notes: [], ticked: [], playerSafeRefused: 'Lit maps go Full.' }}
+      preview={null} warnings={[]} onSave={save} onCancel={() => {}} />);
+    expect((screen.getByLabelText('Player-safe') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Full') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('Lit maps go Full.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ mode: 'full' }));
+  });
 });

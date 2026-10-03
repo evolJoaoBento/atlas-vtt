@@ -797,8 +797,14 @@ export class PixiRendererOrchestrator { // Renamed class
   getGridSystem(): GridSystem | null { return this.gridSystem || null; }
   getBackgroundSprite(): Sprite | null { return this.backgroundSprite; }
   getLaserHub(): LaserHub { return this.laserHub; }
-  /** What the players' window decides what they see by, for online players; undefined while the scene is unlit or lighting is off. */
-  getPlayerLighting(): PlayerLighting | undefined { return this.lighting?.playerLighting(); }
+  /**
+   * What the players' window decides what they see by, for online players. Null while it hides nothing by
+   * lighting (the scene unlit, dynamic lighting off); undefined before the view's renderers exist.
+   */
+  getPlayerLighting(): PlayerLighting | null | undefined {
+    if (!this.lightingFeature) return undefined;
+    return this.lighting?.playerLighting() ?? null;
+  }
 
   /** Calls `listener` whenever what `getPlayerLighting` describes may have changed outside the store; returns the unsubscribe. */
   watchPlayerLighting(listener: () => void): () => void {

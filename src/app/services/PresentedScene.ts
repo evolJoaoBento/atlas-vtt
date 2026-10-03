@@ -23,7 +23,8 @@ export interface PresentedView {
     getBackgroundSprite(): BackgroundSprite | null;
     getViewportInstance?(): CameraViewport | null;
     getLaserHub?(): LaserHub;
-    getPlayerLighting?(): PlayerLighting | undefined;
+    /** Null: the view hides nothing by lighting (dynamic lighting off, the scene unlit); undefined: it cannot tell yet. */
+    getPlayerLighting?(): PlayerLighting | null | undefined;
     watchPlayerLighting?(listener: () => void): () => void;
   } | null;
 }
@@ -41,10 +42,13 @@ export interface PresentedSceneInfo {
   watchCamera(listener: () => void): () => void;
   /** The view's lasers: the GM's own as drawn, and where online players' are shown; null without a renderer. */
   laser(): LaserHub | null;
-  /** What the players' window decides what they see by in a lit scene; undefined while unlit, with lighting off or without a renderer. */
-  lighting?(): PlayerLighting | undefined;
-  /** Calls `listener` when what `lighting` describes may have changed outside the store; returns the unsubscribe. */
-  watchLighting?(listener: () => void): () => void;
+  /**
+   * What the players' window decides what they see by in a lit scene. Null while it hides nothing by
+   * lighting (dynamic lighting off, the scene unlit); undefined when the view cannot tell (no renderer).
+   */
+  lighting?(): PlayerLighting | null | undefined;
+  /** Calls `listener` when what `lighting` describes may have changed outside the store; the unsubscribe, or null without a renderer to watch. */
+  watchLighting?(listener: () => void): (() => void) | null;
 }
 
 export interface PresentedSceneListener {
@@ -133,7 +137,7 @@ export class PresentedScene {
       watchCamera: (listener) => watchViewCamera(view, listener),
       laser: () => view.renderer?.getLaserHub?.() ?? null,
       lighting: () => view.renderer?.getPlayerLighting?.(),
-      watchLighting: (listener) => view.renderer?.watchPlayerLighting?.(listener) ?? ((): void => {}),
+      watchLighting: (listener) => view.renderer?.watchPlayerLighting?.(listener) ?? null,
     };
     this.scene = scene;
     this.held = view.tabMetaStore.getState().activeTabId !== tabId;

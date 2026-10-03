@@ -14,7 +14,7 @@ import { character, exploredImage, light, MAP, playerLightingOf, scene, wall, ty
 import { fakeAssetIds, insideByNonzero } from './sceneFixtures';
 
 /** The presented view's lighting, as a test sets it: `lighting` is what `getPlayerLighting` answers. */
-function lightingSource(initial: PlayerLighting | undefined): { current: PlayerLighting | undefined; changed(): void; info: Pick<PresentedSceneInfo, 'lighting' | 'watchLighting'> } {
+function lightingSource(initial: PlayerLighting | null | undefined): { current: PlayerLighting | null | undefined; changed(): void; info: Pick<PresentedSceneInfo, 'lighting' | 'watchLighting'> } {
   const listeners = new Set<() => void>();
   const source = {
     current: initial,
@@ -32,28 +32,30 @@ const walled = (heroX = 140): Scene => scene({ ambient: 1 }, {
   walls: { w: wall('w', { x: 503, y: -10 }, { x: 503, y: 810 }) },
 });
 
+const LIT = scene({}).lighting;
+
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('live lighting of a presentation', () => {
   it('is nothing while the scene is unlit or dynamic lighting is off', () => {
-    const source = lightingSource(undefined);
+    const source = lightingSource(null);
     const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
-    expect(live.frame({ exploredMask: null }, MAP)).toBeNull();
+    expect(live.frame({ exploredMask: null, lighting: scene({}).lighting }, MAP)).toBeNull();
   });
 
   it('follows tokens at once and works the darkness out at most every interval, calling back when it is due', () => {
     const source = lightingSource(playerLightingOf(walled(), MAP));
     const due = vi.fn();
     const live = new LiveLighting(source.info as PresentedSceneInfo, due);
-    const first = live.frame({ exploredMask: null }, MAP, 0)!;
+    const first = live.frame({ exploredMask: null, lighting: LIT }, MAP, 0)!;
     source.current = playerLightingOf(walled(600), MAP);
-    const soon = live.frame({ exploredMask: null }, MAP, 50)!;
+    const soon = live.frame({ exploredMask: null, lighting: LIT }, MAP, 50)!;
     expect(soon.darkness).toBe(first.darkness);
     expect(soon.seen('goblin')).toBe(true);
     vi.advanceTimersByTime(DARKNESS_INTERVAL_MS - 50);
     expect(due).toHaveBeenCalledTimes(1);
-    expect(live.frame({ exploredMask: null }, MAP, DARKNESS_INTERVAL_MS)!.darkness).not.toBe(first.darkness);
+    expect(live.frame({ exploredMask: null, lighting: LIT }, MAP, DARKNESS_INTERVAL_MS)!.darkness).not.toBe(first.darkness);
     live.dispose();
   });
 
@@ -61,9 +63,9 @@ describe('live lighting of a presentation', () => {
     const lighting = playerLightingOf(walled(), MAP)!;
     const source = lightingSource(lighting);
     const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
-    live.frame({ exploredMask: null }, MAP, 0);
+    live.frame({ exploredMask: null, lighting: LIT }, MAP, 0);
     source.current = { ...lighting, ready: false };
-    const frame = live.frame({ exploredMask: null }, MAP, 10)!;
+    const frame = live.frame({ exploredMask: null, lighting: LIT }, MAP, 10)!;
     expect(frame.seen('hero')).toBe(false);
     expect(frame.darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
   });
@@ -78,13 +80,56 @@ describe('live lighting of a presentation', () => {
       const op = frame?.darkness.fog[DARKNESS_FOG_ID];
       return op?.type === 'lasso' ? op.points : [];
     };
-    expect(insideByNonzero(ring(live.frame({ exploredMask: 'data:image/png;base64,AA' }, MAP, 0)), { x: 900, y: 400 })).toBe(true);
+    expect(insideByNonzero(ring(live.frame({ exploredMask: 'data:image/png;base64,AA', lighting: LIT }, MAP, 0)), { x: 900, y: 400 })).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(due).toHaveBeenCalled();
-    expect(insideByNonzero(ring(live.frame({ exploredMask: 'data:image/png;base64,AA' }, MAP, DARKNESS_INTERVAL_MS)), { x: 900, y: 400 })).toBe(false);
+    expect(insideByNonzero(ring(live.frame({ exploredMask: 'data:image/png;base64,AA', lighting: LIT }, MAP, DARKNESS_INTERVAL_MS)), { x: 900, y: 400 })).toBe(false);
     expect(decode).toHaveBeenCalledTimes(1);
     // Forgetting the memory takes effect at once.
-    expect(insideByNonzero(ring(live.frame({ exploredMask: null }, MAP, 2 * DARKNESS_INTERVAL_MS)), { x: 900, y: 400 })).toBe(true);
+    expect(insideByNonzero(ring(live.frame({ exploredMask: null, lighting: LIT }, MAP, 2 * DARKNESS_INTERVAL_MS)), { x: 900, y: 400 })).toBe(true);
+  });
+
+  it('fails closed when the view cannot tell: a lit scene with no renderer or lighting state shows nothing', () => {
+    const source = lightingSource(undefined);
+    const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
+    const closed = live.frame({ exploredMask: null, lighting: LIT }, MAP)!;
+    expect(closed.seen('hero')).toBe(false);
+    expect(closed.darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    expect(live.frame({ exploredMask: null, lighting: { ...LIT, enabled: false } }, MAP)).toBeNull();
+  });
+
+  it('watches the view once it can be watched, though it had no renderer at first', () => {
+    const source = lightingSource(playerLightingOf(walled(), MAP));
+    let watchable = false;
+    const info = { lighting: source.info.lighting, watchLighting: (listener: () => void) => (watchable ? source.info.watchLighting!(listener) : null) };
+    const due = vi.fn();
+    const live = new LiveLighting(info as PresentedSceneInfo, due);
+    source.changed();
+    expect(due).not.toHaveBeenCalled();
+    watchable = true;
+    live.frame({ exploredMask: null, lighting: LIT }, MAP, 0);
+    source.changed();
+    expect(due).toHaveBeenCalledTimes(1);
+    live.dispose();
+  });
+
+  it('lets no memory decoded before stand in once the scene reloads in place', async () => {
+    const night = scene({ ambient: 0 }, { tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) } });
+    const memories: Record<string, ExploredImage> = { 'data:a': exploredImage(MAP, (x) => x > 700), 'data:b': exploredImage(MAP, () => false) };
+    let finish: (() => void) | null = null;
+    const decode = vi.fn((mask: string) => new Promise<ExploredImage>((resolve) => { finish = () => resolve(memories[mask]!); }));
+    const live = new LiveLighting(lightingSource(playerLightingOf(night, MAP)).info as PresentedSceneInfo, () => {}, decode);
+    const darkAt = (mask: string, now: number): boolean => {
+      const op = live.frame({ exploredMask: mask, lighting: LIT }, MAP, now)?.darkness.fog[DARKNESS_FOG_ID];
+      return insideByNonzero(op?.type === 'lasso' ? op.points : [], { x: 900, y: 400 });
+    };
+    darkAt('data:a', 0);
+    finish!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(darkAt('data:a', DARKNESS_INTERVAL_MS)).toBe(false);
+    // Reloaded in place with another mask: until it decodes, the old one does not stand in.
+    live.restart();
+    expect(darkAt('data:b', 2 * DARKNESS_INTERVAL_MS)).toBe(true);
   });
 
   it('calls back when the view says what players see changed, until disposed', () => {
@@ -145,7 +190,7 @@ describe('the broadcaster with dynamic lighting', () => {
     await vi.advanceTimersByTimeAsync(DARKNESS_INTERVAL_MS);
     // Nothing is dark without the wall: the darkness goes. Dynamic lighting off then changes nothing more.
     expect(players().fog).toEqual({});
-    lighting.current = undefined;
+    lighting.current = null;
     lighting.changed();
     await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
     expect(sent.map((message) => message.type)).toEqual(['scene-snapshot', 'scene-fog', 'scene-patch', 'scene-patch']);
@@ -164,6 +209,24 @@ describe('the broadcaster with dynamic lighting', () => {
       await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
       expect(broadcaster.currentProjection()?.tokens.hero?.x).toBe(x);
     }
+    broadcaster.stop();
+  });
+
+  it('sends no token and full darkness for a lit scene whose view has no renderer', () => {
+    const state = walled();
+    const store = createStore(() => ({ ...state, isMapLoading: false, mapLoaded: true, mapPath: 'maps/cave.atlasmap' }));
+    const tabs = createTabMetaStore();
+    const tab = tabs.getState().addTab('maps/cave.atlasmap', 'Cave');
+    tabs.getState().setActiveTab(tab);
+    const view = { tabMetaStore: tabs, atlasStore: store, register: () => {}, renderer: null } as unknown as PresentedView;
+    const presented = new PresentedScene();
+    const broadcaster = new SceneBroadcaster({
+      session: { use: () => () => {}, send: () => {}, getPlayers: () => [] }, presented, assets: { ...fakeAssetIds(), onChange: () => () => {} }, notify: () => {},
+      settings: { getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true }), onChange: () => () => {} },
+    });
+    broadcaster.start();
+    presented.present(view, tab);
+    expect(broadcaster.currentProjection()?.tokens).toEqual({});
     broadcaster.stop();
   });
 

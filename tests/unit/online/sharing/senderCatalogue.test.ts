@@ -16,7 +16,7 @@ const people = {
 const ana = { tableId: T, personId: 'ana' };
 const ben = { tableId: T, personId: 'ben' };
 
-function setup(): { catalogue: SenderCatalogue; items: { idFor(path: string): string; pathOf(item: string): string | null; ready(): Promise<void> }; notes: Record<string, string> } {
+function setup(options: { lit?: boolean; mode?: 'player-safe' | 'full' } = {}): { catalogue: SenderCatalogue; items: { idFor(path: string): string; pathOf(item: string): string | null; ready(): Promise<void> }; notes: Record<string, string> } {
   const notes: Record<string, string> = {
     'Notes/Cave.md': '---\natlas-share: [Ana]\n---\nThe cave. [[Lair]] and [[Inn]].\n> [!private]\n> Dragon.',
     'Notes/Lair.md': 'No property: private by default.',
@@ -33,8 +33,8 @@ function setup(): { catalogue: SenderCatalogue; items: { idFor(path: string): st
     notes: () => [{ path: 'Notes/Cave.md', title: 'Cave', rule: parseShareRule(['Ana']) }],
     note: (path) => (notes[path] !== undefined ? { path, title: path.slice(6, -3), rule: parseShareRule(undefined) } : null),
     read: async (path) => notes[path] ?? '',
-    maps: async () => [{ name: 'Inn', mapPath: 'm.atlasmap', share: { item: 'm'.repeat(22), everyone: false, people: [`${T}/ben`], except: [], mode: 'player-safe', notes: ['Notes/Inn.md'] } }],
-    readMap: async () => ({ map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {} }),
+    maps: async () => [{ name: 'Inn', mapPath: 'm.atlasmap', share: { item: 'm'.repeat(22), everyone: false, people: [`${T}/ben`], except: [], mode: options.mode ?? 'player-safe', notes: ['Notes/Inn.md'] } }],
+    readMap: async () => ({ map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {}, lit: options.lit ?? false }),
     images: memoryImageFiles({ 'maps/inn.png': 'png-bytes' }).source,
     isFile: (path) => path in notes || path === 'maps/inn.png',
     resolveLink: (linkpath) => (`Notes/${linkpath}.md` in notes ? `Notes/${linkpath}.md` : null),
@@ -90,5 +90,17 @@ describe('SenderCatalogue', () => {
     expect(text(image!.bytes)).toBe('png-bytes');
     expect(await catalogue.open(ana, `${map.item}/${payload.images[0]}`)).toBeNull();
     expect(await catalogue.open(ben, `${map.item}/${'X'.repeat(43)}`)).toBeNull();
+  });
+
+  it('refuses a lit map shared player-safe: not listed, not opened, no image; a full share still goes', async () => {
+    const before = setup();
+    const map = (await before.catalogue.list(ben)).find((item) => item.kind === 'map')!;
+    const payload = JSON.parse(text((await before.catalogue.open(ben, map.item))!.bytes));
+    const { catalogue } = setup({ lit: true });
+    expect((await catalogue.list(ben)).map((item) => item.kind)).toEqual(['note']);
+    expect(await catalogue.open(ben, map.item)).toBeNull();
+    expect(await catalogue.open(ben, `${map.item}/${payload.images[0]}`)).toBeNull();
+    const full = setup({ lit: true, mode: 'full' });
+    expect((await full.catalogue.list(ben)).find((item) => item.kind === 'map')).toMatchObject({ mode: 'full' });
   });
 });

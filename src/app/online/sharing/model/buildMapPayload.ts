@@ -3,6 +3,7 @@
  * first (and the background's size read), so the payload never goes out without its art.
  */
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
+import { readSceneLighting } from '../../../lighting/sceneLightingOptions';
 import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
 import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
@@ -20,7 +21,15 @@ export interface SharedMapSource {
   map: MapFile;
   state: ProjectedState;
   extra: Record<string, unknown>;
+  /** The saved scene has dynamic lighting on, whether or not this device has the feature switched on. */
+  lit: boolean;
 }
+
+/**
+ * Why a lit map is never shared player-safe: what its players see is decided by sight and light,
+ * which a share does not work out yet, so it would hold tokens and pins no player token sees.
+ */
+export const LIT_MAP_NOT_PLAYER_SAFE = 'This map has dynamic lighting on, so it cannot be shared player-safe yet: the share would hold tokens and pins that no player token sees. Share it Full (as a co-GM sees it), or switch its lighting off first.';
 
 export interface MapImages {
   /** Vault path → fingerprint, for the background and token images that could be hashed. */
@@ -57,7 +66,7 @@ export async function readSharedMap(read: (path: string) => Promise<string>, map
       initiative: stored.initiative ?? null, initiativeTrackerOpen: stored.initiativeTrackerOpen === true,
     } as unknown as ProjectedState;
     const extra = Object.fromEntries(FULL_FIELDS.flatMap((key) => (stored[key] === undefined ? [] : [[key, stored[key]]])));
-    return { map, state, extra };
+    return { map, state, extra, lit: readSceneLighting(stored.lighting).enabled === true };
   } catch {
     return null;
   }
@@ -91,7 +100,9 @@ export async function hashMapImages(
   return { fingerprints, size };
 }
 
-export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload {
+/** Null for a lit map (`LIT_MAP_NOT_PLAYER_SAFE`): a player-safe share of it is refused. */
+export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload | null {
+  if (source.lit) return null;
   const memo = createProjectionMemo();
   const coverage = FogCoverage.fromPlayerFog(projectFog(source.map.objects.fog, memo));
   const scene = projectForPlayers(source.state, {

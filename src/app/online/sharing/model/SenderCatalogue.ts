@@ -79,7 +79,10 @@ export class SenderCatalogue {
     }
     for (const map of access.maps) {
       if (items.length >= MAX_CATALOGUE_ITEMS) break;
-      const { version, bytes } = await this.mapPayload(map);
+      const built = await this.mapPayload(map);
+      // A share the sender refuses (a lit map shared player-safe) is not offered.
+      if (!built) continue;
+      const { version, bytes } = built;
       items.push({
         item: map.entry.share.item, kind: 'map', title: map.entry.name, version, size: bytes.byteLength,
         mode: map.entry.share.mode, linked: map.linked.map((path) => this.items.idFor(path)),
@@ -94,7 +97,7 @@ export class SenderCatalogue {
     const slash = ref.indexOf('/');
     if (slash >= 0) return this.image(access, ref.slice(0, slash), ref.slice(slash + 1));
     const map = access.maps.find((candidate) => candidate.entry.share.item === ref);
-    if (map) return (await this.mapPayload(map)).payload;
+    if (map) return (await this.mapPayload(map))?.payload ?? null;
     const path = this.items.pathOf(ref);
     return path && access.notes.has(path) ? this.notePayload(path, recipient, access) : null;
   }
@@ -119,7 +122,9 @@ export class SenderCatalogue {
     return { kind: 'note', bytes, version: await this.hash(bytes) };
   }
 
-  private async mapPayload(map: MapAccess): Promise<{ payload: SharePayload; images: MapImages; version: string; bytes: ArrayBuffer }> {
+  /** Null when the share is refused: a lit map shared player-safe. */
+  private async mapPayload(map: MapAccess): Promise<{ payload: SharePayload; images: MapImages; version: string; bytes: ArrayBuffer } | null> {
+    if (map.entry.share.mode !== 'full' && map.source.lit) return null;
     const images = await hashMapImages(map.source.map, this.sources.images, this.hash, this.dimensions);
     const linked = new Set(map.linked);
     const context = {
@@ -131,6 +136,7 @@ export class SenderCatalogue {
     const built = map.entry.share.mode === 'full'
       ? fullPayload(map.source, map.entry.name, context)
       : playerSafePayload(map.source, map.entry.name, context);
+    if (!built) return null;
     const bytes = utf8(JSON.stringify(built));
     const version = await this.hash(bytes);
     return { payload: { kind: 'map', bytes, version }, images, version, bytes };
@@ -139,7 +145,9 @@ export class SenderCatalogue {
   private async image(access: Access, mapItem: string, fingerprint: string): Promise<SharePayload | null> {
     const map = access.maps.find((candidate) => candidate.entry.share.item === mapItem);
     if (!map) return null;
-    const { payload, images } = await this.mapPayload(map);
+    const built = await this.mapPayload(map);
+    if (!built) return null;
+    const { payload, images } = built;
     const sent: { images: string[] } = JSON.parse(new TextDecoder().decode(payload.bytes)) as { images: string[] };
     if (!sent.images.includes(fingerprint)) return null;
     const path = [...images.fingerprints].find(([, id]) => id === fingerprint)?.[0];

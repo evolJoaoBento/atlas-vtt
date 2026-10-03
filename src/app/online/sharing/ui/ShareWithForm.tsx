@@ -22,7 +22,13 @@ interface ShareWithFormProps {
   rows: readonly ShareRow[];
   initial: { everyone: boolean; people: string[]; except: string[] };
   /** For maps: the mode, every linked note (`hidden`: offered only for full shares) and the ticked ones. */
-  map: { mode: MapShareMode; notes: ReadonlyArray<{ path: string; label: string; private: boolean; hidden?: boolean }>; ticked: string[] } | null;
+  map: {
+    mode: MapShareMode;
+    notes: ReadonlyArray<{ path: string; label: string; private: boolean; hidden?: boolean }>;
+    ticked: string[];
+    /** Why the map cannot be shared player-safe (a lit map); only Full is offered then. */
+    playerSafeRefused?: string;
+  } | null;
   /** The note as one person gets it; null for maps. */
   preview: ((key: string) => Promise<string>) | null;
   warnings: readonly string[];
@@ -37,7 +43,8 @@ export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, o
   const [everyone, setEveryone] = useState(initial.everyone);
   const [people, setPeople] = useState(initial.people);
   const [except, setExcept] = useState(initial.except);
-  const [mode, setMode] = useState<MapShareMode>(map?.mode ?? 'player-safe');
+  const refused = map?.playerSafeRefused;
+  const [mode, setMode] = useState<MapShareMode>(refused ? 'full' : map?.mode ?? 'player-safe');
   const [notes, setNotes] = useState(map?.ticked ?? []);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const known = rows.filter((row) => row.known);
@@ -66,9 +73,11 @@ export function ShareWithForm({ rows, initial, map, preview, warnings, onSave, o
         <section className="atlas-share__section" aria-label="Map">
           <div className="atlas-share__modes" role="radiogroup" aria-label="What to share">
             {(['player-safe', 'full'] as const).map((value) => (
-              <LabelledCheck key={value} radio="atlas-share-mode" label={MODE_LABELS[value]} checked={mode === value} onChange={() => setMode(value)} />
+              <LabelledCheck key={value} radio="atlas-share-mode" label={MODE_LABELS[value]} checked={mode === value}
+                disabled={value === 'player-safe' && Boolean(refused)} onChange={() => setMode(value)} />
             ))}
           </div>
+          {refused && <p className="atlas-share__warning" role="note">{refused}</p>}
           {offered.length > 0 && <h3 className="atlas-share__heading">Linked notes</h3>}
           <ul className="atlas-share__people">
             {offered.map((note) => (

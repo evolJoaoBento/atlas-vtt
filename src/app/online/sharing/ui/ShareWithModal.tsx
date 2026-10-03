@@ -12,7 +12,7 @@ import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { randomId } from '../../ids';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf } from '../people/peopleTypes';
-import { readSharedMap } from '../model/buildMapPayload';
+import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMap } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
 import { unknownNamesIn, unreadablePrivateTextIn } from '../model/noteFilter';
@@ -126,16 +126,20 @@ class ShareWithModal extends Modal {
       <ShareWithForm
         rows={known}
         initial={{ everyone: share?.everyone ?? false, people: share?.people ?? [], except: share?.except ?? [] }}
-        map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [] }}
+        map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [], ...(source.lit && { playerSafeRefused: LIT_MAP_NOT_PLAYER_SAFE }) }}
         preview={null}
         warnings={[]}
         onCancel={() => this.close()}
-        onSave={(result) => { void this.saveMap(scene, share, result); }}
+        onSave={(result) => { void this.saveMap(scene, share, result, source.lit); }}
       />,
     );
   }
 
-  private async saveMap(scene: SceneAsset, previous: MapShare | null, result: ShareFormResult): Promise<void> {
+  private async saveMap(scene: SceneAsset, previous: MapShare | null, result: ShareFormResult, lit: boolean): Promise<void> {
+    if (lit && result.mode === 'player-safe') {
+      new Notice(LIT_MAP_NOT_PLAYER_SAFE);
+      return;
+    }
     if (result.mode === 'full' && previous?.mode !== 'full' && !(await confirmAction(FULL_CONFIRM))) return;
     const nobody = !result.everyone && result.people.length === 0;
     const next: MapShare | null = nobody ? null : {

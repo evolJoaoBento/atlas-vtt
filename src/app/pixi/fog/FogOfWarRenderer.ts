@@ -38,6 +38,18 @@ interface FogSpriteEntry {
   sprite: PIXI.Sprite;
   texture: PIXI.Texture;
   opCanvas: FogOperationCanvas;
+  /** The paint operation and the later erases its canvas was drawn from: while they stay the same records, it stays. */
+  paintOp: FogOperation;
+  erases: FogOperation[];
+}
+
+/** The erase operations that cut into `paintOp`, as `FogOperationCanvas` applies them. */
+function erasesAfter(paintOp: FogOperation, eraseOps: readonly FogOperation[]): FogOperation[] {
+  return eraseOps.filter((erase) => erase.timestamp > paintOp.timestamp);
+}
+
+function sameRecords(a: readonly FogOperation[], b: readonly FogOperation[]): boolean {
+  return a.length === b.length && a.every((op, i) => op === b[i]);
 }
 
 
@@ -483,6 +495,9 @@ export class FogOfWarRenderer {
         if (bounds.width <= 0 || bounds.height <= 0) continue;
 
         const existing = this.fogSprites.get(paintOp.id);
+        const erases = erasesAfter(paintOp, eraseOps);
+        // An operation whose canvas would come out the same is kept: another one changed (a lit scene's darkness).
+        if (existing?.paintOp === paintOp && sameRecords(existing.erases, erases)) continue;
         if (existing) {
           existing.opCanvas.destroy();
           if (!existing.texture.destroyed) existing.texture.destroy(true);
@@ -497,6 +512,8 @@ export class FogOfWarRenderer {
           existing.sprite.height = wb.height;
           existing.texture = texture;
           existing.opCanvas = opCanvas;
+          existing.paintOp = paintOp;
+          existing.erases = erases;
         } else {
           this.createFogSprite(paintOp, eraseOps);
         }
@@ -543,7 +560,7 @@ export class FogOfWarRenderer {
     sprite.eventMode = 'none';
 
     this.container.addChild(sprite);
-    this.fogSprites.set(paintOp.id, { sprite, texture, opCanvas });
+    this.fogSprites.set(paintOp.id, { sprite, texture, opCanvas, paintOp, erases: erasesAfter(paintOp, eraseOps) });
   }
 
   private clearAllFogSprites(): void {

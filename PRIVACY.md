@@ -39,7 +39,7 @@ Nothing is shared until you share it, and only with the people you pick. What le
 - Text that cannot be read fails closed: a private part or an `atlas-share` entry Atlas cannot read is kept back rather than sent, and a name after `except` that is not in your people list hides that part from everyone.
 - Properties are removed except those listed under **Shared note properties**, and the `atlas-share` property itself is never sent. Links to notes the person does not get become plain text.
 - File paths never leave your Atlas. Shared items get random ids, and a map's paths are cleared or replaced by references.
-- A player-safe map holds what online players see. Pins under fog of war, GM-only pins and pins whose note you did not tick are left out. A full map holds the whole map as a co-GM would see it, including hidden tokens, GM-only pins, walls and lights, so Atlas asks you to confirm it.
+- A player-safe map holds what online players see. A map saved with dynamic lighting on is never shared player-safe, since a share does not work out what its players' tokens see yet; share it Full or switch its lighting off. Pins under fog of war, GM-only pins and pins whose note you did not tick are left out. A full map holds the whole map as a co-GM would see it, including hidden tokens, GM-only pins, walls and lights, so Atlas asks you to confirm it.
 - Sharing settings are not part of collection bundles: exporting a collection leaves them out and importing one drops them.
 
 Items go only to someone who pulls them, during a session, over the same encrypted connection as the game.
