@@ -5,6 +5,7 @@ import type { SettingsService } from '../../services/SettingsService';
 import { followVaultChange, type VaultChange } from './model/mapShareRenames';
 import { obsidianCatalogueSources } from './model/catalogueSources';
 import { SenderCatalogue } from './model/SenderCatalogue';
+import { sectionTrustFor } from './model/sectionTrust';
 import type { ShareItems } from './model/ShareItems';
 import type { PeopleBook } from './people/PeopleBook';
 import { GM_PERSON_ID } from './people/peopleTypes';
@@ -29,7 +30,7 @@ export function registerShareCommands(plugin: Plugin, { people, items, settings 
     callback: () => openPeopleModal(plugin.app, settings.getOnlineSettings().table?.id ?? null),
   });
   void items.ready();
-  const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings), items, people);
+  const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings, sectionTrustFor(plugin)), items, people);
   const selfAt = (tableId: string): string | undefined => {
     if (settings.getOnlineSettings().table?.id === tableId) return GM_PERSON_ID;
     const session = shareSessionStore.getState().session;

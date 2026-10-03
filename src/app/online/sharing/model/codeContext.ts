@@ -21,11 +21,20 @@ import { lenientQuote } from './quoteLines';
 export type BlockContext = readonly TextBlock[] | null | 'inline-only';
 
 const REFERENCE_DEFINITION = /^\[[^\]]*\]:/;
-const FENCE_OR_HTML = /^(?:`{3,}|~{3,}|<[A-Za-z!?/])/;
+const FENCE_HTML_OR_MATH = /^(?:`{3,}|~{3,}|<[A-Za-z!?/]|\$\$)/;
+const LIST_ITEM_START = /^[ \t]*(?:[-*+]|\d{1,9}[.)])(?=[ \t]|$)/;
+const QUOTE_MARKERS = /^(?:[ \t]*>)*[ \t]?/;
 
 /** `text` with every backslash escape (`\` before ASCII punctuation) masked, so the escaped character never counts. */
 function withoutEscapes(text: string): string {
   return text.replace(/\\[!-/:-@[-`{-~]/g, 'xx');
+}
+
+/** Whether the character at `at` is escaped: an odd run of backslashes right before it. */
+function escapedAt(text: string, at: number): boolean {
+  let backslashes = 0;
+  for (let index = at - 1; index >= 0 && text[index] === '\\'; index--) backslashes++;
+  return backslashes % 2 === 1;
 }
 
 const MARKER = /^(?:>|[-*+](?=[ \t]|$)|\d{1,9}[.)](?=[ \t]|$))/;
@@ -44,12 +53,26 @@ function deepPrefix(line: string): boolean {
   }
 }
 
-/** Whether the backtick runs of `text` leave a code span open at its end. */
+/**
+ * Whether the backtick runs of `text` leave a code span open at its end. Outside a span a backslash escapes
+ * the next character (so `` \` `` opens nothing); inside one it is literal, and only a run of the opener's
+ * length closes it.
+ */
 function codeSpanOpen(text: string): boolean {
   let open = 0;
-  for (const run of text.match(/`+/g) ?? []) {
-    if (open === 0) open = run.length;
-    else if (run.length === open) open = 0;
+  for (let index = 0; index < text.length;) {
+    if (open === 0 && text[index] === '\\') {
+      index += 2;
+      continue;
+    }
+    if (text[index] !== '`') {
+      index++;
+      continue;
+    }
+    let length = 0;
+    while (text[index] === '`') { length++; index++; }
+    if (open === 0) open = length;
+    else if (length === open) open = 0;
   }
   return open !== 0;
 }
@@ -79,9 +102,12 @@ function linkDestinationOpen(onLine: string): boolean {
 
 const count = (text: string, pattern: RegExp): number => (text.match(pattern) ?? []).length;
 
-/** Inline code, math, links or HTML before the token, in its paragraph or on its line, that may be open there. */
+/**
+ * Inline math, links or HTML before the token, in its paragraph or on its line, that may be open there.
+ * Called on the text as written and with escapes masked: open in either reading counts.
+ */
 function inlineOpen(paragraph: string, onLine: string, line: string): boolean {
-  if (codeSpanOpen(paragraph) || count(onLine, /`/g) % 2 === 1) return true;
+  if (count(onLine, /`/g) % 2 === 1) return true;
   if (count(paragraph, /<(?:pre|code)\b/gi) > count(paragraph, /<\/(?:pre|code)\s*>/gi)) return true;
   if (count(paragraph, /\$\$/g) % 2 === 1 || count(paragraph.replace(/\$\$/g, ''), /\$/g) % 2 === 1) return true;
   if (depthOpen(onLine, (index) => onLine[index] === '<' && /\S/.test(onLine[index + 1] ?? ' '), '>')) return true;
@@ -91,14 +117,17 @@ function inlineOpen(paragraph: string, onLine: string, line: string): boolean {
 
 /** A test for "possibly shown as text" at the start of each of `ranges` (the tag tokens of `text`). */
 export function codeOrLinkTest(text: string, ranges: readonly TextRange[], blocks: BlockContext): (range: TextRange) => boolean {
-  // Other tokens' own brackets and backticks must not count: mask them with a plain letter.
-  let masked = text;
-  for (const range of ranges) masked = masked.slice(0, range.start) + 'x'.repeat(range.end - range.start) + masked.slice(range.end);
-  masked = withoutEscapes(masked);
-  const lines = masked.split('\n');
+  // Other tokens' own brackets and backticks must not count: mask them with a plain letter. The masked text
+  // keeps every offset, so it is read both as written and with escapes masked.
+  let tokensMasked = text;
+  for (const range of ranges) tokensMasked = tokensMasked.slice(0, range.start) + 'x'.repeat(range.end - range.start) + tokensMasked.slice(range.end);
+  const unescaped = withoutEscapes(tokensMasked);
+  const lines = tokensMasked.split('\n');
   const starts: number[] = [];
   lines.reduce((at, line) => { starts.push(at); return at + line.length + 1; }, 0);
   return (range) => {
+    // `\%%[!end]%%` is an escaped `%`: Obsidian shows the token as text.
+    if (escapedAt(text, range.start)) return true;
     let index = starts.findIndex((start, at) => range.start >= start && range.start <= start + (lines[at]?.length ?? 0));
     if (index < 0) index = lines.length - 1;
     let first = 0;
@@ -107,13 +136,22 @@ export function codeOrLinkTest(text: string, ranges: readonly TextRange[], block
       if (!block) return true;
       if (block.container) {
         if (deepPrefix(lines[index] ?? '')) return true;
-        for (let at = block.startLine; at <= index; at++) if (FENCE_OR_HTML.test(lenientQuote(lines[at] ?? '').content)) return true;
+        for (let at = block.startLine; at <= index; at++) if (FENCE_HTML_OR_MATH.test(lenientQuote(lines[at] ?? '').content)) return true;
       }
       first = block.startLine;
     }
-    for (let at = index - 1; at >= first; at--) if ((lines[at] ?? '').replace(/^(?:[ \t]*>)*/, '').trim() === '') { first = at + 1; break; }
-    const paragraph = masked.slice(starts[first] ?? 0, range.start);
-    const onLine = masked.slice(starts[index] ?? 0, range.start);
-    return inlineOpen(paragraph, onLine, lines[index] ?? '');
+    // The token's paragraph: back to a blank line, or to the start of its list item or quote line run, since no
+    // inline span crosses those.
+    const quoteDepth = (line: string): number => (/^(?:[ \t]*>)*/.exec(line)?.[0] ?? '').split('>').length - 1;
+    for (let at = index; at >= first; at--) {
+      const line = lines[at] ?? '';
+      if (at < index && line.replace(/^(?:[ \t]*>)*/, '').trim() === '') { first = at + 1; break; }
+      if (at < index && quoteDepth(line) !== quoteDepth(lines[at + 1] ?? '')) { first = at + 1; break; }
+      if (LIST_ITEM_START.test(line.replace(QUOTE_MARKERS, ''))) { first = at; break; }
+    }
+    const from = starts[first] ?? 0;
+    const lineStart = starts[index] ?? 0;
+    if (codeSpanOpen(tokensMasked.slice(from, range.start))) return true;
+    return [tokensMasked, unescaped].some((reading) => inlineOpen(reading.slice(from, range.start), reading.slice(lineStart, range.start), reading.slice(lineStart, lineStart + (lines[index]?.length ?? 0))));
   };
 }

@@ -9,10 +9,11 @@ import { pickPlayerViewRules } from '../../scene/playerViewRules';
 import { readSharedMap } from './buildMapPayload';
 import type { NoteSource } from './catalogueAccess';
 import { mapShareOf } from './mapShare';
+import { trustedSections, type SectionTrust } from './sectionTrust';
 import type { CatalogueSources } from './SenderCatalogue';
 import { parseShareRule, SHARE_PROPERTY } from './shareRule';
 
-export function obsidianCatalogueSources(app: App, settings: SettingsService): CatalogueSources {
+export function obsidianCatalogueSources(app: App, settings: SettingsService, trust: SectionTrust): CatalogueSources {
   const noteOf = (file: TFile): NoteSource => ({
     path: file.path, title: file.basename, rule: parseShareRule(app.metadataCache.getFileCache(file)?.frontmatter?.[SHARE_PROPERTY]),
   });
@@ -27,9 +28,9 @@ export function obsidianCatalogueSources(app: App, settings: SettingsService): C
     readNote: async (path) => {
       const file = app.vault.getAbstractFileByPath(path);
       if (!(file instanceof TFile)) return { text: await app.vault.adapter.read(path), sections: null };
-      // The sections are taken right after the read, and the filter checks they fit this exact text.
+      // Sections only when parsed from this very text (`SectionTrust`); the filter checks their positions too.
       const text = await app.vault.cachedRead(file);
-      return { text, sections: app.metadataCache.getFileCache(file)?.sections ?? null };
+      return { text, sections: trustedSections(app, trust, file, text) };
     },
     maps: async () => (await AssetService.getInstance(app).getAssets(undefined, 'scene')).flatMap((scene) => {
       const share = mapShareOf(scene);

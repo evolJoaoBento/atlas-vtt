@@ -321,6 +321,41 @@ describe('block context from Obsidian’s sections (T-R4)', () => {
   });
 });
 
+describe('inline leaks of fix round 5', () => {
+  // FIXTURES: `sectionsOf` spells out the sections Obsidian gives for each note (manual test list).
+  const P = '%%[!private]%%';
+  const E = '%%[!end]%%';
+  const lines = (...rows: string[]): string => rows.join('\n');
+  const filterWith = (personId: string, source: string, sections: ReturnType<typeof sectionsOf>, marks = false): string => filterNoteFor(source, {
+    recipient: { tableId: T, personId }, people, shareable: [], links: () => null, sections,
+    marks: marks ? { openTag: () => '%%[!only|@x]%%' } : null,
+  });
+  const repros: Array<[string, string, Array<[string, number, number]>]> = [
+    ['an escaped % before a tag', lines(P, 'x \\' + E + ' LEAK \\' + P, E), [['paragraph', 0, 2]]],
+    ['a backslash inside a code span', lines(P, '`a\\`` ' + E + ' ` LEAK `a\\`` ' + P + ' `', E), [['paragraph', 0, 2]]],
+    ['backticks across list items', lines(P, '- a ``b', '- `` ' + E + ' ``', '- LEAK', '- `` ' + P + ' ``', E), [['paragraph', 0, 0], ['list', 1, 4], ['paragraph', 5, 5]]],
+    ['$ across list items', lines(P, '- $5', '- $x ' + E + '$', '- LEAK', '- $y ' + P + '$', E), [['paragraph', 0, 0], ['list', 1, 4], ['paragraph', 5, 5]]],
+    ['$$ math in a list item across a blank line', lines(P, '', '- item', '  $$', '', '  ' + E, '', '  LEAK', '', '  ' + P, '  $$', '', E),
+      [['paragraph', 0, 0], ['list', 2, 10], ['paragraph', 12, 12]]],
+  ];
+
+  it('each repro leaks nothing to anyone, marked or not, and warns', () => {
+    for (const [label, source, blocks] of repros) {
+      const sections = sectionsOf(source, blocks);
+      for (const personId of everyone) {
+        expect(filterWith(personId, source, sections), label).not.toContain('LEAK');
+        expect(filterWith(personId, source, sections, true), `${label}, marked`).not.toContain('LEAK');
+      }
+      expect(partProblemsInNote(source, sections).tagInCodeOrLink, label).toBe(true);
+    }
+  });
+
+  it('an escaped backslash before a tag leaves the tag a tag', () => {
+    const source = lines('a \\\\' + P + 'secret' + E + ' b');
+    expect(filterWith('ana', source, sectionsOf(source, [['paragraph', 0, 0]]))).toBe('a \\\\ b');
+  });
+});
+
 describe('private part tags', () => {
   it('inline: a private part never goes, the rest of the line stays', () => {
     expect(forPerson('ana', 'The door %%[!private]%%is trapped %%[!end]%%opens.')).toBe('The door opens.');
