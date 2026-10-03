@@ -12,3 +12,9 @@ const TEXT: Record<ShareError['reason'], string> = {
 export function shareErrorText(error: unknown): string {
   return error instanceof ShareError ? TEXT[error.reason] : 'Could not pull that item.';
 }
+
+/** What a failed pull tells the receiver; the error itself goes to the console, where its cause can be read. */
+export function pullFailedText(error: unknown): string {
+  console.error('[Atlas sharing] Pull failed:', error);
+  return shareErrorText(error);
+}

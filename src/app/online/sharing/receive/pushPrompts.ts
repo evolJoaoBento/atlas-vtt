@@ -5,7 +5,7 @@
  */
 import { dismissPush, type PushRequest, type ShareSessionState } from '../shareSessionStore';
 import type { PullOutcome } from './notePull';
-import { shareErrorText } from './shareErrors';
+import { pullFailedText } from './shareErrors';
 import type { SharedWithMe } from './SharedWithMe';
 
 export interface PushPromptDeps {
@@ -22,7 +22,7 @@ export function pullAcceptedPush(
 ): void {
   void service?.pullPushed(push).then(
     (outcome: PullOutcome) => { if ('path' in outcome) report.pulled(outcome.path); },
-    (error: unknown) => report.failed(shareErrorText(error)),
+    (error: unknown) => report.failed(pullFailedText(error)),
   );
 }
 

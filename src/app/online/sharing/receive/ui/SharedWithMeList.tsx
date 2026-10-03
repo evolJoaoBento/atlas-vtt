@@ -3,7 +3,7 @@ import { Button } from '../../../../packages/components/primitives/button';
 import type { PushRequest, SessionPerson } from '../../shareSessionStore';
 import { LabelledCheck } from '../../ui/LabelledCheck';
 import { pullAcceptedPush } from '../pushPrompts';
-import { shareErrorText } from '../shareErrors';
+import { pullFailedText, shareErrorText } from '../shareErrors';
 import type { ItemState, ListedItem, SharedWithMe } from '../SharedWithMe';
 
 export const NOTHING_SHARED_TEXT = 'Nothing is shared with you yet.';
@@ -27,7 +27,7 @@ function ItemRow({ item, onPull, titles }: { item: ListedItem; onPull: (linked: 
   const pull = (): void => {
     setBusy(true);
     setProblem(null);
-    onPull(linked).catch((error: unknown) => setProblem(shareErrorText(error))).finally(() => setBusy(false));
+    onPull(linked).catch((error: unknown) => setProblem(pullFailedText(error))).finally(() => setBusy(false));
   };
   const toggle = (id: string): void => setLinked(linked.includes(id) ? linked.filter((other) => other !== id) : [...linked, id]);
   return (

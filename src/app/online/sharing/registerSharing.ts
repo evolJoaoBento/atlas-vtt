@@ -23,7 +23,7 @@ export interface SharingServices {
 export function registerSharing(plugin: Plugin, services: SharingServices): void {
   const { joins, people, items, pulled, settings, sessions } = services;
   const catalogue = registerShareCommands(plugin, { people, items, settings });
-  registerAskToPull(plugin, items);
+  registerAskToPull(plugin, items, people);
   registerReceiving(plugin, pulled);
   registerSessionHooks(plugin, { joins, people, sessions, catalogue });
 }

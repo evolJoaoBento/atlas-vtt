@@ -8,7 +8,7 @@ import type { App } from 'obsidian';
 import { parseMapPayload } from '../model/mapPayload';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PushRequest } from '../shareSessionStore';
-import type { ShareNode } from '../transport/ShareNode';
+import { ShareError, type ShareNode } from '../transport/ShareNode';
 import { pullMap, type MapPullDeps } from './mapPull';
 import { pullNote, type NoteUpdatePolicy, type PullOutcome } from './notePull';
 import type { PulledItems, PulledRecord } from './PulledItems';
@@ -65,7 +65,7 @@ export class SharedWithMe {
     const pulled = await node.pull(personId, item.item, item.kind, item.version);
     if (item.kind === 'note') return this.writeNote(personId, personName, item, decode(pulled.bytes));
     const payload = parseMapPayload(JSON.parse(decode(pulled.bytes)) as unknown);
-    if (!payload) throw new Error('The map arrived in a shape Atlas does not know.');
+    if (!payload) throw new ShareError('failed');
     const notes = new Map<string, string>();
     const catalogue = this.lists.get(personId) ?? [];
     for (const noteItem of linked.filter((id) => payload.notes.includes(id))) {
@@ -85,7 +85,8 @@ export class SharedWithMe {
   /** A push the receiver chose to pull: looks the item up in that person's list, then pulls it. */
   async pullPushed(push: PushRequest): Promise<PullOutcome> {
     const listed = (await this.refresh(push.from)).items.find((item) => item.item === push.item);
-    if (!listed) throw new Error('That item is not shared with you any more.');
+    // The sender's list decides: a push for an item it does not list for this receiver is one they may not have.
+    if (!listed) throw new ShareError('not-shared');
     return this.pull(push.from, listed);
   }
 

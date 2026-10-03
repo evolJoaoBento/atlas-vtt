@@ -30,6 +30,28 @@ describe('Shared with me list push requests', () => {
     expect(props.onPulled).not.toHaveBeenCalled();
   });
 
+  it('a pull that fails for a reason sharing does not know says so, and logs the error', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const cause = new TypeError('vault.create is not a function');
+    const props = renderList(async () => { throw cause; });
+    fireEvent.click(screen.getByRole('button', { name: 'Pull' }));
+    await waitFor(() => expect(props.onProblem).toHaveBeenCalledWith('Could not pull that item.'));
+    expect(logged).toHaveBeenCalledWith('[Atlas sharing] Pull failed:', cause);
+    logged.mockRestore();
+  });
+
+  it('a listed item whose pull fails logs the error beside the row', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const cause = new Error('disk full');
+    const item = { item: 'n'.repeat(22), kind: 'note' as const, title: 'Cave', version: 'v'.repeat(43), size: 1, state: 'new' as const };
+    const service = { refresh: vi.fn(async () => ({ personId: 'ana', items: [item] })), pull: vi.fn(async () => { throw cause; }), pullPushed: vi.fn() };
+    render(<SharedWithMeList service={service as never} people={[{ personId: 'ana', name: 'Ana' }]} pushes={[]} dismissPush={vi.fn()} onPulled={vi.fn()} onProblem={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Pull' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Could not pull that item.');
+    expect(logged).toHaveBeenCalledWith('[Atlas sharing] Pull failed:', cause);
+    logged.mockRestore();
+  });
+
   it('Not now only dismisses', () => {
     const pullPushed = vi.fn(async () => ({ kind: 'created' as const, path: 'x' }));
     const props = renderList(pullPushed);
