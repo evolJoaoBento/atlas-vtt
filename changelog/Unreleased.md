@@ -35,4 +35,5 @@
 
 ## Important changes
 
-- Callouts no longer mark private parts: `> [!private]`, `> [!only|…]` and `> [!except|…]` are not a sharing syntax any more. A note that still has them keeps them back from everyone, and **Share with…** says so; mark those parts again with **Share part** on the selection.
+- Callouts no longer mark private parts: `> [!private]`, `> [!only|…]` and `> [!except|…]` are not a sharing syntax any more. A note that still has them keeps everything from the first one to its end back from everyone, and **Share with…** says so; mark those parts again with **Share part** on the selection.
+- A note with a `%%[!end]%%` that closes no part is not shared until you fix it: **Share with…** names the line, and nobody can list or pull it.

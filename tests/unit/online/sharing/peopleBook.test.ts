@@ -14,6 +14,21 @@ function book(app = createInMemoryApp().app, now = (): number => 1000): PeopleBo
 }
 
 describe('PeopleBook', () => {
+  it('never gives the names of a removed person to someone else, also after a reload (M6)', async () => {
+    const { app } = createInMemoryApp();
+    const people = book(app);
+    await people.ready();
+    const ben = people.admit(T, 'Ben', D1);
+    people.rename(personKey(T, ben.personId), 'Benny');
+    people.remove(personKey(T, ben.personId));
+    expect(people.admit(T, 'Ben', D2).name).toBe('Ben (2)');
+    expect(people.seen(U, 'p1', 'Benny').name).toBe('Benny (2)');
+    await vi.waitFor(async () => expect(await app.vault.adapter.read(`${SHARING_DATA_DIR}/people.json`)).toContain('retiredNames'));
+    const again = book(app);
+    await again.ready();
+    expect(again.seen(U, 'p2', 'Ben').name).toBe('Ben (3)');
+  });
+
   it('admits new people with unique names and finds them by device, name and key', async () => {
     const people = book();
     await people.ready();

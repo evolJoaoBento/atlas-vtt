@@ -2,7 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Editor, Plugin } from 'obsidian';
+import { NOT_IN_PEOPLE_LIST, partPeopleFrom, UNWRITABLE_NAME_HINT } from '../../../../src/app/online/sharing/parts/partPeople';
 import { PartPeopleForm } from '../../../../src/app/online/sharing/parts/PartPeopleModal';
+import { TABLE_ID, testPeople, testPerson } from './sharingFixtures';
 import { registerPartCommands } from '../../../../src/app/online/sharing/parts/registerPartCommands';
 import type { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { shareSessionStore } from '../../../../src/app/online/sharing/shareSessionStore';
@@ -100,7 +102,7 @@ describe('Share part commands and menu', () => {
 describe('the people picker', () => {
   it('lists the session’s people, keeps a name a tag cannot hold unpickable, and applies the ticked ones', () => {
     const apply = vi.fn();
-    render(<PartPeopleForm choice={{ names: ['Ana', 'Ben', 'Odd, name'], inSession: true }} onApply={apply} onCancel={() => {}} />);
+    render(<PartPeopleForm choice={{ people: [{ name: 'Ana' }, { name: 'Ben' }, { name: 'Odd, name', problem: UNWRITABLE_NAME_HINT }], inSession: true }} onApply={apply} onCancel={() => {}} />);
     expect(screen.getByText('People in this session')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Apply' }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByLabelText('Odd, name') as HTMLInputElement).disabled).toBe(true);
@@ -110,7 +112,34 @@ describe('the people picker', () => {
   });
 
   it('says when it shows the people list because there is no session', () => {
-    render(<PartPeopleForm choice={{ names: ['Ana'], inSession: false }} onApply={() => {}} onCancel={() => {}} />);
+    render(<PartPeopleForm choice={{ people: [{ name: 'Ana' }], inSession: false }} onApply={() => {}} onCancel={() => {}} />);
     expect(screen.getByText('Not in a session: your people list')).toBeTruthy();
+  });
+});
+
+describe('the picker names people as the people list does, never by join name (T-I2)', () => {
+  const session = { role: 'player' as const, tableId: TABLE_ID, self: 'ana', node: {} as never };
+
+  it('another table’s "Ben": this table’s Ben is offered as "Ben (2)"', () => {
+    const book = testPeople([testPerson('ben', 'Ben', 'O'.repeat(43)), testPerson('ben', 'Ben (2)'), testPerson('gm', 'Morgan')]);
+    const choice = partPeopleFrom({ session, people: [{ personId: 'gm', name: 'Morgan' }, { personId: 'ben', name: 'Ben' }] }, book);
+    expect(choice.people).toEqual([{ name: 'Morgan' }, { name: 'Ben (2)' }]);
+  });
+
+  it('a join name that is someone’s former name is not written; the list name is', () => {
+    const ana = { ...testPerson('ana2', 'Ana'), formerNames: ['Bea'] };
+    const book = testPeople([ana, testPerson('bea', 'Bea (2)')]);
+    const choice = partPeopleFrom({ session, people: [{ personId: 'bea', name: 'Bea' }] }, book);
+    expect(choice.people).toEqual([{ name: 'Bea (2)' }]);
+  });
+
+  it('someone the list does not hold yet is shown but cannot be picked', () => {
+    const choice = partPeopleFrom({ session, people: [{ personId: 'new', name: 'Ben' }] }, testPeople([testPerson('ben', 'Ben', 'O'.repeat(43))]));
+    expect(choice.people).toEqual([{ name: 'Ben', problem: NOT_IN_PEOPLE_LIST }]);
+  });
+
+  it('without a session: the people list', () => {
+    const choice = partPeopleFrom({ session: null, people: [] }, testPeople([testPerson('ana', 'Ana'), testPerson('odd', 'Odd, name')]));
+    expect(choice).toEqual({ people: [{ name: 'Ana' }, { name: 'Odd, name', problem: UNWRITABLE_NAME_HINT }], inSession: false });
   });
 });

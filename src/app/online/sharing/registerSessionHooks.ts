@@ -50,8 +50,10 @@ function registerTransport(plugin: Plugin, { joins, people, sessions, catalogue 
       shareSessionStore.setState({ session: { role: 'gm', tableId: table.id, self: GM_PERSON_ID, node: host.node }, pushes: [] });
       present();
       const stopPresent = onlineSessionStore.subscribe(present);
+      const stopNames = people.subscribe(present);
       return () => {
         stopPresent();
+        stopNames();
         host.stop();
         reset();
       };
@@ -81,4 +83,6 @@ function registerTransport(plugin: Plugin, { joins, people, sessions, catalogue 
     presentForPlayer();
   }));
   plugin.register(joinedSessionStore.subscribe(presentForPlayer));
+  // The list hands out names after a session first shows someone: refresh them then, so the store does not keep a join name.
+  plugin.register(people.subscribe(presentForPlayer));
 }

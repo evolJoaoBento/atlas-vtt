@@ -22,6 +22,11 @@ export interface Person {
 export interface PeopleData {
   version: 1;
   people: Person[];
+  /**
+   * Names of removed people. They are never given to anyone else: notes and part tags that name a removed
+   * person must not start reaching whoever is called that next.
+   */
+  retiredNames?: string[];
 }
 
 export const personKey = (tableId: string, personId: string): string => `${tableId}/${personId}`;
@@ -47,5 +52,10 @@ function parsePerson(value: unknown): Person | null {
 /** The stored list; entries of the wrong shape are dropped. */
 export function parsePeopleData(value: unknown): PeopleData {
   const people = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).people : null;
-  return { version: 1, people: Array.isArray(people) ? people.flatMap((entry) => parsePerson(entry) ?? []) : [] };
+  const retired = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).retiredNames : null;
+  return {
+    version: 1,
+    people: Array.isArray(people) ? people.flatMap((entry) => parsePerson(entry) ?? []) : [],
+    retiredNames: Array.isArray(retired) ? retired.filter((name): name is string => typeof name === 'string' && name.length <= 80).slice(0, 1000) : [],
+  };
 }

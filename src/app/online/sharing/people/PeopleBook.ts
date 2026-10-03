@@ -29,6 +29,7 @@ export class PeopleBook {
   }
 
   private people: Person[] = [];
+  private retiredNames: string[] = [];
   private loading: Promise<void> | null = null;
   private readonly listeners = new Set<() => void>();
   private saveTimer: number | null = null;
@@ -41,6 +42,7 @@ export class PeopleBook {
   ready(): Promise<void> {
     this.loading ??= this.file.load().then((data) => {
       this.people = data.people;
+      this.retiredNames = data.retiredNames ?? [];
       this.loaded = true;
       this.listeners.forEach((listener) => listener());
     });
@@ -142,10 +144,12 @@ export class PeopleBook {
     return null;
   }
 
+  /** Removes a person; their names stay taken (`PeopleData.retiredNames`). */
   remove(key: string): void {
     const person = this.byKey(key);
     if (!person) return;
     this.people = this.people.filter((other) => other !== person);
+    this.retiredNames = [...new Set([...this.retiredNames, person.name, ...person.formerNames])];
     this.changed(true);
   }
 
@@ -154,9 +158,9 @@ export class PeopleBook {
     return () => { this.listeners.delete(listener); };
   }
 
-  /** A current or former name of anyone (but `except`): a former name is never given to someone else. */
+  /** A current or former name of anyone (but `except`), or a removed person's: such a name is never given to someone else. */
   private nameTaken(key: string, except?: Person): boolean {
-    return this.people.some((other) => other !== except && (nameKey(other.name) === key || other.formerNames.some((former) => nameKey(former) === key)));
+    return this.retiredNames.some((name) => nameKey(name) === key) || this.people.some((other) => other !== except && (nameKey(other.name) === key || other.formerNames.some((former) => nameKey(former) === key)));
   }
 
   private freeName(name: string): string {
@@ -187,6 +191,6 @@ export class PeopleBook {
   private save(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    if (this.loaded) void this.file.save({ version: 1, people: this.people });
+    if (this.loaded) void this.file.save({ version: 1, people: this.people, retiredNames: this.retiredNames });
   }
 }

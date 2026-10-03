@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { filterNoteFor } from '../../../../src/app/online/sharing/model/noteFilter';
-import { shareWithEveryone, wrapSelection, type PartEdit } from '../../../../src/app/online/sharing/parts/partEdits';
+import { shareWithEveryone, UNCLOSED_BEFORE_SELECTION, wrapSelection, type PartEdit } from '../../../../src/app/online/sharing/parts/partEdits';
 import { TABLE_ID, testPeople, testPerson } from './sharingFixtures';
 
 /** The text after the edit, and the text the selection covers then. */
-function applied(text: string, edit: PartEdit | null): { text: string; selected: string } {
-  if (!edit) return { text, selected: '' };
+function applied(text: string, edit: PartEdit | { refused: string } | null): { text: string; selected: string } {
+  if (!edit || 'refused' in edit) return { text, selected: '' };
   const { change, selection } = edit;
   const next = text.slice(0, change.from) + change.text + text.slice(change.to);
   return { text: next, selected: next.slice(selection.from, selection.to) };
@@ -28,7 +28,8 @@ const unwrap = (text: string, selectedText: string, occurrence = 0) => {
   return applied(text, shareWithEveryone(text, from, from + selectedText.length));
 };
 
-const people = testPeople([testPerson('ana', 'Ana'), testPerson('ben', 'Ben')]);
+const people = testPeople([testPerson('ana', 'Ana'), testPerson('ben', 'Ben'), testPerson('cara', 'Cara')]);
+const forPerson = (personId: string, text: string): string => filterNoteFor(text, { recipient: { tableId: TABLE_ID, personId }, people, shareable: [], links: () => null, marks: null });
 const forBen = (text: string): string => filterNoteFor(text, { recipient: { tableId: TABLE_ID, personId: 'ben' }, people, shareable: [], links: () => null, marks: null });
 
 describe('wrapping a selection', () => {
@@ -100,5 +101,80 @@ describe('sharing a selection with everyone', () => {
 
   it('nothing to change: null', () => {
     expect(shareWithEveryone('plain text', 0, 5)).toBeNull();
+  });
+});
+
+describe('wrapping a selection that crosses other parts (T-I1)', () => {
+  it('a selection across an existing end keeps every selected character in the new part', () => {
+    const text = 'Intro.\n\n%%[!only|Ana]%%\nFor Ana.\n%%[!end]%%\nSecret for nobody.';
+    const from = text.indexOf('For Ana.');
+    const done = applied(text, wrapSelection(text, from, text.length, { kind: 'private' }));
+    for (const personId of ['ana', 'ben', 'cara']) {
+      expect(forPerson(personId, done.text)).not.toContain('Secret for nobody');
+      expect(forPerson(personId, done.text)).not.toContain('For Ana');
+    }
+    const inline = '%%[!except|Cara]%%visible%%[!end]%% GM ONLY';
+    const wrapped = applied(inline, wrapSelection(inline, inline.indexOf('visible'), inline.length, { kind: 'private' }));
+    for (const personId of ['ana', 'ben']) expect(forPerson(personId, wrapped.text)).toBe('');
+  });
+
+  it('a selection across an existing start, or holding a stray end, is wrapped stretch by stretch', () => {
+    const text = 'one two %%[!only|Ana]%%three%%[!end]%%';
+    const done = applied(text, wrapSelection(text, text.indexOf('two'), text.indexOf('three') + 5, { kind: 'only', names: ['Ben'] }));
+    expect(done.text).toBe('one %%[!only|Ben]%%two %%[!end]%%%%[!only|Ana]%%%%[!only|Ben]%%three%%[!end]%%%%[!end]%%');
+    const stray = 'a x %%[!end]%% y b';
+    const wrappedStray = applied(stray, wrapSelection(stray, 2, stray.length - 2, { kind: 'private' }));
+    expect(wrappedStray.text).toBe('a %%[!private]%%x %%[!end]%%%%[!end]%%%%[!private]%% y%%[!end]%% b');
+  });
+
+  it('a selection end inside a tag or a comment takes it in whole (M3)', () => {
+    const text = 'a %%[!only|Ana]%%x%%[!end]%% b %% note %% c';
+    const done = applied(text, wrapSelection(text, text.indexOf('only'), text.indexOf('note'), { kind: 'private' }));
+    expect(done.text).toBe('a %%[!only|Ana]%%%%[!private]%%x%%[!end]%%%%[!end]%%%%[!private]%% b %% note %%%%[!end]%% c');
+    const everyone = shareWithEveryone('a %%[!only|Ana]%%X%%[!only|Ana]%% Y%%[!end]%% b', 5, 16);
+    expect(everyone).not.toBeNull();
+  });
+
+  it('fuzz: after any wrap, no one the new part keeps out gets any wholly selected word', () => {
+    let seed = 12345;
+    const random = (): number => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const pieces = [' ', ' ', '\n', '\n\n', '%%[!private]%%', '%%[!only|Ana]%%', '%%[!except|Ben]%%', '%%[!end]%%', '%%[!end]%%', '%% c %%', '> ', '- '];
+    const rules: Array<[Parameters<typeof wrapSelection>[3], string[]]> = [
+      [{ kind: 'private' }, ['ana', 'ben', 'cara']],
+      [{ kind: 'only', names: ['Ana'] }, ['ben', 'cara']],
+      [{ kind: 'except', names: ['Ben'] }, ['ben']],
+    ];
+    for (let round = 0; round < 3000; round++) {
+      let text = '';
+      const words: Array<{ word: string; start: number }> = [];
+      // Selections start and end between pieces, never inside a word, so no two cut words can join into a selected one.
+      const bounds = [0];
+      for (let index = 0; index < 4 + Math.floor(random() * 14); index++) {
+        if (random() < 0.5) {
+          const word = `w${round}x${index}`;
+          words.push({ word, start: text.length });
+          // A space after each word, so text on either side of a selection cannot run together into one.
+          text += `${word} `;
+        } else text += pieces[Math.floor(random() * pieces.length)];
+        bounds.push(text.length);
+      }
+      const a = bounds[Math.floor(random() * bounds.length)]!;
+      const b = bounds[Math.floor(random() * bounds.length)]!;
+      const [from, to] = a <= b ? [a, b] : [b, a];
+      if (from === to) continue;
+      const [rule, kept] = rules[Math.floor(random() * rules.length)]!;
+      const done = applied(text, wrapSelection(text, from, to, rule));
+      const selected = words.filter((entry) => entry.start >= from && entry.start + entry.word.length <= to);
+      for (const personId of kept) {
+        const got = forPerson(personId, done.text);
+        for (const { word } of selected) expect(got.split(/[^A-Za-z0-9]+/).includes(word), `${JSON.stringify(text)} [${from},${to}) ${rule.kind} → ${personId}`).toBe(false);
+      }
+    }
+  });
+});
+
+describe('sharing with everyone after an unclosed part (M2)', () => {
+  it('is refused, so text the part hides from everyone is not shared with the people it names', () => {
+    expect(shareWithEveryone('a %%[!only|Ana]%%hidden b c', 'a %%[!only|Ana]%%hidden '.length, 'a %%[!only|Ana]%%hidden b'.length)).toEqual({ refused: UNCLOSED_BEFORE_SELECTION });
   });
 });
