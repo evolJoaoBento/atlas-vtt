@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { runInBackground } from './utils/backgroundTask';
+import { joinSessionTile } from './online/obsidian/ui/joinSessionTile';
 import { mapThumbnailPath } from './utils/dataFileMigration';
 
 export const DASHBOARD_VIEW_TYPE = "atlas-vtt-dashboard";
@@ -115,6 +116,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const actionTiles = [
     { key: 'create', icon: Plus, title: 'Create Scene', desc: 'Browse maps & build a scene', onClick: onCreateMap },
     { key: 'assets', icon: FolderOpen, title: 'Asset Manager', desc: 'Your scenes & assets', onClick: onOpenAssetManager },
+    joinSessionTile(app),
   ] as const;
 
   return (
