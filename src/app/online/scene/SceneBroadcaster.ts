@@ -260,11 +260,13 @@ export class SceneBroadcaster implements SessionHandler {
     const state = live.scene.store.getState();
     live.slice = sliceOf(state);
     const lighting = this.lightingOf(live, state);
+    // Rebuilt only when the fog operations or the darkness change.
+    const { coverage, darkCoverage } = this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness);
     return projectForPlayers(state, {
       sceneId: live.sceneId,
       rules: this.rules,
-      // Rebuilt only when the fog operations or the darkness change.
-      coverage: this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness).coverage,
+      coverage,
+      darkCoverage,
       lighting,
       assets: this.options.assets,
       ...sceneContext(live.scene, this.options),

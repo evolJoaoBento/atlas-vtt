@@ -16,8 +16,8 @@ import type { MapSize } from './sceneTypes';
  * The darkness is worked out anew at most this often. Each new darkness makes both clients
  * repaint their fog, so a drag with live sight would otherwise repaint it twenty times a
  * second. A darkness that lags shows the map a moment longer where the party saw it a moment
- * ago. No token shows longer than in the window: one players stop seeing goes at the next tick, and
- * one they start seeing comes with the darkness that uncovers it (under the old one it is covered).
+ * ago. Tokens never wait for it: they follow the window's perception at every tick, and only texts
+ * and drawings are checked against the darkness (`ProjectionContext.darkCoverage`).
  */
 export const DARKNESS_INTERVAL_MS = 200;
 

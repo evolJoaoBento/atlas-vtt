@@ -100,13 +100,13 @@ export function scene(lighting: Partial<SceneLighting>, objects: Partial<Scene['
   };
 }
 
-/** The projection as the broadcaster makes it: the coverage holds the darkness of `lighting`. */
+/** The projection as the broadcaster makes it: texts and drawings are checked against the fog with the darkness of `lighting`. */
 export function project(state: Scene, lighting: LightingFrame | null): PlayerScene {
   const memo = createProjectionMemo();
   const fog = projectFog(state.objects.fog, memo);
   return projectForPlayers(state, {
-    sceneId: 'scene-1', rules: RULES, coverage: FogCoverage.fromPlayerFog(fog, lighting?.darkness.covered ?? []), lighting,
-    assets, mapSize: MAP, memo,
+    sceneId: 'scene-1', rules: RULES, coverage: FogCoverage.fromPlayerFog(fog), darkCoverage: FogCoverage.fromPlayerFog(fog, lighting?.darkness.covered ?? []),
+    lighting, assets, mapSize: MAP, memo,
   });
 }
 

@@ -98,11 +98,14 @@ describe('dynamic lighting for online players', () => {
   });
 
   it('shows nothing until the view has worked out the scene\'s sight', () => {
-    const lighting = playerLightingOf(walled(), MAP)!;
+    const entry = { id: 'e1', tokenId: 'hero', name: 'hero', initiative: 12, initiativeModifier: 0, imagePath: '', isActive: true, isNPC: false, order: 0 };
+    const state: Scene = { ...walled(), initiativeTrackerOpen: true, initiative: { ...walled().initiative, isActive: true, entries: [entry] } };
+    expect(projectLit(state).initiative?.entries.map(({ tokenId }) => tokenId)).toEqual(['hero']);
+    const lighting = playerLightingOf(state, MAP)!;
     const notReady = { ...lighting, ready: false };
-    const projected = project(walled(), lightingFrame(notReady, lightingFrameOf(walled(), MAP)!.darkness));
+    const projected = project(state, lightingFrame(notReady, lightingFrameOf(state, MAP)!.darkness));
     expect(projected.tokens).toEqual({});
-    expect(projected.initiative).toBeNull();
+    expect(projected.initiative?.entries).toEqual([]);
   });
 
   it('leaves out a token the players only sense, which the window outlines', () => {

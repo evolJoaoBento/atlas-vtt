@@ -135,19 +135,35 @@ describe('the broadcaster with dynamic lighting', () => {
     const players = (): PlayerScene => broadcaster.currentProjection()!;
     expect(Object.keys(players().tokens)).toEqual(['hero']);
     expect(players().fog[DARKNESS_FOG_ID]).toBeDefined();
-    // The view's sight changes without a store change (a statblock's senses were read): players follow,
-    // a token they start to see with the darkness that uncovers it.
+    // The view's sight changes without a store change (a statblock's senses were read): players get the
+    // token they now see at the next tick, and the darkness when its interval is over.
     lighting.current = playerLightingOf({ ...state, objects: { ...state.objects, walls: {} } }, MAP);
     lighting.changed();
-    await vi.advanceTimersByTimeAsync(DARKNESS_INTERVAL_MS + SCENE_TICK_MS);
+    await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
     expect(Object.keys(players().tokens).sort()).toEqual(['goblin', 'hero']);
+    expect(players().fog[DARKNESS_FOG_ID]).toBeDefined();
+    await vi.advanceTimersByTimeAsync(DARKNESS_INTERVAL_MS);
     // Nothing is dark without the wall: the darkness goes. Dynamic lighting off then changes nothing more.
     expect(players().fog).toEqual({});
     lighting.current = undefined;
     lighting.changed();
     await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
-    expect(sent.map((message) => message.type)).toEqual(['scene-snapshot', 'scene-fog', 'scene-patch']);
+    expect(sent.map((message) => message.type)).toEqual(['scene-snapshot', 'scene-fog', 'scene-patch', 'scene-patch']);
     expect(JSON.stringify(sent)).not.toMatch(/"(walls|p1|vision|lights)"/);
+    broadcaster.stop();
+  });
+
+  it('keeps a seen token while its darkness waits: the hero dragged through the dark never drops out', async () => {
+    const at = (x: number): Scene => scene({ ambient: 0 }, { tokens: { hero: character('hero', x, 400, { vision: { enabled: true } }) } });
+    const lighting = lightingSource(playerLightingOf(at(140), MAP));
+    const { store, broadcaster } = presentLit(at(140), lighting);
+    for (const x of [280, 420]) {
+      const moved = at(x);
+      lighting.current = playerLightingOf(moved, MAP);
+      store.setState({ objects: moved.objects } as Partial<ViewAtlasState>);
+      await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
+      expect(broadcaster.currentProjection()?.tokens.hero?.x).toBe(x);
+    }
     broadcaster.stop();
   });
 

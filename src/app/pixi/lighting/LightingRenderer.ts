@@ -224,6 +224,8 @@ export class LightingRenderer implements SceneLightingView {
     const base = rebuilt || !this.lastScene ? (this.lastScene = this.takeModel(model, state, bounds)) : this.lastScene;
     const spots = this.spots.update(model, state, this.deps.measurement, this.deps.rules);
     this.spotsNow = spots;
+    // Sight that was not the scene's is again (a restored context may rebuild nothing): who waited on it is told.
+    if (!this.fresh) this.sightChanged = true;
     this.fresh = true;
     this.engine.update({ ...base, spots, ...sceneLook(lighting) });
     requestRender(this.deps.app);

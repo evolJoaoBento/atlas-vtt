@@ -11,7 +11,7 @@ import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import type { ProjectionContext } from './projectForPlayers';
 import { projectFog, type ProjectionMemo } from './projectRecords';
-import { SCENE_LIMITS } from './sceneTypes';
+import { SCENE_LIMITS, type PlayerFogOp } from './sceneTypes';
 
 export interface SceneSession {
   use(handler: SessionHandler): () => void;
@@ -76,22 +76,33 @@ export interface LiveScene {
   readonly unsubscribe: () => void;
 }
 
-/** Coverage rasterised from the fog players receive and the darkness over it, rebuilt only when either changes. */
-export class FogCoverageCache {
-  private entry: { fog: Readonly<Record<string, FogOperation>>; darkness: Darkness; coverage: FogCoverage; truncated: boolean } | null = null;
+/** What players cannot see under the fog, and under the fog and a lit scene's darkness. */
+export interface FogCoverages {
+  coverage: FogCoverage;
+  /** The fog and the darkness together; `coverage` itself without darkness. */
+  darkCoverage: FogCoverage;
+  /** The GM's fog and the darkness have more operations than the limit, so some would not be sent. */
+  truncated: boolean;
+}
 
-  /** `truncated`: the GM's fog and the darkness have more operations than the limit, so some would not be sent. */
-  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): { coverage: FogCoverage; truncated: boolean } {
-    if (this.entry?.fog !== fog || this.entry.darkness !== darkness) {
+/** Coverage rasterised from the fog players receive, and with the darkness over it, each rebuilt only when what it is made of changes. */
+export class FogCoverageCache {
+  private fog: { fog: Readonly<Record<string, FogOperation>>; sent: Record<string, PlayerFogOp>; coverage: FogCoverage } | null = null;
+  private entry: { darkness: Darkness; coverages: FogCoverages } | null = null;
+
+  get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): FogCoverages {
+    const fogChanged = this.fog?.fog !== fog;
+    if (!this.fog || fogChanged) {
       const sent = projectFog(fog, memo);
-      this.entry = {
-        fog,
-        darkness,
-        coverage: FogCoverage.fromPlayerFog(sent, darkness.covered),
-        truncated: Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records,
-      };
+      this.fog = { fog, sent, coverage: FogCoverage.fromPlayerFog(sent) };
     }
-    return this.entry;
+    if (!this.entry || fogChanged || this.entry.darkness !== darkness) {
+      const { sent, coverage } = this.fog;
+      const darkCoverage = darkness.covered.length > 0 ? FogCoverage.fromPlayerFog(sent, darkness.covered) : coverage;
+      const truncated = Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
+      this.entry = { darkness, coverages: { coverage, darkCoverage, truncated } };
+    }
+    return this.entry.coverages;
   }
 }
 

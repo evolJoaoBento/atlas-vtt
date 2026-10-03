@@ -32,13 +32,19 @@ export type ProjectedState = Pick<
 export interface ProjectionContext {
   sceneId: string;
   rules: PlayerViewRules;
-  /** Rebuilt by the caller only when the fog operations, or the darkness of `lighting`, change. */
+  /** The GM's fog players receive; rebuilt by the caller only when the fog operations change. */
   coverage: FogCoverage;
   /**
    * With dynamic lighting on and the scene lit: which tokens the player window shows and the
-   * darkness over the map, which `coverage` must include. Unset or null, nothing is lit.
+   * darkness over the map. Unset or null, nothing is lit.
    */
   lighting?: LightingFrame | null;
+  /**
+   * The fog with the darkness of `lighting` over it, which texts and drawings are checked
+   * against; unset, `coverage`. Tokens are not: the window shows a token by its perception
+   * alone, and one it sees is never wholly dark (a darkness that lags would drop it).
+   */
+  darkCoverage?: FogCoverage;
   assets: AssetIds;
   mapSize: MapSize;
   memo: ProjectionMemo;
@@ -64,8 +70,8 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
-    texts: projectTexts(objects?.texts, context.coverage),
-    drawings: projectDrawings(objects?.drawings, context.coverage, context.memo),
+    texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
+    drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),
     initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules),
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid),
