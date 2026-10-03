@@ -73,7 +73,7 @@ describe('rolling again and from the tray', () => {
 
   it('stops adding dice at the limit, and keeps the tray open when the roll could not go', () => {
     const onToggle = vi.fn();
-    const onRoll = vi.fn(() => false);
+    const onRoll = vi.fn((): string | null => 'Reconnecting to your GM. Roll again once you are back in.');
     render(<DiceDropdownMenu diceTool={{ rollDice: vi.fn() } as never} isOpen onToggle={onToggle} onRoll={onRoll} maxDice={2} />);
     fireEvent.click(addD6());
     fireEvent.click(addD6());
@@ -83,14 +83,14 @@ describe('rolling again and from the tray', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Roll$/ }));
     expect(onRoll).toHaveBeenCalledWith({ 6: 2 }, 0);
     expect(onToggle).not.toHaveBeenCalled();
-    expect(screen.getByText(/send the roll/)).toBeTruthy();
+    expect(screen.getByText('Reconnecting to your GM. Roll again once you are back in.')).toBeTruthy();
     // The tray keeps its dice for another try
     expect(addD6().getAttribute('aria-label')).toBe('Add a d6, 2 in the tray');
   });
 
   it('sends the picked dice instead of rolling them, and shows no toasts', () => {
     const rollDice = vi.fn();
-    const onRoll = vi.fn(() => true);
+    const onRoll = vi.fn((): string | null => null);
     render(<DiceDropdownMenu diceTool={{ rollDice } as never} isOpen onToggle={() => {}} onRoll={onRoll} />);
     fireEvent.click(addD6());
     fireEvent.click(screen.getByRole('button', { name: 'Increase modifier' }));
@@ -103,7 +103,7 @@ describe('rolling again and from the tray', () => {
 
 describe("the online scene's dice log", () => {
   function renderLog() {
-    const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn(() => true) };
+    const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn((): string | null => null) };
     ui.view = { onlineControls: () => controls };
     const store = create(() => ({
       diceLog: diceLogResults([ENTRY]), addDiceLogEntry: vi.fn(), clearDiceLog: vi.fn(), remoteScene: initialRemoteScene(),
@@ -134,8 +134,15 @@ describe("the online scene's dice log", () => {
     expect(Notice).toHaveBeenCalledWith("Can't roll that again.");
   });
 
+  it('says why a roll again did not go', () => {
+    const { controls } = renderLog();
+    controls.rollDice.mockReturnValueOnce('The session has ended. Join again to roll.');
+    fireEvent.click(screen.getByRole('button', { name: 'Roll again' }));
+    expect(Notice).toHaveBeenCalledWith('The session has ended. Join again to roll.');
+  });
+
   it('marks the crit, writes exploded and subtracted dice as Atlas does, and counts the dice it does not list', () => {
-    const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn(() => true) };
+    const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn((): string | null => null) };
     ui.view = { onlineControls: () => controls };
     const entry: DiceLogEntry = {
       ...ENTRY, formula: '1d6-1d4', crit: 'high', unlisted: 4,

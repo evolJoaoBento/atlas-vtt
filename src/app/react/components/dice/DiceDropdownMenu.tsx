@@ -12,8 +12,8 @@ export interface DiceDropdownMenuProps {
   isOpen: boolean;
   onToggle: () => void;
   triggerRef?: React.RefObject<HTMLElement | null>;
-  /** Rolls the tray elsewhere instead of with `diceTool`: the online scene sends it to the GM. False: it could not go, so the tray stays open. */
-  onRoll?: (pool: TrayPool, modifier: number) => boolean;
+  /** Rolls the tray elsewhere instead of with `diceTool`: the online scene sends it to the GM. Null once it went; else why it could not, shown in the tray, which stays open. */
+  onRoll?: (pool: TrayPool, modifier: number) => string | null;
   /** The most dice the tray lets the player pick; the tray's own limit when unset. */
   maxDice?: number;
 }
@@ -66,8 +66,9 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
           {...(maxDice !== undefined ? { maxDice } : {})}
           onRoll={(formula, pool, modifier) => {
             if (onRoll) {
-              if (!onRoll(pool, modifier)) {
-                setNote("Couldn't send the roll. Check your connection.");
+              const problem = onRoll(pool, modifier);
+              if (problem !== null) {
+                setNote(problem);
                 return false;
               }
             } else diceTool.rollDice(formula);

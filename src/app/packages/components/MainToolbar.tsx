@@ -17,6 +17,7 @@ import { Toggle } from "./primitives/Toggle"
 import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
 import { trayPoolByDie, type TrayPool } from "../../react/components/dice/diceTrayPool"
 import { traySelection } from "../../online/obsidian/onlineDice"
+import { sendOnlineRoll } from "../../online/obsidian/onlineRollRefusal"
 import { DICE_LIMITS } from "../../online/tools/toolMessages"
 import { AMBIENT_AUDIO_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
@@ -218,7 +219,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
               isOpen={isDiceTrayOpen}
               onToggle={toggleDiceTray}
               triggerRef={diceButtonRef}
-              {...(remote ? { onRoll: (pool: TrayPool, modifier: number) => { const dice = traySelection(trayPoolByDie(pool)); return dice !== null && (view?.onlineControls()?.rollDice(dice, modifier) ?? false) }, maxDice: DICE_LIMITS.dicePerRoll } : {})}
+              {...(remote ? { onRoll: (pool: TrayPool, modifier: number) => sendOnlineRoll(view?.onlineControls() ?? null, traySelection(trayPoolByDie(pool)), modifier), maxDice: DICE_LIMITS.dicePerRoll } : {})}
             />
           )}
         </div>

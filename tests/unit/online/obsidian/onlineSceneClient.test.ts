@@ -3,6 +3,9 @@ import { MapService } from '../../../../src/app/services/MapService';
 import { WidgetSyncService } from '../../../../src/app/services/WidgetSyncService';
 import { getHistoryStore } from '../../../../src/app/stores/history';
 import { laserColor } from '../../../../src/app/online/tools/laserColors';
+import {
+  ROLL_CONNECTION_LOST_TEXT, ROLL_NOT_SENT_TEXT, ROLL_RECONNECTING_TEXT, ROLL_SESSION_ENDED_TEXT,
+} from '../../../../src/app/online/obsidian/onlineRollRefusal';
 import { playerScene } from '../sceneFixtures';
 import { admitted, onlineSceneSetup } from './onlineSceneFixtures';
 
@@ -121,8 +124,21 @@ describe('OnlineSceneClient', () => {
 
   it('rolls through the session', () => {
     const t = setup();
-    expect(t.client.controls.rollDice({ d20: 1 }, 2)).toBe(true);
+    expect(t.client.controls.rollDice({ d20: 1 }, 2)).toBeNull();
     expect(t.fake.sendDiceRoll).toHaveBeenCalledWith({ d20: 1 }, 2);
+  });
+
+  it("says why a roll did not go, from the session's state", () => {
+    const t = setup();
+    t.fake.sendDiceRoll.mockReturnValue(false);
+    t.sink().session(admitted());
+    expect(t.client.controls.rollDice({ d20: 1 }, 0)).toBe(ROLL_NOT_SENT_TEXT);
+    t.sink().session({ ...admitted(), status: 'connecting' });
+    expect(t.client.controls.rollDice({ d20: 1 }, 0)).toBe(ROLL_RECONNECTING_TEXT);
+    t.sink().session({ ...admitted(), status: 'lost', reason: 'connection-lost' });
+    expect(t.client.controls.rollDice({ d20: 1 }, 0)).toBe(ROLL_CONNECTION_LOST_TEXT);
+    t.sink().session({ ...admitted(), status: 'lost', reason: 'ended' });
+    expect(t.client.controls.rollDice({ d20: 1 }, 0)).toBe(ROLL_SESSION_ENDED_TEXT);
   });
 
   it('closes its tab when the session is left from elsewhere', () => {

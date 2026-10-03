@@ -16,6 +16,7 @@ import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
 import { diceLogResult, diceLogResults } from './onlineDice';
 import { OnlineLaserLink } from './OnlineLaserLink';
 import type { OnlineJoinService, OnlineSceneSink } from './OnlineJoinService';
+import { rollRefusal } from './onlineRollRefusal';
 import { onlineSceneStatus } from './onlineSceneStatus';
 import { updateRemoteScene, type OnlineSceneControls } from './remoteScene';
 import type { RemoteMapBackdrop } from './RemoteMapBackdrop';
@@ -82,7 +83,7 @@ export class OnlineSceneClient implements OnlineSceneSink {
       followGm: () => this.follower.followGm(),
       fitMap: () => this.follower.fitMap(),
       reconnect: () => options.service.reconnect(),
-      rollDice: (dice, modifier) => options.service.sendDiceRoll(dice, modifier),
+      rollDice: (dice, modifier) => (options.service.sendDiceRoll(dice, modifier) ? null : rollRefusal(this.state)),
     };
     options.initiative.mount(options.parent);
     options.initiative.present(store);

@@ -87,7 +87,7 @@ describe('an Obsidian player end to end', () => {
 
   it("rolls through the GM, into the GM's dice log and the player's", async () => {
     const { w, service, view } = await joinFromObsidian();
-    expect(view().client.controls.rollDice({ d20: 1 }, 2)).toBe(true);
+    expect(view().client.controls.rollDice({ d20: 1 }, 2)).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(w.feed.published.at(-1)).toMatchObject({ formula: 'd20+2', rolledBy: 'Anna', total: 13 });
     expect(view().store.getState().diceLog[0]).toMatchObject({ formula: 'd20+2', total: 13, rolledBy: 'Anna' });

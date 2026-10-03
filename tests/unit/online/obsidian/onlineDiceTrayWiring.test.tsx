@@ -13,7 +13,7 @@ const closeAssetManager = vi.fn();
 const setInitiativeTrackerOpen = vi.fn();
 const setOnlinePanelOpen = vi.fn();
 
-const { rollDice, trayProps } = vi.hoisted(() => ({ rollDice: vi.fn(() => true), trayProps: { current: {} as Record<string, any> } }));
+const { rollDice, trayProps } = vi.hoisted(() => ({ rollDice: vi.fn((): string | null => null), trayProps: { current: {} as Record<string, any> } }));
 
 let capturedShortcuts: Record<string, (event: KeyboardEvent) => void> = {};
 
@@ -136,16 +136,16 @@ describe('the online scene dice tray in the toolbar', () => {
   // The online scene is a player view, so Atlas's dice toasts (`DiceRollDisplay`) are not mounted there.
   it('sends the picks and the modifier as a dice-roll, within the GM limit', () => {
     render(<MainToolbar viewId="view-1" />);
-    const { onRoll, maxDice } = trayProps.current as { onRoll(pool: Record<number, number>, modifier: number): boolean; maxDice: number };
+    const { onRoll, maxDice } = trayProps.current as { onRoll(pool: Record<number, number>, modifier: number): string | null; maxDice: number };
     expect(maxDice).toBe(20);
-    expect(onRoll({ 6: 2, 20: 0 }, 0)).toBe(true);
+    expect(onRoll({ 6: 2, 20: 0 }, 0)).toBeNull();
     expect(rollDice).toHaveBeenCalledWith({ d6: 2 }, 0);
-    expect(onRoll({ 6: 1 }, 3)).toBe(true);
+    expect(onRoll({ 6: 1 }, 3)).toBeNull();
     expect(rollDice).toHaveBeenLastCalledWith({ d6: 1 }, 3);
     rollDice.mockClear();
-    expect(onRoll({ 6: 21 }, 0)).toBe(false);
+    expect(onRoll({ 6: 21 }, 0)).toBe('Roll 1 to 20 dice.');
     expect(rollDice).not.toHaveBeenCalled();
-    rollDice.mockReturnValueOnce(false);
-    expect(onRoll({ 6: 1 }, 0)).toBe(false);
+    rollDice.mockReturnValueOnce("The GM hasn't let you in yet.");
+    expect(onRoll({ 6: 1 }, 0)).toBe("The GM hasn't let you in yet.");
   });
 });

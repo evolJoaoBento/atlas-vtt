@@ -53,8 +53,8 @@ export interface OnlineSceneControls {
   followGm(): void;
   fitMap(): void;
   reconnect(): void;
-  /** Sends a roll from the dice tray or the dice log; false when it could not go. */
-  rollDice(dice: DiceSelection, modifier: number): boolean;
+  /** Sends a roll from the dice tray or the dice log; null once it went, else why it could not (`rollRefusal`). */
+  rollDice(dice: DiceSelection, modifier: number): string | null;
 }
 
 /** The object URLs the scene's images show by; null while an image is not ready. */

@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initialRemoteScene } from '../../../../src/app/online/obsidian/remoteScene';
 
-const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn(() => true) };
+const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn((): string | null => null) };
 const storeState: Record<string, unknown> = {
   activeTool: 'move', setActiveTool: vi.fn(), selectionMode: 'box', setSelectionMode: vi.fn(), isGMView: true, setGMView: vi.fn(),
   isCommandPaletteOpen: false, setCommandPaletteOpen: vi.fn(), isAssetManagerOpen: false, assetManagerInitialTab: 'assets',

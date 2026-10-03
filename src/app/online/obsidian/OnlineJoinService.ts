@@ -188,17 +188,32 @@ export class OnlineJoinService {
     sink?.close();
   }
 
-  /** The Online scene view attaches: it gets what is known so far, then every change. Null without a joined session. */
+  /**
+   * The Online scene view attaches: it gets what is known so far, then every change. Null without a
+   * joined session. Once the sink is set the view is attached, whatever the catch-up does: a step that
+   * throws (Atlas's renderer taking the scene) is logged, the others still run, and the view keeps its
+   * controls; a throw here would leave it showing the session without them.
+   */
   attach(sink: OnlineSceneSink): (() => void) | null {
     const joined = this.joined;
-    if (!joined?.session) return null;
+    const session = joined?.session;
+    if (!joined || !session) return null;
     this.sink = sink;
-    sink.session(joined.session.state);
-    sink.control(joined.control);
-    sink.diceLog(joined.dice);
-    sink.scene(joined.scene);
-    if (joined.camera) sink.camera(joined.camera);
-    sink.images();
+    const steps: Array<() => void> = [
+      () => sink.session(session.state),
+      () => sink.control(joined.control),
+      () => sink.diceLog(joined.dice),
+      () => sink.scene(joined.scene),
+      () => { if (joined.camera) sink.camera(joined.camera); },
+      () => sink.images(),
+    ];
+    for (const step of steps) {
+      try {
+        step();
+      } catch (error) {
+        console.error('[Atlas online] The Online scene could not show part of the session:', error);
+      }
+    }
     return () => {
       if (this.sink === sink) this.sink = null;
     };
