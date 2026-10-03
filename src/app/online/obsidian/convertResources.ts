@@ -3,11 +3,12 @@
  * (a colour, a share and whether the bar is darkened), never definitions or numbers, so each
  * token gets stand-in definitions of its own: one per bar, in the colour the GM's window shows
  * it in, filled to the share (current out of `SHARE_SCALE`). Atlas's `ResourceBarView` then draws
- * exactly what the window does. A downed token carries a stand-in resource players never see,
- * which makes Atlas grey it and mark it with a skull as it does in the window.
+ * exactly what the window does. Every token with stand-ins also carries a `downed` one, which the
+ * remote store hides from the token UI (`hiddenResources`): Atlas greys the token and marks it with a
+ * skull while it is spent, as in the window, and eases back when it is not.
  */
 import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
-import { MAX_RESOURCES } from '../../resources/resourceTypes';
+import { BAR_SLOTS } from '../../resources/resourceTypes';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerResource, PlayerToken } from '../scene/sceneTypes';
 
@@ -40,7 +41,8 @@ function barValue(bar: PlayerResource): ResourceValue {
 
 /** The stand-ins of a token's bars and downed state; null when it has neither. */
 export function atlasBars(token: PlayerToken): AtlasBars | null {
-  const bars = (token.resources ?? []).slice(0, MAX_RESOURCES);
+  // The window draws two bars for players, so the stand-ins never reach a wheel socket
+  const bars = (token.resources ?? []).slice(0, BAR_SLOTS);
   if (bars.length === 0 && token.downed !== true) return null;
   const values: Record<string, ResourceValue> = {};
   const definitions = bars.map((bar, slot) => {
@@ -48,14 +50,12 @@ export function atlasBars(token: PlayerToken): AtlasBars | null {
     values[definition.key] = barValue(bar);
     return definition;
   });
-  if (token.downed === true) {
-    // Out of players' sight (`visibleToPlayers`), in the last socket: only `isDefeated` reads it
-    definitions.push({
-      key: DOWNED_KEY, name: 'Downed', field: '', direction: 'drains', color: DOWNED_COLOR,
-      defeatedWhenSpent: true, visibleToPlayers: false, slot: MAX_RESOURCES - 1,
-    });
-    values[DOWNED_KEY] = { current: 0, max: 1 };
-  }
+  // In no socket of its own and listed in `hiddenResources`: only `isDefeated` reads it. At 1 out of 1 it is
+  // not spent, so a token that is healed has it too and Atlas eases the grey out
+  definitions.push({
+    key: DOWNED_KEY, name: 'Downed', field: '', direction: 'drains', color: DOWNED_COLOR, defeatedWhenSpent: true, visibleToPlayers: false,
+  });
+  values[DOWNED_KEY] = { current: token.downed === true ? 0 : 1, max: 1 };
   return { values, definitions };
 }
 

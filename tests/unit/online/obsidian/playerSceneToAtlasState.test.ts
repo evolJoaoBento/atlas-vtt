@@ -48,7 +48,11 @@ describe('playerSceneToAtlasState', () => {
     expect(tokens.downed).toMatchObject({ kind: 'character', resources: { downed: { current: 0, max: 1 } } });
     expect(tokens.plain).toMatchObject({ kind: 'token' });
     // Atlas draws each bar from a stand-in definition of the colour sent; nothing of the GM's definitions
-    expect(parts.resources.named).toEqual([expect.objectContaining({ key: 'bar0', color: '#22c55e', slot: 0, visibleToPlayers: true })]);
+    expect(parts.resources.named).toEqual([
+      expect.objectContaining({ key: 'bar0', color: '#22c55e', slot: 0, visibleToPlayers: true }),
+      expect.objectContaining({ key: 'downed', visibleToPlayers: false, defeatedWhenSpent: true }),
+    ]);
+    expect(tokens.named).toMatchObject({ resources: { downed: { current: 1, max: 1 } } });
     expect(parts.resources.downed).toEqual([expect.objectContaining({ key: 'downed', visibleToPlayers: false, defeatedWhenSpent: true })]);
     expect(parts.resources).not.toHaveProperty('plain');
   });

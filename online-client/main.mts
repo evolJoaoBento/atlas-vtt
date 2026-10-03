@@ -22,6 +22,7 @@ import { AssetsPanel, rememberedKeep } from './assetsPanel.mts';
 import { createCanvasSurface } from './canvasSurface.mts';
 import { DiceLogView } from './diceLogView.mts';
 import { DiceTrayView } from './diceTrayView.mts';
+import { fillList } from './fillList.mts';
 import { decodeImage } from './imageDecoder.mts';
 import { MapView } from './mapView.mts';
 import { Menu } from './menu.mts';
@@ -136,21 +137,6 @@ function stored(key: string, fallback: () => string): string {
   } catch {
     return fallback();
   }
-}
-
-const listContent = new WeakMap<HTMLElement, string>();
-
-/** Rebuilds a list only when its lines changed; scene patches arrive many times a second. */
-function fillList(list: HTMLElement, lines: string[]): void {
-  list.hidden = lines.length === 0;
-  const joined = JSON.stringify(lines);
-  if (listContent.get(list) === joined) return;
-  listContent.set(list, joined);
-  list.replaceChildren(...lines.map((line) => {
-    const item = document.createElement('li');
-    item.textContent = line;
-    return item;
-  }));
 }
 
 function show(view: PageScreen): void {

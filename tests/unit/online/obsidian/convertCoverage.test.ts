@@ -160,10 +160,11 @@ const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
   statblockName: field('goblin', 'name', 'Goblin'),
   // The two first resources are bars, filled to their share out of 100 and drawn from stand-in definitions of the colour the window shows
   resources: (t) => {
-    expect(tokenOf(t.full, 'hero').resources).toEqual({ bar0: { current: 70, max: 100 }, bar1: { current: 33, max: 100 } });
+    expect(tokenOf(t.full, 'hero').resources).toEqual({ bar0: { current: 70, max: 100 }, bar1: { current: 33, max: 100 }, downed: { current: 1, max: 1 } });
     expect(t.full.back.resources.hero).toEqual([
       expect.objectContaining({ key: 'bar0', color: '#22c55e', direction: 'drains', slot: 0, visibleToPlayers: true }),
       expect.objectContaining({ key: 'bar1', color: '#a855f7', slot: 1, visibleToPlayers: true }),
+      expect.objectContaining({ key: 'downed', defeatedWhenSpent: true }),
     ]);
     expect(tokenOf(t.full, 'crate')).not.toHaveProperty('resources');
     // A spent HP bar is darkened by Atlas and red; the downed state rides on a resource players never see
@@ -177,18 +178,18 @@ const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
 /** What each definition field decides, seen on the Atlas store the online scene draws. */
 const RESOURCE_CHECKS: Checks<keyof ResourceDefinition> = {
   key: (t) => {
-    expect(Object.keys(tokenOf(t.renamedHp, 'hero').resources as object)).toEqual(['bar0']);
+    expect(Object.keys(tokenOf(t.renamedHp, 'hero').resources as object)).toEqual(['bar0', 'downed']);
     expect(t.renamedHp.back.initiativeHealth).toEqual({});
   },
   direction: (t) => expect(tokenOf(t.staticHp, 'hero').resources).toMatchObject({ bar0: { current: 100, max: 100 } }),
-  color: (t) => expect(t.full.back.resources.hero?.map((definition) => definition.color)).toEqual(['#22c55e', '#a855f7']),
+  color: (t) => expect(t.full.back.resources.hero?.slice(0, 2).map((definition) => definition.color)).toEqual(['#22c55e', '#a855f7']),
   defeatedWhenSpent: (t) => {
     expect(t.full.back.resources.fallen?.[0]?.color).toBe('#ef4444');
     expect(t.full.back.resources.hero?.[0]).not.toHaveProperty('defeatedWhenSpent');
   },
   visibleToPlayers: (t) => expect(Object.keys(tokenOf(t.full, 'hero').resources as object)).not.toContain('bar3'),
   // A resource in a wheel socket is not drawn for players: the window has no wheels for them
-  slot: (t) => expect(Object.keys(tokenOf(t.full, 'hero').resources as object)).toEqual(['bar0', 'bar1']),
+  slot: (t) => expect(Object.keys(tokenOf(t.full, 'hero').resources as object)).toEqual(['bar0', 'bar1', 'downed']),
 };
 
 const TEXT_SAME = [
@@ -305,7 +306,7 @@ const OBJECT_CHECKS: Checks<keyof typeof OBJECT_COVERAGE> = {
 
 function everySentField<K extends PropertyKey>(name: string, table: CoverageTable<K>, checks: Checks<K>): void {
   for (const [key, coverage] of Object.entries(table) as Array<[K, Coverage]>) {
-    if (coverage.status !== 'sent') continue;
+    if (coverage.status !== 'sent' && coverage.status !== 'used') continue;
     const check = checks[key];
     expect(check, `${name}.${String(key)} is sent but has no round trip check`).toBeDefined();
     check?.(TRIPS);

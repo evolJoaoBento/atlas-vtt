@@ -5,6 +5,8 @@
  *
  * - `sent`: changes what players receive: the value itself, or what it decides
  *   (a hidden token never reaches players).
+ * - `used`: never sent itself; it decides what is sent (a resource definition's socket decides which bar
+ *   players see). Changing it changes what players receive.
  * - `lighting`: never sent, in any message; with dynamic lighting on and the scene lit it
  *   decides what players receive, through the lighting the GM's player window is drawn by
  *   (`PlayerLighting`): which tokens they see and the darkness over the map. Off, it changes nothing.
@@ -26,6 +28,7 @@ import type { ProjectedState } from './scene/projectForPlayers';
 export type Coverage =
   | { readonly status: 'sent' }
   | { readonly status: 'lighting' }
+  | { readonly status: 'used'; readonly reason: string }
   | { readonly status: 'gm-only'; readonly reason: string }
   | { readonly status: 'not-yet'; readonly piece: string };
 
@@ -36,6 +39,7 @@ export type KeysOfUnion<T> = T extends unknown ? keyof T : never;
 
 const SENT: Coverage = { status: 'sent' };
 const LIGHTING: Coverage = { status: 'lighting' };
+const used = (reason: string): Coverage => ({ status: 'used', reason });
 const gmOnly = (reason: string): Coverage => ({ status: 'gm-only', reason });
 const notYet = (piece: string): Coverage => ({ status: 'not-yet', piece });
 
@@ -235,14 +239,14 @@ export const SCENE_LIGHTING_COVERAGE: CoverageTable<keyof SceneLighting> = {
  * draws no label and no numbers, so what a resource is called and where its maximum comes from stay with the GM.
  */
 export const RESOURCE_DEFINITION_COVERAGE: CoverageTable<keyof ResourceDefinition> = {
-  key: SENT,
+  key: used('tokens keep their values by key; the key picks which value a bar shows, and `hp` the initiative bar'),
   name: gmOnly('players see a bar, never what it is called'),
   field: gmOnly('the statblock field that supplies the maximum; players see only the share'),
-  direction: SENT,
+  direction: used('a static value fills its bar, and the direction decides the warning tint and when it is spent'),
   color: SENT,
-  defeatedWhenSpent: SENT,
-  visibleToPlayers: SENT,
-  slot: SENT,
+  defeatedWhenSpent: used('warning tints, the darkened bar and the downed mark'),
+  visibleToPlayers: used('decides which resources have a bar'),
+  slot: used('decides bar or wheel, and the order of the bars'),
 };
 
 export const INITIATIVE_COVERAGE: CoverageTable<keyof InitiativeState> = {

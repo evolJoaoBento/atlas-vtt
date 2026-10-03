@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sceneWorldBounds } from '../../../src/app/online/preview/previewLayout';
 import { MAX_GRID_HEXES, fogShapes, gridLines } from '../../../src/app/online/preview/previewShapes';
+import { fillList } from '../../../online-client/fillList.mts';
 import { initiativeLines, playerLines, widgetLines } from '../../../src/app/online/preview/sceneSummary';
 import type { PlayerGrid } from '../../../src/app/online/scene/sceneTypes';
 import { fogRect, playerScene, playerToken } from './sceneFixtures';
@@ -79,8 +80,31 @@ describe('scene summary', () => {
         { id: 'e2', tokenId: 't2', initiative: 12, name: null, hp: null, isActive: false },
       ],
     });
-    expect(lines).toEqual(['Round 2', '▶ 18 · Anna · HP 50%', '12 · Unnamed']);
+    expect(lines).toEqual([{ text: 'Round 2' }, { text: '▶ 18 · Anna', share: 0.5 }, { text: '12 · Unnamed' }]);
+    // The window draws a bar and no number: no row prints the share
+    expect(JSON.stringify(lines.map((line) => line.text))).not.toMatch(/HP|%|0\.5/);
     expect(initiativeLines({ round: 0, active: false, entries: [] })).toEqual([]);
     expect(initiativeLines(null)).toEqual([]);
+  });
+});
+
+describe('join page lists', () => {
+  it('draws a bar after an initiative name, with no number, and plain rows for the other lists', () => {
+    const list = document.createElement('ol');
+    fillList(list, initiativeLines({
+      round: 1, active: false,
+      entries: [{ id: 'e1', tokenId: 't1', initiative: 9, name: 'Anna', hp: null, hpShare: 0.25, isActive: false },
+        { id: 'e2', tokenId: 't2', initiative: 3, name: 'Bo', hp: null, hpShare: null, isActive: false }],
+    }));
+    const [first, second] = Array.from(list.children);
+    const bar = first!.querySelector('progress');
+    expect(bar).toMatchObject({ max: 1, value: 0.25 });
+    expect(first!.textContent).toBe('9 · Anna ');
+    expect(second!.querySelector('progress')).toBeNull();
+    const plain = document.createElement('ul');
+    fillList(plain, ['Torches: 3']);
+    expect(plain.innerHTML).toBe('<li>Torches: 3</li>');
+    fillList(plain, []);
+    expect(plain.hidden).toBe(true);
   });
 });

@@ -239,3 +239,4 @@ button:disabled { opacity: 0.5; cursor: default; }
   /* Follow GM and Fit map move above the toolbar. */
   .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
 }
+#initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }

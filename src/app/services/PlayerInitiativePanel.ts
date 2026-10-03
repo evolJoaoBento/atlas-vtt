@@ -60,7 +60,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       .join(TOKEN_ID_SEPARATOR);
     const entryTokens = JSON.stringify(entries.map((entry): EntryToken => {
       const token = tokens?.[entry.tokenId];
-      const hp = remoteScene ? remoteScene.initiativeHealth[entry.tokenId] : token?.resources?.hp;
+      const hp = remoteScene ? (Object.hasOwn(remoteScene.initiativeHealth, entry.tokenId) ? remoteScene.initiativeHealth[entry.tokenId] : undefined) : token?.resources?.hp;
       return { hp: hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
     }));
     return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, remote: remoteScene != null, tokens: entryTokens };

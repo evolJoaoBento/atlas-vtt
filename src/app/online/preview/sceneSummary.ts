@@ -10,14 +10,19 @@ export function widgetLines(widgets: readonly PlayerWidget[]): string[] {
   });
 }
 
-export function initiativeLines(initiative: PlayerInitiative | null): string[] {
+/** A list row: its text, and how full the bar after it is (0 to 1) where the player window draws one. */
+export interface ListRow {
+  text: string;
+  share?: number;
+}
+
+/** The initiative list's rows. The player window draws a bar after the name and no numbers, so the share is not printed. */
+export function initiativeLines(initiative: PlayerInitiative | null): ListRow[] {
   if (!initiative || initiative.entries.length === 0) return [];
-  const lines = initiative.active ? [`Round ${initiative.round}`] : [];
+  const lines: ListRow[] = initiative.active ? [{ text: `Round ${initiative.round}` }] : [];
   for (const entry of initiative.entries) {
     const turn = entry.isActive ? '▶ ' : '';
-    // The player window draws a bar with no numbers: the share is all the list says too
-    const hp = typeof entry.hpShare === 'number' ? ` · HP ${Math.round(entry.hpShare * 100)}%` : '';
-    lines.push(`${turn}${entry.initiative} · ${entry.name ?? 'Unnamed'}${hp}`);
+    lines.push({ text: `${turn}${entry.initiative} · ${entry.name ?? 'Unnamed'}`, ...(typeof entry.hpShare === 'number' ? { share: entry.hpShare } : {}) });
   }
   return lines;
 }

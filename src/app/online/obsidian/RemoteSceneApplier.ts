@@ -13,6 +13,7 @@ import type { FogOperation } from '../../types/fogTypes';
 import { sameValue, setOwn } from '../scene/sceneDiff';
 import type { PlayerDrawing, PlayerFogOp, PlayerScene, PlayerText, PlayerToken, ScenePoint } from '../scene/sceneTypes';
 import { atlasDrawing, atlasFog, atlasText } from './convertShapes';
+import { DOWNED_KEY } from './convertResources';
 import { atlasToken } from './convertTokens';
 import { emptyRemoteScene, playerSceneToAtlasState, type RecordBuilders, type RemoteSceneParts } from './playerSceneToAtlasState';
 import type { RemoteImages } from './remoteScene';
@@ -142,6 +143,10 @@ export class RemoteSceneApplier {
     if (!sameValue(state.widgetValues, next.widgetValues)) update.widgetValues = next.widgetValues;
     if (!sameValue(state.initiative, next.initiative)) update.initiative = next.initiative;
     if (state.initiativeTrackerOpen !== next.initiativeTrackerOpen) update.initiativeTrackerOpen = next.initiativeTrackerOpen;
+    // The downed stand-ins are not bars: the token UI skips them
+    if (!state.tokenSettings.hiddenResources.includes(DOWNED_KEY)) {
+      update.tokenSettings = { ...state.tokenSettings, hiddenResources: [...state.tokenSettings.hiddenResources, DOWNED_KEY] };
+    }
     const remote = state.remoteScene;
     const { measurement, conditions, resources, initiativeHealth } = parts;
     const scene = { measurement, conditions, resources, initiativeHealth };

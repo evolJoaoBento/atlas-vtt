@@ -18,13 +18,13 @@ import { coverageOfFog, fakeAssetIds } from './sceneFixtures';
 
 type Variants<K extends PropertyKey, T> = Record<K, (base: T) => T>;
 
-/** A `sent` field changes the projection; a `lighting`, `gm-only` or `not-yet` field never does without lighting (`lightingCoverage.test.ts`). */
+/** A `sent` or `used` field changes the projection; a `lighting`, `gm-only` or `not-yet` field never does without lighting (`lightingCoverage.test.ts`). */
 function expectCoverage<K extends string, T>(table: CoverageTable<K>, variants: Variants<K, T>, base: T, project: (value: T) => unknown): void {
   expect(Object.keys(variants).sort()).toEqual(Object.keys(table).sort());
   const before = project(base);
   for (const key of Object.keys(table) as K[]) {
     const after = project(variants[key](base));
-    if (table[key].status === 'sent') expect(after, `${key} is marked sent`).not.toEqual(before);
+    if (table[key].status === 'sent' || table[key].status === 'used') expect(after, `${key} is marked sent`).not.toEqual(before);
     else expect(after, `${key} is marked ${table[key].status}`).toEqual(before);
   }
 }

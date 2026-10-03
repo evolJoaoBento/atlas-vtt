@@ -21,7 +21,7 @@ import { createViewAtlasStore } from '../../../../src/app/storeFactory';
 import type { Character, TokenEntity } from '../../../../src/app/types';
 import { createDefaultInitiativeState } from '../../../../src/app/types/initiativeTypes';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
-import { coverageOfFog, fakeAssetIds } from '../sceneFixtures';
+import { coverageOfFog, fakeAssetIds, playerScene, playerToken } from '../sceneFixtures';
 
 const IMAGES: RemoteImages = { background: () => null, token: () => null };
 const COLLECTIONS = { getCollectionForMap: () => null, getCollectionSettings: () => { throw new Error('a remote scene has no collection'); } };
@@ -142,7 +142,7 @@ describe('resources in the online scene', () => {
 
   it('answers for tokens it has stand-ins for, and for no other', () => {
     const store = sceneStore();
-    expect(definitionsOf(store)('hurt').map((definition) => definition.key)).toEqual(['bar0', 'bar1']);
+    expect(definitionsOf(store)('hurt').map((definition) => definition.key)).toEqual(['bar0', 'bar1', 'downed']);
     expect(definitionsOf(store)('nobody')).toEqual([]);
     expect(definitionsOf(store)()).toEqual([]);
   });
@@ -168,5 +168,32 @@ describe('resources in the online scene', () => {
     expect(bar).not.toBeNull();
     expect(bar!.value / bar!.max).toBeCloseTo(0.5);
     panel.destroy();
+  });
+
+  it('never gives a stand-in a wheel socket, however many bars arrive, and keeps the downed stand-in out of sight', () => {
+    mockCanvas();
+    const store = sceneStore();
+    const applier = new RemoteSceneApplier({ store, images: IMAGES });
+    const bar = { color: '#3b82f6', share: 0.5, spent: false };
+    applier.apply({
+      ...playerScene(), tokens: { t1: playerToken({ name: 'Many', resources: Array.from({ length: 6 }, () => bar), downed: true }) },
+    });
+    expect(store.getState().tokenSettings.hiddenResources).toEqual(['downed']);
+    const ui = tokenUi(store);
+    try {
+      ui.update(tokenOf(store, 't1'), 70);
+      expect(ui.getResourceSlots().map((slot) => [slot.key, slot.kind])).toEqual([['bar0', 'bar'], ['bar1', 'bar']]);
+      expect(isTokenDowned(tokenOf(store, 't1'), definitionsOf(store)('t1'))).toBe(true);
+    } finally { ui.destroy(); }
+  });
+
+  it('keeps the downed stand-in on a healed token, so the grey eases out as it does in a GM view', () => {
+    const store = sceneStore();
+    const before = tokenOf(store, 'fallen');
+    new RemoteSceneApplier({ store, images: IMAGES }).apply(playerScene({ tokens: { fallen: playerToken({ name: 'Fallen', resources: [{ color: '#22c55e', share: 1, spent: false }], downed: false }) } }));
+    const after = tokenOf(store, 'fallen');
+    const definitions = definitionsOf(store)('fallen');
+    expect(isTokenDowned(before, definitions)).toBe(true);
+    expect(isTokenDowned(after, definitions)).toBe(false);
   });
 });
