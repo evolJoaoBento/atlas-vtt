@@ -248,6 +248,12 @@ describe('projectForPlayers', () => {
     expect(projectForPlayers(gmState(), context({ collectionGrid })).measurement.coneAngle).toBe(53.13);
     expect(projectForPlayers(gmState(), context({ collectionGrid: { ...collectionGrid, coneAngle: 500 } })).measurement.coneAngle).toBe(90);
   });
+
+  it("sends the GM's cone angle when given, over the collection's grid defaults", () => {
+    const collectionGrid = { unitType: 'feet' as const, unitDistance: 5, measurementMode: 'metric' as const };
+    expect(projectForPlayers(gmState(), context({ collectionGrid, coneAngle: 53.13 })).measurement.coneAngle).toBe(53.13);
+    expect(projectForPlayers(gmState(), context({ collectionGrid: null, coneAngle: 53.13 })).measurement.coneAngle).toBe(53.13);
+  });
 });
 
 describe('projectForPlayers out-of-range numbers', () => {

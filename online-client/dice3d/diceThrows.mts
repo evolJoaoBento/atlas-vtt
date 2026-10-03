@@ -3,13 +3,55 @@
  * The join page's 3D dice: Atlas's own (`src/app/dice3d/`, three.js) throwing the player's own
  * rolls. Its own chunk, loaded with the first roll the page throws (`OwnRollThrows`), so the page
  * opens as fast as without it. The Obsidian globals the dice use are installed first.
+ *
+ * The page holds at most two WebGL contexts (`PAGE_STAGES`): the stage on screen and one spare, so
+ * a roll that replaces the one showing finds a stage made. Atlas's `warmStages` builds four (a
+ * stack of rolls, panels fading out); one panel at a time needs no more, and a phone's GPU memory
+ * is better spent elsewhere.
  */
 import './obsidianShim.mts';
-import { borrowStage, returnStage, warmStages } from '../../src/app/dice3d/stagePool';
+import { stagePixelRatio, type DiceRenderer } from '../../src/app/dice3d/DiceRenderer';
+import { DIE_BODIES } from '../../src/app/dice3d/diceScene';
+import { loadDiceArtwork } from '../../src/app/dice3d/dieArtwork';
+import { makeDie } from '../../src/app/dice3d/dieMotion';
+import { borrowStage, returnStage } from '../../src/app/dice3d/stagePool';
 import type { DiceThrowModule } from '../../src/app/online/page/ownRollThrows';
 import { ThrowPanel, type PageThrow } from './throwPanel.mts';
 
+/** The stage on screen and a spare. */
+export const PAGE_STAGES = 2;
+/** `stagePool`'s warm-up size in rem and spin: the panel's size and more, fast enough for the smear's shader. */
+const WARM_REM = [21, 24] as const;
+const WARM_SPIN = [40, 0, 0] as const;
+
 let current: ThrowPanel | null = null;
+let spare = false;
+
+/**
+ * One unseen frame of every body on a renderer, as `stagePool`'s warm-up draws it: the shaders get
+ * compiled and the artwork reaches the graphics card before a roll needs them.
+ */
+function warmUp(renderer: DiceRenderer): void {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  renderer.setSize(Math.ceil(WARM_REM[0] * rem), Math.ceil(WARM_REM[1] * rem), stagePixelRatio(window));
+  renderer.setPlan(DIE_BODIES);
+  renderer.render(DIE_BODIES.map((sides) => ({ sides, anim: { ...makeDie(Math.random), w: [...WARM_SPIN] } })), 0);
+}
+
+/** Builds the spare stage once, in an idle moment after the first throw, and puts it in the pool. */
+function prepareSpare(): void {
+  if (spare) return;
+  spare = true;
+  const idle = (run: () => void): void => {
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 3000 });
+    else window.setTimeout(run, 500);
+  };
+  void loadDiceArtwork().then(() => idle(() => {
+    const lease = borrowStage(document);
+    if (lease.renderer) warmUp(lease.renderer);
+    returnStage(lease);
+  }));
+}
 
 /** Throws `roll` into `container`; false without WebGL, so the page shows the result card instead. */
 function throwRoll(container: HTMLElement, roll: PageThrow): boolean {
@@ -23,8 +65,7 @@ function throwRoll(container: HTMLElement, roll: PageThrow): boolean {
     if (current === panel) current = null;
   });
   current = panel;
-  // The next roll finds a stage made: building one is a freeze at the moment the dice leave the hand.
-  warmStages(document);
+  prepareSpare();
   return true;
 }
 

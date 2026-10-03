@@ -1,4 +1,4 @@
-import { resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
+import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
 import { collectionConeAngle } from '../gameSystems/coneAngle';
 import type { ViewAtlasState } from '../storeFactory';
 import type { CollectionGridDefaults, CollectionSettings } from '../types/collectionSettingsTypes';
@@ -10,15 +10,22 @@ function collectionSettingsFor(assetService: AssetService, mapPath: string | nul
   return collectionId ? assetService.getCollectionSettings(collectionId) : null;
 }
 
-/**
- * The grid defaults of the collection holding the map at `mapPath`, with the cone angle the GM's
- * measure tool uses (`collectionConeAngle`: a collection set up before cone angles takes its
- * system's), so online players' cones open as the GM's; null for a map outside a collection.
- */
+/** The grid defaults of the collection holding the map at `mapPath`; null for a map outside a collection. */
 export function collectionGridDefaultsFor(assetService: AssetService, mapPath: string | null): CollectionGridDefaults | null {
+  return collectionSettingsFor(assetService, mapPath)?.gridDefaults ?? null;
+}
+
+/**
+ * The cone angle the map at `mapPath` measures with, for the GM's measure tool and for online
+ * players alike, so the two never differ: its collection's (`collectionConeAngle`: its own, else
+ * its system's, with or without grid defaults), a quarter circle outside a collection or for a
+ * stored angle no cone can open with (one edited by hand).
+ */
+export function mapConeAngle(assetService: AssetService, mapPath: string | null): number {
   const settings = collectionSettingsFor(assetService, mapPath);
-  const gridDefaults = settings?.gridDefaults;
-  return gridDefaults ? { ...gridDefaults, coneAngle: collectionConeAngle(gridDefaults, settings.systemPresetId) } : null;
+  if (!settings) return DEFAULT_CONE_ANGLE;
+  const angle = collectionConeAngle(settings.gridDefaults, settings.systemPresetId);
+  return isValidConeAngle(angle) ? angle : DEFAULT_CONE_ANGLE;
 }
 
 /** Measurement settings for the map in `state`: its collection's, or, in the online scene, the GM's. */
@@ -29,6 +36,5 @@ export function mapMeasurementSettings(
   if (state.remoteScene) return state.remoteScene.measurement;
   const settings = collectionSettingsFor(assetService, state.mapPath);
   if (!settings) return resolveMeasurementSettings(undefined, state.grid);
-  const { gridDefaults, systemPresetId } = settings;
-  return { ...resolveMeasurementSettings(gridDefaults, state.grid), coneAngle: collectionConeAngle(gridDefaults, systemPresetId) };
+  return { ...resolveMeasurementSettings(settings.gridDefaults, state.grid), coneAngle: mapConeAngle(assetService, state.mapPath) };
 }

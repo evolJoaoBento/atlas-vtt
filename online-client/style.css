@@ -42,8 +42,16 @@ button:disabled { opacity: 0.5; cursor: default; }
 #map.can-grab { cursor: grab; }
 #map:active, #map.is-grabbing { cursor: grabbing; }
 /* "Move not allowed.": over the top of the map, never taking input. */
+/* The top of the map: the move notice, a roll's toast and your own throw, stacked so none covers another. */
+.top-stack {
+  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; max-width: calc(100% - 32px);
+  display: flex; flex-direction: column; align-items: center; gap: var(--gap); pointer-events: none;
+}
+.top-notes { display: flex; flex-direction: column; align-items: center; gap: var(--gap); max-width: 100%; }
+.top-notes:not(:has(> :not([hidden]))) { display: none; }
+.dice-toast, .dice-throws { pointer-events: auto; }
 .move-notice {
-  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin: 12px 0 0;
+  margin: 0;
   padding: var(--gap); background: var(--bar); color: var(--text); border: 1px solid var(--border); border-radius: 8px; pointer-events: none;
 }
 .top-bar {
@@ -248,15 +256,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 /* A new roll, at the top while the log is closed; a tap opens the log. */
 .dice-toast {
-  grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin: 12px 0 0;
-  min-height: 0; min-width: 200px; max-width: calc(100% - 32px); padding: var(--inset); text-align: left;
+  margin: 0; min-height: 0; min-width: 200px; max-width: 100%; padding: var(--inset); text-align: left;
   background: var(--card); color: var(--text); font-weight: 400; border: var(--panel-border) solid var(--border);
   border-radius: 16px; box-shadow: var(--shadow);
 }
 .dice-toast .dice-entry { padding: 4px; border: 0; }
 
 /* The player's own roll, thrown as Atlas's 3D dice at the top of the map (`dice3d/throwPanel.mts`). */
-.dice-throws { grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; pointer-events: none; }
+.dice-throws { display: contents; }
+.dice-throws:empty { display: none; }
 .dice-throw {
   pointer-events: auto; width: min(21rem, calc(100vw - 32px)); display: grid; gap: var(--inset); padding: var(--inset);
   background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius);
@@ -269,6 +277,15 @@ button:disabled { opacity: 0.5; cursor: default; }
 .dice-throw-label { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dice-throw-close { width: 32px; height: 32px; margin: 0; font-size: 18px; border-top-right-radius: var(--inset-radius); }
 .dice-throw-stage { position: relative; height: min(13rem, 40vh); overflow: hidden; border-radius: 12px; }
+/* A phone on its side: a lower stage, and the throw beside the notice and toast rather than under them, clear of the toolbar. */
+@media (max-height: 500px) {
+  /* What the top bar, the panel's own parts and the toolbar leave of the height, at most 22vh. */
+  .dice-throw-stage { height: max(3.5rem, min(22vh, calc(100vh - 292px))); }
+  .dice-throw-slot, .dice-throw-slot.has-breakdown { min-height: 2.6rem; }
+}
+@media (max-height: 500px) and (min-width: 560px) {
+  .top-stack { flex-direction: row; align-items: flex-start; }
+}
 /* Atlas draws in the canvas's bottom-left corner and lets it only grow (`DiceRenderer.setView`): the stage clips the rest. */
 .dice-throw-stage canvas { position: absolute; bottom: 0; left: 0; display: block; max-width: none; }
 .dice-throw-slot { margin: 0; min-height: 3.2rem; display: grid; justify-items: center; align-content: center; gap: 2px; }

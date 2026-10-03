@@ -2,7 +2,7 @@ import { Notice, type App } from 'obsidian';
 import { AssetService } from '../services/AssetService';
 import { mapResources } from '../resources/collectionResources';
 import type { ResourceDefinition } from '../resources/resourceTypes';
-import { collectionGridDefaultsFor } from '../services/mapMeasurementSettings';
+import { collectionGridDefaultsFor, mapConeAngle } from '../services/mapMeasurementSettings';
 import { mapDiceRules } from '../services/mapDiceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
 import { watchCollectionResources } from './watchCollectionResources';
@@ -57,6 +57,8 @@ interface Deps {
   images?: ImageFiles;
   /** The grid defaults of a map's collection; Atlas's asset index unless a test passes its own. */
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
+  /** The cone angle the GM measures with on a map; Atlas's asset index unless a test passes its own. */
+  coneAngle?: (mapPath: string | null) => number;
   /** The resources of a map's collection; Atlas's asset index unless a test passes its own. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   /** Tells when those resources may have changed; the collection settings events unless a test passes its own. */
@@ -102,6 +104,7 @@ export class OnlineSessionService {
   private readonly showRequest: NonNullable<Deps['showRequest']>;
   private readonly isJoined: () => boolean;
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
+  private readonly coneAngle: (mapPath: string | null) => number;
   private readonly resources: (mapPath: string | null) => readonly ResourceDefinition[];
   private readonly watchResources: (listener: () => void) => () => void;
   private readonly loadTable: () => Promise<TableIdentity | null>;
@@ -122,6 +125,7 @@ export class OnlineSessionService {
     this.images = deps.images ?? vaultImageFiles(app);
     this.collectionGrid = deps.collectionGrid
       ?? ((mapPath) => (mapPath ? collectionGridDefaultsFor(AssetService.getInstance(app), mapPath) : null));
+    this.coneAngle = deps.coneAngle ?? ((mapPath) => mapConeAngle(AssetService.getInstance(app), mapPath));
     this.resources = deps.resources ?? ((mapPath) => mapResources(AssetService.getInstance(app), mapPath));
     this.watchResources = deps.watchResources ?? ((listener) => watchCollectionResources(app, listener));
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
@@ -223,7 +227,7 @@ export class OnlineSessionService {
     // The broadcaster and the camera sender send through the log, so diagnostics see every scene message.
     const scenes = loggedSession(session, log);
     const broadcaster = new SceneBroadcaster({
-      session: scenes, presented: this.presented, settings: this.settings, assets: registry, notify, collectionGrid: this.collectionGrid,
+      session: scenes, presented: this.presented, settings: this.settings, assets: registry, notify, collectionGrid: this.collectionGrid, coneAngle: this.coneAngle,
       resources: this.resources, watchResources: this.watchResources,
     });
     // The GM's view of the presented scene, which players follow by default; registered after the broadcaster.

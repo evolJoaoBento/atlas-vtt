@@ -52,6 +52,8 @@ export interface ProjectionContext {
   memo: ProjectionMemo;
   /** The grid defaults of the map's collection, which decide the measurement; without them the map's grid does. */
   collectionGrid?: CollectionGridDefaults | null;
+  /** The cone angle the GM's measure tool opens on this map (`mapConeAngle`); without it, the collection's grid defaults decide. */
+  coneAngle?: number;
   /**
    * The resources of the map's collection, which decide the bars players see (`projectBars`); without
    * them nothing is shown, so a map whose collection is unknown shows no resource.
@@ -82,7 +84,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),
     initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules, context.resources ?? NO_RESOURCES),
-    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid),
+    measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
   };
 }
 
@@ -113,8 +115,10 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
 }
 
 /** The settings Atlas's ruler and measure tool use for this map, field by field. */
-function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null): PlayerMeasurement {
+function projectMeasurement(collection: CollectionGridDefaults | null, grid: GridState | null, coneAngle?: number): PlayerMeasurement {
   const settings = resolveMeasurementSettings(collection ?? undefined, grid);
+  // `mapConeAngle` gives only valid angles; one the page would refuse (from a share's raw grid defaults) opens a quarter circle.
+  const cone = coneAngle ?? settings.coneAngle;
   const rangeBands: unknown = settings.rangeBands;
   const bands = Array.isArray(rangeBands) ? (rangeBands as unknown[]) : [];
   return {
@@ -123,7 +127,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     unitDistance: finiteOr(settings.unitDistance, 5, SCENE_RANGES.unitDistance),
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
     snapToGrid: grid?.snapToGrid ?? true,
-    coneAngle: isValidConeAngle(settings.coneAngle) ? settings.coneAngle : DEFAULT_CONE_ANGLE,
+    coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,
     rangeBands: bands.slice(0, SCENE_LIMITS.rangeBands).map((band) => {
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };

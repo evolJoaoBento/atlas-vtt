@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { diceThrows } from '../../../online-client/dice3d/diceThrows.mts';
 import { LEAVE_MS, LINGER_MS, ThrowPanel, TICK_DELAY_MS, type PageThrow } from '../../../online-client/dice3d/throwPanel.mts';
@@ -75,5 +77,16 @@ describe("the join page's thrown roll", () => {
     panel.dismiss();
     expect(renderer.reset).toHaveBeenCalled();
     expect(lease.canvas.isConnected).toBe(false);
+  });
+
+  // The page shows a refused move, another player's roll and your own throw at the top of the map:
+  // one column, so none covers another (`.top-stack` in style.css).
+  it("stacks the move notice, the roll toast and your throw under one another at the top of the map", () => {
+    const page = new DOMParser().parseFromString(readFileSync(join(process.cwd(), 'online-client/index.html'), 'utf8'), 'text/html');
+    const stack = page.querySelector('.top-stack');
+    expect([...stack!.querySelectorAll('[id]')].map((child) => child.id)).toEqual(['move-notice', 'dice-toast', 'dice-throws']);
+    const css = readFileSync(join(process.cwd(), 'online-client/style.css'), 'utf8');
+    expect(css).toMatch(/\.top-stack \{[^}]*flex-direction: column/);
+    expect(css).not.toMatch(/\.(move-notice|dice-toast|dice-throws) \{[^}]*grid-row/);
   });
 });

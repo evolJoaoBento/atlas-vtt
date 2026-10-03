@@ -42,6 +42,8 @@ export interface SceneBroadcasterOptions {
   notify(message: string): void;
   /** The grid defaults of the collection holding the map at `mapPath`; tests leave it out. */
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
+  /** The cone angle the GM measures with on the map at `mapPath` (`mapConeAngle`); tests leave it out. */
+  coneAngle?: (mapPath: string | null) => number;
   /** The resources of the collection holding the map at `mapPath`, which decide the bars players see; without it none show. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
   /** Calls `listener` when a collection's settings change or the asset index loads (the resources may differ); returns the stop. */
@@ -113,12 +115,14 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides its store's slice. */
 export function sceneContext(
   scene: PresentedSceneInfo,
-  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'resources'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'resources'> {
+  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'coneAngle' | 'resources'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources'> {
   const mapPath = scene.store.getState().mapPath ?? null;
+  const coneAngle = options.coneAngle?.(mapPath);
   return {
     mapSize: scene.mapSize(),
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
+    ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
   };
 }
