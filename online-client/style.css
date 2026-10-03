@@ -315,4 +315,8 @@ button:disabled { opacity: 0.5; cursor: default; }
   /* Follow GM and Fit map move above the toolbar. */
   .view-buttons { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--toolbar-height) + var(--inset)); }
 }
+#initiative:has(li.side) { list-style: none; padding-left: 0; }
+#initiative li.side { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--muted, inherit); list-style: none; }
+#initiative li.side[aria-current="true"] { color: var(--accent); }
+#initiative li.sitting-out { opacity: 0.45; }
 #initiative progress.health { width: 56px; height: 6px; margin-left: 6px; vertical-align: middle; accent-color: var(--accent); }

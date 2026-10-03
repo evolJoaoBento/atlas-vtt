@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
+  DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, INITIATIVE_RULES_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
   OBJECT_COVERAGE, RESOURCE_DEFINITION_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, TOKEN_SETTINGS_COVERAGE, type CoverageTable, type KeysOfUnion,
 } from '../../../src/app/online/coverage';
 import { projectForPlayers, type ProjectedState } from '../../../src/app/online/scene/projectForPlayers';
@@ -11,6 +11,7 @@ import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { Character, DrawingStroke, TextElement } from '../../../src/app/types';
 import type { CollectionGridDefaults } from '../../../src/app/types/collectionSettingsTypes';
+import type { InitiativeRules } from '../../../src/app/types/initiativeRulesTypes';
 import type { FogBrushStroke, FogOperation, FogRectangleFill } from '../../../src/app/types/fogTypes';
 import { createDefaultInitiativeState, type InitiativeEntry, type InitiativeState } from '../../../src/app/types/initiativeTypes';
 import type { AnyWidget } from '../../../src/app/types/widgetTypes';
@@ -39,9 +40,9 @@ const DEFINITIONS: readonly ResourceDefinition[] = [
   { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true, slot: 0 },
   { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7', visibleToPlayers: true, slot: 1 },
 ];
-const project = (state: ProjectedState, resources: readonly ResourceDefinition[] = DEFINITIONS): unknown => projectForPlayers(state, {
+const project = (state: ProjectedState, resources: readonly ResourceDefinition[] = DEFINITIONS, initiativeRules?: InitiativeRules): unknown => projectForPlayers(state, {
   sceneId: 'scene-1', rules: RULES, coverage: coverageOfFog({}), assets, mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(),
-  resources,
+  resources, ...(initiativeRules && { initiativeRules }),
 });
 
 const TOKEN: Character = {
@@ -85,9 +86,13 @@ function sceneState(overrides: Partial<ProjectedState> = {}): ProjectedState {
   };
 }
 
+/** The token in a fight by sides, since only then does the window file a combatant under a side. */
 const withToken = (token: Character): ProjectedState => {
   const base = sceneState();
-  return { ...base, objects: { ...base.objects, tokens: { [token.id]: token } } };
+  return {
+    ...base, objects: { ...base.objects, tokens: { [token.id]: token } },
+    initiative: { ...base.initiative, sides: { first: 'players', active: 'players' } },
+  };
 };
 
 describe('coverage of map objects', () => {
@@ -262,6 +267,19 @@ describe('coverage of the initiative', () => {
       order: set({ order: 2 }), sitsOut: set({ sitsOut: true }),
     };
     expectCoverage(INITIATIVE_ENTRY_COVERAGE, variants, ENTRY, (entry) => project(withInitiative({ ...base, entries: [entry, second] })));
+  });
+});
+
+describe('coverage of the initiative rules', () => {
+  it("sends what the collection's rules decide before a fight, and nothing of the roll", () => {
+    const base: InitiativeRules = { mode: 'sides', roll: '1d20', firstSide: 'players' };
+    const set = (patch: Partial<InitiativeRules>) => (rules: InitiativeRules): InitiativeRules => ({ ...rules, ...patch });
+    const variants: Variants<keyof InitiativeRules, InitiativeRules> = {
+      mode: set({ mode: 'turn-order' }), firstSide: set({ firstSide: 'opponents' }), roll: set({ roll: '2d6' }),
+    };
+    // No fight is running, so the collection's rules decide the list
+    const idle = sceneState({ initiative: { ...createDefaultInitiativeState(), entries: [ENTRY] } });
+    expectCoverage(INITIATIVE_RULES_COVERAGE, variants, base, (rules) => project(idle, DEFINITIONS, rules));
   });
 });
 

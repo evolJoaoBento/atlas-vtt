@@ -5,6 +5,7 @@
  * GM's records, never spread, so anything this code does not name, including
  * fields a later Atlas adds, is left out.
  */
+import { DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
 import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { DEFAULT_HEX_NUMBER_OPACITY, isHexNumberFormat } from '../../grid/hexNumbering';
 import type { GridState } from '../../services/MapPersistence';
@@ -12,18 +13,19 @@ import type { ViewAtlasState } from '../../storeFactory';
 import type { Character, TokenEntity } from '../../types';
 import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
+import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
 import type { LightingFrame } from './LiveLighting';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
-import { projectInitiative, projectWidgets } from './projectPanels';
+import { combatantSides, projectInitiative, projectSides, projectWidgets } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
-  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
+  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerSide, type PlayerToken,
 } from './sceneTypes';
 
 export type ProjectedState = Pick<
@@ -59,6 +61,11 @@ export interface ProjectionContext {
    * them nothing is shown, so a map whose collection is unknown shows no resource.
    */
   resources?: readonly ResourceDefinition[];
+  /**
+   * The initiative rules of the map's collection, which decide whether the list is by sides before
+   * a fight starts (`projectSides`); without them the default rules apply: turn order.
+   */
+  initiativeRules?: InitiativeRules;
 }
 
 const DEFAULT_RING = '#ffffff';
@@ -70,8 +77,10 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
   // Raw (finite, positive) size for local coverage checks; the wire gets the clamped value.
   const cellSize = positiveOr(state.grid?.size, DEFAULT_GRID_SIZE);
   const lighting = context.lighting ?? null;
+  const initiativeRules = context.initiativeRules ?? DEFAULT_INITIATIVE_RULES;
   // A token the player window does not show (unseen, or only sensed) is not sent, with its nameplate and bars.
-  const tokens = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize)));
+  const sides = combatantSides(state, projectSides(state, context.rules, initiativeRules));
+  const tokens = projectRecord(objects?.tokens, (token, id) => (lighting && !lighting.seen(id) ? null : projectToken(token, context, cellSize, sides.get(id))));
   const fog = projectFog(objects?.fog, context.memo);
   return {
     sceneId: context.sceneId,
@@ -83,7 +92,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
     drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),
-    initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules, context.resources ?? NO_RESOURCES),
+    initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules),
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
   };
 }
@@ -135,7 +144,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
   };
 }
 
-function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: number): PlayerToken | null {
+function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: number, side?: PlayerSide): PlayerToken | null {
   // Any truthy value hides, as in the local window (`playerSafeFrame`, `PlayerInitiativePanel`).
   if (token.isHidden) return null;
   const x = finiteOrNull(token.x);
@@ -162,6 +171,7 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     stress: null,
     resources: character ? projectBars(character, definitions) : [],
     downed: isDowned(token, definitions),
+    ...(side && { side }),
   };
 }
 

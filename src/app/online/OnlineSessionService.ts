@@ -4,6 +4,8 @@ import { mapResources } from '../resources/collectionResources';
 import type { ResourceDefinition } from '../resources/resourceTypes';
 import { collectionGridDefaultsFor, mapConeAngle } from '../services/mapMeasurementSettings';
 import { mapDiceRules } from '../services/mapDiceRules';
+import { mapInitiativeRules } from '../services/mapInitiativeRules';
+import type { InitiativeRules } from '../types/initiativeRulesTypes';
 import type { DiceRules } from '../types/diceRulesTypes';
 import { watchCollectionResources } from './watchCollectionResources';
 import { presentedScene } from '../services/PresentedScene';
@@ -61,7 +63,9 @@ interface Deps {
   coneAngle?: (mapPath: string | null) => number;
   /** The resources of a map's collection; Atlas's asset index unless a test passes its own. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
-  /** Tells when those resources may have changed; the collection settings events unless a test passes its own. */
+  /** The initiative rules of a map's collection; Atlas's asset index unless a test passes its own. */
+  initiativeRules?: (mapPath: string | null) => InitiativeRules;
+  /** Tells when those resources or rules may have changed; the collection settings events unless a test passes its own. */
   watchResources?: (listener: () => void) => () => void;
   /** Atlas's dice rolls; the `atlas-dice-rolled` document event unless a test passes its own. */
   diceFeed?: DiceFeed;
@@ -106,6 +110,7 @@ export class OnlineSessionService {
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
   private readonly coneAngle: (mapPath: string | null) => number;
   private readonly resources: (mapPath: string | null) => readonly ResourceDefinition[];
+  private readonly initiativeRules: (mapPath: string | null) => InitiativeRules;
   private readonly watchResources: (listener: () => void) => () => void;
   private readonly loadTable: () => Promise<TableIdentity | null>;
   private readonly identityCrypto: IdentityCrypto;
@@ -127,6 +132,7 @@ export class OnlineSessionService {
       ?? ((mapPath) => (mapPath ? collectionGridDefaultsFor(AssetService.getInstance(app), mapPath) : null));
     this.coneAngle = deps.coneAngle ?? ((mapPath) => mapConeAngle(AssetService.getInstance(app), mapPath));
     this.resources = deps.resources ?? ((mapPath) => mapResources(AssetService.getInstance(app), mapPath));
+    this.initiativeRules = deps.initiativeRules ?? ((mapPath) => mapInitiativeRules(app, mapPath));
     this.watchResources = deps.watchResources ?? ((listener) => watchCollectionResources(app, listener));
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
     this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.settings, this.identityCrypto));
@@ -228,7 +234,7 @@ export class OnlineSessionService {
     const scenes = loggedSession(session, log);
     const broadcaster = new SceneBroadcaster({
       session: scenes, presented: this.presented, settings: this.settings, assets: registry, notify, collectionGrid: this.collectionGrid, coneAngle: this.coneAngle,
-      resources: this.resources, watchResources: this.watchResources,
+      resources: this.resources, initiativeRules: this.initiativeRules, watchResources: this.watchResources,
     });
     // The GM's view of the presented scene, which players follow by default; registered after the broadcaster.
     const cameraSender = new CameraSender({ session: scenes, presented: this.presented, projection: broadcaster });

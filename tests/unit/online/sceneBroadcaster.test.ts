@@ -16,7 +16,8 @@ import { createTabMetaStore } from '../../../src/app/stores/tabMetaStore';
 import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { Character, DrawingStroke } from '../../../src/app/types';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
-import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
+import type { InitiativeRules } from '../../../src/app/types/initiativeRulesTypes';
+import { createDefaultInitiativeState, type InitiativeEntry } from '../../../src/app/types/initiativeTypes';
 import { fingerprintOf, memoryImageFiles, nodeHash, type MemoryImageFiles } from './assetFixtures';
 import { fogRect, playerScene } from './sceneFixtures';
 
@@ -112,6 +113,8 @@ interface Harness {
   setRules(next: Partial<PlayerViewRules>): void;
   /** The GM edits the collection's resources; the broadcaster is told, as the collection settings event does. */
   setResources(next: readonly ResourceDefinition[]): void;
+  /** The GM edits the collection's initiative rules; announced the same way. */
+  setInitiativeRules(next: InitiativeRules): void;
 }
 
 function setup(options: { start?: boolean; images?: Record<string, string | Uint8Array> } = {}): Harness {
@@ -132,10 +135,12 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
   const files = memoryImageFiles(options.images ?? {});
   const assets = new AssetRegistry({ files: files.source, notify: (message) => notices.push(message), hash: nodeHash });
   let definitions: readonly ResourceDefinition[] = [HP];
+  let initiativeRules: InitiativeRules = { mode: 'turn-order', roll: '1d20', firstSide: 'players' };
   const resourceListeners = new Set<() => void>();
   const broadcaster = new SceneBroadcaster({
     session: gm, presented, settings, assets, notify: (message) => notices.push(message),
     resources: () => definitions,
+    initiativeRules: () => initiativeRules,
     watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
   });
   if (options.start !== false) broadcaster.start();
@@ -147,7 +152,11 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
     definitions = next;
     resourceListeners.forEach((listener) => listener());
   };
-  return { network, gm, requests, presented, broadcaster, notices, setRules, setResources, files };
+  const setInitiativeRules = (next: InitiativeRules): void => {
+    initiativeRules = next;
+    resourceListeners.forEach((listener) => listener());
+  };
+  return { network, gm, requests, presented, broadcaster, notices, setRules, setResources, setInitiativeRules, files };
 }
 
 /** A player through `PlayerSession`, admitted by the GM. */
@@ -251,6 +260,65 @@ describe('SceneBroadcaster', () => {
     h.setResources([HP]);
     await tick();
     expect(player.scene?.tokens.hero?.resources).toEqual([]);
+  });
+
+  describe('initiative by sides', () => {
+    const entry = (id: string, tokenId: string, initiative: number, order: number, isActive = false): InitiativeEntry => ({
+      id, tokenId, name: tokenId, initiative, initiativeModifier: 0, imagePath: '', isActive, isNPC: false, order,
+    });
+    const listed = (state: SceneState, fight: Partial<SceneState['initiative']> = {}): SceneState => ({
+      ...state, initiativeTrackerOpen: true,
+      initiative: {
+        ...createDefaultInitiativeState(), round: 1,
+        entries: [entry('e1', 'hero', 17, 0, true), entry('e2', 'orc', 23, 1)], ...fight,
+      },
+    });
+    const SIDES: InitiativeRules = { mode: 'sides', roll: '1d20', firstSide: 'opponents' };
+
+    it('groups a collection by sides before a fight, follows the GM editing its rules, and sends no numbers by sides', async () => {
+      const h = setup();
+      const state = listed(sceneState({ hero: character('hero', 140, { side: 'players' }), orc: character('orc', 210) }));
+      const { view, tavern } = fakeView(state);
+      h.presented.present(view, tavern);
+      const player = await join(h);
+      expect(player.scene?.initiative).toMatchObject({ active: false, entries: [{ initiative: 17, isActive: false }, { initiative: 23 }] });
+      expect(player.scene?.initiative).not.toHaveProperty('sides');
+      expect(player.scene?.tokens.hero).not.toHaveProperty('side');
+      h.setInitiativeRules(SIDES);
+      await tick();
+      expect(player.scene?.initiative).toMatchObject({ sides: { first: 'opponents' }, entries: [{ initiative: 0 }, { initiative: 0 }] });
+      expect(player.scene?.tokens.hero?.side).toBe('players');
+      expect(player.scene?.tokens.orc?.side).toBe('opponents');
+      h.setInitiativeRules({ ...SIDES, firstSide: 'players' });
+      await tick();
+      expect(player.scene?.initiative?.sides).toEqual({ first: 'players' });
+      h.setInitiativeRules({ mode: 'turn-order', roll: '1d20', firstSide: 'players' });
+      await tick();
+      expect(player.scene?.initiative).not.toHaveProperty('sides');
+      expect(player.scene?.tokens.hero).not.toHaveProperty('side');
+    });
+
+    it('lets a running fight keep the mode it started in, whatever the rules say since', async () => {
+      const h = setup();
+      const state = listed(sceneState({ hero: character('hero', 140, { side: 'players' }), orc: character('orc', 210) }), {
+        isActive: true, sides: { first: 'opponents', active: 'opponents' },
+      });
+      const { view, store, tavern } = fakeView(state);
+      h.presented.present(view, tavern);
+      const player = await join(h);
+      // The collection went back to turn order mid-fight; the fight still runs by sides
+      expect(player.scene?.initiative).toMatchObject({ active: true, sides: { first: 'opponents', active: 'opponents' } });
+      expect(player.scene?.initiative?.entries.map((e) => [e.initiative, e.isActive])).toEqual([[0, false], [0, false]]);
+      store.setState({ initiative: { ...store.getState().initiative, sides: { first: 'opponents', active: 'players' } } });
+      await tick();
+      expect(player.scene?.initiative?.sides).toEqual({ first: 'opponents', active: 'players' });
+      // A turn-order fight under a by-sides collection stays in turn order
+      store.setState({ initiative: { ...store.getState().initiative, sides: undefined } });
+      h.setInitiativeRules(SIDES);
+      await tick();
+      expect(player.scene?.initiative).not.toHaveProperty('sides');
+      expect(player.scene?.initiative?.entries.map((e) => e.initiative)).toEqual([17, 23]);
+    });
   });
 
   it('follows the GM editing a resource in the collection settings: colour, socket, order', async () => {

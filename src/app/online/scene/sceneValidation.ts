@@ -6,7 +6,7 @@
  */
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_DRAWING_TYPES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
-  PLAYER_MEASUREMENT_MODES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
+  PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_LIMITS, SCENE_RANGES, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
 
@@ -111,7 +111,7 @@ function isPlayerToken(value: unknown): boolean {
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
     && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
-    && optional(isResources)(value.resources) && optional(isBoolean)(value.downed);
+    && optional(isResources)(value.resources) && optional(isBoolean)(value.downed) && optional(oneOf(PLAYER_SIDES))(value.side);
 }
 
 function isPlayerFogOp(value: unknown): boolean {
@@ -150,11 +150,15 @@ function isPlayerWidgets(value: unknown): boolean {
 function isInitiativeEntry(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && isText(value.tokenId, SCENE_LIMITS.idLength)
     && isNumber(value.initiative) && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp)
-    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive);
+    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive) && optional((flag) => flag === true)(value.sitsOut);
+}
+function isPlayerSides(value: unknown): boolean {
+  return isFields(value) && oneOf(PLAYER_SIDES)(value.first) && optional(oneOf(PLAYER_SIDES))(value.active);
 }
 function isPlayerInitiative(value: unknown): boolean {
   return isFields(value) && isNumber(value.round) && isBoolean(value.active) && Array.isArray(value.entries)
-    && value.entries.length <= SCENE_LIMITS.initiativeEntries && value.entries.every((entry) => isInitiativeEntry(entry));
+    && value.entries.length <= SCENE_LIMITS.initiativeEntries && value.entries.every((entry) => isInitiativeEntry(entry))
+    && optional(isPlayerSides)(value.sides);
 }
 
 function isRecordOf(value: unknown, check: Check): boolean {

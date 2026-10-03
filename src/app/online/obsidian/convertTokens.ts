@@ -40,6 +40,8 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     showRing: token.ring !== null,
     ...(token.ring !== null ? { ringColor: token.ring } : {}),
     ...conditionFields(token.conditions),
+    // Where the list by sides files the combatant (`sideOf`); sent only for combatants while the list is by sides
+    ...(token.side && { side: token.side }),
   };
   const bars = atlasBars(token);
   if (token.name === null && bars === null) {

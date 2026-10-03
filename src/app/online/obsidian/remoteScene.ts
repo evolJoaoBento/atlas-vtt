@@ -9,6 +9,7 @@ import type { ResourceDefinition, ResourceValue } from '../../resources/resource
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { DiceRollResult, DiceSelection } from '../../tools/diceRolling';
+import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import { withMeasurementDefaults, type PlayerMeasurement } from '../scene/sceneTypes';
 
@@ -36,6 +37,8 @@ export interface RemoteSceneState {
   resources: Readonly<Record<string, readonly ResourceDefinition[]>>;
   /** How full the initiative list's bar is for each combatant's token, by token id: the share out of 100. */
   initiativeHealth: Readonly<Record<string, ResourceValue>>;
+  /** How the GM's window groups the initiative list (`atlasInitiativeRules`); null until a scene arrives. */
+  initiativeRules: InitiativeRules | null;
   status: OnlineSceneStatus;
   /** Whether the camera follows the GM; Follow GM and Fit map show while it does not. */
   following: boolean;
@@ -82,6 +85,7 @@ export function initialRemoteScene(): RemoteSceneState {
     conditions: [],
     resources: {},
     initiativeHealth: {},
+    initiativeRules: null,
     status: { title: DEFAULT_TABLE_TITLE, connection: 'Connecting…', tone: 'pending', message: null, reconnect: false },
     following: true,
     notice: null,

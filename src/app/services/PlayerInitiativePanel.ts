@@ -6,7 +6,7 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { InitiativeEntry } from '../types/initiativeTypes';
 import { createTokenPortrait } from '../packages/components/shared/tokenPortraitElement';
 import { SIDE_LABELS, listedBySides, sideOf, sidesInOrder } from '../initiative/sides';
-import type { InitiativeSide } from '../types/initiativeRulesTypes';
+import type { InitiativeRules, InitiativeSide } from '../types/initiativeRulesTypes';
 import { scrollWithin } from '../utils/scrollWithin';
 import { mapInitiativeRules } from './mapInitiativeRules';
 import { PlayerSceneOverlay, type PlayerSettings, type PlayerSettingsSource } from './PlayerSceneOverlay';
@@ -21,6 +21,8 @@ interface InitiativeScene {
   /** Initiative tokens players may see, joined into a key so edits to other tokens compare equal. */
   visibleTokenIds: string;
   mapPath: string | null;
+  /** The online scene's list is grouped as the GM's window groups it (`remoteScene.initiativeRules`), not by the player's own collection; null elsewhere. */
+  remoteRules: InitiativeRules | null;
   /** The online scene's list: the GM decided which combatants show a bar, and sent it (`remoteScene.initiativeHealth`). */
   remote: boolean;
   /** What the list shows of every initiative token (`EntryToken`), in entry order, as a key that changes when one of them does. */
@@ -63,7 +65,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       const hp = remoteScene ? (Object.hasOwn(remoteScene.initiativeHealth, entry.tokenId) ? remoteScene.initiativeHealth[entry.tokenId] : undefined) : token?.resources?.hp;
       return { hp: hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
     }));
-    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, remote: remoteScene != null, tokens: entryTokens };
+    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, remoteRules: remoteScene?.initiativeRules ?? null, remote: remoteScene != null, tokens: entryTokens };
   }
 
   protected render(container: HTMLElement, scene: InitiativeScene, settings: PlayerSettings): void {
@@ -86,7 +88,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       cls: 'atlas-player-initiative',
       attr: { role: 'region', 'aria-label': 'Initiative order' },
     });
-    const rules = mapInitiativeRules(this.app, scene.mapPath);
+    const rules = scene.remoteRules ?? mapInitiativeRules(this.app, scene.mapPath);
     if (listedBySides(initiative, rules)) {
       this.renderSides(panel, combatants, initiative, settings, initiative.sides?.first ?? rules.firstSide);
     } else {

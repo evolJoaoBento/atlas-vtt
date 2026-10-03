@@ -273,5 +273,25 @@ describe('scene limits', () => {
       for (const ok of [{}, { hpShare: null }, { hpShare: 0 }, { hpShare: 1 }, { hpShare: 0.4 }]) expect(patch(initiative(ok)).kind).toBe('message');
       for (const bad of [{ hpShare: 1.5 }, { hpShare: -1 }, { hpShare: '1' }]) expect(patch(initiative(bad)).kind).toBe('invalid');
     });
+
+    it('checks initiative by sides: the sides, an entry that sits out and a token\'s side, all optional', () => {
+      const entry = { id: 'e', tokenId: 't', initiative: 0, name: null, hp: null, isActive: false };
+      const list = (value: object, entryExtra: object = {}): object => ({ round: 1, active: true, entries: [{ ...entry, ...entryExtra }], ...value });
+      const patch = (initiative: object, tokens: object = {}): ReturnType<typeof decodeControl> => decodeRaw({
+        v: 1, type: 'scene-patch', seq: 2, upsert: { tokens }, remove: {}, set: { initiative },
+      });
+      // Older GMs send none of them
+      expect(patch(list({})).kind).toBe('message');
+      for (const sides of [{ first: 'players' }, { first: 'opponents', active: 'players' }, { first: 'players', active: 'opponents' }]) {
+        expect(patch(list({ sides })).kind, JSON.stringify(sides)).toBe('message');
+      }
+      for (const sides of [{}, { first: 'monsters' }, { first: 'players', active: 'both' }, { first: 'players', active: null }, 'players', null, []]) {
+        expect(patch(list({ sides })).kind, JSON.stringify(sides)).toBe('invalid');
+      }
+      expect(patch(list({}, { sitsOut: true })).kind).toBe('message');
+      for (const sitsOut of [false, 1, 'true', null]) expect(patch(list({}, { sitsOut })).kind, String(sitsOut)).toBe('invalid');
+      expect(patch(list({}), { t: { ...playerToken(), side: 'opponents' } }).kind).toBe('message');
+      for (const side of ['both', '', 1, null]) expect(patch(list({}), { t: { ...playerToken(), side } }).kind, String(side)).toBe('invalid');
+    });
   });
 });

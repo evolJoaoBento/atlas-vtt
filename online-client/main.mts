@@ -206,7 +206,7 @@ function renderScene(): void {
     map?.setScene(shown);
   }
   fillList(widgetList, shown ? widgetLines(shown.widgets) : []);
-  fillList(initiativeList, shown ? initiativeLines(shown.initiative) : []);
+  fillList(initiativeList, shown ? initiativeLines(shown.initiative, shown.tokens) : []);
   // Read-only, for checking in the developer tools what this page received.
   (window as unknown as { atlasScene: PlayerScene | null }).atlasScene = shown;
 }

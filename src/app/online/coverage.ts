@@ -20,6 +20,7 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
 import type { CollectionGridDefaults } from '../types/collectionSettingsTypes';
 import type { FogOperation } from '../types/fogTypes';
+import type { InitiativeRules } from '../types/initiativeRulesTypes';
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
 import type { SceneLighting } from '../types/lightingTypes';
 import type { ResourceDefinition } from '../resources/resourceTypes';
@@ -45,7 +46,6 @@ const notYet = (piece: string): Coverage => ({ status: 'not-yet', piece });
 
 const KIND = gmOnly('the record kind; players get each kind in its own list');
 const LOCAL_PLAYER_LINK = gmOnly('links the token to a local player character, not to an online player');
-const INITIATIVE_SIDES = notYet('initiative by sides (Atlas 0.5)');
 /** Only how the player window draws what it shows (tints, looks): never what it shows or hides. */
 const LIGHTING_LOOK = gmOnly('the look of the lit picture; players get what it shows, not how it is tinted');
 
@@ -90,7 +90,8 @@ export const TOKEN_FIELD_COVERAGE: CoverageTable<KeysOfUnion<TokenEntity>> = {
   playerCharacterId: LOCAL_PLAYER_LINK,
   vision: LIGHTING,
   light: LIGHTING,
-  side: INITIATIVE_SIDES,
+  // Sent as `PlayerToken.side` only for a combatant while the player window lists by sides (`combatantSides`); the window files it by `sideOf`.
+  side: SENT,
   instanceNumber: notYet('instance badges, with the scene\'s Show instance badges setting (a later piece)'),
 };
 
@@ -255,7 +256,8 @@ export const INITIATIVE_COVERAGE: CoverageTable<keyof InitiativeState> = {
   round: SENT,
   isActive: SENT,
   config: gmOnly('how the tracker of the GM sorts'),
-  sides: INITIATIVE_SIDES,
+  // Sent only while the window groups the list by sides (`projectSides`); the fight's own mode wins over the collection's rules.
+  sides: SENT,
 };
 
 export const INITIATIVE_ENTRY_COVERAGE: CoverageTable<keyof InitiativeEntry> = {
@@ -269,5 +271,12 @@ export const INITIATIVE_ENTRY_COVERAGE: CoverageTable<keyof InitiativeEntry> = {
   isActive: SENT,
   isNPC: gmOnly('players see every entry alike'),
   order: SENT,
-  sitsOut: INITIATIVE_SIDES,
+  sitsOut: SENT,
+};
+
+/** The collection's initiative rules (`InitiativeRules`), read for the grouping of a list that has not started a fight yet. */
+export const INITIATIVE_RULES_COVERAGE: CoverageTable<keyof InitiativeRules> = {
+  mode: used('decides whether a list before a fight is grouped by sides; a running fight keeps the mode it started in'),
+  firstSide: used('the side listed first before a fight; the first side of the running fight once there is one'),
+  roll: gmOnly('the dice the GM rolls initiative with; by sides nothing is rolled, and in turn order players see the numbers'),
 };

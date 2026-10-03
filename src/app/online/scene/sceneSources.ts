@@ -6,6 +6,7 @@ import type { PresentedSceneInfo, PresentedSceneListener } from '../../services/
 import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
+import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { FogOperation } from '../../types/fogTypes';
 import type { AssetRegistry } from './AssetRegistry';
 import { NO_DARKNESS, type Darkness } from './darknessFog';
@@ -46,7 +47,9 @@ export interface SceneBroadcasterOptions {
   coneAngle?: (mapPath: string | null) => number;
   /** The resources of the collection holding the map at `mapPath`, which decide the bars players see; without it none show. */
   resources?: (mapPath: string | null) => readonly ResourceDefinition[];
-  /** Calls `listener` when a collection's settings change or the asset index loads (the resources may differ); returns the stop. */
+  /** The initiative rules of the collection holding the map at `mapPath`, which say whether the list is by sides before a fight; without it the list is in turn order. */
+  initiativeRules?: (mapPath: string | null) => InitiativeRules;
+  /** Calls `listener` when a collection's settings change or the asset index loads (its resources or initiative rules may differ); returns the stop. */
   watchResources?: (listener: () => void) => () => void;
 }
 
@@ -115,14 +118,16 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides its store's slice. */
 export function sceneContext(
   scene: PresentedSceneInfo,
-  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'coneAngle' | 'resources'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources'> {
+  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'coneAngle' | 'resources' | 'initiativeRules'> {
   const mapPath = scene.store.getState().mapPath ?? null;
   const coneAngle = options.coneAngle?.(mapPath);
+  const initiativeRules = options.initiativeRules?.(mapPath);
   return {
     mapSize: scene.mapSize(),
     collectionGrid: options.collectionGrid?.(mapPath) ?? null,
     ...(coneAngle !== undefined && { coneAngle }),
     resources: options.resources?.(mapPath) ?? [],
+    ...(initiativeRules && { initiativeRules }),
   };
 }

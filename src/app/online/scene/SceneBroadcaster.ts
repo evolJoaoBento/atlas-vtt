@@ -70,7 +70,7 @@ export class SceneBroadcaster implements SessionHandler {
       settings.onChange(() => this.settingsChanged()),
       // A fingerprint became known or was forgotten: the next tick carries the change.
       assets.onChange(() => { if (this.live && !this.live.loading) this.scheduleTick(); }),
-      // A collection's resources are not in the store: edits to their colour, order or player visibility arrive here.
+      // A collection's resources and initiative rules are not in the store: edits to them arrive here.
       this.options.watchResources?.(() => { if (this.live && !this.live.loading) this.scheduleTick(); }) ?? (() => undefined),
     );
     const current = presented.current();

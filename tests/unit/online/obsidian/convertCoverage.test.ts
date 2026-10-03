@@ -30,7 +30,7 @@ const IMAGES: RemoteImages = {
 const hero: Character = {
   id: 'hero', kind: 'character', x: 140, y: 210, imagePath: 'art/hero.png', size: 2, rotation: 45, layer: 3,
   showRing: true, ringColor: '#3366ff', conditions: ['prone', 'frightened'], conditionValues: { frightened: 2 },
-  name: 'Anna', resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 }, mana: { current: 1, max: 2 } },
+  name: 'Anna', resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 }, mana: { current: 1, max: 2 } }, side: 'players',
   statblockPath: 'Bestiary/Anna.md', statblockName: 'Anna (statblock)', notePath: 'GM/anna.md', tags: ['pc'],
 };
 const goblin: Character = { id: 'goblin', kind: 'character', x: 350, y: 70, imagePath: 'art/goblin.png', name: '', statblockPath: 'Bestiary/Goblin.md', statblockName: 'Goblin' };
@@ -81,13 +81,17 @@ const WIDGETS: Record<string, AnyWidget> = {
   secret: { id: 'secret', type: 'counter', label: 'Secret', icon: 'star', visible: true, visibleToPlayers: false, value: 1, order: 3 },
 };
 
-interface Variant { collection?: CollectionGridDefaults | null; grid?: GridState; trackerOpen?: boolean; definitions?: readonly ResourceDefinition[] }
+interface Variant {
+  collection?: CollectionGridDefaults | null; grid?: GridState; trackerOpen?: boolean; definitions?: readonly ResourceDefinition[];
+  /** A fight by sides: the side whose turn it is. */
+  sides?: 'players' | 'opponents';
+}
 interface Trip { back: RemoteSceneParts; sent: PlayerScene }
-interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip; renamedHp: Trip; staticHp: Trip }
+interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip; renamedHp: Trip; staticHp: Trip; sidesFight: Trip }
 type Check = (trips: Trips) => void;
 type Checks<K extends PropertyKey> = { readonly [P in K]?: Check };
 
-function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true, definitions = DEFINITIONS }: Variant = {}): Trip {
+function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true, definitions = DEFINITIONS, sides }: Variant = {}): Trip {
   const fog = { brush, lasso, rect };
   const state: ProjectedState = {
     background: 'atlas-vtt/assets/tavern.png',
@@ -99,7 +103,7 @@ function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true, def
     widgetSettings: { widgets: WIDGETS, globalVisible: true, position: 'top', scale: 1 },
     widgetValues: { torches: 3, doom: 2 },
     initiative: {
-      ...createDefaultInitiativeState(), isActive: true, round: 2,
+      ...createDefaultInitiativeState(), isActive: true, round: 2, ...(sides && { sides: { first: 'opponents' as const, active: sides } }),
       entries: [{
         id: 'e1', tokenId: 'hero', name: 'Anna', initiative: 17, initiativeModifier: 2,
         imagePath: 'art/hero.png', isActive: true, isNPC: false, order: 0,
@@ -124,6 +128,7 @@ const TRIPS: Trips = {
   closedTracker: trip({ trackerOpen: false }),
   renamedHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, key: 'health' } : definition)) }),
   staticHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, direction: 'static' as const } : definition)) }),
+  sidesFight: trip({ sides: 'players' }),
 };
 
 const tokenOf = (t: Trip, id: string): Record<string, unknown> => t.back.state.objects.tokens[id] as unknown as Record<string, unknown>;
@@ -158,6 +163,12 @@ const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
     for (const token of Object.values(t.full.back.state.objects.tokens)) expect(token).not.toHaveProperty('statblockPath');
   },
   statblockName: field('goblin', 'name', 'Goblin'),
+  // Sent only for a combatant, while the list is by sides
+  side: (t) => {
+    expect(tokenOf(t.full, 'hero')).not.toHaveProperty('side');
+    expect(tokenOf(t.sidesFight, 'hero').side).toBe('players');
+    expect(tokenOf(t.sidesFight, 'goblin')).not.toHaveProperty('side');
+  },
   // The two first resources are bars, filled to their share out of 100 and drawn from stand-in definitions of the colour the window shows
   resources: (t) => {
     expect(tokenOf(t.full, 'hero').resources).toEqual({ bar0: { current: 70, max: 100 }, bar1: { current: 33, max: 100 }, downed: { current: 1, max: 1 } });

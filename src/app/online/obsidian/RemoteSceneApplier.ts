@@ -72,7 +72,7 @@ const NO_INPUT = (): string => '';
 const pointKey = (point: ScenePoint | null): string => (point ? `${point.x},${point.y}` : '');
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 /** What the GM's scene decides of `remoteScene`, besides the session's own state. */
-const REMOTE_PARTS = ['measurement', 'conditions', 'resources', 'initiativeHealth'] as const;
+const REMOTE_PARTS = ['measurement', 'conditions', 'resources', 'initiativeHealth', 'initiativeRules'] as const;
 
 export class RemoteSceneApplier {
   private scene: PlayerScene | null = null;
@@ -148,8 +148,8 @@ export class RemoteSceneApplier {
       update.tokenSettings = { ...state.tokenSettings, hiddenResources: [...state.tokenSettings.hiddenResources, DOWNED_KEY] };
     }
     const remote = state.remoteScene;
-    const { measurement, conditions, resources, initiativeHealth } = parts;
-    const scene = { measurement, conditions, resources, initiativeHealth };
+    const { measurement, conditions, resources, initiativeHealth, initiativeRules } = parts;
+    const scene = { measurement, conditions, resources, initiativeHealth, initiativeRules };
     if (remote && REMOTE_PARTS.some((key) => !sameValue(remote[key], scene[key]))) update.remoteScene = { ...remote, ...scene };
     return update;
   }

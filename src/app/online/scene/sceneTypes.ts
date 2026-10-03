@@ -69,6 +69,10 @@ export interface PlayerCondition {
   value: number | null;
 }
 
+/** The two sides of a fight by sides, as `InitiativeSide` (a parity test keeps them equal). */
+export const PLAYER_SIDES = ['players', 'opponents'] as const;
+export type PlayerSide = typeof PLAYER_SIDES[number];
+
 export interface PlayerToken {
   x: number;
   y: number;
@@ -89,6 +93,8 @@ export interface PlayerToken {
   resources?: PlayerResource[];
   /** The window greys the token out and marks it with a skull: a resource that defeats it is spent, whether players see that resource or not. */
   downed?: boolean;
+  /** The side the list by sides puts this combatant under; sent only for a token with an initiative entry while the list is by sides. */
+  side?: PlayerSide;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */
@@ -154,7 +160,18 @@ export interface PlayerInitiativeEntry {
   hp: PlayerLegacyBar | null;
   /** How full the bar after the name is (the token's `hp` resource, where players see it); null without one. Absent from an older GM. */
   hpShare?: number | null;
+  /** By sides the turn belongs to a side, so this is always false there. */
   isActive: boolean;
+  /** The combatant does not act in the running round; the window fades it. Absent from an older GM. */
+  sitsOut?: true;
+}
+
+/** How the list is grouped while it is by sides; the combatants' sides are on their tokens. */
+export interface PlayerInitiativeSides {
+  /** The side that acts first in a round, and so is listed first. */
+  first: PlayerSide;
+  /** The side whose turn it is; absent between fights. */
+  active?: PlayerSide;
 }
 
 export interface PlayerInitiative {
@@ -162,6 +179,12 @@ export interface PlayerInitiative {
   /** Whether combat is running. */
   active: boolean;
   entries: PlayerInitiativeEntry[];
+  /**
+   * Present exactly when the player window groups the combatants by side. Then no initiative
+   * numbers are sent (every `initiative` is 0, since older pages require one) and no entry is
+   * the active one. Absent for a list in turn order, and from an older GM.
+   */
+  sides?: PlayerInitiativeSides;
 }
 
 export const PLAYER_MEASUREMENT_MODES = ['metric', 'abstract'] as const;

@@ -4,6 +4,8 @@
  */
 import type { TokenEntity } from '../../types';
 import { createDefaultInitiativeState, DEFAULT_INITIATIVE_CONFIG, type InitiativeEntry, type InitiativeState } from '../../types/initiativeTypes';
+import { DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
+import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import { resolveWidgetIcon } from '../../types/widgetIcons';
 import type { AnyWidget, CounterWidget, TimerWidget, WidgetSettings } from '../../types/widgetTypes';
 import { setOwn } from '../scene/sceneDiff';
@@ -56,6 +58,7 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
     isActive: entry.isActive,
     isNPC: true,
     order,
+    ...(entry.sitsOut === true && { sitsOut: true }),
   }));
   return {
     initiative: {
@@ -64,7 +67,22 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
       round: initiative.round,
       isActive: initiative.active,
       config: { ...DEFAULT_INITIATIVE_CONFIG },
+      // A fight by sides keeps its mode (`listedBySides`); before one, `atlasInitiativeRules` says the list is by sides
+      ...(initiative.active && initiative.sides && { sides: { first: initiative.sides.first, active: initiative.sides.active ?? initiative.sides.first } }),
     },
     initiativeTrackerOpen: true,
+  };
+}
+
+/**
+ * The initiative rules the list reads in the online scene (`remoteScene.initiativeRules`): the player's own
+ * collection says nothing of the GM's table, so the GM's grouping arrives as rules: by sides when
+ * the window groups by sides, else in turn order. The roll is the GM's alone and is never sent.
+ */
+export function atlasInitiativeRules(initiative: PlayerInitiative | null): InitiativeRules {
+  return {
+    mode: initiative?.sides ? 'sides' : 'turn-order',
+    roll: DEFAULT_INITIATIVE_RULES.roll,
+    firstSide: initiative?.sides?.first ?? DEFAULT_INITIATIVE_RULES.firstSide,
   };
 }

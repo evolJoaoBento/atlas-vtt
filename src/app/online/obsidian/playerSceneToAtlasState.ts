@@ -9,6 +9,7 @@ import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { DrawingStroke, TextElement, TokenEntity } from '../../types';
 import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
+import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import type { FogOperation } from '../../types/fogTypes';
 import { DEFAULT_GRID_SIZE } from '../scene/objectBounds';
@@ -17,7 +18,7 @@ import {
   withMeasurementDefaults,
   type PlayerDrawing, type PlayerFogOp, type PlayerMeasurement, type PlayerScene, type PlayerText, type PlayerToken, type ScenePoint,
 } from '../scene/sceneTypes';
-import { atlasInitiative, atlasWidgets } from './convertPanels';
+import { atlasInitiative, atlasInitiativeRules, atlasWidgets } from './convertPanels';
 import { atlasDrawing, atlasFog, atlasText } from './convertShapes';
 import { atlasInitiativeHealth, atlasResourceDefinitions } from './convertResources';
 import { atlasToken, neutralConditions } from './convertTokens';
@@ -38,6 +39,8 @@ export interface RemoteSceneParts {
   resources: Record<string, readonly ResourceDefinition[]>;
   /** For `remoteScene.initiativeHealth`: the bar after a combatant's name. */
   initiativeHealth: Record<string, ResourceValue>;
+  /** For `remoteScene.initiativeRules`: whether the list is by sides before a fight. */
+  initiativeRules: InitiativeRules;
 }
 
 /** Builds each record kind; the applier passes builders that reuse unchanged records. */
@@ -127,6 +130,7 @@ export function playerSceneToAtlasState(scene: PlayerScene, images: RemoteImages
     conditions: neutralConditions(scene.tokens),
     resources: atlasResourceDefinitions(scene.tokens),
     initiativeHealth: atlasInitiativeHealth(scene.initiative),
+    initiativeRules: atlasInitiativeRules(scene.initiative),
   };
 }
 
@@ -145,5 +149,6 @@ export function emptyRemoteScene(builders: RecordBuilders): RemoteSceneParts {
     conditions: [],
     resources: {},
     initiativeHealth: {},
+    initiativeRules: atlasInitiativeRules(null),
   };
 }
