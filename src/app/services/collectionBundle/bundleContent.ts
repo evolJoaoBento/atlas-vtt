@@ -1,5 +1,5 @@
 import type { BundleFile, BundleFileRole } from './bundleFormat';
-import { withoutJsonSharing } from './bundleSharing';
+import { isNote, withoutJsonSharing, withoutNoteSharing } from './bundleSharing';
 import { movedFolders, remapPaths, type PathMap } from './pathRemap';
 
 /** JSON files carry vault paths and asset ids that must follow the files and records they point at. */
@@ -89,7 +89,8 @@ export function rewriteText(file: BundleFile, text: string, rewrites: PathMap): 
 export function rewriteContent(file: BundleFile, raw: ArrayBuffer, rewrites: PathMap): ArrayBuffer {
   if (!mayRewrite(file, rewrites)) return raw;
   const text = decoder.decode(raw);
-  const rewritten = rewriteText(file, text, rewrites);
+  // Only here, never in `rewriteText`: moving a scene to another collection rewrites the user's own notes in place.
+  const rewritten = rewriteText(file, withoutNoteSharing(file, text), rewrites);
   return rewritten === text ? raw : toBuffer(rewritten);
 }
 
@@ -99,4 +100,4 @@ export const refersToFiles = (file: BundleFile): boolean =>
 
 /** Whether `rewriteContent` may change the file's bytes, so they must be read to know the result. Record files may carry a map share, which never travels. */
 export const mayRewrite = (file: BundleFile, rewrites: PathMap): boolean =>
-  refersToFiles(file) && (rewrites.size > 0 || file.role === 'asset-file');
+  (refersToFiles(file) && (rewrites.size > 0 || file.role === 'asset-file')) || isNote(file);

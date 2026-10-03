@@ -201,6 +201,33 @@ describe('exporting', () => {
     expect(JSON.parse(fan.vault.files.get(MAP_PATH)!).state.objects.pins.p1.notePath).toBe(`${notes}/Cave.md#Door`);
   });
 
+  it("strips a note's atlas-share property from the bundle, installs without it and leaves the sender's note alone", async () => {
+    const creator = await creatorVault();
+    const lore = '---\natlas-share: [Ana]\nstatus: draft\n---\n# Door\nLocked.';
+    const goblin = '---\nstatblock: true\natlas-share: public\nimage: "[[goblin.png]]"\n---\nA goblin.';
+    await pinNote(creator, 'Lore/Cave.md#Door', lore);
+    creator.vault.files.set(NOTE_PATH, goblin);
+    const blob = await exportFrom(creator);
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const manifest = await manifestOf(blob) as PackedManifest & { files: Array<{ vaultPath: string; sha256: string }> };
+    const packed = async (path: string): Promise<string> => zip.file(`files/${path}`)!.async('string');
+    expect(await packed('Lore/Cave.md')).toBe('---\nstatus: draft\n---\n# Door\nLocked.');
+    expect(await packed(NOTE_PATH)).toBe('---\nstatblock: true\nimage: "[[goblin.png]]"\n---\nA goblin.');
+    // The checksum is of the bytes in the zip, so a later install sees them as the sender's release
+    for (const path of ['Lore/Cave.md', NOTE_PATH]) {
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await zip.file(`files/${path}`)!.async('arraybuffer')))).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      expect(manifest.files.find((file) => file.vaultPath === path)?.sha256).toBe(digest);
+    }
+    expect(creator.vault.files.get('Lore/Cave.md')).toBe(lore);
+    expect(creator.vault.files.get(NOTE_PATH)).toBe(goblin);
+
+    const fan = await emptyVault();
+    await importInto(fan, blob);
+    expect(fan.vault.files.get('atlas-vtt/collections/source/notes/Lore/Cave.md')).toBe('---\nstatus: draft\n---\n# Door\nLocked.');
+    expect([...fan.vault.files.values()].some((text) => text.includes('atlas-share'))).toBe(false);
+  });
+
   it('packs the chosen cover, keeps it with the collection and installs it with the collection', async () => {
     const creator = await creatorVault();
     const [scene] = await creator.assets.getAssets('source', 'scene');
