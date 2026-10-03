@@ -255,6 +255,37 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .dice-toast .dice-entry { padding: 4px; border: 0; }
 
+/* The player's own roll, thrown as Atlas's 3D dice at the top of the map (`dice3d/throwPanel.mts`). */
+.dice-throws { grid-row: 2; grid-column: 1; align-self: start; justify-self: center; z-index: 1; margin-top: 12px; pointer-events: none; }
+.dice-throw {
+  pointer-events: auto; width: min(21rem, calc(100vw - 32px)); display: grid; gap: var(--inset); padding: var(--inset);
+  background: var(--card); color: var(--text); border: var(--panel-border) solid var(--border); border-radius: var(--panel-radius);
+  box-shadow: var(--shadow); cursor: pointer; touch-action: manipulation; animation: dice-throw-in 0.3s ease-out both;
+}
+.dice-throw.is-leaving { opacity: 0; transform: translateY(-14px) scale(0.96); transition: opacity 0.43s, transform 0.43s; }
+.dice-throw.is-crit-success { border-color: #2f9e44; box-shadow: var(--shadow), 0 0 24px rgba(47, 158, 68, 0.45); }
+.dice-throw.is-crit-fail { border-color: #e03131; box-shadow: var(--shadow), 0 0 24px rgba(224, 49, 49, 0.45); }
+.dice-throw-header { display: flex; align-items: center; gap: var(--inset); }
+.dice-throw-label { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dice-throw-close { width: 32px; height: 32px; margin: 0; font-size: 18px; border-top-right-radius: var(--inset-radius); }
+.dice-throw-stage { position: relative; height: min(13rem, 40vh); overflow: hidden; border-radius: 12px; }
+/* Atlas draws in the canvas's bottom-left corner and lets it only grow (`DiceRenderer.setView`): the stage clips the rest. */
+.dice-throw-stage canvas { position: absolute; bottom: 0; left: 0; display: block; max-width: none; }
+.dice-throw-slot { margin: 0; min-height: 3.2rem; display: grid; justify-items: center; align-content: center; gap: 2px; }
+.dice-throw-slot.has-breakdown { min-height: 4.25rem; }
+.dice-throw-formula { color: var(--muted); }
+.dice-throw-total { font-size: 32px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.dice-throw-breakdown { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+@keyframes dice-throw-in { from { opacity: 0; transform: translateY(-28px) scale(0.92); } }
+@media (prefers-reduced-motion: reduce) { .dice-throw, .dice-throw.is-leaving { animation: none; transition: none; transform: none; } }
+
+/* Roll display in the menu: Atlas's three choices as a segmented row. */
+.dice-display { display: grid; gap: 8px; }
+.dice-display-label { font-size: 14px; font-weight: 600; }
+.segmented { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 12px; }
+.segmented-option { flex: 1; min-height: 36px; padding: 0 8px; background: transparent; color: var(--text); font-weight: 500; border-radius: 8px; }
+.segmented-option[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
 /* The Dice log button sits beside Menu. */
 .icon-button + .icon-button { margin-left: 0; }
 .icon-button .tool-icon { width: 20px; height: 20px; }

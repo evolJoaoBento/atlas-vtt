@@ -10,7 +10,9 @@ import { openIndexedDbImageStore } from '../src/app/online/assets/indexedDbImage
 import { randomId } from '../src/app/online/ids';
 import { parseJoinFragment } from '../src/app/online/joinLink';
 import { createOnlineLog } from '../src/app/online/onlineLog';
+import { loadDiceDisplay, saveDiceDisplay } from '../src/app/online/page/diceDisplayStore';
 import { loadLaserColor, saveLaserColor } from '../src/app/online/page/laserColorStore';
+import { OwnRollThrows } from '../src/app/online/page/ownRollThrows';
 import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT, NO_CANVAS_TEXT, pageScreen, type PageScreen } from '../src/app/online/page/pageScreen';
 import type { PlayerSession, PlayerSessionState } from '../src/app/online/PlayerSession';
 import { createJoinSession } from '../src/app/online/preview/joinSession';
@@ -20,6 +22,7 @@ import type { PlayerScene } from '../src/app/online/scene/sceneTypes';
 import { createPeerClient } from '../src/app/online/transport/PeerTransport';
 import { AssetsPanel, rememberedKeep } from './assetsPanel.mts';
 import { createCanvasSurface } from './canvasSurface.mts';
+import { DiceDisplayView } from './diceDisplayView.mts';
 import { DiceLogView } from './diceLogView.mts';
 import { DiceTrayView } from './diceTrayView.mts';
 import { fillList } from './fillList.mts';
@@ -71,9 +74,22 @@ const diceTray = new DiceTrayView({
   roll: (dice, modifier) => session?.sendDiceRoll(dice, modifier) ?? false,
   onClose: () => setDiceOpen(false),
 });
+const diceDisplay = new DiceDisplayView(element('dice-display'), loadDiceDisplay(() => localStorage), (display) => {
+  saveDiceDisplay(display, () => localStorage);
+});
+const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+// Each player sees their own rolls thrown; three.js and the dice load with the first throw.
+const ownRolls = new OwnRollThrows({
+  container: element('dice-throws'),
+  display: () => diceDisplay.value,
+  reducedMotion: () => reducedMotion?.matches === true,
+  load: () => import('./dice3d/diceThrows.mts').then((chunk) => chunk.diceThrows),
+  fallback: (entry) => diceLog.log.toastRoll(entry),
+});
 const diceLog = new DiceLogView({
   panel: element('dice-log'), list: element('dice-log-list'), empty: element('dice-log-empty'),
   closeButton: element('dice-log-close'), toggleButton: element('dice-log-button'), toast: element('dice-toast'),
+  onOwnRoll: (entry) => ownRolls.handle(entry),
 });
 const toolbar = new PageToolbar({
   root: element('toolbar'),
