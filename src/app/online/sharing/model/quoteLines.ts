@@ -42,7 +42,6 @@ export function strictQuote(line: string): QuoteLine {
 }
 
 const FENCE_OPEN = /^ {0,3}(?:(`{3,})[^`]*|(~{3,}).*)$/;
-const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 const HEADING = /^ {0,3}#{1,6}(?:\s|$)/;
 const ONLY_QUOTES = /^(?:[ \t]*>)*[ \t]*$/;
 
@@ -50,11 +49,6 @@ const ONLY_QUOTES = /^(?:[ \t]*>)*[ \t]*$/;
 export function fenceOpened(content: string): string | null {
   const match = FENCE_OPEN.exec(content);
   return match ? match[1] ?? match[2] ?? null : null;
-}
-
-export function closesFence(content: string, fence: string): boolean {
-  const marker = FENCE_CLOSE.exec(content)?.[1];
-  return marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length;
 }
 
 /** Nothing but whitespace and quote markers: a bare list marker is not blank. Depth is its `>` count. */

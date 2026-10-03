@@ -1,32 +1,10 @@
 /**
- * Comments, which are never shared: `%% … %%` and HTML `<!-- … -->`, inline or across lines,
- * but not inside code fences.
+ * Comments, which are never shared: `%% … %%` and HTML `<!-- … -->`, inline or across lines.
+ * Code fences are not tracked on purpose: every comment is removed everywhere, inside code too,
+ * and an unclosed one hides the rest of the note. Following fences through quotes and lists
+ * kept finding new ways to keep a comment that Obsidian hides, so this fails closed instead.
  */
-import { closesFence, fenceOpened, lenientQuote, strictQuote } from './quoteLines';
-
-interface OpenFence {
-  marker: string;
-  /** Quote depth of the line that opened it. */
-  depth: number;
-  /** The content indent of the list item it sits in, when it sits in one: the fence ends at a text line indented less. Null at top level. */
-  listIndent: number | null;
-}
-
-const indentOf = (content: string): number => content.length - content.trimStart().length;
-
-/**
- * A fence ends with its container: a quoted fence when a line has fewer quote markers (a blank
- * line included), one in a list item when a text line is indented less than the item's content.
- * Otherwise only its closing fence ends it: ending it early would turn its closing line into an
- * opener and flip every fence after it.
- */
-function endedByContainer(fence: OpenFence, line: string): boolean {
-  const { depth, content } = strictQuote(line);
-  if (depth < fence.depth) return true;
-  return fence.listIndent !== null && content.trim() !== '' && indentOf(content) < fence.listIndent;
-}
-
-const LIST_ITEM = /^( *)([-*+]|\d{1,9}[.)])( +)\S/;
+import { lenientQuote } from './quoteLines';
 
 const OPENERS = ['%%', '<!--'] as const;
 const CLOSERS: Record<string, string> = { '%%': '%%', '<!--': '-->' };
@@ -56,38 +34,12 @@ function withoutComments(line: string, open: string | null): { kept: string; ope
 
 /**
  * Removes the comments; a line left with nothing (or only quote and list markers) goes, so no
- * blank line appears where there was none. An unclosed comment runs to the end of the note.
- * A fence counts only in plain position (at most three spaces), so a look-alike never keeps a
- * comment that is meant to stay private.
+ * blank line appears where there was none.
  */
 export function stripComments(lines: readonly string[]): string[] {
   const out: string[] = [];
   let open: string | null = null;
-  let fence: OpenFence | null = null;
-  // The content indent of the list item the text is in, until a text line at the margin ends the list.
-  let listIndent: number | null = null;
   for (const line of lines) {
-    if (open === null) {
-      if (fence !== null && endedByContainer(fence, line)) fence = null;
-      const { depth, content } = strictQuote(line);
-      if (fence !== null) {
-        if (closesFence(content, fence.marker)) fence = null;
-        out.push(line);
-        continue;
-      }
-      const marker = fenceOpened(content);
-      if (marker) {
-        fence = { marker, depth, listIndent: listIndent !== null && indentOf(content) >= listIndent ? listIndent : null };
-        out.push(line);
-        continue;
-      }
-    }
-    if (open === null) {
-      const { content } = strictQuote(line);
-      const item = LIST_ITEM.exec(content);
-      if (item) listIndent = (item[1] ?? '').length + (item[2] ?? '').length + 1;
-      else if (content.trim() !== '' && indentOf(content) === 0) listIndent = null;
-    }
     const result = withoutComments(line, open);
     open = result.open;
     if (!result.touched) out.push(line);

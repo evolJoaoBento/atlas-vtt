@@ -1,6 +1,6 @@
 /**
  * What of a note one recipient gets, decided on the sender's machine before anything is
- * hashed or sent. Comments (`%% … %%`, outside code fences) go first, then callouts:
+ * hashed or sent. Comments (`%% … %%` and HTML comments, everywhere, code included) go first, then callouts:
  * `[!private]` never, `[!only|names]` only those people, `[!except|names]` everyone but them,
  * and a section nested in another must pass every rule. A callout ends only at a blank line, a
  * heading or a fence at a lower quote depth: Obsidian continues a callout's paragraph onto the

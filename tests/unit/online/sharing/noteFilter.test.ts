@@ -37,16 +37,27 @@ describe('filtering a note for one person', () => {
     expect(forPerson('ana', '> > [!private]\n> > Secret.\n> lazy secret\n> [!only|Ana]\n>\n> shown')).toBe('>\n> shown');
   });
 
-  it('removes comments inline and across lines, but not inside code fences', () => {
-    const source = 'A %%hidden%% B\n%%\nhidden\n%%\nC\n```\n%% kept in code %%\n```';
-    expect(forPerson('ana', source)).toBe('A  B\nC\n```\n%% kept in code %%\n```');
+  it('removes comments inline and across lines, everywhere (R3-1)', () => {
+    expect(forPerson('ana', 'A %%hidden%% B\n%%\nhidden\n%%\nC')).toBe('A  B\nC');
     expect(forPerson('ana', 'x %% open to the end\nstill hidden')).toBe('x');
+    // Code is not treated differently: a comment in a fence goes too, and no fence can keep one.
+    expect(forPerson('ana', 'C\n```\n%% in code %%\n```')).toBe('C\n```\n```');
+    expect(forPerson('ana', 'x\n    ```\n%% secret %%\ny')).toBe('x\n    ```\ny');
   });
 
-  it('a look-alike fence never keeps a comment, and a closing fence has no info string', () => {
-    expect(forPerson('ana', 'x\n    ```\n%% secret %%\ny')).toBe('x\n    ```\ny');
-    expect(forPerson('ana', '```\n```js\n%% in code %%\n```\n%% gone %%\nz')).toBe('```\n```js\n%% in code %%\n```\nz');
-    expect(forPerson('ana', 'a `` ``` `` b\n%% gone %%\nc')).toBe('a `` ``` `` b\nc');
+  it('keeps no comment after a fence, a quote or a list, however they end (R3-1)', () => {
+    for (const source of [
+      '- a\nlazy\n  ```\n  code\n%% S %%',
+      '> a\nlazy\n> ```\n> code\n%% S %%',
+      '- a\n\n x\n  ```\n  code\n %% in %%\n  ```\n  %% S %%',
+      ' ```\ncode\n ```\n %% S %%',
+      '> ```\n> code\n\n%% S %%\nafter',
+      '- item\n  ```\n  code\nPara %% S %%',
+      '```\ncode\n\n%% S %%\nstill code',
+    ]) {
+      expect(forPerson('ana', source), source).not.toContain('S %%');
+      expect(forPerson('ana', source), source).not.toContain('in %%');
+    }
   });
 
   it('unknown names: only reaches nobody, except hides from everyone, and the sender is told', () => {
@@ -121,40 +132,15 @@ describe('private text that cannot be read fails closed', () => {
 });
 
 describe('HTML comments and a byte order mark', () => {
-  it('drops HTML comments, one line or several, but not in code fences', () => {
+  it('drops HTML comments, one line or several, code fences included', () => {
     expect(forPerson('ana', 'a <!-- gm note --> b\n<!--\nmore\n-->\nc')).toBe('a  b\nc');
     expect(forPerson('ana', 'a <!-- never closed\nsecret')).toBe('a');
-    expect(forPerson('ana', '```\n<!-- in code -->\n```')).toBe('```\n<!-- in code -->\n```');
+    expect(forPerson('ana', '```\n<!-- in code -->\n```')).toBe('```\n```');
     expect(forPerson('ana', '<!-- %% -->\nx %% gone %%')).toBe('x');
   });
 
   it('reads frontmatter after a BOM, and ends it only at ---', () => {
     expect(forPerson('ana', '﻿---\natlas-share: [Ana]\nsecret: x\ntags: [a]\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
     expect(forPerson('ana', '---\ntags: [a]\n...\nsecret: x\n---\nBody')).toBe('---\ntags: [a]\n---\nBody');
-  });
-});
-
-describe('a code fence ends with its container (I1)', () => {
-  it('a fence in a quote ends when the quote does', () => {
-    expect(forPerson('ana', '> ```\n> code\n\n%% gm secret %%\nafter')).toBe('> ```\n> code\n\nafter');
-    expect(forPerson('ana', '> ```\n> code\nlazy\n%% gm secret %%\nafter')).not.toContain('gm secret');
-    expect(forPerson('ana', '> > ~~~\n> > code\n> %% gm secret %%\nafter')).not.toContain('gm secret');
-  });
-
-  it('a fence in a list item ends when the item does', () => {
-    expect(forPerson('ana', '- item\n  ```\n  code\nPara %% gm secret %%')).toBe('- item\n  ```\n  code\nPara');
-    expect(forPerson('ana', '1. item\n   ```\n   code\n\n%% gm secret %%\nafter')).not.toContain('gm secret');
-  });
-
-  it('a top-level fence indented one to three spaces ends only at its closing fence (R2-1)', () => {
-    expect(forPerson('ana', ' ```\ncode\n ```\n %% S %%')).toBe(' ```\ncode\n ```');
-    expect(forPerson('ana', 'text\n  ~~~\ncode\n%% in code %%\n  ~~~\n%% S %%\nz')).toBe('text\n  ~~~\ncode\n%% in code %%\n  ~~~\nz');
-    expect(forPerson('ana', '- item\n  ```\n  code\nPara\n\n%% S %%')).not.toContain('S %%');
-  });
-
-  it('still keeps comments inside a fence that is still open', () => {
-    expect(forPerson('ana', '> ```\n> %% in code %%\n> ```\nafter')).toBe('> ```\n> %% in code %%\n> ```\nafter');
-    expect(forPerson('ana', '- item\n  ```\n  %% in code %%\n  ```')).toBe('- item\n  ```\n  %% in code %%\n  ```');
-    expect(forPerson('ana', '```\ncode\n\n%% in code %%\nstill code')).toContain('%% in code %%');
   });
 });

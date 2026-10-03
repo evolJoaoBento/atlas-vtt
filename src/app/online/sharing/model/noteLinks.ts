@@ -111,7 +111,6 @@ function stripHtmlUrls(text: string): string {
 }
 
 const MAX_PASSES = 8;
-
 /** Runs `pass` until it changes nothing, at most `MAX_PASSES` times. */
 function untilStable(text: string, pass: (text: string) => string): string {
   let current = text;
@@ -127,8 +126,24 @@ function untilStable(text: string, pass: (text: string) => string): string {
 const sweep = (text: string): string =>
   untilStable(text, (current) => current.replace(MARKDOWN_LINK, (all: string, _bang: string, label: string, raw: string) => (WEB.test(cleanTarget(raw)) ? all : label)));
 
+/** The last net for wiki links: one whose target is not a title this pass wrote becomes its text (an embed, only its file name). */
+function wikiSweep(text: string, titles: ReadonlySet<string>): string {
+  return text.replace(WIKI_LINK, (all: string, bang: string, raw: string, alias: string | undefined): string => {
+    const { path, sub } = splitTarget(raw.trim());
+    if (path && titles.has(path)) return all;
+    if (alias !== undefined && !bang) return alias;
+    return path ? nameOf(path) : sub.replace(/^[#^]/, '');
+  });
+}
+
 export function rewriteLinks(text: string, resolve: LinkResolver): string {
-  const { kept, targets } = takeDefinitions(rewriteWiki(text, resolve).split('\n'));
-  const rewritten = untilStable(kept.join('\n'), (current) => rewriteSpans(current, targets, resolve));
-  return stripHtmlUrls(sweep(rewritten));
+  const titles = new Set<string>();
+  const tracked: LinkResolver = (linkpath) => {
+    const title = resolve(linkpath);
+    if (title) titles.add(title);
+    return title;
+  };
+  const { kept, targets } = takeDefinitions(rewriteWiki(text, tracked).split('\n'));
+  const rewritten = untilStable(kept.join('\n'), (current) => rewriteSpans(current, targets, tracked));
+  return stripHtmlUrls(untilStable(rewritten, (current) => sweep(wikiSweep(current, titles))));
 }

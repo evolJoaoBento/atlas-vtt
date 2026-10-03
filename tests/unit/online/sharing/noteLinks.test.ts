@@ -57,6 +57,13 @@ describe('links in shared notes', () => {
     expect(rewriteLinks('[![![i](GM/a.png)](GM/b.md)](https://example.org)', shared)).not.toMatch(/GM\//);
   });
 
+  it('a wiki link that is not a shared title ends as plain text, an embed as its file name (R3-2)', () => {
+    const swept = rewriteLinks('![[GM/a.png|![i](x)]] and [[GM/Secret|![j](y)]] and [[Cave]]', shared);
+    expect(swept).not.toContain('GM/');
+    expect(swept).not.toContain('![[');
+    expect(swept).toBe('a.png and j and [[Cave]]');
+  });
+
   it('only web links stay: Obsidian, app and file links become their text', () => {
     expect(rewriteLinks('[x](obsidian://open?vault=V&file=GM%2FSecret%20plan) [m](mailto:a@b.c)', shared)).toBe('x [m](mailto:a@b.c)');
     expect(rewriteLinks('<img src="app://abc/C:/Users/x/a.png"> <img src="file:///C:/a.png"> <a href="javascript:alert(1)">j</a>', shared)).toBe('<img> <img> <a>j</a>');
