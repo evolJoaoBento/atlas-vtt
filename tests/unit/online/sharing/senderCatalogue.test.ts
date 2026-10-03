@@ -4,6 +4,7 @@ import { parseShareRule } from '../../../../src/app/online/sharing/model/shareRu
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { migrateMapFile } from '../../../../src/app/services/MapPersistence';
 import { memoryImageFiles, nodeHash } from '../assetFixtures';
+import { simpleSections } from './obsidianSections';
 
 const T = 'T'.repeat(43);
 const person = (personId: string, name: string): Person => ({ tableId: T, personId, name, formerNames: [], devices: [], aliases: [], lastSeen: 0 });
@@ -34,7 +35,7 @@ function setup(options: { lit?: boolean; mode?: 'player-safe' | 'full' } = {}): 
   const sources: CatalogueSources = {
     notes: () => [{ path: 'Notes/Cave.md', title: 'Cave', rule: parseShareRule(['Ana']) }],
     note: (path) => (notes[path] !== undefined ? { path, title: path.slice(6, -3), rule: parseShareRule(undefined) } : null),
-    read: async (path) => notes[path] ?? '',
+    readNote: async (path) => { const text = notes[path] ?? ''; return { text, sections: simpleSections(text) }; },
     maps: async () => [{ name: 'Inn', mapPath: 'm.atlasmap', share: { item: 'm'.repeat(22), everyone: false, people: [`${T}/ben`], except: [], mode: options.mode ?? 'player-safe', notes: ['Notes/Inn.md'] } }],
     readMap: async () => ({ map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {}, lit: options.lit ?? false }),
     images: memoryImageFiles({ 'maps/inn.png': 'png-bytes' }).source,

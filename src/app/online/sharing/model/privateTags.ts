@@ -9,7 +9,7 @@
  * A token whose text is not a tag (an unknown keyword, no names, `end|x`) is malformed: it opens a part
  * hidden from everyone and never closes one, so a mistyped tag can only hide more.
  */
-import { codeOrLinkTest } from './codeContext';
+import { codeOrLinkTest, type BlockContext } from './codeContext';
 import { scanComments, type CommentSpan, type TextRange } from './commentFilter';
 
 export type PartRule = { kind: 'private' } | { kind: 'only' | 'except'; names: string[] };
@@ -63,11 +63,15 @@ function tagOf(content: string, start: number, end: number): PartTag {
   return { kind: 'open', rule: { kind: kind === 'only' ? 'only' : 'except', names: list }, start, end };
 }
 
-/** The tags of `text` as whole tokens, then the comments in the gaps between them. */
-export function scanMarkup(text: string): NoteMarkup {
+/**
+ * The tags of `text` as whole tokens, then the comments in the gaps between them. `blocks` is the block context
+ * (`codeContext.ts`): Obsidian's text blocks when filtering, `inline-only` where none can be known (the editor,
+ * a received or merged text), null when the note's sections are missing (no token is a tag then).
+ */
+export function scanMarkup(text: string, blocks: BlockContext): NoteMarkup {
   const tokens = [...text.matchAll(TOKEN)].map((match) => ({ content: match[1] ?? '', start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }));
   // A token possibly inside code or a link shows as text in Obsidian: never a tag (T-R2), it hides the rest of the note instead.
-  const inCodeOrLink = codeOrLinkTest(text, tokens);
+  const inCodeOrLink = codeOrLinkTest(text, tokens, blocks);
   const suspects = tokens.filter((token) => inCodeOrLink(token)).map(({ start, end }) => ({ start, end }));
   const tags = tokens.filter((token) => !suspects.some((suspect) => suspect.start === token.start))
     .map((token) => tagOf(token.content, token.start, token.end));
@@ -83,8 +87,8 @@ export function scanMarkup(text: string): NoteMarkup {
 }
 
 /** Every tag in `text`, in order. */
-export function scanTags(text: string): PartTag[] {
-  return scanMarkup(text).tags;
+export function scanTags(text: string, blocks: BlockContext): PartTag[] {
+  return scanMarkup(text, blocks).tags;
 }
 
 /** Pairs each opener with the end that closes it; ends with nothing open are `stray`. */
@@ -109,7 +113,7 @@ export function pairTags(tags: readonly PartTag[]): { parts: OpenPart[]; stray: 
 /** Whether `after` (a merge) still holds the parts of `before` whole: as many closed parts, no more stray or unclosed tags. */
 export function partsSurvive(before: string, after: string): boolean {
   const shape = (text: string): { closed: number; broken: number } => {
-    const { parts, stray } = pairTags(scanTags(text));
+    const { parts, stray } = pairTags(scanTags(text, 'inline-only'));
     return { closed: parts.filter((part) => part.close !== null).length, broken: stray.length + parts.filter((part) => part.close === null).length };
   };
   const was = shape(before);

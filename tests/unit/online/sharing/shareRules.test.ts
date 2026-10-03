@@ -56,7 +56,7 @@ function openedShare(running: boolean): Promise<ReturnType<typeof parseMapPayloa
   const sources: CatalogueSources = {
     ...real,
     notes: () => [],
-    read: async () => '',
+    readNote: async () => ({ text: '', sections: [] }),
     maps: async () => [{ name: 'Inn', mapPath: 'm.atlasmap', share: { item: 'm'.repeat(22), everyone: false, people: [`${T}/ben`], except: [], mode: 'player-safe', notes: [] } }],
     readMap: async () => ({ map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetValues: {}, initiative, initiativeTrackerOpen: true } as never, extra: {}, lit: false }),
     images: memoryImageFiles({ 'maps/inn.png': 'png-bytes', 'art/hero.png': 'a', 'art/orc.png': 'b' }).source,

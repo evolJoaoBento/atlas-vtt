@@ -5,6 +5,7 @@ import type { SenderCatalogue } from '../../../../src/app/online/sharing/model/S
 import type { Recipient } from '../../../../src/app/online/sharing/model/audience';
 import { nodeHash } from '../assetFixtures';
 import { noteCatalogue, TABLE_ID, testPeople, testPerson } from './sharingFixtures';
+import { simpleSections } from './obsidianSections';
 
 const T = TABLE_ID;
 const OTHER = 'O'.repeat(43);
@@ -132,7 +133,7 @@ describe('the receiver’s names come from its own people list only', () => {
 
 describe('a re-share runs the received tags through the normal filter', () => {
   const anaList = testPeople([testPerson('gm', 'Morgan'), testPerson('ben', 'Ben')]);
-  const reshare = (text: string, personId: string): string => filterNoteFor(text, {
+  const reshare = (text: string, personId: string): string => filterNoteFor(text, { sections: simpleSections(text),
     recipient: as(personId), people: anaList, shareable: [], links: () => null, marks: null,
   });
 

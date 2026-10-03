@@ -1,78 +1,47 @@
 /**
- * Whether a place in a note is possibly inside code, math or a link, where Obsidian shows a tag as plain text:
- * - a code fence (``` or ~~~, behind any quote, list or indent prefix, unclosed to the end);
- * - indented code: a line 4 or more columns (a tab is 4) beyond the content indent of the list or quote it
- *   sits in, after a blank line or a block start (`indentedCode`);
- * - a code span (backtick runs from the start of the paragraph, or an odd number of backticks on its line);
- * - a `<pre>` or `<code>` HTML block not closed yet, `$$` math (odd count before it), `$` math (odd count in
- *   its paragraph), an autolink `<…>` open on its line, a reference definition line (`[r]: <u>`, `[r]: u`);
- * - a link label or wiki link (bracket depth in its paragraph above 0), or a link destination (a `](` on its
- *   line not closed by `)`).
- * Detection is deliberately loose: a false "maybe" only hides more (the filter's backstop), while a tag
- * counted where Obsidian shows text could pair with a real one and share a part. Container indents are only
- * ever underestimated, which can only find more code.
+ * Whether a tag token may be shown by Obsidian as text rather than read as a comment, so it must not count
+ * as a tag. Block context comes from Obsidian's sections (`noteSections.ts`): outside a text block it is text.
+ * Inside one:
+ * - a list, quote or callout (sections are top-level only, so code nested in them is not a section of its
+ *   own): a fence-looking or HTML-looking line earlier in the block, or 4 or more columns of whitespace in the
+ *   token line's prefix (indentation, or after a quote or list marker: possibly indented code);
+ * - inline, from the start of the token's paragraph (the block, cut at its last blank line): an open code span,
+ *   an odd number of backticks on its line, unclosed inline `<code>`/`<pre>`, `$$` or `$` math, an autolink
+ *   `<…>` open on its line, a reference definition line, an open link label or wiki link (bracket depth), or a
+ *   link destination (`](` not closed by `)`).
+ * Backslash escapes are honoured: an escaped character never counts. Detection is deliberately loose: a false
+ * "maybe" only hides more (the filter's backstop), while a tag counted where Obsidian shows text could pair
+ * with a real one and share a part.
  */
 import type { TextRange } from './commentFilter';
+import type { TextBlock } from './noteSections';
 import { lenientQuote } from './quoteLines';
 
-const FENCE = /^(`{3,}|~{3,})(.*)$/;
-const LIST_ITEM = /^([-*+]|\d{1,9}[.)])( +|\t|$)/;
-const ORDERED = /^\d/;
+/** Block context for a scan: Obsidian's text blocks, null when unknown (every token is then text), or `inline-only`. */
+export type BlockContext = readonly TextBlock[] | null | 'inline-only';
+
 const REFERENCE_DEFINITION = /^\[[^\]]*\]:/;
+const FENCE_OR_HTML = /^(?:`{3,}|~{3,}|<[A-Za-z!?/])/;
 
-interface Line {
-  start: number;
-  end: number;
-  blank: boolean;
-  /** A fence line, a line inside an open fence, or possibly indented code. */
-  code: boolean;
+/** `text` with every backslash escape (`\` before ASCII punctuation) masked, so the escaped character never counts. */
+function withoutEscapes(text: string): string {
+  return text.replace(/\\[!-/:-@[-`{-~]/g, 'xx');
 }
 
-/** Columns of leading whitespace (tabs to the next multiple of 4), and the rest. */
-function indentOf(text: string): { columns: number; rest: string } {
-  let columns = 0;
-  let index = 0;
-  for (; index < text.length && (text[index] === ' ' || text[index] === '\t'); index++) columns = text[index] === '\t' ? columns + 4 - (columns % 4) : columns + 1;
-  return { columns, rest: text.slice(index) };
-}
+const MARKER = /^(?:>|[-*+](?=[ \t]|$)|\d{1,9}[.)](?=[ \t]|$))/;
+const columnsOf = (space: string): number => [...space].reduce((columns, char) => (char === '\t' ? columns + 4 - (columns % 4) : columns + 1), 0);
 
-/** The line without its quote markers (each `>` and one optional space). */
-const withoutQuotes = (raw: string): string => raw.replace(/^(?:[ ]{0,3}>[ ]?)+/, '');
-
-function linesOf(text: string): Line[] {
-  const lines: Line[] = [];
-  let fence: { char: string; length: number } | null = null;
-  let listContent = 0;
-  let previous: { blank: boolean; code: boolean; paragraph: boolean; listItem: boolean } = { blank: true, code: false, paragraph: false, listItem: false };
-  let start = 0;
-  for (const raw of text.split('\n')) {
-    // A line holding only quote markers is blank inside its quote.
-    const blank = withoutQuotes(raw).trim() === '';
-    const { columns, rest } = indentOf(withoutQuotes(raw));
-    const opener = FENCE.exec(lenientQuote(raw).content);
-    let code = fence !== null;
-    let paragraph = false;
-    let listItem = false;
-    if (fence) {
-      if (opener && opener[1]?.[0] === fence.char && (opener[1]?.length ?? 0) >= fence.length && (opener[2] ?? '').trim() === '') fence = null;
-    } else if (opener && !(opener[1]?.[0] === '`' && (opener[2] ?? '').includes('`'))) {
-      fence = { char: opener[1]?.[0] ?? '`', length: opener[1]?.length ?? 3 };
-      code = true;
-    } else if (!blank) {
-      const marker = LIST_ITEM.exec(rest);
-      // An ordered item cannot interrupt a paragraph: only trust it after a blank line or another item.
-      listItem = marker !== null && (!ORDERED.test(rest) || previous.blank || previous.listItem);
-      const startsBlock = previous.blank || previous.code || !previous.paragraph;
-      if (!listItem && previous.blank && columns < listContent) listContent = 0;
-      if (columns >= listContent + 4 && (startsBlock || previous.code)) code = true;
-      else if (listItem && marker) listContent = columns + (marker[1]?.length ?? 1) + Math.min(Math.max((marker[2] ?? ' ').length, 1), 4);
-      paragraph = !code && !/^#{1,6}(\s|$)/.test(rest);
-    }
-    lines.push({ start, end: start + raw.length, blank, code });
-    previous = { blank, code: code && !blank, paragraph, listItem };
-    start += raw.length + 1;
+/** Whether the line's prefix of quote and list markers holds a whitespace run of 4 or more columns (a tab is 4). */
+function deepPrefix(line: string): boolean {
+  let rest = line;
+  for (;;) {
+    const space = /^[ \t]*/.exec(rest)?.[0] ?? '';
+    if (columnsOf(space) >= 4) return true;
+    rest = rest.slice(space.length);
+    const marker = MARKER.exec(rest);
+    if (!marker) return false;
+    rest = rest.slice(marker[0].length);
   }
-  return lines;
 }
 
 /** Whether the backtick runs of `text` leave a code span open at its end. */
@@ -85,7 +54,7 @@ function codeSpanOpen(text: string): boolean {
   return open !== 0;
 }
 
-/** Whether `open` is left open at the end of `text`: depth counting, a closer at depth 0 changes nothing. */
+/** Whether something `opens` marks is left open at the end of `text`: depth counting, a closer at depth 0 changes nothing. */
 function depthOpen(text: string, opens: (index: number) => boolean, closer: string): boolean {
   let depth = 0;
   for (let index = 0; index < text.length; index++) {
@@ -110,30 +79,41 @@ function linkDestinationOpen(onLine: string): boolean {
 
 const count = (text: string, pattern: RegExp): number => (text.match(pattern) ?? []).length;
 
-/** Code, math or HTML before `at` that may still be open there. */
-function codeOpen(before: string, paragraph: string, onLine: string): boolean {
+/** Inline code, math, links or HTML before the token, in its paragraph or on its line, that may be open there. */
+function inlineOpen(paragraph: string, onLine: string, line: string): boolean {
   if (codeSpanOpen(paragraph) || count(onLine, /`/g) % 2 === 1) return true;
-  if (count(before, /<(?:pre|code)\b/gi) > count(before, /<\/(?:pre|code)\s*>/gi)) return true;
-  if (count(before, /\$\$/g) % 2 === 1 || count(paragraph.replace(/\$\$/g, ''), /\$/g) % 2 === 1) return true;
-  return depthOpen(onLine, (index) => onLine[index] === '<' && /\S/.test(onLine[index + 1] ?? ' '), '>');
+  if (count(paragraph, /<(?:pre|code)\b/gi) > count(paragraph, /<\/(?:pre|code)\s*>/gi)) return true;
+  if (count(paragraph, /\$\$/g) % 2 === 1 || count(paragraph.replace(/\$\$/g, ''), /\$/g) % 2 === 1) return true;
+  if (depthOpen(onLine, (index) => onLine[index] === '<' && /\S/.test(onLine[index + 1] ?? ' '), '>')) return true;
+  if (REFERENCE_DEFINITION.test(lenientQuote(line).content)) return true;
+  return depthOpen(paragraph, (index) => paragraph[index] === '[', ']') || linkDestinationOpen(onLine);
 }
 
-/** A test for "possibly inside code, math or a link" at the start of each of `ranges` (the tag tokens of `text`). */
-export function codeOrLinkTest(text: string, ranges: readonly TextRange[]): (range: TextRange) => boolean {
-  // Other tokens' own brackets and backticks must not count: mask them with a plain letter (not spaces, which would read as indent).
+/** A test for "possibly shown as text" at the start of each of `ranges` (the tag tokens of `text`). */
+export function codeOrLinkTest(text: string, ranges: readonly TextRange[], blocks: BlockContext): (range: TextRange) => boolean {
+  // Other tokens' own brackets and backticks must not count: mask them with a plain letter.
   let masked = text;
   for (const range of ranges) masked = masked.slice(0, range.start) + 'x'.repeat(range.end - range.start) + masked.slice(range.end);
-  const lines = linesOf(masked);
+  masked = withoutEscapes(masked);
+  const lines = masked.split('\n');
+  const starts: number[] = [];
+  lines.reduce((at, line) => { starts.push(at); return at + line.length + 1; }, 0);
   return (range) => {
-    const index = lines.findIndex((line) => range.start >= line.start && range.start <= line.end);
-    const line = lines[index];
-    if (!line || line.code) return true;
-    let first = index;
-    while (first > 0 && !lines[first - 1]?.blank && !lines[first - 1]?.code) first--;
-    const paragraph = masked.slice(lines[first]?.start ?? line.start, range.start);
-    const onLine = masked.slice(line.start, range.start);
-    if (codeOpen(masked.slice(0, range.start), paragraph, onLine)) return true;
-    if (REFERENCE_DEFINITION.test(lenientQuote(masked.slice(line.start, line.end)).content)) return true;
-    return depthOpen(paragraph, (at) => paragraph[at] === '[', ']') || linkDestinationOpen(onLine);
+    let index = starts.findIndex((start, at) => range.start >= start && range.start <= start + (lines[at]?.length ?? 0));
+    if (index < 0) index = lines.length - 1;
+    let first = 0;
+    if (blocks !== 'inline-only') {
+      const block = blocks?.find((candidate) => index >= candidate.startLine && index <= candidate.endLine);
+      if (!block) return true;
+      if (block.container) {
+        if (deepPrefix(lines[index] ?? '')) return true;
+        for (let at = block.startLine; at <= index; at++) if (FENCE_OR_HTML.test(lenientQuote(lines[at] ?? '').content)) return true;
+      }
+      first = block.startLine;
+    }
+    for (let at = index - 1; at >= first; at--) if ((lines[at] ?? '').replace(/^(?:[ \t]*>)*/, '').trim() === '') { first = at + 1; break; }
+    const paragraph = masked.slice(starts[first] ?? 0, range.start);
+    const onLine = masked.slice(starts[index] ?? 0, range.start);
+    return inlineOpen(paragraph, onLine, lines[index] ?? '');
   };
 }

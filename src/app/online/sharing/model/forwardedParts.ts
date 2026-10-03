@@ -57,7 +57,7 @@ function personIdOf(name: string, tableId: string): string | null {
 export function localizeForwardedTags(text: string, tableId: string, nameOf: (personId: string) => string | null): string {
   let out = '';
   let at = 0;
-  for (const tag of scanTags(text)) {
+  for (const tag of scanTags(text, 'inline-only')) {
     out += text.slice(at, tag.start);
     at = tag.end;
     if (tag.kind === 'end') {

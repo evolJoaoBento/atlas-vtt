@@ -18,6 +18,7 @@ import { accessFor, type Access, type AccessSources, type MapAccess } from './ca
 import type { MapShareMode } from './mapShare';
 import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES } from './forwardedParts';
 import { filterNoteFor, strayEndLineIn, strayEndProblem } from './noteFilter';
+import type { NoteSection } from './noteSections';
 import type { PartMarks } from './privateParts';
 import type { ShareItems } from './ShareItems';
 
@@ -42,7 +43,11 @@ export interface SharePayload {
 }
 
 export interface CatalogueSources extends AccessSources {
-  read(path: string): Promise<string>;
+  /**
+   * A note's text and Obsidian's sections for it (`metadataCache` sections; null when there are none). The
+   * filter checks that the sections fit this exact text and keeps tags back when they do not.
+   */
+  readNote(path: string): Promise<{ text: string; sections: readonly NoteSection[] | null }>;
   images: ImageFiles;
   isFile(path: string): boolean;
   /** The vault path a link in `from` points at; null when it resolves to nothing. */
@@ -116,7 +121,10 @@ export class SenderCatalogue {
   /** The note as this person would get it, whatever its rule says now (the dialog's preview), its tags naming people as this list does. */
   async previewNote(recipient: Recipient, path: string, self?: string): Promise<string> {
     const text = await this.noteText(path, recipient, await this.access(recipient), self);
-    if (text === null) return strayEndProblem(strayEndLineIn(await this.sources.read(path)) ?? 0);
+    if (text === null) {
+      const note = await this.sources.readNote(path);
+      return strayEndProblem(strayEndLineIn(note.text, note.sections) ?? 0);
+    }
     return localizeForwardedTags(text, recipient.tableId, (personId) => (personId === self ? 'you' : this.people.get(recipient.tableId, personId)?.name ?? null));
   }
 
@@ -135,10 +143,10 @@ export class SenderCatalogue {
 
   /** Null for a note that is not shared at all: a stray end tag (`strayEndLineIn`). */
   private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<string | null> {
-    const source = await this.sources.read(path);
-    if (strayEndLineIn(source) !== null) return null;
+    const { text: source, sections } = await this.sources.readNote(path);
+    if (strayEndLineIn(source, sections) !== null) return null;
     return filterNoteFor(source, {
-      recipient, people: this.people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self),
+      recipient, people: this.people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self), sections,
       links: (linkpath) => {
         const target = this.sources.resolveLink(linkpath, path);
         return target ? access.notes.get(target)?.title ?? null : null;

@@ -5,6 +5,7 @@ import { chooseAction } from '../../ui/confirmDialog';
 import { ruleReaches } from './model/audience';
 import { mapShareOf } from './model/mapShare';
 import { strayEndLineIn, strayEndProblem } from './model/noteFilter';
+import type { NoteSection } from './model/noteSections';
 import type { ShareItems } from './model/ShareItems';
 import { parseShareRule, SHARE_PROPERTY } from './model/shareRule';
 import type { PeopleBook } from './people/PeopleBook';
@@ -20,8 +21,8 @@ interface PushableItem {
 }
 
 /** Why a note may not be pushed: it is not shared at all while it has a stray end tag (`strayEndLineIn`). */
-export function pushRefusal(text: string): string | null {
-  const line = strayEndLineIn(text);
+export function pushRefusal(text: string, sections: readonly NoteSection[] | null): string | null {
+  const line = strayEndLineIn(text, sections);
   return line === null ? null : strayEndProblem(line);
 }
 
@@ -49,7 +50,9 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
       new Notice('Nobody else in this session shares with Atlas in Obsidian.');
       return;
     }
-    const refused = file.extension === 'md' ? pushRefusal(await plugin.app.vault.cachedRead(file)) : null;
+    const refused = file.extension === 'md'
+      ? pushRefusal(await plugin.app.vault.cachedRead(file), plugin.app.metadataCache.getFileCache(file)?.sections ?? null)
+      : null;
     if (refused) {
       new Notice(refused);
       return;

@@ -71,7 +71,7 @@ class ShareWithModal extends Modal {
   private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<{ warnings: string[]; error: string | null }> {
     const text = await this.app.vault.cachedRead(this.file);
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
-    const problems = partProblemsInNote(text);
+    const problems = partProblemsInNote(text, this.app.metadataCache.getFileCache(this.file)?.sections ?? null);
     const warnings = [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),

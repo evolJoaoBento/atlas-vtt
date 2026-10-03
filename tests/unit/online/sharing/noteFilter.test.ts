@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { filterNoteFor, partProblemsInNote, strayEndLineIn, unknownNamesIn } from '../../../../src/app/online/sharing/model/noteFilter';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
+import { sectionsOf, simpleSections } from './obsidianSections';
+// Block context: unless a test spells out its sections (`sectionsOf`), notes get `simpleSections`, an
+// approximation of Obsidian's parser (obsidianSections.ts). Repros that rest on it are on the manual test list.
+const problemsOf = (source: string) => partProblemsInNote(source, simpleSections(source));
+const strayLineOf = (source: string) => strayEndLineIn(source, simpleSections(source));
 
 const T = 'T'.repeat(43);
 const person = (personId: string, name: string, formerNames: string[] = []): Person => ({ tableId: T, personId, name, formerNames, devices: [], aliases: [], lastSeen: 0 });
@@ -11,7 +16,7 @@ const people = {
   allByName: (name: string): Person[] => list.filter((p) => matches(p, name)),
 };
 const forPerson = (personId: string, source: string, shareable: string[] = ['tags']): string =>
-  filterNoteFor(source, { recipient: { tableId: T, personId }, people, shareable, links: () => null, marks: null });
+  filterNoteFor(source, { sections: simpleSections(source), recipient: { tableId: T, personId }, people, shareable, links: () => null, marks: null });
 const everyone = ['ana', 'ben', 'cara'];
 
 /** Every probe of the callout era (Task 3 and its fix rounds): its secret never reaches anyone now. */
@@ -62,7 +67,7 @@ const OLD_PROBES: Array<[string, string[]]> = [
 
 describe('the old callouts are kept back now (fail closed)', () => {
   it('no probe from the callout era reaches anyone, with restricted parts marked or not', () => {
-    const marked = (personId: string, source: string): string => filterNoteFor(source, {
+    const marked = (personId: string, source: string): string => filterNoteFor(source, { sections: simpleSections(source),
       recipient: { tableId: T, personId }, people, shareable: ['tags'], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
     });
     for (const [source, secrets] of OLD_PROBES) {
@@ -85,7 +90,7 @@ describe('the old callouts are kept back now (fail closed)', () => {
       ['%%[!only|Ana]%%%%[!end|x]%%SECRET%%[!end]%%', { ana: false, ben: false, cara: false }],
       ['> [!private] x %%[!only|Ana]%%\nSECRET\n\n%%[!end]%%', { ana: false, ben: false, cara: false }],
     ];
-    const marked = (personId: string, source: string): string => filterNoteFor(source, {
+    const marked = (personId: string, source: string): string => filterNoteFor(source, { sections: simpleSections(source),
       recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
     });
     for (const [source, reaches] of probes) {
@@ -116,14 +121,14 @@ describe('the old callouts are kept back now (fail closed)', () => {
   });
 
   it('tells the sender about old callouts and other tag text, and leaves a note without them quiet', () => {
-    expect(partProblemsInNote('Open.\n> [!private]\n> s').strayText).toEqual({ text: '[!private]\n> s', oldCallout: true });
-    expect(partProblemsInNote('mid [!except Cara] end').strayText).toEqual({ text: '[!except Cara] end', oldCallout: false });
-    expect(partProblemsInNote('%%[!private]%%s%%[!end]%%\n%% a comment %%').strayText).toBeNull();
+    expect(problemsOf('Open.\n> [!private]\n> s').strayText).toEqual({ text: '[!private]\n> s', oldCallout: true });
+    expect(problemsOf('mid [!except Cara] end').strayText).toEqual({ text: '[!except Cara] end', oldCallout: false });
+    expect(problemsOf('%%[!private]%%s%%[!end]%%\n%% a comment %%').strayText).toBeNull();
   });
 });
 
 describe('a %% in code cannot shift which tags pair (T-C1)', () => {
-  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+  const marked = (personId: string, source: string): string => filterNoteFor(source, { sections: simpleSections(source),
     recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
   });
   const probes: Array<[string, string, string[]]> = [
@@ -154,12 +159,12 @@ describe('a %% in code cannot shift which tags pair (T-C1)', () => {
   it('tags are found whatever the comments around them; a comment unclosed before the next tag hides the rest', () => {
     expect(forPerson('ana', 'a `%%` b\n%%[!only|Ana]%%x%%[!end]%%\nc')).toBe('a `');
     expect(forPerson('cara', 'pub\n%%[!only|Cara]%%\nC `%%` C\n%%[!end]%%\nend')).toBe('pub\nC `');
-    expect(partProblemsInNote('a `%%` b\n%%[!private]%%x%%[!end]%%').unclosedComment).toBe(true);
+    expect(problemsOf('a `%%` b\n%%[!private]%%x%%[!end]%%').unclosedComment).toBe(true);
   });
 });
 
 describe('a tag written inside code or a link is never a tag (T-R2)', () => {
-  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+  const marked = (personId: string, source: string): string => filterNoteFor(source, { sections: simpleSections(source),
     recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
   });
   const leaks: Array<[string, string]> = [
@@ -182,7 +187,7 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
         expect(forPerson(personId, source), label).not.toContain('LEAK');
         expect(marked(personId, source), `${label}, marked`).not.toContain('LEAK');
       }
-      expect(partProblemsInNote(source).tagInCodeOrLink, label).toBe(true);
+      expect(problemsOf(source).tagInCodeOrLink, label).toBe(true);
     }
   });
 
@@ -194,7 +199,7 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
     const source = 'Run `npm test` %%[!only|Ana]%%secret `x`%%[!end]%% done `y`';
     expect(forPerson('ana', source)).toBe('Run `npm test` secret `x` done `y`');
     expect(forPerson('ben', source)).toBe('Run `npm test`  done `y`');
-    expect(partProblemsInNote(source).tagInCodeOrLink).toBe(false);
+    expect(problemsOf(source).tagInCodeOrLink).toBe(false);
     expect(forPerson('ben', '```\ncode\n```\n%%[!private]%%s%%[!end]%% [a](b) after')).toBe('```\ncode\n```\n a after');
     expect(forPerson('ben', 'See [x](https://e.org/a_(b)) %%[!private]%%s%%[!end]%% after')).toBe('See [x](https://e.org/a_(b))  after');
   });
@@ -203,7 +208,7 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
 describe('indented code, brackets, HTML, math, autolinks and reference definitions (T-R3)', () => {
   const P = '%%[!private]%%';
   const E = '%%[!end]%%';
-  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+  const marked = (personId: string, source: string): string => filterNoteFor(source, { sections: simpleSections(source),
     recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
   });
   const leaks: Array<[string, string]> = [
@@ -227,15 +232,20 @@ describe('indented code, brackets, HTML, math, autolinks and reference definitio
         expect(forPerson(personId, source), label).not.toContain('LEAK');
         expect(marked(personId, source), `${label}, marked`).not.toContain('LEAK');
       }
-      expect(partProblemsInNote(source).tagInCodeOrLink, label).toBe(true);
+      expect(problemsOf(source).tagInCodeOrLink, label).toBe(true);
     }
   });
 
   it('real block tags in lists, at the list content column, still work', () => {
     expect(forPerson('ben', `- item\n  ${P}\n  secret\n  ${E}\n- next`)).toBe('- item\n- next');
-    expect(forPerson('ben', `- a\n  - b\n    ${P}\n    secret\n    ${E}\n- c`)).toBe('- a\n  - b\n- c');
-    expect(forPerson('ben', `- a\n  - b\n\n    ${P}\n    secret\n    ${E}\n\n- c`)).toBe('- a\n  - b\n\n\n- c');
     expect(forPerson('ben', `1. one\n2. two\n   ${P}\n   secret\n   ${E}`)).toBe('1. one\n2. two');
+    expect(forPerson('ben', `- item ${P}secret${E}\n  - sub ${P}more${E} end`)).toBe('- item\n  - sub  end');
+  });
+
+  it('a block tag indented 4 or more in a nested list is kept back as possible code, and warned (accepted over-hiding)', () => {
+    const source = `- a\n  - b\n    ${P}\n    secret\n    ${E}\n- c`;
+    expect(forPerson('ben', source)).toBe('- a\n  - b');
+    expect(problemsOf(source).tagInCodeOrLink).toBe(true);
   });
 
   it('a common session note keeps its real tags working', () => {
@@ -245,11 +255,69 @@ describe('indented code, brackets, HTML, math, autolinks and reference definitio
       `  - Price: 50 gp ${P}(real: 30)${E}`, '', '> [!note] Weather', '> Rain all night.', '', '```dice', '1d20 + 3', '```', '',
       `${P}`, 'The innkeeper is the cult leader.', '', 'Clues: the ring, the ledger.', E, '', 'Next time: the crypt.',
     ].join('\n');
-    expect(partProblemsInNote(note).tagInCodeOrLink).toBe(false);
+    expect(problemsOf(note).tagInCodeOrLink).toBe(false);
     const forBen = forPerson('ben', note);
     for (const secret of ['recognises', 'real: 30', 'cult leader', 'ledger']) expect(forBen).not.toContain(secret);
     expect(forBen).toContain('Next time: the crypt.');
     expect(forPerson('ana', note)).toContain('Ana recognises the innkeeper.');
+  });
+});
+
+describe('block context from Obsidian’s sections (T-R4)', () => {
+  // FIXTURES: each `sectionsOf` below spells out the sections Obsidian's metadata cache gives for that note
+  // (top-level blocks only). They stand in for Obsidian's parser; these cases are on the manual test list.
+  const P = '%%[!private]%%';
+  const E = '%%[!end]%%';
+  const filterWith = (personId: string, source: string, sections: ReturnType<typeof sectionsOf> | null, marks = false): string => filterNoteFor(source, {
+    recipient: { tableId: T, personId }, people, shareable: [], links: () => null, sections,
+    marks: marks ? { openTag: () => '%%[!only|@x]%%' } : null,
+  });
+  const lines = (...rows: string[]): string => rows.join('\n');
+  const repros: Array<[string, string, Array<[string, number, number]>]> = [
+    ['a quote nested in a list', lines(P, '', '- item', '  > q', `  >     ${E}`, '', '  LEAK', '', '  > q', `  >     ${P}`, '', E),
+      [['paragraph', 0, 0], ['list', 2, 9], ['paragraph', 11, 11]]],
+    ['a quote right after a list', lines(P, '', '- item', '> q', `>     ${E}`, '', 'LEAK', '', `>     ${P}`, '', E),
+      [['paragraph', 0, 0], ['list', 2, 2], ['blockquote', 3, 4], ['paragraph', 6, 6], ['blockquote', 8, 8], ['paragraph', 10, 10]]],
+    ['a list marker and 5 spaces', lines(P, '', `-      ${E}`, '', 'LEAK', '', `-      ${P}`, '', E),
+      [['paragraph', 0, 0], ['list', 2, 2], ['paragraph', 4, 4], ['list', 6, 6], ['paragraph', 8, 8]]],
+    ...['details', 'div', 'script', 'textarea'].map((tag): [string, string, Array<[string, number, number]>] => [
+      `a <${tag}> block`, lines(P, '', `<${tag}>`, E, `</${tag}>`, '', 'LEAK', '', `<${tag}>`, P, `</${tag}>`, '', E),
+      [['paragraph', 0, 0], ['html', 2, 4], ['paragraph', 6, 6], ['html', 8, 10], ['paragraph', 12, 12]]]),
+    ['an escaped backtick', lines(P, 'x \\` `' + E + '` LEAK `' + P + '`', E), [['paragraph', 0, 2]]],
+    ['an escaped ]', lines(P, '[a\\] ' + E + '](u) LEAK [b\\] ' + P + '](v)', E), [['paragraph', 0, 2]]],
+    ['an escaped $', lines(P, '\\$ $' + E + '$ LEAK $' + P + '$', E), [['paragraph', 0, 2]]],
+  ];
+
+  it('today’s repros leak nothing to anyone, marked or not, and warn', () => {
+    for (const [label, source, blocks] of repros) {
+      const sections = sectionsOf(source, blocks);
+      for (const personId of everyone) {
+        expect(filterWith(personId, source, sections), label).not.toContain('LEAK');
+        expect(filterWith(personId, source, sections, true), `${label}, marked`).not.toContain('LEAK');
+      }
+      expect(partProblemsInNote(source, sections).tagInCodeOrLink, label).toBe(true);
+    }
+  });
+
+  it('a tag in a code, math, table or footnote section, or between sections, is text', () => {
+    const source = lines('Open.', '', `\`\`\``, E, `\`\`\``, '', 'After.');
+    expect(filterWith('ana', lines(P, '', source), sectionsOf(lines(P, '', source), [['paragraph', 0, 0], ['paragraph', 2, 2], ['code', 4, 6], ['paragraph', 8, 8]]))).toBe('');
+    for (const type of ['math', 'table', 'footnoteDefinition', 'element']) {
+      const note = lines('Open.', `x ${P} y`);
+      expect(filterWith('ana', note, sectionsOf(note, [['paragraph', 0, 0], [type, 1, 1]])), type).toBe('Open.\nx');
+    }
+    const gap = lines('Open.', `x ${P} y`);
+    expect(filterWith('ana', gap, sectionsOf(gap, [['paragraph', 0, 0]]))).toBe('Open.\nx');
+  });
+
+  it('missing or stale sections keep every tag back', () => {
+    const source = lines('Open.', `${P}`, 'secret', E, 'After.');
+    expect(filterWith('ana', source, null)).toBe('Open.');
+    expect(partProblemsInNote(source, null).tagInCodeOrLink).toBe(true);
+    // Sections of the note before an edit: their offsets no longer match this text.
+    const before = lines('Open!!', `${P}`, 'secret', E, 'After.');
+    expect(filterWith('ana', source, sectionsOf(before, [['paragraph', 0, 4]]))).toBe('Open.');
+    expect(filterWith('ana', source, sectionsOf(source, [['paragraph', 0, 4]]))).toBe('Open.\nAfter.');
   });
 });
 
@@ -286,14 +354,14 @@ describe('private part tags', () => {
   it('an unclosed tag hides everything after it from everyone, its own people included', () => {
     expect(forPerson('ana', 'Open. %%[!only|Ana]%% for Ana\nand more\n\nstill')).toBe('Open.');
     expect(forPerson('ana', 'Open.\n%%[!private]%%\nrest')).toBe('Open.');
-    expect(partProblemsInNote('a %%[!only|Ana]%% b').unclosed).toBe(1);
+    expect(problemsOf('a %%[!only|Ana]%% b').unclosed).toBe(1);
   });
 
   it('a stray end is removed from the text, and its line is reported (the note is then not shared: T-stray)', () => {
     expect(forPerson('ana', 'a %%[!end]%% b\n%%[!private]%%s%%[!end]%%')).toBe('a  b');
-    expect(partProblemsInNote('a %%[!end]%% b').strayEndLines).toEqual([1]);
-    expect(strayEndLineIn('---\ntags: [a]\n---\nOne\n%%[!private]%%x%%[!end]%%\nTwo %%[!end]%%')).toBe(6);
-    expect(strayEndLineIn('%%[!private]%%x%%[!end]%%')).toBeNull();
+    expect(problemsOf('a %%[!end]%% b').strayEndLines).toEqual([1]);
+    expect(strayLineOf('---\ntags: [a]\n---\nOne\n%%[!private]%%x%%[!end]%%\nTwo %%[!end]%%')).toBe(6);
+    expect(strayLineOf('%%[!private]%%x%%[!end]%%')).toBeNull();
   });
 
   it('a malformed tag hides up to its matching end; a tag-like comment hides the rest of the note', () => {
@@ -311,7 +379,7 @@ describe('private part tags', () => {
     for (const [source, expected] of cases) {
       for (const personId of everyone) expect(forPerson(personId, source), source).toBe(expected);
     }
-    expect(partProblemsInNote('a %%[!secret]%% b %%[!only]%%').malformed).toEqual(['[!secret]', '[!only]']);
+    expect(problemsOf('a %%[!secret]%% b %%[!only]%%').malformed).toEqual(['[!secret]', '[!only]']);
   });
 
   it('a malformed end never closes a part', () => {

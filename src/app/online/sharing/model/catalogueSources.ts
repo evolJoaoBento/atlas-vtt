@@ -24,9 +24,12 @@ export function obsidianCatalogueSources(app: App, settings: SettingsService): C
       const file = app.vault.getAbstractFileByPath(path);
       return file instanceof TFile && file.extension === 'md' ? noteOf(file) : null;
     },
-    read: async (path) => {
+    readNote: async (path) => {
       const file = app.vault.getAbstractFileByPath(path);
-      return file instanceof TFile ? app.vault.cachedRead(file) : app.vault.adapter.read(path);
+      if (!(file instanceof TFile)) return { text: await app.vault.adapter.read(path), sections: null };
+      // The sections are taken right after the read, and the filter checks they fit this exact text.
+      const text = await app.vault.cachedRead(file);
+      return { text, sections: app.metadataCache.getFileCache(file)?.sections ?? null };
     },
     maps: async () => (await AssetService.getInstance(app).getAssets(undefined, 'scene')).flatMap((scene) => {
       const share = mapShareOf(scene);

@@ -8,6 +8,7 @@ import { SenderCatalogue, type CatalogueSources } from '../../../../src/app/onli
 import { parseShareRule } from '../../../../src/app/online/sharing/model/shareRule';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { memoryImageFiles, nodeHash } from '../assetFixtures';
+import { simpleSections } from './obsidianSections';
 
 export const nodeIdentityCrypto: IdentityCrypto = {
   generate: (): Promise<KeyPairJwk> => {
@@ -78,7 +79,7 @@ export function noteCatalogue(notes: Record<string, { text: string; share: unkno
     notes: () => Object.entries(notes).filter(([, note]) => note.share !== undefined)
       .map(([path, note]) => ({ path, title: title(path), rule: parseShareRule(note.share) })),
     note: (path) => (notes[path] ? { path, title: title(path), rule: parseShareRule(notes[path]!.share) } : null),
-    read: async (path) => notes[path]?.text ?? '',
+    readNote: async (path) => { const text = notes[path]?.text ?? ''; return { text, sections: simpleSections(text) }; },
     maps: async () => [],
     readMap: async () => null,
     images: memoryImageFiles({}).source,

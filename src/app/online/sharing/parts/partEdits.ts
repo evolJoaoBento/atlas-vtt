@@ -61,7 +61,7 @@ function asOneChange(text: string, edits: readonly TextEdit[], from: number, to:
 
 /** The selection with its ends moved out of tags and comments: a tag or comment an end cuts is taken in whole. */
 function snapped(text: string, from: number, to: number): { from: number; to: number } {
-  const { tags, comments } = scanMarkup(text);
+  const { tags, comments } = scanMarkup(text, 'inline-only');
   let start = from;
   let end = to;
   for (const span of [...tags, ...comments]) {
@@ -91,7 +91,7 @@ function wrapEdits(text: string, from: number, to: number, open: string): { edit
 export function wrapSelection(text: string, from: number, to: number, rule: PartRule): PartEdit {
   const open = openTag(rule);
   const range = snapped(text, from, to);
-  const inner = scanMarkup(text).tags.filter((tag) => tag.start >= range.from && tag.end <= range.to);
+  const inner = scanMarkup(text, 'inline-only').tags.filter((tag) => tag.start >= range.from && tag.end <= range.to);
   if (inner.length === 0) {
     const { edits, to: end } = wrapEdits(text, range.from, range.to, open);
     return asOneChange(text, edits, range.from, end);
@@ -159,7 +159,7 @@ export const UNCLOSED_BEFORE_SELECTION = 'A part that starts before the selectio
  */
 export function shareWithEveryone(text: string, selectedFrom: number, selectedTo: number): PartEdit | { refused: string } | null {
   const { from, to } = snapped(text, selectedFrom, selectedTo);
-  const tags = scanTags(text);
+  const tags = scanTags(text, 'inline-only');
   const { parts } = pairTags(tags);
   const { start, end } = absorbEdges(text, tags, from, to);
   const inside = tags.filter((tag) => tag.start >= start && tag.end <= end);

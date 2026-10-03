@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { filterNoteFor } from '../../../../src/app/online/sharing/model/noteFilter';
 import { shareWithEveryone, UNCLOSED_BEFORE_SELECTION, wrapSelection, type PartEdit } from '../../../../src/app/online/sharing/parts/partEdits';
 import { TABLE_ID, testPeople, testPerson } from './sharingFixtures';
+import { simpleSections } from './obsidianSections';
 
 /** The text after the edit, and the text the selection covers then. */
 function applied(text: string, edit: PartEdit | { refused: string } | null): { text: string; selected: string } {
@@ -29,8 +30,8 @@ const unwrap = (text: string, selectedText: string, occurrence = 0) => {
 };
 
 const people = testPeople([testPerson('ana', 'Ana'), testPerson('ben', 'Ben'), testPerson('cara', 'Cara')]);
-const forPerson = (personId: string, text: string): string => filterNoteFor(text, { recipient: { tableId: TABLE_ID, personId }, people, shareable: [], links: () => null, marks: null });
-const forBen = (text: string): string => filterNoteFor(text, { recipient: { tableId: TABLE_ID, personId: 'ben' }, people, shareable: [], links: () => null, marks: null });
+const forPerson = (personId: string, text: string): string => filterNoteFor(text, { sections: simpleSections(text), recipient: { tableId: TABLE_ID, personId }, people, shareable: [], links: () => null, marks: null });
+const forBen = (text: string): string => filterNoteFor(text, { sections: simpleSections(text), recipient: { tableId: TABLE_ID, personId: 'ben' }, people, shareable: [], links: () => null, marks: null });
 
 describe('wrapping a selection', () => {
   it('within one line: inline tags, the selection stays on the text', () => {

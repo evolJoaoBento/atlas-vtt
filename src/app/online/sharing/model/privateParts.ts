@@ -13,6 +13,7 @@
  */
 import { keptLines, visibleView, type TextRange } from './commentFilter';
 import { lenientQuote } from './quoteLines';
+import type { BlockContext } from './codeContext';
 import { END_TAG, looksLikeTag, pairTags, scanMarkup, TAG_MENTION, type OpenPart, type PartRule, type PartTag } from './privateTags';
 
 /** What the sender should hear about a note's tags. */
@@ -59,8 +60,8 @@ interface Markup {
   backstop: number | null;
 }
 
-function markupOf(body: string): Markup {
-  const { tags, comments, suspects } = scanMarkup(body);
+function markupOf(body: string, blocks: BlockContext): Markup {
+  const { tags, comments, suspects } = scanMarkup(body, blocks);
   const tagRanges = tags.map(spanOf);
   const commentRanges = comments.map(({ start, end }) => ({ start, end }));
   // A comment that reads as a tag is tag text outside a tag too.
@@ -72,7 +73,7 @@ function markupOf(body: string): Markup {
 
 /** Whether `text` holds exactly `count` well-formed parts, each closed, and no other tag. */
 function holdsMarkedParts(text: string, count: number): boolean {
-  const { tags, comments } = scanMarkup(text);
+  const { tags, comments } = scanMarkup(text, 'inline-only');
   const { parts, stray } = pairTags(tags);
   return comments.length === 0 && stray.length === 0 && parts.length === count && parts.every((part) => part.tag.kind === 'open' && part.close !== null);
 }
@@ -84,8 +85,8 @@ const inside = (range: TextRange, cover: TextRange): boolean => cover.start <= r
  * `marks`); a part whose tags do not both come through is hidden instead, so a tag never goes without its
  * end. Without `marks`, tags go like any comment.
  */
-export function bodyLinesFor(body: string, allows: (rule: PartRule) => boolean, marks?: PartMarks): string[] {
-  const markup = markupOf(body);
+export function bodyLinesFor(body: string, allows: (rule: PartRule) => boolean, blocks: BlockContext, marks?: PartMarks): string[] {
+  const markup = markupOf(body, blocks);
   const hidden = new Set(markup.parts.filter((part) => !shown(part, allows)));
   let backstop = markup.backstop;
   for (;;) {
@@ -121,10 +122,10 @@ export function bodyLinesFor(body: string, allows: (rule: PartRule) => boolean, 
 
 const lineOf = (body: string, offset: number): number => body.slice(0, offset).split('\n').length;
 
-export function partProblemsIn(body: string): PartProblems {
-  const { tags, comments, suspects } = scanMarkup(body);
+export function partProblemsIn(body: string, blocks: BlockContext): PartProblems {
+  const { tags, comments, suspects } = scanMarkup(body, blocks);
   const { parts, stray } = pairTags(tags);
-  const { backstop } = markupOf(body);
+  const { backstop } = markupOf(body, blocks);
   let strayText: PartProblems['strayText'] = null;
   if (backstop !== null && !suspects.some((suspect) => suspect.start === backstop)) {
     const lineStart = body.lastIndexOf('\n', backstop - 1) + 1;
@@ -144,5 +145,5 @@ export function partProblemsIn(body: string): PartProblems {
 
 /** The names `only` and `except` tags use, in order of appearance. */
 export function partNamesIn(body: string): string[] {
-  return scanMarkup(body).tags.flatMap((tag) => (tag.kind === 'open' && tag.rule.kind !== 'private' ? tag.rule.names : []));
+  return scanMarkup(body, 'inline-only').tags.flatMap((tag) => (tag.kind === 'open' && tag.rule.kind !== 'private' ? tag.rule.names : []));
 }
