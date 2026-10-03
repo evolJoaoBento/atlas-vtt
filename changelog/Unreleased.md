@@ -23,6 +23,8 @@
 - Online players see the initiative list exactly as your player window shows it, on the join page and in the Online scene tab: grouped under **Players** and **Opponents** for a collection that fights by sides (the side that acts first on top, the side whose turn it is marked, combatants that sit out faded), and with no initiative numbers where the player window shows none. Changing the collection's initiative rules reaches players as you do it. A player-safe map you share lists initiative the same way.
 - Exporting a collection no longer takes the `atlas-share` property with its notes, and installing a bundle drops it from its notes, so a note you share with your online players is not shared with someone else's.
 - The Atlas dashboard has a **Join online session** tile that opens the Join dialog, as the command does.
+- Keep part of a shared note back from the editor: select text, right-click and pick **Share part: Private**, **Only…** or **Except…** (Only and Except list the people in your session), or **Share part: Everyone** to share a selection again. The same are commands for hotkeys: **Mark selection as private**, **Share selection only with…**, **Share selection with everyone except…** and **Share selection with everyone**. Atlas marks the part with tags hidden in comments, `%%[!private]%%`, `%%[!only|Ana, Ben]%%` or `%%[!except|Cara]%%` up to `%%[!end]%%`, which you can also type, inline or on their own lines, and nest.
+- Parts meant only for you arrive marked, so if you share the note on, they stay with you and the sender.
 
 ## Fixed
 
@@ -30,3 +32,7 @@
 - Settings → Online play: the own server's host, port and path sit on their own row under the setting's name, so its description no longer wraps one word per line, and other rows with wide fields move them below the text in a narrow window. The own server fields are shown disabled while **PeerJS cloud (free)** is chosen.
 - **Ask to pull…** on a note offers only the people the note is shared with, and says to share it first when it reaches nobody, instead of sending a request whose **Pull** could only fail with "Could not pull that item." A pull that fails now says why where Atlas knows (the item is no longer shared with you, it arrived damaged), and every failed pull writes its error to the developer console.
 - The Online scene tab no longer fails to open its grid ("Failed to open view") while the map image is still on its way: the automatic grid colour uses white lines while the map shows its placeholder instead of trying to read it.
+
+## Important changes
+
+- Callouts no longer mark private parts: `> [!private]`, `> [!only|…]` and `> [!except|…]` are not a sharing syntax any more. A note that still has them keeps them back from everyone, and **Share with…** says so; mark those parts again with **Share part** on the selection.
