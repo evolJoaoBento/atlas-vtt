@@ -41,6 +41,8 @@ function setup(options: { lit?: boolean; mode?: 'player-safe' | 'full' } = {}): 
     shareable: () => [],
     rules: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
     collectionGrid: () => null,
+    coneAngle: () => 90,
+    initiativeRules: () => ({ mode: 'turn-order', roll: '1d20', firstSide: 'players' }),
   };
   return { catalogue: new SenderCatalogue(sources, items, people, nodeHash, async () => ({ width: 100, height: 100 })), items, notes };
 }

@@ -1,7 +1,8 @@
 /** The catalogue's view of this vault: notes with `atlas-share`, shared scenes, map files and images. */
 import { TFile, type App } from 'obsidian';
 import { AssetService } from '../../../services/AssetService';
-import { collectionGridDefaultsFor } from '../../../services/mapMeasurementSettings';
+import { collectionGridDefaultsFor, mapConeAngle } from '../../../services/mapMeasurementSettings';
+import { mapInitiativeRules } from '../../../services/mapInitiativeRules';
 import type { SettingsService } from '../../../services/SettingsService';
 import { vaultImageFiles } from '../../assets/vaultImageFiles';
 import { pickPlayerViewRules } from '../../scene/playerViewRules';
@@ -42,5 +43,7 @@ export function obsidianCatalogueSources(app: App, settings: SettingsService): C
     shareable: () => settings.getOnlineSettings().shareableProperties,
     rules: () => pickPlayerViewRules(settings.getLocalPlayerViewSettings()),
     collectionGrid: (mapPath) => collectionGridDefaultsFor(AssetService.getInstance(app), mapPath),
+    coneAngle: (mapPath) => mapConeAngle(AssetService.getInstance(app), mapPath),
+    initiativeRules: (mapPath) => mapInitiativeRules(app, mapPath),
   };
 }

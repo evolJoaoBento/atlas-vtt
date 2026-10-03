@@ -30,6 +30,8 @@ function source(): SharedMapSource {
 const context = (ticked: string[]): PayloadContext => ({
   rules: { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
   collectionGrid: null,
+  coneAngle: 90,
+  initiativeRules: { mode: 'turn-order', roll: '1d20', firstSide: 'players' },
   images: { fingerprints: new Map([['maps/inn.png', 'M'.repeat(43)], ['art/hero.png', 'H'.repeat(43)], ['art/spy.png', 'S'.repeat(43)]]), size: { width: 700, height: 700 } },
   noteItem: (path) => (ticked.includes(path) ? `item-${path.length}`.padEnd(22, 'x') : null),
   linked: ticked.map((path) => `item-${path.length}`.padEnd(22, 'x')),

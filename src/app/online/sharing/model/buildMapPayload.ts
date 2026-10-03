@@ -6,6 +6,7 @@ import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { readSceneLighting } from '../../../lighting/sceneLightingOptions';
 import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
 import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
+import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
 import { FogCoverage } from '../../scene/FogCoverage';
@@ -40,6 +41,10 @@ export interface MapImages {
 export interface PayloadContext {
   rules: PlayerViewRules;
   collectionGrid: CollectionGridDefaults | null;
+  /** The cone angle the sender's measure tool opens on this map (`mapConeAngle`), the same as in live play. */
+  coneAngle: number;
+  /** The initiative rules of the map's collection, which say whether the list is by sides before a fight (`projectSides`). */
+  initiativeRules: InitiativeRules;
   images: MapImages;
   /** The item id of a ticked note this recipient gets; null for any other path. */
   noteItem(path: string): string | null;
@@ -108,7 +113,7 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
   const scene = projectForPlayers(source.state, {
     sceneId: SHARED_SCENE_ID, rules: context.rules, coverage, memo, mapSize: context.images.size,
     assets: { idFor: (path) => (path ? context.images.fingerprints.get(path) ?? null : null) },
-    collectionGrid: context.collectionGrid,
+    collectionGrid: context.collectionGrid, coneAngle: context.coneAngle, initiativeRules: context.initiativeRules,
   });
   // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {

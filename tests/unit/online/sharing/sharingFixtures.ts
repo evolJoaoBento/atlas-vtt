@@ -85,6 +85,8 @@ export function noteCatalogue(notes: Record<string, { text: string; share: unkno
     shareable: () => [],
     rules: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
     collectionGrid: () => null,
+    coneAngle: () => 90,
+    initiativeRules: () => ({ mode: 'turn-order', roll: '1d20', firstSide: 'players' }),
   };
   return new SenderCatalogue(sources, items, testPeople(people), nodeHash, async () => null);
 }

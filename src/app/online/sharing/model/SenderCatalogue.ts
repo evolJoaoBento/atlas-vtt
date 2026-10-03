@@ -4,6 +4,7 @@
  * would be sent, so an edit to a part they never get never shows them an update.
  */
 import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
+import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { mimeForPath, sha256Id, type AssetMime, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
@@ -45,6 +46,10 @@ export interface CatalogueSources extends AccessSources {
   shareable(): readonly string[];
   rules(): PlayerViewRules;
   collectionGrid(mapPath: string): CollectionGridDefaults | null;
+  /** The cone angle of the measure tool on the map at `mapPath` (`mapConeAngle`). */
+  coneAngle(mapPath: string): number;
+  /** The initiative rules of the collection holding the map at `mapPath`. */
+  initiativeRules(mapPath: string): InitiativeRules;
 }
 
 function utf8(text: string): ArrayBuffer {
@@ -128,7 +133,8 @@ export class SenderCatalogue {
     const images = await hashMapImages(map.source.map, this.sources.images, this.hash, this.dimensions);
     const linked = new Set(map.linked);
     const context = {
-      rules: this.sources.rules(), collectionGrid: this.sources.collectionGrid(map.entry.mapPath), images,
+      rules: this.sources.rules(), collectionGrid: this.sources.collectionGrid(map.entry.mapPath),
+      coneAngle: this.sources.coneAngle(map.entry.mapPath), initiativeRules: this.sources.initiativeRules(map.entry.mapPath), images,
       noteItem: (path: string): string | null => (linked.has(path) ? this.items.idFor(path) : null),
       linked: map.linked.map((path) => this.items.idFor(path)),
       isFile: (path: string): boolean => this.sources.isFile(path),
