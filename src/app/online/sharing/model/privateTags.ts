@@ -9,7 +9,8 @@
  * A token whose text is not a tag (an unknown keyword, no names, `end|x`) is malformed: it opens a part
  * hidden from everyone and never closes one, so a mistyped tag can only hide more.
  */
-import { scanComments, type CommentSpan } from './commentFilter';
+import { codeOrLinkTest } from './codeContext';
+import { scanComments, type CommentSpan, type TextRange } from './commentFilter';
 
 export type PartRule = { kind: 'private' } | { kind: 'only' | 'except'; names: string[] };
 
@@ -25,10 +26,11 @@ export interface OpenPart {
   close: Extract<PartTag, { kind: 'end' }> | null;
 }
 
-/** A note's tags and its comments outside them. */
+/** A note's tags, its comments outside them, and tag tokens possibly inside code or a link (never tags). */
 export interface NoteMarkup {
   tags: PartTag[];
   comments: CommentSpan[];
+  suspects: TextRange[];
 }
 
 export const END_TAG = '%%[!end]%%';
@@ -63,7 +65,12 @@ function tagOf(content: string, start: number, end: number): PartTag {
 
 /** The tags of `text` as whole tokens, then the comments in the gaps between them. */
 export function scanMarkup(text: string): NoteMarkup {
-  const tags = [...text.matchAll(TOKEN)].map((match) => tagOf(match[1] ?? '', match.index ?? 0, (match.index ?? 0) + match[0].length));
+  const tokens = [...text.matchAll(TOKEN)].map((match) => ({ content: match[1] ?? '', start: match.index ?? 0, end: (match.index ?? 0) + match[0].length }));
+  // A token possibly inside code or a link shows as text in Obsidian: never a tag (T-R2), it hides the rest of the note instead.
+  const inCodeOrLink = codeOrLinkTest(text, tokens);
+  const suspects = tokens.filter((token) => inCodeOrLink(token)).map(({ start, end }) => ({ start, end }));
+  const tags = tokens.filter((token) => !suspects.some((suspect) => suspect.start === token.start))
+    .map((token) => tagOf(token.content, token.start, token.end));
   const comments: CommentSpan[] = [];
   let gapStart = 0;
   for (const gapEnd of [...tags.map((tag) => tag.start), text.length]) {
@@ -72,7 +79,7 @@ export function scanMarkup(text: string): NoteMarkup {
     if (found.some((comment) => !comment.closed)) break;
     gapStart = tags.find((tag) => tag.start === gapEnd)?.end ?? gapEnd;
   }
-  return { tags, comments };
+  return { tags, comments, suspects };
 }
 
 /** Every tag in `text`, in order. */

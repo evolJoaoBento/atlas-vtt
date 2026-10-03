@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { partProblemsInNote, strayEndProblem } from '../../../../src/app/online/sharing/model/noteFilter';
 import { pushRefusal } from '../../../../src/app/online/sharing/registerAskToPull';
-import { OLD_CALLOUTS_WARNING, partError, partWarnings, UNCLOSED_COMMENT_WARNING } from '../../../../src/app/online/sharing/ui/partWarnings';
+import { OLD_CALLOUTS_WARNING, partError, partWarnings, TAG_IN_CODE_WARNING, UNCLOSED_COMMENT_WARNING } from '../../../../src/app/online/sharing/ui/partWarnings';
 import { ShareWithForm } from '../../../../src/app/online/sharing/ui/ShareWithForm';
 
 const STRAY = '---\ntags: [a]\n---\nOne\nTwo %%[!end]%%\nThree';
@@ -32,5 +32,6 @@ describe('the sender’s warnings', () => {
     expect(other[0]).toContain('reads like a part tag');
     expect(partWarnings(partProblemsInNote('a `%%` b\n%%[!private]%%x%%[!end]%%'))).toContain(UNCLOSED_COMMENT_WARNING);
     expect(partWarnings(partProblemsInNote('%%[!private]%%x%%[!end]%%'))).toEqual([]);
+    expect(partWarnings(partProblemsInNote('Write `%%[!private]%%` to hide.'))).toEqual([TAG_IN_CODE_WARNING]);
   });
 });

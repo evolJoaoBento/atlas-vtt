@@ -158,6 +158,46 @@ describe('a %% in code cannot shift which tags pair (T-C1)', () => {
   });
 });
 
+describe('a tag written inside code or a link is never a tag (T-R2)', () => {
+  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+    recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
+  });
+  const leaks: Array<[string, string]> = [
+    ['inline code', '%%[!private]%%\nClose with `%%[!end]%%` LEAK then reopen `%%[!private]%%`.\n%%[!end]%%\nAfter'],
+    ['double backticks', '%%[!private]%%\nClose with ``x %%[!end]%% y`` LEAK then ``%%[!private]%%``.\n%%[!end]%%'],
+    ['a fence', '%%[!private]%%\n```\n%%[!end]%%\n```\nLEAK\n```\n%%[!private]%%\n```\n%%[!end]%%'],
+    ['a ~~~ fence', '%%[!private]%%\n~~~md\n%%[!end]%%\n~~~\nLEAK\n~~~\n%%[!private]%%\n~~~\n%%[!end]%%'],
+    ['an unclosed fence', '%%[!private]%%\nx\n```\n%%[!end]%% LEAK %%[!private]%%\n%%[!end]%%'],
+    ['a fence in a quote', '%%[!private]%%\n> ```\n> %%[!end]%%\n> ```\n> LEAK\n> ```\n> %%[!private]%%\n> ```\n%%[!end]%%'],
+    ['a fence in a list', '%%[!private]%%\n- item\n  ```\n  %%[!end]%%\n  ```\n  LEAK\n  ```\n  %%[!private]%%\n  ```\n%%[!end]%%'],
+    ['a link label', '%%[!private]%%\n[x %%[!end]%%](u) LEAK [y %%[!private]%%](v)\n%%[!end]%%'],
+    ['a wiki alias', '%%[!private]%%\n[[Note|a %%[!end]%%]] LEAK [[Other|b %%[!private]%%]]\n%%[!end]%%'],
+    ['a code span across lines', '%%[!private]%%\nsee `the\n%%[!end]%% tag` LEAK `and\n%%[!private]%% too`\n%%[!end]%%'],
+  ];
+
+  it('the reviewer’s examples and variants leak nothing, marked or not, and warn', () => {
+    for (const [label, source] of leaks) {
+      for (const personId of everyone) {
+        expect(forPerson(personId, source), label).not.toContain('LEAK');
+        expect(marked(personId, source), `${label}, marked`).not.toContain('LEAK');
+      }
+      expect(partProblemsInNote(source).tagInCodeOrLink, label).toBe(true);
+    }
+  });
+
+  it('a tag in code hides the rest of the note from where it stands', () => {
+    expect(forPerson('ana', 'Top\nWrite `%%[!private]%%` to hide.\nMore')).toBe('Top\nWrite `');
+  });
+
+  it('real tags next to code on the same line, outside the backticks, still work', () => {
+    const source = 'Run `npm test` %%[!only|Ana]%%secret `x`%%[!end]%% done `y`';
+    expect(forPerson('ana', source)).toBe('Run `npm test` secret `x` done `y`');
+    expect(forPerson('ben', source)).toBe('Run `npm test`  done `y`');
+    expect(partProblemsInNote(source).tagInCodeOrLink).toBe(false);
+    expect(forPerson('ben', '```\ncode\n```\n%%[!private]%%s%%[!end]%% [a](b) after')).toBe('```\ncode\n```\n a after');
+  });
+});
+
 describe('private part tags', () => {
   it('inline: a private part never goes, the rest of the line stays', () => {
     expect(forPerson('ana', 'The door %%[!private]%%is trapped %%[!end]%%opens.')).toBe('The door opens.');
@@ -228,10 +268,10 @@ describe('private part tags', () => {
     expect(forPerson('ana', 'a %% [!private-x] in a comment %% b')).toBe('a');
   });
 
-  it('works inside lists, quotes and code fences, since comments are removed everywhere', () => {
+  it('works inside lists and quotes; in a code fence a tag is text and keeps the rest back (T-R2)', () => {
     expect(forPerson('ana', '- one\n- two %%[!private]%%secret%%[!end]%%\n- three')).toBe('- one\n- two\n- three');
     expect(forPerson('ana', '> quote\n> %%[!private]%%\n> secret\n> %%[!end]%%\n> after')).toBe('> quote\n> after');
-    expect(forPerson('ana', '```\ncode\n%%[!private]%%\nsecret()\n%%[!end]%%\nmore()\n```')).toBe('```\ncode\nmore()\n```');
+    expect(forPerson('ana', '```\ncode\n%%[!private]%%\nsecret()\n%%[!end]%%\nmore()\n```')).toBe('```\ncode');
     expect(forPerson('ben', '- item\n  %%[!only|Ana]%%\n  for Ana\n  %%[!end]%%\n- next')).toBe('- item\n- next');
   });
 

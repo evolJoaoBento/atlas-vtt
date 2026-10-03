@@ -25,6 +25,8 @@ export interface PartProblems {
   unclosed: number;
   /** A comment never closed (before the next tag): it hides the rest of the note. */
   unclosedComment: boolean;
+  /** A tag token possibly inside code or a link: not used, and the rest of the note is kept back. */
+  tagInCodeOrLink: boolean;
   /** Tag text outside a tag, which hides the rest of the note: its start, and whether it reads as an old callout. */
   strayText: { text: string; oldCallout: boolean } | null;
 }
@@ -58,13 +60,13 @@ interface Markup {
 }
 
 function markupOf(body: string): Markup {
-  const { tags, comments } = scanMarkup(body);
+  const { tags, comments, suspects } = scanMarkup(body);
   const tagRanges = tags.map(spanOf);
   const commentRanges = comments.map(({ start, end }) => ({ start, end }));
   // A comment that reads as a tag is tag text outside a tag too.
   const tagLike = comments.filter((comment) => looksLikeTag(comment.content)).map((comment) => comment.start);
   const authorText = strayTagText(body, [...tagRanges, ...commentRanges]);
-  const starts = [...tagLike, ...(authorText === null ? [] : [authorText])];
+  const starts = [...tagLike, ...suspects.map((suspect) => suspect.start), ...(authorText === null ? [] : [authorText])];
   return { tags: tagRanges, comments: commentRanges, parts: pairTags(tags).parts, backstop: starts.length > 0 ? Math.min(...starts) : null };
 }
 
@@ -120,11 +122,11 @@ export function bodyLinesFor(body: string, allows: (rule: PartRule) => boolean, 
 const lineOf = (body: string, offset: number): number => body.slice(0, offset).split('\n').length;
 
 export function partProblemsIn(body: string): PartProblems {
-  const { tags, comments } = scanMarkup(body);
+  const { tags, comments, suspects } = scanMarkup(body);
   const { parts, stray } = pairTags(tags);
   const { backstop } = markupOf(body);
   let strayText: PartProblems['strayText'] = null;
-  if (backstop !== null) {
+  if (backstop !== null && !suspects.some((suspect) => suspect.start === backstop)) {
     const lineStart = body.lastIndexOf('\n', backstop - 1) + 1;
     const line = body.slice(lineStart, body.indexOf('\n', backstop) < 0 ? body.length : body.indexOf('\n', backstop));
     const { depth, content } = lenientQuote(line);
@@ -135,6 +137,7 @@ export function partProblemsIn(body: string): PartProblems {
     strayEndLines: stray.map((tag) => lineOf(body, tag.start)),
     unclosed: parts.filter((part) => part.close === null).length,
     unclosedComment: comments.some((comment) => !comment.closed),
+    tagInCodeOrLink: suspects.length > 0,
     strayText,
   };
 }
