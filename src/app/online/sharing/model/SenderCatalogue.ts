@@ -17,7 +17,7 @@ import { fullPayload, hashMapImages, playerSafePayload, type MapImages } from '.
 import { accessFor, type Access, type AccessSources, type MapAccess } from './catalogueAccess';
 import type { MapShareMode } from './mapShare';
 import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES } from './forwardedParts';
-import { filterNoteFor } from './noteFilter';
+import { filterNoteFor, strayEndLineIn, strayEndProblem } from './noteFilter';
 import type { PartMarks } from './privateParts';
 import type { ShareItems } from './ShareItems';
 
@@ -84,6 +84,8 @@ export class SenderCatalogue {
     for (const note of access.notes.values()) {
       if (items.length >= MAX_CATALOGUE_ITEMS) break;
       const payload = await this.notePayload(note.path, recipient, access, self);
+      // A note with a stray end tag is not shared until the sender fixes it.
+      if (!payload) continue;
       items.push({ item: this.items.idFor(note.path), kind: 'note', title: note.title, version: payload.version, size: payload.bytes.byteLength });
     }
     for (const map of access.maps) {
@@ -114,6 +116,7 @@ export class SenderCatalogue {
   /** The note as this person would get it, whatever its rule says now (the dialog's preview), its tags naming people as this list does. */
   async previewNote(recipient: Recipient, path: string, self?: string): Promise<string> {
     const text = await this.noteText(path, recipient, await this.access(recipient), self);
+    if (text === null) return strayEndProblem(strayEndLineIn(await this.sources.read(path)) ?? 0);
     return localizeForwardedTags(text, recipient.tableId, (personId) => (personId === self ? 'you' : this.people.get(recipient.tableId, personId)?.name ?? null));
   }
 
@@ -130,8 +133,11 @@ export class SenderCatalogue {
     };
   }
 
-  private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<string> {
-    return filterNoteFor(await this.sources.read(path), {
+  /** Null for a note that is not shared at all: a stray end tag (`strayEndLineIn`). */
+  private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<string | null> {
+    const source = await this.sources.read(path);
+    if (strayEndLineIn(source) !== null) return null;
+    return filterNoteFor(source, {
       recipient, people: this.people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self),
       links: (linkpath) => {
         const target = this.sources.resolveLink(linkpath, path);
@@ -140,8 +146,10 @@ export class SenderCatalogue {
     });
   }
 
-  private async notePayload(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<SharePayload> {
-    const bytes = utf8(await this.noteText(path, recipient, access, self));
+  private async notePayload(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<SharePayload | null> {
+    const text = await this.noteText(path, recipient, access, self);
+    if (text === null) return null;
+    const bytes = utf8(text);
     return { kind: 'note', bytes, version: await this.hash(bytes) };
   }
 

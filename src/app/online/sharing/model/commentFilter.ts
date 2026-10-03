@@ -3,7 +3,7 @@
  * Code fences are not tracked on purpose: every comment is removed everywhere, inside code too,
  * and an unclosed one hides the rest of the note. Following fences through quotes and lists
  * kept finding new ways to keep a comment that Obsidian hides, so this fails closed instead.
- * The same scan finds the private part tags (`privateTags.ts`), so both always agree on what a comment is.
+ * Part tags are found before comments (`privateTags.scanMarkup`), which then pairs comments only between them.
  */
 import { lenientQuote } from './quoteLines';
 
@@ -29,24 +29,48 @@ export interface TextRange {
 const OPENERS: readonly CommentOpener[] = ['%%', '<!--'];
 const CLOSERS: Record<CommentOpener, string> = { '%%': '%%', '<!--': '-->' };
 
-/** Every comment in `text`, in order. */
-export function scanComments(text: string): CommentSpan[] {
+/**
+ * Every comment in `text`, in order; with `from`/`to`, only those that open and close inside `[from, to)`
+ * (a gap between part tags). A comment not closed there is unclosed and runs to the end of the text.
+ */
+export function scanComments(text: string, from = 0, to = text.length): CommentSpan[] {
   const spans: CommentSpan[] = [];
-  let at = 0;
+  const within = text.slice(0, to);
+  let at = from;
   for (;;) {
-    const found = OPENERS.map((opener) => ({ opener, index: text.indexOf(opener, at) }))
+    const found = OPENERS.map((opener) => ({ opener, index: within.indexOf(opener, at) }))
       .filter((hit) => hit.index >= 0).sort((a, b) => a.index - b.index)[0];
     if (!found) return spans;
-    const from = found.index + found.opener.length;
-    const close = text.indexOf(CLOSERS[found.opener], from);
+    const contentStart = found.index + found.opener.length;
+    const close = within.indexOf(CLOSERS[found.opener], contentStart);
     if (close < 0) {
-      spans.push({ start: found.index, end: text.length, opener: found.opener, content: text.slice(from), closed: false });
+      spans.push({ start: found.index, end: text.length, opener: found.opener, content: text.slice(contentStart), closed: false });
       return spans;
     }
     const end = close + CLOSERS[found.opener].length;
-    spans.push({ start: found.index, end, opener: found.opener, content: text.slice(from, close), closed: true });
+    spans.push({ start: found.index, end, opener: found.opener, content: text.slice(contentStart, close), closed: true });
     at = end;
   }
+}
+
+/**
+ * `text` without the plain `hidden` ranges, as the author or a reader sees it, with the offset in `text`
+ * of each character it keeps (to map a match back).
+ */
+export function visibleView(text: string, hidden: readonly TextRange[]): { text: string; offsets: number[] } {
+  let view = '';
+  const offsets: number[] = [];
+  let at = 0;
+  const keep = (end: number): void => {
+    for (let index = at; index < end; index++) offsets.push(index);
+    view += text.slice(at, end);
+  };
+  for (const range of merged(hidden.filter((candidate) => candidate.text === undefined))) {
+    keep(range.start);
+    at = Math.max(at, range.end);
+  }
+  keep(text.length);
+  return { text: view, offsets };
 }
 
 /**

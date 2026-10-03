@@ -17,9 +17,9 @@ import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
 import { partProblemsInNote, unknownNamesIn } from '../model/noteFilter';
 import type { SenderCatalogue } from '../model/SenderCatalogue';
-import { END_TAG } from '../model/privateTags';
 import { formatShareRule, parseShareRule, SHARE_PROPERTY, unknownRuleNames } from '../model/shareRule';
 import { writeNoteShare } from '../model/shareWriting';
+import { partError, partWarnings } from './partWarnings';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
 
 export const SHARE_DIALOG_TITLE = 'Share with';
@@ -28,8 +28,6 @@ const FULL_CONFIRM = {
   message: ['A full share sends everything on this map, as a co-GM would see it: hidden tokens, GM-only pins, walls and lights.'],
   confirmLabel: 'Share full map',
 };
-const MAX_UNREADABLE_WARNINGS = 3;
-const OLD_CALLOUTS_WARNING = 'This note still uses the old > [!private] callouts; they are kept back. Use Mark as private on the selection instead.';
 export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
 
 export interface ShareWithDeps {
@@ -69,20 +67,17 @@ class ShareWithModal extends Modal {
     else await this.renderMap(known);
   }
 
-  /** What the sender should know before saving: names the list lacks, and parts that could not be read. */
-  private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<string[]> {
+  /** What the sender should know before saving: names the list lacks and parts that could not be read; and why the note is not shared, if it is not. */
+  private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<{ warnings: string[]; error: string | null }> {
     const text = await this.app.vault.cachedRead(this.file);
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
     const problems = partProblemsInNote(text);
-    return [
+    const warnings = [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
-      ...(problems.oldSyntax.length ? [OLD_CALLOUTS_WARNING] : []),
-      ...[...new Set(problems.malformed)].slice(0, MAX_UNREADABLE_WARNINGS)
-        .map((start) => `Could not read the private part tag "${start}". What it marks is hidden from everyone.`),
-      ...(problems.unclosed ? [`A private part tag is never closed with ${END_TAG}, so everything after it is hidden from everyone.`] : []),
-      ...(problems.strayEnds ? [`An ${END_TAG} tag closes no part; it is ignored.`] : []),
+      ...partWarnings(problems),
     ];
+    return { warnings, error: partError(problems) };
   }
 
   private async renderNote(known: ShareRow[]): Promise<void> {
@@ -92,13 +87,14 @@ class ShareWithModal extends Modal {
     const unknown = unknownRuleNames(rule, people);
     const rows = [...known, ...unknown.map((name) => ({ key: nameKey(name), name, known: false }))];
     const nameFor = (key: string): string => rows.find((row) => row.key === key)?.name ?? key.replace(/^name:/, '');
-    const warnings = await this.noteWarnings(unknown, rule.unreadable === true);
+    const { warnings, error } = await this.noteWarnings(unknown, rule.unreadable === true);
     this.root?.render(
       <ShareWithForm
         rows={rows}
         initial={{ everyone: rule.public && !rule.private, people: rule.private ? [] : rule.only.map(keyFor), except: rule.except.map(keyFor) }}
         map={null}
         warnings={warnings}
+        {...(error ? { error } : {})}
         hint={PART_HINT}
         preview={(key) => {
           const person = people.byKey(key);

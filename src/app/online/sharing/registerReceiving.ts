@@ -33,7 +33,9 @@ const sessionName = (personId: string): string | null =>
 /** One service per share session: a new session (a new node) gets a fresh one. */
 function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, people: PeopleBook): () => SharedWithMe | null {
   // Choices and the merge page run only inside a pull the receiver started.
-  const policy = createUpdatePolicy({ pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request) });
+  const policy = createUpdatePolicy({
+    pulled, ask: (context) => askUpdateChoice(app, context), merge: (request) => openMergePage(app, request), warn: (message) => new Notice(message),
+  });
   const replaced = (record: PulledRecord, before: string, after: string): Promise<void> => history.add(record, { at: Date.now(), before, after });
   let current: { node: ShareSession['node']; service: SharedWithMe } | null = null;
   return () => {

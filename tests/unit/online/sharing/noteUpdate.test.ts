@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MAX_DIFF_LINES } from '../../../../src/app/online/sharing/merge/diffLines';
 import { SHARING_DATA_DIR } from '../../../../src/app/online/sharing/dataFile';
 import { MAX_HISTORY_CHARS, MergeHistory, undoLastMerge } from '../../../../src/app/online/sharing/merge/MergeHistory';
-import { createUpdatePolicy, type AskResult } from '../../../../src/app/online/sharing/merge/noteUpdate';
+import { createUpdatePolicy, TAGS_LOST_WARNING, type AskResult } from '../../../../src/app/online/sharing/merge/noteUpdate';
 import type { CatalogueItem } from '../../../../src/app/online/sharing/model/SenderCatalogue';
 import { pullNote } from '../../../../src/app/online/sharing/receive/notePull';
 import { PulledItems } from '../../../../src/app/online/sharing/receive/PulledItems';
@@ -239,5 +239,32 @@ describe('the merge history', () => {
     expect(await undoLastMerge(app, history, pulled.get(record.tableId, record.from, record.item)!, confirm)).toBe('nothing');
     expect(files.get(PATH)).toBe('a stranger at the same path');
     expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('merges and part tags (M5)', () => {
+  const context = (theirs: string) => ({
+    record: { key: 'k', conflictDefault: 'mine', choice: 'auto', silent: true } as never,
+    title: 'Cave', personName: 'Morgan', base: 'a\nb\nc', mine: 'a\nMINE\nc', theirs,
+  });
+
+  it('a silent auto merge that would lose part tags shows the merge page, and saving it without them warns', async () => {
+    const merge = vi.fn(async () => ({ text: 'a\nMINE\nc', conflictDefault: 'mine' as const }));
+    const warn = vi.fn();
+    const policy = createUpdatePolicy({ pulled: { update: vi.fn() } as never, ask: vi.fn(), merge, warn });
+    const result = await policy.resolve(context('a\n%%[!only|Morgan]%%\nTHEIRS\n%%[!end]%%\nc'));
+    expect(merge).toHaveBeenCalledOnce();
+    expect(result).toEqual({ kind: 'write', text: 'a\nMINE\nc' });
+    expect(warn).toHaveBeenCalledWith(TAGS_LOST_WARNING);
+  });
+
+  it('a silent auto merge that keeps the tags is saved unseen, with no warning', async () => {
+    const merge = vi.fn();
+    const warn = vi.fn();
+    const policy = createUpdatePolicy({ pulled: { update: vi.fn() } as never, ask: vi.fn(), merge, warn });
+    const result = await policy.resolve({ ...context('%%[!only|Morgan]%%\na\n%%[!end]%%\nb\nc'), mine: 'a\nb\nc MINE' });
+    expect(merge).not.toHaveBeenCalled();
+    expect(result).toEqual({ kind: 'write', text: '%%[!only|Morgan]%%\na\n%%[!end]%%\nb\nc MINE' });
+    expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -33,6 +33,8 @@ interface ShareWithFormProps {
   preview: ((key: string) => Promise<string>) | null;
   /** A line of help under the preview (notes: how to keep a part back). */
   hint?: string;
+  /** Why the item is not shared at all until the sender fixes it. */
+  error?: string;
   warnings: readonly string[];
   onSave: (result: ShareFormResult) => void;
   onCancel: () => void;
@@ -41,7 +43,7 @@ interface ShareWithFormProps {
 const toggled = (list: readonly string[], key: string): string[] => (list.includes(key) ? list.filter((item) => item !== key) : [...list, key]);
 const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': 'Player-safe', full: 'Full' };
 
-export function ShareWithForm({ rows, initial, map, preview, hint, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
+export function ShareWithForm({ rows, initial, map, preview, hint, error, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
   const [everyone, setEveryone] = useState(initial.everyone);
   const [people, setPeople] = useState(initial.people);
   const [except, setExcept] = useState(initial.except);
@@ -58,6 +60,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, warnings, onS
   });
   return (
     <div className="atlas-share">
+      {error && <p className="atlas-share__error" role="alert">{error}</p>}
       <section className="atlas-share__section">
         <LabelledCheck label="Everyone in my sessions" checked={everyone} onChange={() => setEveryone(!everyone)} />
         <ul className="atlas-share__people">

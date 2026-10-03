@@ -7,6 +7,7 @@
 import type { NoteUpdatePolicy, UpdateContext, UpdateResult } from '../receive/notePull';
 import type { ConflictDefault, PulledItems, UpdateChoice } from '../receive/PulledItems';
 import { toLf, usesCrlf, withEnding } from '../receive/lineEndings';
+import { partsSurvive } from '../model/privateTags';
 import { diff3Checked, type MergeChunk } from './diff3';
 import { mergedText } from './mergeResult';
 
@@ -35,7 +36,11 @@ export interface UpdatePolicyDeps {
   ask(context: UpdateContext): Promise<AskResult | null>;
   /** The merge page; null when it is closed without saving. */
   merge(request: MergeRequest): Promise<MergeAnswer | null>;
+  /** Tells the receiver something about a merge they saved (lost part tags). */
+  warn?(message: string): void;
 }
+
+export const TAGS_LOST_WARNING = 'The merged note lost part of a part tag (%%[!only|…]%% or %%[!end]%%), so text meant for fewer people may be shared on. Check the tags in the note.';
 
 export function createUpdatePolicy(deps: UpdatePolicyDeps): NoteUpdatePolicy {
   /** The result for a choice. Merges run on LF text and are written back in the receiver's line ending. */
@@ -49,10 +54,13 @@ export function createUpdatePolicy(deps: UpdatePolicyDeps): NoteUpdatePolicy {
     const { chunks, aligned } = diff3Checked(toLf(context.base), toLf(context.mine), toLf(context.theirs));
     const automatic = mergedText(chunks, [], conflictDefault);
     // Only a real merge is saved unseen: with no base, or when the diff gave up, the receiver sees the merge page.
-    if (choice === 'auto' && silent && aligned && !context.baseMissing) return { kind: 'write', text: withEnding(automatic, crlf) };
+    // A merge that breaks the part tags theirs came with is never saved unseen either.
+    const tagsKept = partsSurvive(toLf(context.theirs), automatic);
+    if (choice === 'auto' && silent && aligned && !context.baseMissing && tagsKept) return { kind: 'write', text: withEnding(automatic, crlf) };
     const answer = await deps.merge({ context, chunks, preview: choice === 'auto' ? automatic : null, conflictDefault });
     if (!answer) return { kind: 'cancel' };
     if (answer.conflictDefault !== conflictDefault) deps.pulled.update(record.key, { conflictDefault: answer.conflictDefault });
+    if (!partsSurvive(toLf(context.theirs), toLf(answer.text))) deps.warn?.(TAGS_LOST_WARNING);
     return { kind: 'write', text: withEnding(answer.text, crlf) };
   }
 

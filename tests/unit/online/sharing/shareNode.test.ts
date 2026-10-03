@@ -45,7 +45,8 @@ describe('ShareNode', () => {
     const items = await player.requestList('gm');
     expect(items.map((item: CatalogueItem) => item.title)).toEqual(['Cave']);
     const pulled = await player.pull('gm', items[0]!.item, 'note');
-    expect(new TextDecoder().decode(pulled.bytes)).toBe('A cave.\n\nEnd.');
+    // The old callout hides the rest of the note.
+    expect(new TextDecoder().decode(pulled.bytes)).toBe('A cave.');
     expect(pulled.version).toBe(items[0]!.version);
     expect(frames.join('\n')).not.toContain('Dragon');
   });

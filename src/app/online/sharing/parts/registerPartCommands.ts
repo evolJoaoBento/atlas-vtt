@@ -8,7 +8,8 @@ import type { PeopleBook } from '../people/PeopleBook';
 import type { PartRule } from '../model/privateTags';
 import { shareSessionStore } from '../shareSessionStore';
 import { shareWithEveryone, wrapSelection, type PartEdit } from './partEdits';
-import { openPartPeopleModal, type PartPeopleChoice, type PartPeopleKind } from './PartPeopleModal';
+import { partPeopleFrom } from './partPeople';
+import { openPartPeopleModal, type PartPeopleKind } from './PartPeopleModal';
 
 interface PartAction {
   id: string;
@@ -26,8 +27,12 @@ function selectionOffsets(editor: Editor): { from: number; to: number } {
   return { from: Math.min(anchor, head), to: Math.max(anchor, head) };
 }
 
-function apply(editor: Editor, edit: PartEdit | null): void {
+function apply(editor: Editor, edit: PartEdit | { refused: string } | null): void {
   if (!edit) return;
+  if ('refused' in edit) {
+    new Notice(edit.refused);
+    return;
+  }
   const { change, selection } = edit;
   editor.transaction({ changes: [{ from: editor.offsetToPos(change.from), to: editor.offsetToPos(change.to), text: change.text }] });
   editor.setSelection(editor.offsetToPos(selection.from), editor.offsetToPos(selection.to));
@@ -38,17 +43,10 @@ function wrap(editor: Editor, rule: PartRule): void {
   apply(editor, wrapSelection(editor.getValue(), from, to, rule));
 }
 
-/** Everyone in the session by their names in this Atlas's people list; the people list when there is no session. */
-function partPeople(people: PeopleBook): PartPeopleChoice {
-  const { session, people: present } = shareSessionStore.getState();
-  if (session) return { names: present.map((person) => person.name), inSession: true };
-  return { names: people.list().map((person) => person.name), inSession: false };
-}
-
 function pickAndWrap(plugin: Plugin, people: PeopleBook, editor: Editor, kind: PartPeopleKind): void {
   const before = editor.getValue();
   const { from, to } = selectionOffsets(editor);
-  void people.ready().then(() => openPartPeopleModal(plugin.app, kind, partPeople(people), (names) => {
+  void people.ready().then(() => openPartPeopleModal(plugin.app, kind, partPeopleFrom(shareSessionStore.getState(), people), (names) => {
     if (editor.getValue() !== before) {
       new Notice(NOTE_CHANGED);
       return;

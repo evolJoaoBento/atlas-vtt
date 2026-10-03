@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterNoteFor, partProblemsInNote, unknownNamesIn } from '../../../../src/app/online/sharing/model/noteFilter';
+import { filterNoteFor, partProblemsInNote, strayEndLineIn, unknownNamesIn } from '../../../../src/app/online/sharing/model/noteFilter';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
 
 const T = 'T'.repeat(43);
@@ -96,23 +96,65 @@ describe('the old callouts are kept back now (fail closed)', () => {
     }
   });
 
-  it('a callout hides up to a blank line, a heading or a fence at a lower depth, as before', () => {
-    expect(forPerson('ana', 'Open.\n\n> [!private]\n> Secret.\n> More secret.\n\nAfter.')).toBe('Open.\n\n\nAfter.');
-    expect(forPerson('ana', '> [!only|Ana]\n> For Ana.\n\nAll.')).toBe('\nAll.');
-    expect(forPerson('ana', '> [!private]\n> Secret.\n# Heading\nPublic.')).toBe('# Heading\nPublic.');
-    expect(forPerson('ana', '> [!private]\n> Secret.\n```\ncode\n```')).toBe('```\ncode\n```');
-    expect(forPerson('ben', '- a\n\t- b\n\t\t> [!only|Ana]\n\t\t> For Ana.\n\nEnd')).toBe('- a\n\t- b\n\nEnd');
-    expect(forPerson('ana', '> [!private]\n> s\n   # x\nmore')).toBe('   # x\nmore');
+  it('an old callout, or any tag text outside a tag, hides everything from it to the end of the note (T-C1 backstop)', () => {
+    expect(forPerson('ana', 'Open.\n\n> [!private]\n> Secret.\n> More secret.\n\nAfter.')).toBe('Open.\n');
+    expect(forPerson('ana', '> [!only|Ana]\n> For Ana.\n\nAll.')).toBe('');
+    expect(forPerson('ana', 'Before.\n> [!private]\n> Secret.\n# Heading\nPublic.')).toBe('Before.');
+    expect(forPerson('ben', '- a\n\t- b\n\t\t> [!only|Ana]\n\t\t> For Ana.\n\nEnd')).toBe('- a\n\t- b');
+    expect(forPerson('ana', 'a [!public] b\nc')).toBe('a');
+    expect(forPerson('ana', 'a [!end] b')).toBe('a');
   });
 
   it('a tag around only a callout header cannot uncover the callout body', () => {
     const source = '> %%[!only|Ana]%%[!private]%%[!end]%%\n> old secret\n\nAfter';
-    for (const personId of everyone) expect(forPerson(personId, source)).toBe('\nAfter');
+    for (const personId of everyone) expect(forPerson(personId, source)).toBe('');
   });
 
-  it('tells the sender about old callouts, and leaves a note without them quiet', () => {
-    expect(partProblemsInNote('Open.\n> [!private]\n> s\nmid [!except Cara] end').oldSyntax).toEqual(['[!private]', '[!except Cara] end']);
-    expect(partProblemsInNote('%%[!private]%%s%%[!end]%%\n%% a comment %%').oldSyntax).toEqual([]);
+  it('a malformed tag around an old callout header cannot uncover its body (M1)', () => {
+    const source = 'Top\n%%[!secret]%%\n> [!private]\n%%[!end]%%\n> SECRET6 body\n\nAfter';
+    for (const personId of everyone) expect(forPerson(personId, source)).toBe('Top');
+  });
+
+  it('tells the sender about old callouts and other tag text, and leaves a note without them quiet', () => {
+    expect(partProblemsInNote('Open.\n> [!private]\n> s').strayText).toEqual({ text: '[!private]\n> s', oldCallout: true });
+    expect(partProblemsInNote('mid [!except Cara] end').strayText).toEqual({ text: '[!except Cara] end', oldCallout: false });
+    expect(partProblemsInNote('%%[!private]%%s%%[!end]%%\n%% a comment %%').strayText).toBeNull();
+  });
+});
+
+describe('a %% in code cannot shift which tags pair (T-C1)', () => {
+  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+    recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
+  });
+  const probes: Array<[string, string, string[]]> = [
+    ['inline code before the part and inside it',
+      'Use `%%` for comments.\n\n%%[!private]%%\n\nThe prior line uses `%%` too.\n\nThe traitor is SECRET1.\n\n%%[!end]%%', everyone],
+    ['inline code inside the part only',
+      'Open.\n%%[!private]%%\nA `%%` here.\nSECRET2\n%%[!end]%%\nAfter.', everyone],
+    ['inline code before the part only',
+      'Write `%%` to comment.\n%%[!private]%%\nSECRET3\n%%[!end]%%\nAfter.', everyone],
+    ['fences before and inside an only|Cara part',
+      '```\nx %% y\n```\n%%[!only|Cara]%%\nFor Cara: SECRET4\n```\n%%\n```\n%%[!end]%%\nAfter.', ['ana', 'ben']],
+    ['an escaped %%',
+      'Escaped \\%% here.\n%%[!private]%%\nSECRET5\n%%[!end]%%\n\\%% again.\nAfter.', everyone],
+    ['a %% between two parts',
+      '%%[!only|Ana]%%A1%%[!end]%% `%%` %%[!private]%%SECRET7%%[!end]%% tail', everyone],
+  ];
+
+  it('every probe from the review is kept back from everyone it is not for, marked or not', () => {
+    for (const [label, source, kept] of probes) {
+      const secret = /SECRET\d/.exec(source)![0];
+      for (const personId of kept) {
+        expect(forPerson(personId, source), `${label} (${personId})`).not.toContain(secret);
+        expect(marked(personId, source), `${label} (${personId}, marked)`).not.toContain(secret);
+      }
+    }
+  });
+
+  it('tags are found whatever the comments around them; a comment unclosed before the next tag hides the rest', () => {
+    expect(forPerson('ana', 'a `%%` b\n%%[!only|Ana]%%x%%[!end]%%\nc')).toBe('a `');
+    expect(forPerson('cara', 'pub\n%%[!only|Cara]%%\nC `%%` C\n%%[!end]%%\nend')).toBe('pub\nC `');
+    expect(partProblemsInNote('a `%%` b\n%%[!private]%%x%%[!end]%%').unclosedComment).toBe(true);
   });
 });
 
@@ -152,21 +194,23 @@ describe('private part tags', () => {
     expect(partProblemsInNote('a %%[!only|Ana]%% b').unclosed).toBe(1);
   });
 
-  it('a stray end is removed and changes nothing; the sender is told', () => {
+  it('a stray end is removed from the text, and its line is reported (the note is then not shared: T-stray)', () => {
     expect(forPerson('ana', 'a %%[!end]%% b\n%%[!private]%%s%%[!end]%%')).toBe('a  b');
-    expect(partProblemsInNote('a %%[!end]%% b').strayEnds).toBe(1);
+    expect(partProblemsInNote('a %%[!end]%% b').strayEndLines).toEqual([1]);
+    expect(strayEndLineIn('---\ntags: [a]\n---\nOne\n%%[!private]%%x%%[!end]%%\nTwo %%[!end]%%')).toBe(6);
+    expect(strayEndLineIn('%%[!private]%%x%%[!end]%%')).toBeNull();
   });
 
-  it('a malformed tag hides up to its matching end, or the end of the note, and is reported', () => {
+  it('a malformed tag hides up to its matching end; a tag-like comment hides the rest of the note', () => {
     const cases: Array<[string, string]> = [
       ['a %%[!only]%%s%%[!end]%% b', 'a  b'],
       ['a %%[!except|]%%s%%[!end]%% b', 'a  b'],
       ['a %%[!secret]%%s%%[!end]%% b', 'a  b'],
       ['a %%[!private|Ana]%%s%%[!end]%% b', 'a  b'],
       ['a %%[!private-x]%%s%%[!end]%% b', 'a  b'],
-      ['a %% GM: [!private] %%s%%[!end]%% b', 'a  b'],
+      ['a %% GM: [!private] %%s%%[!end]%% b', 'a'],
       ['a %%[ !private]%%s%%[!end]%% b', 'a  b'],
-      ['a <!--[!private]-->s%%[!end]%% b', 'a  b'],
+      ['a <!--[!private]-->s%%[!end]%% b', 'a'],
       ['a %%[!secret]%% s\nmore', 'a'],
     ];
     for (const [source, expected] of cases) {
@@ -209,7 +253,7 @@ describe('private part tags', () => {
     // `,` splits, `|` and `%` stay in the name or break the comment, `]` ends the tag early.
     expect(forPerson('ana', 'a %%[!only|An,a]%%s%%[!end]%% b')).toBe('a  b');
     expect(forPerson('ana', 'a %%[!only|An|a]%%s%%[!end]%% b')).toBe('a  b');
-    expect(forPerson('ana', 'a %%[!only|An]a]%%s%%[!end]%% b')).toBe('a  b');
+    expect(forPerson('ana', 'a %%[!only|An]a]%%s%%[!end]%% b')).toBe('a');
     expect(forPerson('ana', 'a %%[!only|An%%a]%%s%%[!end]%% b')).not.toContain('s');
   });
 

@@ -1,11 +1,13 @@
 /**
  * The text edits behind Share part on a selection, worked out on the note's text by offset so they can be
- * tested without an editor. Wrapping puts tags inline when the selection lies within one line or cuts lines,
- * and on their own lines (with the first line's quote markers) when it covers whole lines. Sharing with
+ * tested without an editor. Both first move the selection's ends out of any tag or comment they cut.
+ * Wrapping puts tags inline when the selection lies within one line or cuts lines, and on their own lines
+ * (with the first line's quote markers) when it covers whole lines; a selection holding other parts' tags
+ * is wrapped stretch by stretch between them. Sharing with
  * everyone frees exactly the selection: tags inside it go, and every part still open at its edges is closed
  * before it and opened again after it, so nothing outside the selection is shared by accident.
  */
-import { END_TAG, openTag, pairTags, scanTags, type OpenPart, type PartRule, type PartTag } from '../model/privateTags';
+import { END_TAG, openTag, pairTags, scanMarkup, scanTags, type OpenPart, type PartRule, type PartTag } from '../model/privateTags';
 
 export interface TextEdit {
   from: number;
@@ -57,16 +59,51 @@ function asOneChange(text: string, edits: readonly TextEdit[], from: number, to:
   return { change: { from: first, to: last, text: replaced }, selection: { from: map(from, true), to: map(to, false) } };
 }
 
-/** Wraps `[from, to)` in a part with `rule`. */
+/** The selection with its ends moved out of tags and comments: a tag or comment an end cuts is taken in whole. */
+function snapped(text: string, from: number, to: number): { from: number; to: number } {
+  const { tags, comments } = scanMarkup(text);
+  let start = from;
+  let end = to;
+  for (const span of [...tags, ...comments]) {
+    if (span.start < start && start < span.end) start = span.start;
+    if (span.start < end && end < span.end) end = span.end;
+  }
+  return { from: start, to: end };
+}
+
+/** The tags for one stretch: inline, or on lines of their own when it covers whole lines. */
+function wrapEdits(text: string, from: number, to: number, open: string): { edits: TextEdit[]; to: number } {
+  const lines = wholeLines(text, from, to);
+  if (!lines) return { edits: [{ from, to: from, text: open }, { from: to, to, text: END_TAG }], to };
+  return {
+    edits: [
+      { from, to: from, text: `${quotePrefix(text, from)}${open}\n` },
+      { from: lines.last, to: lines.last, text: `\n${quotePrefix(text, lines.last)}${END_TAG}` },
+    ],
+    to: lines.last,
+  };
+}
+
+/**
+ * Wraps `[from, to)` in a part with `rule`. When the selection holds tags of other parts, each stretch between
+ * them is wrapped on its own, so every selected character ends up inside the new part whatever it crosses.
+ */
 export function wrapSelection(text: string, from: number, to: number, rule: PartRule): PartEdit {
   const open = openTag(rule);
-  const lines = wholeLines(text, from, to);
-  if (!lines) return asOneChange(text, [{ from, to: from, text: open }, { from: to, to, text: END_TAG }], from, to);
-  const edits = [
-    { from, to: from, text: `${quotePrefix(text, from)}${open}\n` },
-    { from: lines.last, to: lines.last, text: `\n${quotePrefix(text, lines.last)}${END_TAG}` },
-  ];
-  return asOneChange(text, edits, from, lines.last);
+  const range = snapped(text, from, to);
+  const inner = scanMarkup(text).tags.filter((tag) => tag.start >= range.from && tag.end <= range.to);
+  if (inner.length === 0) {
+    const { edits, to: end } = wrapEdits(text, range.from, range.to, open);
+    return asOneChange(text, edits, range.from, end);
+  }
+  const bounds = [range.from, ...inner.flatMap((tag) => [tag.start, tag.end]), range.to];
+  const edits: TextEdit[] = [];
+  for (let index = 0; index < bounds.length; index += 2) {
+    const start = bounds[index] ?? 0;
+    const end = bounds[index + 1] ?? start;
+    if (text.slice(start, end).trim() !== '') edits.push(...wrapEdits(text, start, end, open).edits);
+  }
+  return asOneChange(text, edits, range.from, range.to);
 }
 
 const isOpener = (tag: PartTag): boolean => tag.kind !== 'end';
@@ -113,13 +150,22 @@ function removals(text: string, tags: readonly PartTag[]): Removal[] {
 const openAt = (parts: readonly OpenPart[], at: number): OpenPart[] =>
   parts.filter((part) => part.tag.end <= at && (part.close === null || part.close.start >= at));
 
-/** Shares `[from, to)` with everyone the note is shared with (see the module comment); null when nothing changes. */
-export function shareWithEveryone(text: string, from: number, to: number): PartEdit | null {
+export const UNCLOSED_BEFORE_SELECTION = 'A part that starts before the selection is never closed, so the selection cannot be shared on its own. Close that part with Share part first.';
+
+/**
+ * Shares `[from, to)` with everyone the note is shared with (see the module comment); null when nothing
+ * changes. Refused when a part open at the selection's start is never closed: closing it there would
+ * share what lies between its tag and the selection, which it now hides from everyone.
+ */
+export function shareWithEveryone(text: string, selectedFrom: number, selectedTo: number): PartEdit | { refused: string } | null {
+  const { from, to } = snapped(text, selectedFrom, selectedTo);
   const tags = scanTags(text);
   const { parts } = pairTags(tags);
   const { start, end } = absorbEdges(text, tags, from, to);
   const inside = tags.filter((tag) => tag.start >= start && tag.end <= end);
-  const closing = openAt(parts, start).map(() => END_TAG);
+  const openAtStart = openAt(parts, start);
+  if (openAtStart.some((part) => part.close === null)) return { refused: UNCLOSED_BEFORE_SELECTION };
+  const closing = openAtStart.map(() => END_TAG);
   const reopening = openAt(parts, end).map((part) => text.slice(part.tag.start, part.tag.end));
   if (inside.length === 0 && closing.length === 0 && reopening.length === 0) return null;
   const edits = removals(text, inside);

@@ -49,12 +49,22 @@ describe('restricted parts the recipient gets arrive marked (sender side)', () =
     expect((await sent(source, as('ben'))).text).toBe(`%%[!only|@${T}/gm, @${T}/ana]%%Both. End.%%[!end]%%`);
   });
 
-  it('a part whose tag line an old callout hides is not sent at all, so no tag goes without its end', async () => {
-    const source = '> [!private] old %%[!only|Ana]%%\nlazy\n\nFor Ana.\n%%[!end]%%\nAfter';
-    expect((await sent(source, as('ana'))).text).toBe('After');
-    // A tag alone on a line inside the callout hides no text, so the part keeps its tags there.
-    const alone = '> [!private] old\n> %%[!only|Ana]%%\nlazy\n\nFor Ana.\n%%[!end]%%\nAfter';
-    expect((await sent(alone, as('ana'))).text).toBe(`> %%[!only|@${T}/gm]%%\n\nFor Ana.\n%%[!end]%%\nAfter`);
+  it('a part whose end tag falls in hidden text is not sent at all, so no tag goes without its end', async () => {
+    const stray = 'Top\n%%[!only|Ana]%%\nFor Ana.\n[!private] old\n%%[!end]%%\nAfter';
+    expect((await sent(stray, as('ana'))).text).toBe('Top');
+    const unclosedComment = 'Top\n%%[!only|Ana]%%\nFor Ana. `%%`\n%%[!end]%%\nAfter';
+    expect((await sent(unclosedComment, as('ana'))).text).toBe('Top');
+  });
+
+  it('a note with a stray end is neither listed nor served, and its preview says why (T-stray)', async () => {
+    const note = { text: 'Open.', share: 'public' };
+    const notes = noteCatalogue({ 'Lore/Note.md': note }, gmList);
+    const [item] = await notes.list(as('ana'), 'gm');
+    expect(await notes.open(as('ana'), item!.item, 'gm')).not.toBeNull();
+    note.text = 'Open.\n%%[!end]%%\nRest.';
+    expect(await notes.list(as('ana'), 'gm')).toEqual([]);
+    expect(await notes.open(as('ana'), item!.item, 'gm')).toBeNull();
+    expect(await notes.previewNote(as('ana'), 'Lore/Note.md', 'gm')).toContain('line 2');
   });
 
   it('the preview shows the tags with the sender’s names', async () => {

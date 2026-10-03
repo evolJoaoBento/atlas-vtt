@@ -4,6 +4,7 @@ import { AssetService } from '../../services/AssetService';
 import { chooseAction } from '../../ui/confirmDialog';
 import { ruleReaches } from './model/audience';
 import { mapShareOf } from './model/mapShare';
+import { strayEndLineIn, strayEndProblem } from './model/noteFilter';
 import type { ShareItems } from './model/ShareItems';
 import { parseShareRule, SHARE_PROPERTY } from './model/shareRule';
 import type { PeopleBook } from './people/PeopleBook';
@@ -16,6 +17,12 @@ export const NOTE_NOT_SHARED_TEXT = 'Share this note with them first, then ask t
 interface PushableItem {
   item: string;
   kind: 'note' | 'map';
+}
+
+/** Why a note may not be pushed: it is not shared at all while it has a stray end tag (`strayEndLineIn`). */
+export function pushRefusal(text: string): string | null {
+  const line = strayEndLineIn(text);
+  return line === null ? null : strayEndProblem(line);
 }
 
 export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor'>, people: Pick<PeopleBook, 'byName' | 'allByName' | 'ready'>): void {
@@ -40,6 +47,11 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
     }
     if (present.length === 0) {
       new Notice('Nobody else in this session shares with Atlas in Obsidian.');
+      return;
+    }
+    const refused = file.extension === 'md' ? pushRefusal(await plugin.app.vault.cachedRead(file)) : null;
+    if (refused) {
+      new Notice(refused);
       return;
     }
     const choices = await askable(file, session.tableId, present);
