@@ -1,8 +1,11 @@
 /**
  * Atlas's dice: the dice its tray offers, the formula a selection makes, rolling a formula, and
  * what players may see of a roll. Shared with the online GM side and the join page, so it
- * imports nothing.
+ * imports nothing but the pure dice maths (`diceFormula.ts`, `diceCrit.ts`).
  */
+import { getDiceCrit, type DiceCrit } from './diceCrit';
+import { rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';
+import type { DiceRules } from '../types/diceRulesTypes';
 
 /** The dice of Atlas's dice tray, in tray order. */
 export const DICE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'] as const;
@@ -18,13 +21,11 @@ export interface DiceRollResult {
   id: string;
   timestamp: number;
   formula: string;
-  rolls: Array<{
-    die: string; // e.g., "d20", "d6"
-    value: number;
-    max: number;
-  }>;
+  rolls: RolledDie[];
   modifiers: number;
   total: number;
+  /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
+  crit?: DiceCrit;
   player?: string;
   /** Who rolled it when it was not the GM: an online player's name. */
   rolledBy?: string;
@@ -58,30 +59,12 @@ export function diceFormula(selection: Readonly<Partial<Record<string, number>>>
 }
 
 /**
- * One term of a formula: dice with an optional sign and count ("+3d8", "d20"), or a signed flat
- * modifier ("- 2"). Reading both in one pass keeps the count of a later die from also counting
- * as a modifier.
+ * Rolls `formula` with `random` for the dice (`diceFormula.ts`), by the collection's `rules` when
+ * given: its exploding dice and, for the result, its critical rule. The id stays random however
+ * the dice are rolled, so rolls made in the same millisecond never share one.
  */
-const TERM = /([+-])?\s*(\d+)?d(\d+)|([+-])\s*(\d+)/gi;
-
-/**
- * Rolls `formula` with `random` for the dice. Dice add up whatever their sign, as Atlas has
- * always rolled them. The id stays random however the dice are rolled, so rolls made in the
- * same millisecond never share one.
- */
-export function rollFormula(formula: string, random: () => number = Math.random, now: number = Date.now()): DiceRollResult {
-  const rolls: DiceRollResult['rolls'] = [];
-  let modifiers = 0;
-  for (const [, , count, sides, sign, flat] of formula.matchAll(TERM)) {
-    if (sides !== undefined) {
-      const max = parseInt(sides, 10);
-      const times = parseInt(count ?? '1', 10);
-      for (let i = 0; i < times; i++) rolls.push({ die: `d${max}`, value: Math.floor(random() * max) + 1, max });
-    } else if (flat !== undefined) {
-      modifiers += sign === '-' ? -parseInt(flat, 10) : parseInt(flat, 10);
-    }
-  }
-  const total = rolls.reduce((sum, roll) => sum + roll.value, 0) + modifiers;
+export function rollFormula(formula: string, random: () => number = Math.random, now: number = Date.now(), rules?: DiceRules): DiceRollResult {
+  const { rolls, modifiers, total } = rollDiceFormula(formula, random, rules);
   return {
     id: `roll_${now}_${Math.random().toString(36).slice(2, 11)}`,
     timestamp: now,
@@ -89,6 +72,7 @@ export function rollFormula(formula: string, random: () => number = Math.random,
     rolls,
     modifiers,
     total,
+    ...(rules && { crit: getDiceCrit(rolls, rules) }),
     player: 'Player',
   };
 }

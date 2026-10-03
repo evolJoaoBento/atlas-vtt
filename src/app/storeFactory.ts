@@ -1,3 +1,5 @@
+import type { ResourceDefinition } from './resources/resourceTypes';
+import { defeatedResources, restedResources } from './resources/resourceValues';
 import { create } from "zustand";
 import type { Mutate, StoreApi } from "zustand";
 import { subscribeWithSelector, persist } from "zustand/middleware";
@@ -8,11 +10,13 @@ import type { App, Plugin } from 'obsidian';
 import type AtlasVTTPlugin from '../../main';
 import type { TokenEntity, Character, NotePin, TextElement, DrawingStroke } from './types';
 import type { FogOperation, FogOperationInput } from './types/fogTypes';
-import type { WallSegment, WallInput, LightSource, LightInput } from './types/wallTypes';
+import type { WallSegment, WallInput } from './types/wallTypes';
+import { DEFAULT_SCENE_LIGHTING, type LightChanges, type LightInput, type LightSource, type LightZone, type LightZoneChanges, type LightZoneInput, type SceneLighting, type SceneLightingChanges, type SceneLightingOption } from './types/lightingTypes';
 import type { AudioSource, AudioInput } from './types/audioTypes';
 import type { AnyWidget, WidgetSettings } from './types/widgetTypes';
 import type { InitiativeState, InitiativeEntry, InitiativeConfig } from './types/initiativeTypes';
 import { createDefaultInitiativeState } from './types/initiativeTypes';
+import type { InitiativeRules } from './types/initiativeRulesTypes';
 import { CameraState, GridState, createAtlasStorage, ATLAS_SCHEMA, ATLAS_VERSION } from './services/MapPersistence';
 import type { AtlasPersistStorage } from './services/MapPersistence';
 import { normalizeImagePath } from './utils/pathUtils';
@@ -27,12 +31,17 @@ import { withoutCollectionWidgets } from './utils/collectionWidgets';
 import { withWidgetOff } from './utils/widgetActivation';
 import { createMapObjectsActions, type MapObjectsSlice } from './stores/mapObjectsSlice';
 import { computeNextInstanceNumber } from './stores/tokenInstanceNumbers';
+import { raiseTokens } from './stores/tokenStacking';
 import type { DiceRollResult } from './tools/DiceTool';
 import { persistableDiceLog } from './tools/diceRolling';
 import { isAtlasToolAvailable } from './tools/toolAvailability';
+import { readExploredMask } from './lighting/exploredMaskCodec';
+import { clampLitThreshold, readSceneLighting } from './lighting/sceneLightingOptions';
 import { isPinLabelKind, nextPinLabel } from './tools/pinLabels';
 import { movedPathOf, rewriteMapReferences } from './services/renamedPaths';
 import { conditionValue, removeCondition, setConditionValue } from './utils/conditionValues';
+import { HydrationTracker } from './stores/hydrationTracker';
+import { isolateListeners } from './stores/isolatedListeners';
 
 // Individual store state interface (same as AtlasState but isolated)
 export interface ViewAtlasState {
@@ -45,6 +54,13 @@ export interface ViewAtlasState {
   persistenceEnabled: boolean;
   setPersistenceEnabled: (enabled: boolean) => void;
   
+  /**
+   * Whether the store holds the scene at `mapPath` as it was loaded. It does not while
+   * a scene loads or after loading failed, and is then never saved to the scene's file.
+   */
+  mapLoaded: boolean;
+  setMapLoaded: (loaded: boolean) => void;
+
   // Loading state
   isMapLoading: boolean;
   mapLoadingProgress?: number;
@@ -77,6 +93,8 @@ export interface ViewAtlasState {
     walls: Record<string, WallSegment>;
     lights: Record<string, LightSource>;
     audios: Record<string, AudioSource>;
+    /** Areas with ambient light of their own, in the order they were drawn; absent until the first is. Read with `lightZoneList`. */
+    lightZones?: Record<string, LightZone>;
   };
   
   // Camera state
@@ -93,7 +111,6 @@ export interface ViewAtlasState {
     y: number;
     imagePath: string;
     name: string;
-    hp: number;
     notePath?: string;
     snapped?: boolean;
     ringColor?: string;
@@ -103,7 +120,7 @@ export interface ViewAtlasState {
   addTokenWithId: (
     id: string,
     data: { x: number; y: number; imagePath: string; snapped?: boolean },
-    extra: Pick<Character, 'name' | 'hp' | 'notePath'>
+    extra: Pick<Character, 'name' | 'notePath'>
   ) => void;
 
   moveToken: (id: string, x: number, y: number) => void;
@@ -123,8 +140,10 @@ export interface ViewAtlasState {
    */
   changeTokensConditionValue: (tokenIds: string[], conditionId: string, delta: number) => void;
   clearTokenConditions: (id: string) => void;
-  killTokens: (ids: string[]) => void;
-  resetTokens: (ids: string[]) => void;
+  /** Spends every resource of `definitions` that defeats a token. */
+  killTokens: (ids: string[], definitions: readonly ResourceDefinition[]) => void;
+  /** Returns every resource of `definitions` to its start and clears conditions. */
+  resetTokens: (ids: string[], definitions: readonly ResourceDefinition[]) => void;
 
   // Note Pin actions
   /** With `hex`, the note is linked to the hex containing (x, y) rather than pinned to the point. */
@@ -156,10 +175,21 @@ export interface ViewAtlasState {
   setFogOperations: (fog: Record<string, FogOperation>) => void;
   clearFog: () => void;
 
-  // Vision dirty flag (non-persisted)
-  _visionDirty: boolean;
-  markVisionDirty: () => void;
-  consumeVisionDirty: () => boolean;
+  /** Dynamic lighting of the scene; saved with the map, never undo-tracked. */
+  lighting: SceneLighting;
+  /** Merges `changes` into the scene's lighting; an option given as undefined is removed. */
+  setSceneLighting: (changes: SceneLightingChanges) => void;
+  /** What the players' tokens have explored, as a PNG data URL; saved with the map, never undo-tracked. */
+  exploredMask: string | null;
+  setExploredMask: (dataUrl: string | null) => void;
+  /**
+   * How many edits by hand led to the explored memory as it is, counted since the scene loaded.
+   * The memory itself is no store state, so this count stands for it in the undo history: a
+   * memory edit is the step that raises it, and undo and redo reach it in the order the GM
+   * worked (`ExploredMemory` puts the memory back when it changes). Never saved.
+   */
+  exploredEdits: number;
+  setExploredEdits: (count: number) => void;
 
   // Wall actions
   addWall: (data: WallInput) => string;
@@ -167,11 +197,16 @@ export interface ViewAtlasState {
   deleteWall: (id: string) => void;
   deleteWalls: (ids: string[]) => void;
   toggleDoor: (id: string) => void;
+  /** Locks a door, closing it, or unlocks it; a locked door does not open (`toggleDoor`). */
+  setDoorLocked: (id: string, locked: boolean) => void;
 
   // Light actions
   addLight: (data: LightInput) => string;
-  updateLight: (id: string, changes: Partial<LightSource>) => void;
+  updateLight: (id: string, changes: LightChanges) => void;
   deleteLight: (id: string) => void;
+  addLightZone: (data: LightZoneInput) => string;
+  updateLightZone: (id: string, changes: LightZoneChanges) => void;
+  deleteLightZone: (id: string) => void;
 
   // Audio dirty flag (non-persisted)
   _audioDirty: boolean;
@@ -193,6 +228,11 @@ export interface ViewAtlasState {
   clearSelection: () => void;
   moveTokensBulk: (ids: string[], dx: number, dy: number) => void;
   setTokenPositions: (positions: Array<{id: string, x: number, y: number}>) => void;
+  /**
+   * The pointer lets go of the tokens it dragged: they stand at `positions`, on top of every
+   * other token, and are no longer held. One write, so sight works the drop out once.
+   */
+  dropTokens: (positions: Array<{id: string, x: number, y: number}>) => void;
   deleteTokens: (ids: string[]) => void;
   /** Deletes every selected token, drawing, text and pin in one undo step. */
   deleteSelected: () => void;
@@ -222,7 +262,7 @@ export interface ViewAtlasState {
   isGMView: boolean;
   setGMView: (on: boolean) => void;
 
-  // DM Dashboard state
+  // DM screen state
   dmNotePath: string | null;
   setDMNotePath: (path: string | null) => void;
 
@@ -242,8 +282,8 @@ export interface ViewAtlasState {
   // Token settings
   tokenSettings: {
     showNameplates: boolean;
-    showHPBars: boolean;
-    showStressBars: boolean;
+    /** Keys of the collection's resources this map does not show to the GM; see `resources/sceneVisibility.ts`. */
+    hiddenResources: string[];
     showInstanceBadges: boolean;
     tokenRingSize: number;
   };
@@ -256,17 +296,18 @@ export interface ViewAtlasState {
   addToInitiative: (entry: Omit<InitiativeEntry, 'id' | 'order' | 'isActive'>) => string;
   removeFromInitiative: (id: string) => void;
   updateInitiativeEntry: (id: string, updates: Partial<InitiativeEntry>) => void;
-  rollAllInitiative: () => void;
-  rollEntryInitiative: (id: string) => void;
+  rollAllInitiative: (roll?: string) => void;
+  rollEntryInitiative: (id: string, roll?: string) => void;
   nextTurn: () => void;
   previousTurn: () => void;
   reorderInitiative: (fromIndex: number, toIndex: number) => void;
   moveToFront: (id: string) => void;
   moveToBack: (id: string) => void;
-  startCombat: () => void;
+  startCombat: (rules?: InitiativeRules) => void;
   endCombat: () => void;
+  setInitiativeSitsOut: (id: string, sitsOut: boolean) => void;
+  resetInitiative: () => void;
   setInitiativeConfig: (config: Partial<InitiativeConfig>) => void;
-  syncInitiativeWithTokens: () => void;
 
   // Dice roll log (persisted per map, capped at 20 entries)
   diceLog: DiceRollResult[];
@@ -286,7 +327,7 @@ export interface ViewAtlasState {
 
   // --- Per-view UI visibility (from uiSlice.ts, NOT persisted) ---
   isGridSettingsOpen: UISlice['isGridSettingsOpen'];
-  isDMDashboardOpen: UISlice['isDMDashboardOpen'];
+  isDMScreenOpen: UISlice['isDMScreenOpen'];
   isGridAlignmentOpen: UISlice['isGridAlignmentOpen'];
   isDiceLogOpen: UISlice['isDiceLogOpen'];
   isAssetManagerOpen: UISlice['isAssetManagerOpen'];
@@ -294,8 +335,20 @@ export interface ViewAtlasState {
   isCommandPaletteOpen: UISlice['isCommandPaletteOpen'];
   isDiceTrayOpen: UISlice['isDiceTrayOpen'];
   isOnlinePanelOpen: UISlice['isOnlinePanelOpen'];
+  lightPopover: UISlice['lightPopover'];
+  openLightPopover: UISlice['openLightPopover'];
+  closeLightPopover: UISlice['closeLightPopover'];
+  lightZonePopover: UISlice['lightZonePopover'];
+  openLightZonePopover: UISlice['openLightZonePopover'];
+  closeLightZonePopover: UISlice['closeLightZonePopover'];
+  isSceneLightingPanelOpen: UISlice['isSceneLightingPanelOpen'];
+  setSceneLightingPanelOpen: UISlice['setSceneLightingPanelOpen'];
+  heldTokens: UISlice['heldTokens'];
+  setHeldTokens: UISlice['setHeldTokens'];
+  exploredBrush: UISlice['exploredBrush'];
+  setExploredBrush: UISlice['setExploredBrush'];
   setGridSettingsOpen: UISlice['setGridSettingsOpen'];
-  setDMDashboardOpen: UISlice['setDMDashboardOpen'];
+  setDMScreenOpen: UISlice['setDMScreenOpen'];
   setGridAlignmentOpen: UISlice['setGridAlignmentOpen'];
   setDiceLogOpen: UISlice['setDiceLogOpen'];
   openAssetManager: UISlice['openAssetManager'];
@@ -325,13 +378,15 @@ const createDefaultWidgets = (): WidgetSettings => ({
 /** Token display settings of a map that never set its own. */
 export const DEFAULT_TOKEN_SETTINGS: Readonly<ViewAtlasState['tokenSettings']> = {
   showNameplates: false,
-  showHPBars: true,
-  showStressBars: false,
+  hiddenResources: [],
   showInstanceBadges: true,
   tokenRingSize: 1,
 };
 
-const createInitialState = (): Pick<ViewAtlasState, 'schema' | 'version' | 'mapPath' | 'background' | 'grid' | 'objects' | 'camera' | 'persistenceEnabled' | 'widgetSettings' | 'widgetValues' | 'dmNotePath' | 'tokenSettings' | 'initiative' | 'diceLog' | 'pinnedNotePreviews' | 'lootRoller'> => ({
+const createInitialState = (): Pick<ViewAtlasState, 'schema' | 'version' | 'mapPath' | 'background' | 'grid' | 'objects' | 'camera' | 'persistenceEnabled' | 'widgetSettings' | 'widgetValues' | 'dmNotePath' | 'tokenSettings' | 'initiative' | 'diceLog' | 'pinnedNotePreviews' | 'lootRoller' | 'lighting' | 'exploredMask' | 'exploredEdits'> => ({
+  lighting: { ...DEFAULT_SCENE_LIGHTING },
+  exploredMask: null,
+  exploredEdits: 0,
   schema: ATLAS_SCHEMA,
   version: ATLAS_VERSION,
   mapPath: null,
@@ -365,8 +420,7 @@ const createInitialState = (): Pick<ViewAtlasState, 'schema' | 'version' | 'mapP
   dmNotePath: null, // DM note linking
   tokenSettings: {
     showNameplates: false,
-    showHPBars: true,
-    showStressBars: true,
+    hiddenResources: [],
     showInstanceBadges: true,
     tokenRingSize: 1
   },
@@ -392,6 +446,13 @@ export type ViewAtlasStore = Mutate<
   [['zustand/subscribeWithSelector', never], ['zustand/persist', PersistedViewState]]
 > & {
   flushStorage: () => Promise<void>;
+  /**
+   * Fills the store from the file at `mapPath`. Rejects when the store did not take the
+   * file's state (it cannot be read or loaded, or merging it failed); a path without a
+   * file is a new map and resolves with the store as it was. A read that returns after
+   * `isSuperseded` turned true, or after a later call, is dropped instead of applied.
+   */
+  rehydrateFromFile: (isSuperseded?: () => boolean) => Promise<void>;
 };
 
 function applyTokenUpdates(token: TokenEntity | undefined, updates: TokenUpdates): void {
@@ -432,6 +493,8 @@ export function createViewAtlasStore(
   // Create a storage factory that will access the store once it's created
   let storeRef: Pick<StoreApi<ViewAtlasState>, 'getState'> | null = null;
 
+  const hydrations = new HydrationTracker();
+
   // Keep a reference to the delayed storage so we can expose flush() on the store
   let delayedStorageRef: ReturnType<typeof createDelayedStorage> | null = null;
 
@@ -464,7 +527,7 @@ export function createViewAtlasStore(
           return null;
         }
         const storage = getOrCreateStorage();
-        return storage ? storage.getItem(name) : null;
+        return hydrations.read(async () => (storage ? storage.getItem(name) : null));
       },
       async setItem(name: string, value: StorageValue<PersistedViewState>): Promise<void> {
         if (!storeRef) {
@@ -472,9 +535,10 @@ export function createViewAtlasStore(
           return;
         }
 
-        // Check per-store persistence control
+        // Check per-store persistence control. A store without a loaded map is refused by
+        // the storage as well; stopping here keeps its state from counting as already saved.
         const state = storeRef.getState();
-        if (!state.persistenceEnabled) {
+        if (!state.persistenceEnabled || !state.mapLoaded) {
           return;
         }
 
@@ -532,7 +596,7 @@ export function createViewAtlasStore(
           ...(plugin && { plugin }),
           currentCollectionId: 'default', // Default to 'default' collection
           
-          // DM Dashboard state
+          // DM screen state
           dmNotePath: null,
           
           // Token settings
@@ -544,6 +608,11 @@ export function createViewAtlasStore(
             draft.persistenceEnabled = enabled;
           }),
           
+          mapLoaded: false,
+          setMapLoaded: (loaded) => set((draft) => {
+            draft.mapLoaded = loaded;
+          }),
+
           // Loading state (not persisted)
           isMapLoading: false,
           setMapLoading: (loading, progress, message) => set((draft) => {
@@ -634,7 +703,7 @@ export function createViewAtlasStore(
                 draft.objects.tokens[id] = { ...data, id, kind: data.kind ?? 'token', imagePath, instanceNumber } as TokenEntity;
                 ids.push(id);
               }
-              if (ids.length > 0) draft._visionDirty = true;
+              raiseTokens(draft.objects.tokens, ids);
             });
             return ids;
           },
@@ -653,7 +722,6 @@ export function createViewAtlasStore(
               y: data.y,
               imagePath: normalizedImagePath,
               name: data.name,
-              hp: data.hp,
               instanceNumber,
               ...(data.notePath && { notePath: data.notePath }),
               ...(data.snapped !== undefined && { snapped: data.snapped }),
@@ -662,6 +730,7 @@ export function createViewAtlasStore(
             };
             set((draft) => {
               draft.objects.tokens[id] = token;
+              raiseTokens(draft.objects.tokens, [id]);
             });
             return id;
           },
@@ -679,11 +748,11 @@ export function createViewAtlasStore(
                 imagePath: normalizedImagePath,
                 name: extra.name,
                 instanceNumber,
-                ...(extra.hp !== undefined && { hp: extra.hp }),
                 ...(extra.notePath && { notePath: extra.notePath }),
                 ...(data.snapped !== undefined && { snapped: data.snapped }),
               };
               draft.objects.tokens[id] = char;
+              raiseTokens(draft.objects.tokens, [id]);
             });
           },
 
@@ -692,7 +761,6 @@ export function createViewAtlasStore(
             if (token) {
               token.x = x;
               token.y = y;
-              draft._visionDirty = true;
               draft._audioDirty = true;
             }
           }),
@@ -713,7 +781,6 @@ export function createViewAtlasStore(
 
           deleteToken: (id) => set((draft) => {
             delete draft.objects.tokens[id];
-            draft._visionDirty = true;
           }),
 
           setTokens: (map) => set((draft) => {
@@ -832,7 +899,6 @@ export function createViewAtlasStore(
                 token.y += dy;
               }
             });
-            draft._visionDirty = true;
             draft._audioDirty = true;
           }),
 
@@ -848,7 +914,19 @@ export function createViewAtlasStore(
                 token.y = y;
               }
             });
-            draft._visionDirty = true;
+            draft._audioDirty = true;
+          }),
+
+          dropTokens: (positions) => set((draft) => {
+            for (const { id, x, y } of positions) {
+              const token = draft.objects.tokens[id];
+              if (token) {
+                token.x = x;
+                token.y = y;
+              }
+            }
+            raiseTokens(draft.objects.tokens, positions.map(({ id }) => id));
+            if (Object.keys(draft.heldTokens).length > 0) draft.heldTokens = {};
             draft._audioDirty = true;
           }),
 
@@ -908,14 +986,12 @@ export function createViewAtlasStore(
                 if (draft.objects.walls[id]) {
                   delete draft.objects.walls[id];
                   draft.selectedIds = draft.selectedIds.filter(selectedId => selectedId !== id);
-                  draft._visionDirty = true;
                 }
                 break;
               case 'light':
                 if (draft.objects.lights[id]) {
                   delete draft.objects.lights[id];
                   draft.selectedIds = draft.selectedIds.filter(selectedId => selectedId !== id);
-                  draft._visionDirty = true;
                 }
                 break;
               case 'audio':
@@ -930,7 +1006,7 @@ export function createViewAtlasStore(
             }
           }),
           
-          // DM Dashboard actions
+          // DM screen actions
           setDMNotePath: (path) => set((draft) => {
             draft.dmNotePath = path;
           }),
@@ -1144,14 +1220,22 @@ export function createViewAtlasStore(
             draft.objects.fog = {};
           }),
 
-          // Vision dirty flag (non-persisted)
-          _visionDirty: false,
-          markVisionDirty: () => set((draft) => { draft._visionDirty = true; }),
-          consumeVisionDirty: () => {
-            const dirty = get()._visionDirty;
-            if (dirty) set((draft) => { draft._visionDirty = false; });
-            return dirty;
-          },
+          setSceneLighting: (changes) => set((draft) => {
+            Object.assign(draft.lighting, changes);
+            for (const field of Object.keys(changes) as SceneLightingOption[]) {
+              if (changes[field] === undefined) delete draft.lighting[field];
+            }
+            draft.lighting.ambient = Math.min(1, Math.max(0, draft.lighting.ambient));
+            if (draft.lighting.litThreshold !== undefined) draft.lighting.litThreshold = clampLitThreshold(draft.lighting.litThreshold);
+          }),
+
+          setExploredMask: (dataUrl) => set((draft) => {
+            draft.exploredMask = dataUrl;
+          }),
+
+          setExploredEdits: (count) => set((draft) => {
+            draft.exploredEdits = count;
+          }),
 
           // Audio dirty flag
           _audioDirty: false,
@@ -1167,7 +1251,6 @@ export function createViewAtlasStore(
             const id = `wall_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
             set((draft) => {
               draft.objects.walls[id] = { id, kind: 'wall', ...data };
-              draft._visionDirty = true;
               draft._audioDirty = true;
             });
             return id;
@@ -1177,7 +1260,8 @@ export function createViewAtlasStore(
             const wall = draft.objects.walls[id];
             if (wall) {
               Object.assign(wall, changes);
-              draft._visionDirty = true;
+              // A field given as undefined is removed: the wall is as if it never had it.
+              for (const key of Object.keys(changes) as (keyof WallSegment)[]) if (changes[key] === undefined) delete wall[key];
               draft._audioDirty = true;
             }
           }),
@@ -1185,7 +1269,6 @@ export function createViewAtlasStore(
           deleteWall: (id) => set((draft) => {
             delete draft.objects.walls[id];
             draft.selectedIds = draft.selectedIds.filter(sid => sid !== id);
-            draft._visionDirty = true;
             draft._audioDirty = true;
           }),
 
@@ -1194,15 +1277,28 @@ export function createViewAtlasStore(
               delete draft.objects.walls[id];
             }
             draft.selectedIds = draft.selectedIds.filter(sid => !ids.includes(sid));
-            draft._visionDirty = true;
             draft._audioDirty = true;
           }),
 
           toggleDoor: (id) => set((draft) => {
             const wall = draft.objects.walls[id];
-            if (wall && (wall.type === 'door' || wall.type === 'secret-door')) {
+            // A locked door stays shut until it is unlocked.
+            if (wall && (wall.type === 'door' || wall.type === 'secret-door') && wall.locked !== true) {
               wall.closed = !(wall.closed ?? true);
-              draft._visionDirty = true;
+              draft._audioDirty = true;
+            }
+          }),
+
+          setDoorLocked: (id, locked) => set((draft) => {
+            const wall = draft.objects.walls[id];
+            if (!wall || (wall.type !== 'door' && wall.type !== 'secret-door')) return;
+            if (!locked) {
+              delete wall.locked;
+              return;
+            }
+            wall.locked = true;
+            if (!(wall.closed ?? true)) {
+              wall.closed = true;
               draft._audioDirty = true;
             }
           }),
@@ -1212,23 +1308,48 @@ export function createViewAtlasStore(
             const id = `light_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
             set((draft) => {
               draft.objects.lights[id] = { id, kind: 'light', ...data };
-              draft._visionDirty = true;
             });
             return id;
           },
 
           updateLight: (id, changes) => set((draft) => {
             const light = draft.objects.lights[id];
-            if (light) {
-              Object.assign(light, changes);
-              draft._visionDirty = true;
+            if (!light) return;
+            Object.assign(light, changes);
+            // A field given as undefined is removed, not stored as undefined.
+            for (const field of Object.keys(changes) as (keyof LightChanges)[]) {
+              if (changes[field] === undefined) delete light[field];
             }
           }),
 
           deleteLight: (id) => set((draft) => {
             delete draft.objects.lights[id];
             draft.selectedIds = draft.selectedIds.filter(sid => sid !== id);
-            draft._visionDirty = true;
+          }),
+
+          // Light zones: map geometry like walls, in the order they were drawn
+          addLightZone: (data) => {
+            const id = `zone_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+            set((draft) => {
+              // Whatever is in their place that is no record (a store filled by something else than a load) gives way.
+              if (!isRecord(draft.objects.lightZones)) draft.objects.lightZones = {};
+              draft.objects.lightZones[id] = { id, kind: 'light-zone', ...data };
+            });
+            return id;
+          },
+
+          updateLightZone: (id, changes) => set((draft) => {
+            const zone = draft.objects.lightZones?.[id];
+            if (!zone) return;
+            Object.assign(zone, changes);
+            for (const field of Object.keys(changes) as (keyof LightZoneChanges)[]) {
+              if (changes[field] === undefined) delete zone[field];
+            }
+          }),
+
+          deleteLightZone: (id) => set((draft) => {
+            delete draft.objects.lightZones?.[id];
+            if (draft.lightZonePopover === id) draft.lightZonePopover = null;
           }),
 
           // Audio actions
@@ -1292,6 +1413,9 @@ export function createViewAtlasStore(
             draft.widgetValues = {};
             draft.pinnedNotePreviews = {};
             draft.lootRoller = createInitialLootRollerState();
+            draft.lighting = { ...DEFAULT_SCENE_LIGHTING };
+            draft.exploredMask = null;
+            draft.exploredEdits = 0;
 
             // Note: We don't clear background here - it will be set by the new map
             // Note: We don't clear mapPath - it must be preserved for storage adapter
@@ -1352,59 +1476,25 @@ export function createViewAtlasStore(
           }),
 
           // Kill tokens - set HP to 0
-          killTokens: (ids) => set((draft) => {
-            if (!ids || !Array.isArray(ids)) {
-              console.warn(`[ViewStore-${viewId}] Invalid ids provided to killTokens:`, ids);
-              return;
+          killTokens: (ids, definitions) => set((draft) => {
+            for (const id of ids) {
+              const token = draft.objects.tokens[id];
+              if (token?.kind !== 'character') continue;
+              const resources = defeatedResources(token, definitions);
+              if (resources) token.resources = resources;
             }
-
-            const updatedTokens = { ...draft.objects.tokens };
-            ids.forEach(id => {
-              const existing = updatedTokens[id];
-              if (existing) {
-                if (existing.kind !== 'character') return;
-
-                // Set HP to 0 - handle both number and object formats
-                const hp = typeof existing.hp === 'object' && existing.hp !== null
-                  ? { ...existing.hp, current: 0 }
-                  : 0;
-                updatedTokens[id] = { ...existing, hp };
-              }
-            });
-
-            draft.objects.tokens = updatedTokens;
           }),
 
-          // Reset tokens - restore HP and stress, clear statuses
-          resetTokens: (ids) => set((draft) => {
-            if (!ids || !Array.isArray(ids)) {
-              console.warn(`[ViewStore-${viewId}] Invalid ids provided to resetTokens:`, ids);
-              return;
+          // Reset tokens - restore every resource and clear conditions
+          resetTokens: (ids, definitions) => set((draft) => {
+            for (const id of ids) {
+              const token = draft.objects.tokens[id];
+              if (!token) continue;
+              const resources = token.kind === 'character' ? restedResources(token, definitions) : undefined;
+              if (resources) token.resources = resources;
+              delete token.conditions;
+              delete token.conditionValues;
             }
-
-            const updatedTokens = { ...draft.objects.tokens };
-            ids.forEach(id => {
-              const existing = updatedTokens[id];
-              if (existing) {
-                const updated: TokenEntity = { ...existing };
-
-                if (updated.kind === 'character') {
-                  // Reset HP to max. The plain number format carries no max, so it is left as is.
-                  if (typeof updated.hp === 'object' && updated.hp !== null && updated.hp.max) {
-                    updated.hp = { ...updated.hp, current: updated.hp.max };
-                  }
-                  updated.stress = 0;
-                }
-
-                // Clear all conditions
-                delete updated.conditions;
-                delete updated.conditionValues;
-
-                updatedTokens[id] = updated;
-              }
-            });
-
-            draft.objects.tokens = updatedTokens;
           }),
 
           // --- Initiative Tracker State & Actions (from initiativeSlice.ts) ---
@@ -1480,6 +1570,8 @@ export function createViewAtlasStore(
               diceLog: persistableDiceLog(state.diceLog), // Dice roll history (last 20 per map); online players' rolls stay in memory
               pinnedNotePreviews: state.pinnedNotePreviews, // Pinned note preview windows
               lootRoller: state.lootRoller, // Loot roller window, filters and history
+              lighting: state.lighting,
+              exploredMask: state.exploredMask,
             };
           },
           
@@ -1487,21 +1579,26 @@ export function createViewAtlasStore(
           merge: (persisted, current): ViewAtlasState => {
             const saved: Partial<ViewAtlasState> = isRecord(persisted) ? persisted : {};
             // `remoteScene` marks the online scene view and never comes from a file.
-            return { ...current, ...saved, remoteScene: current.remoteScene, lootRoller: readLootRollerState(saved.lootRoller) };
+            return {
+              ...current,
+              ...saved,
+              remoteScene: current.remoteScene,
+              lootRoller: readLootRollerState(saved.lootRoller),
+              lighting: readSceneLighting(saved.lighting),
+              exploredMask: readExploredMask(saved.exploredMask),
+              // Counted per session: a file never brings one.
+              exploredEdits: current.exploredEdits,
+            };
           },
 
-          onRehydrateStorage: () => {
-            return (_state, error) => {
-              if (error) {
-                console.error(`[ViewStore-${viewId}] Hydration failed:`, error);
-              }
-            };
-          }
+          onRehydrateStorage: () => hydrations.reporter((error) => {
+            console.error(`[ViewStore-${viewId}] Hydration failed:`, error);
+          }),
         }
       )
     ),
-    // Undo/redo tracks objects, grid, background and widgetValues only;
-    // selection, camera, tool and loading state never enter the history.
+    // Undo/redo tracks objects, grid, background, widgetValues and the count of explored-memory
+    // edits only; selection, camera, tool and loading state never enter the history.
     // storeRef is assigned right after creation, before any history call.
     createHistoryOptions<ViewAtlasState>(() => storeRef!.getState())
   )
@@ -1512,10 +1609,15 @@ export function createViewAtlasStore(
   // A remote store's edits are the GM's scene or a preview; nothing of it is undoable.
   if (remote) getHistoryStore(store)?.getState().pause();
 
+  // A renderer that fails on some state must not keep the others, or a scene load, from going on
+  isolateListeners(store, (error) => {
+    console.error(`[ViewStore-${viewId}] A store subscriber failed:`, error);
+  });
+
   // Immer types `setState` with draft updaters, and WritableDraft<ViewAtlasState> is not
   // assignable back to ViewAtlasState because the state holds the Obsidian `plugin`.
   // The public type keeps the plain StoreApi `setState`, which the Immer store also honours.
-  const publicStore = store as unknown as Omit<ViewAtlasStore, 'flushStorage'>;
+  const publicStore = store as unknown as Omit<ViewAtlasStore, 'flushStorage' | 'rehydrateFromFile'>;
 
   // Expose the storage flush method on the store for tab-switch save coordination
   return Object.assign(publicStore, {
@@ -1524,5 +1626,8 @@ export function createViewAtlasStore(
         await delayedStorageRef.flush();
       }
     },
+    rehydrateFromFile: (isSuperseded = (): boolean => false): Promise<void> => (
+      hydrations.run(() => store.persist.rehydrate(), isSuperseded)
+    ),
   });
 }

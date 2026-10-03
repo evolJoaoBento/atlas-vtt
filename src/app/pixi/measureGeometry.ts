@@ -25,7 +25,7 @@ export const MEASURE_POINT = { radius: 8, halo: 3, haloAlpha: 0.3, fillAlpha: 0.
 /** Circle and cone areas: a faint fill and an outline; circles add a thin highlight just inside. */
 export const MEASURE_AREA = { fillAlpha: 0.1, strokeWidth: 3, strokeAlpha: 0.8, highlightWidth: 1.5, highlightInset: 1 } as const;
 
-/** The cone's opening: 90 degrees, 45 on each side. */
+/** The cone's default opening: 90 degrees, 45 on each side. A game system may set another (`MeasurementSettings.coneAngle`). */
 export const CONE_ANGLE = Math.PI / 2;
 
 export const MEASURE_LABEL_FONT_SIZE = 16;
@@ -94,14 +94,14 @@ export interface ConeGeometry {
   right: Point;
 }
 
-/** A cone from `start` towards `end`. */
-export function coneGeometry(start: Point, end: Point): ConeGeometry {
+/** A cone from `start` towards `end`, opening `opening` radians. */
+export function coneGeometry(start: Point, end: Point, opening: number = CONE_ANGLE): ConeGeometry {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const radius = Math.sqrt(dx * dx + dy * dy);
   const baseAngle = Math.atan2(dy, dx);
-  const startAngle = baseAngle - CONE_ANGLE / 2;
-  const endAngle = baseAngle + CONE_ANGLE / 2;
+  const startAngle = baseAngle - opening / 2;
+  const endAngle = baseAngle + opening / 2;
   const at = (angle: number): Point => ({ x: start.x + radius * Math.cos(angle), y: start.y + radius * Math.sin(angle) });
   return { radius, startAngle, endAngle, left: at(startAngle), right: at(endAngle) };
 }

@@ -16,6 +16,8 @@ export interface PlayerOverlay {
   present(store: StoreApi<ViewAtlasState>): void;
   /** Keep the presented scene while the DM browses other scene tabs. */
   hold(): void;
+  /** Draw again: something outside the store and the player settings changed what players see. */
+  refresh?(): void;
   destroy(): void;
 }
 
@@ -86,7 +88,7 @@ export abstract class PlayerSceneOverlay<Scene extends object> implements Player
   /** Fills the emptied `container` from the presented `scene`. */
   protected abstract render(container: HTMLElement, scene: Scene, settings: PlayerSettings): void;
 
-  private refresh(): void {
+  refresh(): void {
     if (!this.container) return;
     this.container.empty();
     if (this.scene) this.render(this.container, this.scene, this.playerSettings);

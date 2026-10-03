@@ -1,101 +1,35 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from 'src/utils/cn';
 import { useKeepInView } from '../../../packages/components/primitives/useKeepInView';
 import { DiceTool } from '../../../tools/DiceTool';
-import { diceFormula } from '../../../tools/diceRolling';
-import { DiceGrid } from './DiceGrid';
-import { DiceFormulaBar } from './DiceFormulaBar';
-import { DiceToastContainer } from './DiceToastContainer';
-
-interface DiceSelection {
-  [die: string]: number;
-}
+import { DiceTray } from './DiceTray';
+import type { TrayPool } from './diceTrayPool';
+import { useAtlasUI } from '../../root/AtlasUIContext';
+import { diceFontClass, useDiceLook } from '../../hooks/useDiceLook';
 
 export interface DiceDropdownMenuProps {
   diceTool: DiceTool;
   isOpen: boolean;
   onToggle: () => void;
   triggerRef?: React.RefObject<HTMLElement | null>;
-  /** Rolls the picks elsewhere instead of with `diceTool`: the online scene sends them to the GM. False: it could not go, so the tray stays open. */
-  onRoll?: (selection: Readonly<Record<string, number>>) => boolean;
-  /** The most dice the tray lets the player pick; none when unset. */
+  /** Rolls the tray elsewhere instead of with `diceTool`: the online scene sends it to the GM. False: it could not go, so the tray stays open. */
+  onRoll?: (pool: TrayPool, modifier: number) => boolean;
+  /** The most dice the tray lets the player pick; the tray's own limit when unset. */
   maxDice?: number;
-  /** Atlas's dice toasts follow the document-wide dice event; the online scene shows none. */
-  showToasts?: boolean;
 }
 
-export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRoll, maxDice, showToasts = true }: DiceDropdownMenuProps): React.ReactElement {
-  const [selection, setSelection] = useState<DiceSelection>({});
+export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRoll, maxDice }: DiceDropdownMenuProps): React.ReactElement | null {
+  const trayRef = useRef<HTMLDivElement>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const portalRef = useRef<HTMLDivElement>(null);
-  const keepInView = useKeepInView(portalRef, isOpen, 'top', `${position.left},${position.top}`);
-
-  // ── Dice add / remove ────────────────────────
-
-  const handleAdd = useCallback((die: string, event: React.MouseEvent): void => {
-    event.stopPropagation();
-    event.preventDefault();
-    const picked = Object.values(selection).reduce((sum, count) => sum + count, 0);
-    if (maxDice !== undefined && picked >= maxDice) {
-      setNote(`A roll has at most ${maxDice} dice.`);
-      return;
-    }
-    setNote(null);
-    setSelection((prev) => ({ ...prev, [die]: (prev[die] ?? 0) + 1 }));
-  }, [selection, maxDice]);
-
-  const handleRemove = useCallback((die: string, event: React.MouseEvent): void => {
-    event.preventDefault();
-    event.stopPropagation();
-    setNote(null);
-    setSelection((prev) => {
-      const next = { ...prev };
-      if (next[die] !== undefined && next[die] > 1) {
-        next[die]--;
-      } else {
-        delete next[die];
-      }
-      return next;
-    });
-  }, []);
-
-  // ── Roll & clear ─────────────────────────────
-
-  const handleRoll = useCallback((): void => {
-    const formula = diceFormula(selection);
-    if (!formula) return;
-
-    if (onRoll) {
-      if (!onRoll(selection)) {
-        setNote("Couldn't send the roll. Check your connection.");
-        return;
-      }
-    } else diceTool.rollDice(formula);
-    onToggle();
-  }, [selection, diceTool, onToggle, onRoll]);
-
-  const handleClear = useCallback((): void => {
-    setNote(null);
-    setSelection({});
-  }, []);
-
-  // ── Position & reset when opened ─────────────
-
-  useEffect(() => {
-    if (!isOpen) {
-      setSelection({});
-      setNote(null);
-      return;
-    }
-    if (triggerRef?.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({ top: rect.top - 16, left: rect.left + rect.width / 2 });
-    }
-  }, [isOpen, triggerRef]);
+  const { app } = useAtlasUI();
+  const look = useDiceLook(app ?? undefined);
+  const keepInView = useKeepInView(trayRef, isOpen, 'top');
 
   // ── Click-outside ────────────────────────────
+
+  useEffect(() => {
+    if (!isOpen) setNote(null);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -103,7 +37,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
     const handleClickOutside = (event: MouseEvent): void => {
       const target = event.target as HTMLElement;
       if (triggerRef?.current?.contains(target)) return;
-      if (target.closest('.atlas-dice-portal')) return;
+      if (target.closest('.atlas-dice-tray')) return;
       onToggle();
     };
 
@@ -117,27 +51,32 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
     };
   }, [isOpen, onToggle, triggerRef]);
 
+  // Hangs from its toolbar button inside the map view, like the other toolbar
+  // dropdowns: it stays in the view's stacking order, so the DM dashboard and
+  // the asset manager cover it. Closed, the tray unmounts and forgets its dice.
+  if (!isOpen) return null;
   return (
-    <>
-      {/* Dropdown panel */}
-      {isOpen &&
-        createPortal(
-          <div
-            ref={portalRef}
-            className={cn('atlas-dice-portal atlas-vtt-plugin', keepInView.capped && 'atlas-keep-in-view--capped')}
-            style={{ ...keepInView.style, top: `${position.top}px`, left: `${position.left}px` }}
-          >
-            <div className="atlas-dice-panel">
-              <DiceGrid selection={selection} onAdd={handleAdd} onRemove={handleRemove} />
-              {note && <div className="atlas-dice-note" role="status">{note}</div>}
-              <DiceFormulaBar selection={selection} onClear={handleClear} onRoll={handleRoll} />
-            </div>
-          </div>,
-          document.body,
-        )}
-
-      {/* Global toast layer — listens for atlas-dice-rolled CustomEvent */}
-      {showToasts && <DiceToastContainer />}
-    </>
+    <div
+      ref={trayRef}
+      className={cn('atlas-dice-tray', diceFontClass(look), keepInView.capped && 'atlas-keep-in-view--capped')}
+      style={keepInView.style}
+    >
+      <div className="atlas-dice-panel">
+        <DiceTray
+          {...(maxDice !== undefined ? { maxDice } : {})}
+          onRoll={(formula, pool, modifier) => {
+            if (onRoll) {
+              if (!onRoll(pool, modifier)) {
+                setNote("Couldn't send the roll. Check your connection.");
+                return false;
+              }
+            } else diceTool.rollDice(formula);
+            onToggle();
+            return true;
+          }}
+        />
+        {note && <div className="atlas-dice-note" role="status">{note}</div>}
+      </div>
+    </div>
   );
 }

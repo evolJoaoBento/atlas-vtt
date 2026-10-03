@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { SettingsService } from '../../src/app/services/SettingsService';
-import { PlayerWindowService, type PlayerFrameSource } from '../../src/app/services/PlayerWindowService';
+import type { PlayerFrameSource } from '../../src/app/services/PlayerFrameMirror';
+import { PlayerWindowService } from '../../src/app/services/PlayerWindowService';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
 import { attachFakePlayerWindow } from '../mocks/playerPopout';
 
@@ -150,7 +151,7 @@ describe('live player settings', () => {
     (service as any).startMirroring();
     vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0](40);
     expect(capture).toHaveBeenLastCalledWith(expect.any(Function), settings.getLocalPlayerViewSettings(), undefined);
-    settings.setLocalPlayerViewSettings({ showGrid: false, showTokenHP: true });
+    settings.setLocalPlayerViewSettings({ showGrid: false, showTokenNameplates: true });
     const nextFrame = vi.mocked(requestAnimationFrame).mock.calls.at(-1)![0];
     capture.mockClear();
     nextFrame(56);

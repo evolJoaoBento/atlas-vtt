@@ -17,6 +17,11 @@
   animation-delay: calc(var(--atlas-enter-index, 0) * 30ms);
   transition: background-color $transition-fast $transition-ease;
 
+  // Scrolled back into view: it was on screen before, so it appears as it is
+  &.atlas-token-card--settled {
+    animation: none;
+  }
+
   &:hover {
     background: var(--background-modifier-hover);
 
@@ -179,24 +184,12 @@
   }
 }
 
-.atlas-token-card__busy {
+// Holds the art's place while the upload is converted, under the crop mask and the ring.
+.atlas-token-card__pending {
   position: absolute;
   inset: 0;
-  z-index: 3;
-  @include atlas-flex-col($gap: $spacing-xs);
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in oklch, var(--mono-0) 45%, transparent);
-  backdrop-filter: blur(3px);
-  color: var(--text-normal);
-  font-size: $font-ui-smaller;
-  font-weight: $font-weight-medium;
-
-  svg {
-    width: $icon-m;
-    height: $icon-m;
-    animation: atlas-spin 700ms linear infinite;
-  }
+  border-radius: 0;
+  pointer-events: none;
 }
 
 .atlas-token-card__badge {
@@ -216,6 +209,10 @@
   @starting-style {
     opacity: 0;
   }
+}
+
+.atlas-token-card__badge--scaled {
+  color: var(--color-orange);
 }
 
 // ── Name + zoom ─────────────────────────────────────────────────────────────

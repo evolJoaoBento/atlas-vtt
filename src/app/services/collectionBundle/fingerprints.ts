@@ -1,5 +1,6 @@
 import { withoutSceneSharing } from './bundleSharing';
 import type { Asset, CollectionMetadata } from '../AssetService';
+import { comparableSettings } from './bundleSettings';
 import { hashJson } from './hashing';
 import type { CollectionField } from './installRecord';
 
@@ -13,5 +14,5 @@ export function assetFingerprint(asset: Asset): Promise<string> {
 
 /** Fingerprint of one collection record field; a missing field hashes like null. */
 export function fieldFingerprint(collection: CollectionMetadata, field: CollectionField): Promise<string> {
-  return hashJson(collection[field] ?? null);
+  return hashJson((field === 'settings' ? comparableSettings(collection.settings) : collection[field]) ?? null);
 }

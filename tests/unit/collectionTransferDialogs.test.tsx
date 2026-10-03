@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ExportCollectionDialog } from '../../src/app/packages/components/asset-manager/collection-transfer/ExportCollectionDialog';
 import { ImportReviewDialog } from '../../src/app/packages/components/asset-manager/collection-transfer/ImportReviewDialog';
 import type { App } from 'obsidian';
@@ -8,32 +8,12 @@ import type { ContentMedia } from '../../src/app/packages/components/asset-manag
 import type { Asset } from '../../src/app/services/AssetService';
 import type { ExportPreview } from '../../src/app/services/collectionBundle/collectionExport';
 import type { ImportReview } from '../../src/app/services/collectionBundle/importReview';
+import { stubLayout } from '../mocks/jsdomLayout';
 
 afterEach(cleanup);
 
 const VIEWPORT = { width: 800, height: 600 };
-const rect = (): DOMRect => ({
-  ...VIEWPORT, top: 0, left: 0, right: VIEWPORT.width, bottom: VIEWPORT.height, x: 0, y: 0, toJSON: () => ({}),
-}) as DOMRect;
-
-// jsdom has no layout: give every element the viewport's box, so the virtual
-// lists inside the dialog's scrolling pane have room to show their first rows.
-const layoutStubs: Array<[object, string, PropertyDescriptor]> = [
-  [Element.prototype, 'getBoundingClientRect', { configurable: true, value: rect }],
-  [Element.prototype, 'clientWidth', { configurable: true, get: () => VIEWPORT.width }],
-  [HTMLElement.prototype, 'offsetWidth', { configurable: true, get: () => VIEWPORT.width }],
-  [HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => VIEWPORT.height }],
-];
-const originals = layoutStubs.map(([target, name]) => [target, name, Object.getOwnPropertyDescriptor(target, name)] as const);
-beforeAll(() => {
-  for (const [target, name, descriptor] of layoutStubs) Object.defineProperty(target, name, descriptor);
-});
-afterAll(() => {
-  for (const [target, name, descriptor] of originals) {
-    if (descriptor) Object.defineProperty(target, name, descriptor);
-    else Reflect.deleteProperty(target, name);
-  }
-});
+stubLayout(VIEWPORT);
 
 const media: ContentMedia = {
   // Just what the statblock preview reaches for; without Fantasy Statblocks it shows its install hint.
@@ -240,6 +220,27 @@ describe('export options', () => {
     expect((screen.getByRole('button', { name: 'Export v3' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('lists notes below the note that led to them, says why each is there, and leaves out what only an unticked note links to', () => {
+    const files: ExportPreview['files'] = [
+      { vaultPath: 'Lore/Cave.md', role: 'linked-note', owners: ['cave'] },
+      { vaultPath: 'Lore/Pelor.md', role: 'linked-note', linkedFrom: ['Lore/Cave.md'] },
+      { vaultPath: 'Lore/Sun.md', role: 'linked-note', linkedFrom: ['Lore/Pelor.md'] },
+      { vaultPath: 'Lore/sun.png', role: 'note-attachment', linkedFrom: ['Lore/Sun.md'] },
+    ];
+    const { container } = render(<ExportCollectionDialog media={media} preview={preview({ files })} onExport={vi.fn(async () => null)} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Notes/ }));
+    const rows = (): string[] => [...container.querySelectorAll('.atlas-transfer-item')].map((row) => row.textContent ?? '');
+    expect(rows()).toEqual(['CaveOpened in Cave2 linked notes', 'PelorLinked from Cave1 linked note', 'SunLinked from Pelor']);
+    expect(screen.getByText('6 items · 4 files · 0 Bytes')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Images and PDFs/ }).textContent).toContain('1');
+
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Pelor/ }));
+    expect(screen.getByRole('button', { name: /Notes/ }).textContent).toContain('1 of 3');
+    expect(rows()[2]).toBe('SunOnly used by content you left out');
+    expect(screen.getByRole('button', { name: /Images and PDFs/ }).textContent).toContain('0 of 1');
+    expect(screen.getByText('3 items · 1 file · 0 Bytes')).toBeTruthy();
+  });
+
   it('names nothing through aria-label or title, and shows no banner without a cover', () => {
     const { container } = render(<ExportCollectionDialog media={media} preview={preview({ publisher: 'other' })} onExport={vi.fn(async () => null)} onCancel={vi.fn()} />);
     expect(container.querySelectorAll('[aria-label], [title]')).toHaveLength(0);
@@ -270,7 +271,7 @@ describe('export options', () => {
     expect(hero()).toBeUndefined();
   });
 
-  it('shows tokens as cards the way they spawn, and opens a token\'s statblock after resting on it', async () => {
+  it('shows tokens as cards the way they spawn, and opens a token\'s statblock while Ctrl/Cmd is held over it, as the asset manager does', async () => {
     vi.useFakeTimers();
     const goblin = { ...token, thumbnailPath: 'atlas-vtt/assets/thumbnails/goblin.webp', showRing: false, statblockPath: 'Bestiary/Goblin.md' } as Asset;
     const orc = { ...token, id: 'orc', name: 'Orc', imagePath: 'atlas-vtt/assets/orc.webp' } as Asset;
@@ -286,12 +287,19 @@ describe('export options', () => {
     expect(cards[0]!.querySelector('.atlas-transfer-token__statblock')).toBeTruthy();
     expect(cards[1]!.querySelector('.atlas-transfer-token__statblock')).toBeNull();
 
-    fireEvent.pointerEnter(cards[0]!);
-    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
-    expect(document.querySelector('.statblock-hover-preview--over-modal')).toBeNull();
-    await act(async () => { await vi.advanceTimersByTimeAsync(400); });
+    const settle = async (): Promise<void> => { await act(async () => { await vi.advanceTimersByTimeAsync(500); }); };
+    fireEvent.mouseMove(cards[0]!);
+    await settle();
+    expect(document.querySelector('.atlas-statblock-preview-window')).toBeNull();
+
+    fireEvent.keyDown(window, { key: 'Control', ctrlKey: true });
+    await settle();
     expect(noteText).toHaveBeenCalledWith('Bestiary/Goblin.md');
-    expect(document.querySelector('.statblock-hover-preview--over-modal')).toBeTruthy();
+    expect(document.querySelector('.atlas-statblock-preview-window--over-modal')).toBeTruthy();
+
+    fireEvent.keyUp(window, { key: 'Control' });
+    await settle();
+    expect(document.querySelector('.atlas-statblock-preview-window')).toBeNull();
 
     fireEvent.click(within(cards[1] as HTMLElement).getByRole('checkbox'));
     expect(cards[1]!.getAttribute('data-state')).toBe('excluded');

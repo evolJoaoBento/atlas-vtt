@@ -1,5 +1,8 @@
 export type WallType = 'solid' | 'door' | 'secret-door';
 
+/** What a wall can stop: the sight of tokens, or light. */
+export type WallChannel = 'sight' | 'light';
+
 export interface WallSegment {
   id: string;
   kind: 'wall';
@@ -8,30 +11,21 @@ export interface WallSegment {
   p2: { x: number; y: number };
   direction?: 'left' | 'right' | undefined;   // Light pass-through side (undefined = blocks both sides)
   closed?: boolean;               // Doors/secret doors: true = blocks vision (default true)
+  /** A door the GM locked: it is closed and its badge does not open it until it is unlocked. A GM aid; light and sight read only `closed`. */
+  locked?: boolean;
+  /**
+   * The one thing the wall stops: a curtain stops sight and lets light through, glass that glows
+   * stops light and lets sight through. Unset, it stops both. A door keeps its kind.
+   */
+  blocks?: WallChannel | undefined;
+  /**
+   * A hedge, a low wall, a fence: sight and light pass the first limited wall on their way and
+   * stop at the second, so what stands at it or right behind it is seen, and nothing through
+   * two. A solid wall stops them as ever. With `blocks`, it is limited for that thing alone.
+   */
+  limited?: boolean | undefined;
   chainId?: string;               // Groups segments from same draw action
 }
 
 /** Input for creating a wall (without auto-generated id/kind) */
 export type WallInput = Omit<WallSegment, 'id' | 'kind'>;
-
-export type LightStyle = 'torch' | 'magic' | 'steady';
-
-export interface LightSource {
-  id: string;
-  kind: 'light';
-  x: number;
-  y: number;
-  innerRadius: number;   // Bright/full visibility radius (world pixels)
-  outerRadius?: number;  // Dim visibility radius (world pixels)
-  color?: string;        // Hex color string e.g. '#ff9933' (default warm orange)
-  lightStyle?: LightStyle; // Animation style (default 'torch')
-}
-
-/** Input for creating a light source (without auto-generated id/kind) */
-export type LightInput = Omit<LightSource, 'id' | 'kind'>;
-
-export interface VisionSettings {
-  enabled: boolean;
-  defaultInnerRadius: number;    // Default bright vision radius (world pixels)
-  defaultOuterRadius?: number | undefined;   // Optional dim vision radius (world pixels); undefined = no dim zone
-}

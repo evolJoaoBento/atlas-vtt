@@ -7,7 +7,8 @@ import { pathLengthInCells } from '../grid/gridDistance';
 import { formatDistance, resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
-import { createMeasureLabelText, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
+import { isHandled } from './utils/handledEvents';
+import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
 import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './measureGeometry';
 
 interface PersistentMeasurement {
@@ -170,8 +171,8 @@ export class MeasureRenderer {
       return;
     }
     
-    // Left click - measure tool
-    if (e.button === 0) {
+    // Left click - measure tool, unless a pin, door badge or light marker took the press
+    if (e.button === 0 && !isHandled(e)) {
       e.stopPropagation();
       
       const point = this.measurePoint(e);
@@ -285,7 +286,7 @@ export class MeasureRenderer {
   
   private drawCircle(color: number, radius: number): void {
     if (!this.startPoint) return;
-    this.drawCircleOnGraphics(this.measureGraphics, color, radius, this.startPoint);
+    drawMeasureCircle(this.measureGraphics, color, this.startPoint, radius);
   }
   
   private drawCone(color: number): void {
@@ -303,8 +304,12 @@ export class MeasureRenderer {
     return measureLabelAnchor(start, end, this.viewport.scale.x);
   }
 
+  private measurementSettings(): MeasurementSettings {
+    return this.measurementSettingsProvider?.() ?? resolveMeasurementSettings(undefined, this.store.getState().grid);
+  }
+
   private measurementLabel(start: { x: number; y: number }, end: { x: number; y: number }): string {
-    const settings = this.measurementSettingsProvider?.() ?? resolveMeasurementSettings(undefined, this.store.getState().grid);
+    const settings = this.measurementSettings();
     return formatDistance(pathLengthInCells(this.gridSystem.getOptions(), [start, end], settings.diagonalRule), settings);
   }
   
@@ -345,7 +350,7 @@ export class MeasureRenderer {
         break;
       case 'circle':
       case 'sphere':
-        this.drawCircleOnGraphics(persistGraphics, accentHex, distance, this.startPoint);
+        drawMeasureCircle(persistGraphics, accentHex, this.startPoint, distance);
         break;
       case 'cone':
         this.drawConeOnGraphics(persistGraphics, accentHex, this.startPoint, this.endPoint);
@@ -376,18 +381,10 @@ export class MeasureRenderer {
     drawMeasurePoint(graphics, color, end);
   }
   
-  private drawCircleOnGraphics(graphics: Graphics, color: number, radius: number, center: { x: number; y: number }): void {
-    graphics.circle(center.x, center.y, radius);
-    graphics.fill({ color, alpha: MEASURE_AREA.fillAlpha });
-    graphics.circle(center.x, center.y, radius);
-    graphics.stroke({ width: MEASURE_AREA.strokeWidth, color, alpha: MEASURE_AREA.strokeAlpha });
-    // Inner stroke for highlight
-    graphics.circle(center.x, center.y, radius - MEASURE_AREA.highlightInset);
-    graphics.stroke({ width: MEASURE_AREA.highlightWidth, color, alpha: 1 });
-  }
-
   private drawConeOnGraphics(graphics: Graphics, color: number, start: { x: number; y: number }, end: { x: number; y: number }): void {
-    const { radius, startAngle, endAngle, left, right } = coneGeometry(start, end);
+    // The collection's game system sets how wide the cone opens
+    const opening = this.measurementSettings().coneAngle * Math.PI / 180;
+    const { radius, startAngle, endAngle, left, right } = coneGeometry(start, end, opening);
     const outline = { width: MEASURE_AREA.strokeWidth, color, alpha: MEASURE_AREA.strokeAlpha };
 
     graphics.moveTo(start.x, start.y);

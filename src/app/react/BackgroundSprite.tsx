@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Texture, Sprite } from 'pixi.js';
 import { useAtlasUI } from './root/AtlasUIContext';
 import { useViewStoreHook } from './ViewStoreContext';
 import type { GridOptions } from '../grid/GridSystem';
 import { toGridOptions } from '../grid/gridStateOptions';
 import { backgroundTextureCache } from '../pixi/backgroundTextureCache';
-import { destroyTree } from '../pixi/utils/destroyTree';
 
 const FALLBACK_GRID_OPTIONS: GridOptions = {
   type: 'square',
@@ -36,7 +35,6 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
   // The texture and the cache URL it holds travel together: the URL is released only once the
   // sprite showing the texture is out of the viewport (an online map's texture is destroyed on release).
   const [loaded, setLoaded] = useState<LoadedBackground | null>(null);
-  const backgroundSpriteRef = useRef<Sprite | null>(null);
 
   useEffect(() => {
     if (!imagePath) return;
@@ -83,27 +81,6 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
       return;
     }
     
-    // --- Remove the previous background sprite if it exists ---
-    if (backgroundSpriteRef.current) {
-      const oldSprite = backgroundSpriteRef.current;
-      oldSprite.visible = false;
-      oldSprite.renderable = false;
-      
-      if (oldSprite.parent) {
-        oldSprite.parent.removeChild(oldSprite);
-      }
-      
-      // Destroy after render cycle
-      window.requestAnimationFrame(() => {
-        if (oldSprite && !oldSprite.destroyed) {
-          destroyTree(oldSprite);
-        }
-      });
-      
-      backgroundSpriteRef.current = null;
-    }
-    // --- End removal of previous sprite ---
-    
     // Create sprite using native PixiJS
     const sprite = new Sprite(texture);
     sprite.width = size.width;
@@ -114,12 +91,9 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
     
     // Add to viewport
     viewport.addChild(sprite);
-    backgroundSpriteRef.current = sprite; // Store reference to the new sprite
-    
-    // Let the renderer know about the background sprite and its URL
-    if (renderer.setBackgroundSprite) {
-      renderer.setBackgroundSprite(sprite);
-    }
+
+    // The renderer shows it as the map and destroys the sprite it replaces
+    renderer.setBackgroundSprite(sprite);
     
     // Initialize grid system if it doesn't exist (crucial for streamed maps)
     const gridSystem = renderer.getGridSystem();
@@ -142,35 +116,8 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
     // The grid system will now handle sprite readiness checking internally
     // No need to force recreation here as the grid system will wait for the sprite to be ready
     
-    // Cleanup function: Remove only this background sprite
-    return () => {
-      if (backgroundSpriteRef.current) {
-        const spriteToClean = backgroundSpriteRef.current;
-        spriteToClean.visible = false;
-        spriteToClean.renderable = false;
-        
-        if (spriteToClean.parent) {
-          try {
-            spriteToClean.parent.removeChild(spriteToClean);
-          } catch {
-            // Parent might be destroyed
-          }
-        }
-        
-        // Destroy after render cycle
-        window.requestAnimationFrame(() => {
-          if (spriteToClean && !spriteToClean.destroyed) {
-            try {
-              destroyTree(spriteToClean);
-            } catch {
-              // Ignore destruction errors
-            }
-          }
-        });
-        
-        backgroundSpriteRef.current = null;
-      }
-    };
+    // The renderer owns the sprite's removal, so the grid and the lighting learn that the map is gone
+    return () => renderer.removeBackgroundSprite(sprite);
   }, [loaded, renderer]);
 
   // Declared after the sprite effect, so a replaced texture is released after its sprite left the viewport.

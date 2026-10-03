@@ -1,5 +1,5 @@
 import type { ImageJob, ImageJobResult, ImageLayout, ThumbnailSpec } from './imageJob';
-import { fitWithin, frameImageRect, frameSize, type Size } from './imageLayout';
+import { fitWithin, frameImageRect, frameSize, scaleDown, type Size } from './imageLayout';
 
 /**
  * Runs inside an image worker: one decode per job, scaling on a 2D canvas,
@@ -96,6 +96,10 @@ function scaledCopy(source: Drawable, spec: ThumbnailSpec): OffscreenCanvas {
   return renderFit(source, fitWithin(source, spec.size, spec.size));
 }
 
+async function renderCopy(source: Drawable, spec: ThumbnailSpec | undefined): Promise<Blob | null> {
+  return spec ? encode(scaledCopy(source, spec), spec.quality) : null;
+}
+
 /**
  * The thumbnail and preview of `output`. A preview at least as large as the
  * thumbnail is its source, so a large map is reduced once rather than twice.
@@ -123,13 +127,15 @@ function render(bitmap: ImageBitmap, layout: ImageLayout): OffscreenCanvas {
 export async function renderImageJob(job: ImageJob): Promise<ImageJobResult> {
   const bitmap = await decode(job.source);
   try {
+    const sourcePreview = await renderCopy(bitmap, job.sourcePreview);
     if (job.source instanceof Blob && await keepsSource(job.layout, job.source, bitmap)) {
-      return { image: job.source, ...await renderCopies(bitmap, job) };
+      return { image: job.source, sourcePreview, ...await renderCopies(bitmap, job) };
     }
     const canvas = render(bitmap, job.layout);
+    const scaledDown = scaleDown(job.layout, bitmap, canvas);
     // The output no longer needs the decoded source; free it before the slow encode.
     bitmap.close();
-    return { image: await encode(canvas, job.quality), ...await renderCopies(canvas, job) };
+    return { image: await encode(canvas, job.quality), sourcePreview, ...await renderCopies(canvas, job), scaledDown };
   } finally {
     bitmap.close();
   }

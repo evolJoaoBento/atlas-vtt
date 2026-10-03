@@ -15,20 +15,22 @@ import { useOnlineSession } from "../../react/components/online/useOnlineState"
 import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
 import { Toggle } from "./primitives/Toggle"
 import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
+import { trayPoolByDie, type TrayPool } from "../../react/components/dice/diceTrayPool"
 import { traySelection } from "../../online/obsidian/onlineDice"
 import { DICE_LIMITS } from "../../online/tools/toolMessages"
-import { AMBIENT_AUDIO_ENABLED, WALLS_AND_LIGHTING_ENABLED } from "../../featureFlags"
+import { AMBIENT_AUDIO_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
+import { useExperimentalFeature } from "../../react/hooks/useExperimentalFeature"
 import { ResponsiveToolbar } from "./toolbar/ResponsiveToolbar"
 import { MoveToolGroup } from "./toolbar/MoveToolGroup"
 import { FogToolGroup } from "./toolbar/FogToolGroup"
 import { DrawToolGroup } from "./toolbar/DrawToolGroup"
 import { TextToolGroup } from "./toolbar/TextToolGroup"
 import { MeasureToolGroup } from "./toolbar/MeasureToolGroup"
-import { WallToolGroup } from "./toolbar/WallToolGroup"
+import { LightingToolGroup } from "./toolbar/LightingToolGroup"
 import { useToolbarHotkeys } from "./toolbar/useToolbarHotkeys"
 import {
-  drawToolFace, fogToolFace, measureToolFace, moveToolFace, textToolFace, wallToolFace,
+  drawToolFace, fogToolFace, measureToolFace, moveToolFace, textToolFace, lightingToolFace,
   type Tool, type ToolFace,
 } from "./toolbar/toolFaces"
 import type { ToolGroupControls } from "./toolbar/ToolGroup"
@@ -72,6 +74,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const isGMView = useAtlasStore(state => state.isGMView)
   const setGMView = useAtlasStore(state => state.setGMView)
   const hotkeyLabel = useHotkeyLabels()
+  const lightingOn = useExperimentalFeature('dynamicLighting')
 
   const isActualPlayerView = view?.getViewType?.() === 'atlas-vtt-player'
   // The online scene view: another Atlas's scene, with the player's tools only
@@ -194,10 +197,10 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
     ...(remote && !following
       ? onlineSceneToolbarItems({ priority: { follow: PRIORITY.follow, fit: PRIORITY.fit }, fitShortcut: hotkeyLabel('fitMap'), controls: view?.onlineControls() ?? null })
       : []),
-    ...(dm ? [toolButtonItem('pin', "note-pin", MapPin, "Note Pin Tool", hotkeyLabel('pin'))] : []),
-    ...(dm && WALLS_AND_LIGHTING_ENABLED
-      ? [toolGroupItem('wall', wallToolFace(activeTool), hotkeyLabel('wall'), <WallToolGroup {...groupControls('wall')} />)]
+    ...(dm && lightingOn
+      ? [toolGroupItem('wall', lightingToolFace(activeTool), hotkeyLabel('wall'), <LightingToolGroup {...groupControls('wall')} />)]
       : []),
+    ...(dm ? [toolButtonItem('pin', "note-pin", MapPin, "Note Pin Tool", hotkeyLabel('pin'))] : []),
     ...(dm && AMBIENT_AUDIO_ENABLED
       ? [toolButtonItem('audio', "audio", Volume2, "Ambient Sound", hotkeyLabel('audio'))]
       : []),
@@ -215,7 +218,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
               isOpen={isDiceTrayOpen}
               onToggle={toggleDiceTray}
               triggerRef={diceButtonRef}
-              {...(remote ? { onRoll: (selection: Readonly<Record<string, number>>) => { const dice = traySelection(selection); return dice !== null && (view?.onlineControls()?.rollDice(dice, 0) ?? false) }, maxDice: DICE_LIMITS.dicePerRoll, showToasts: false } : {})}
+              {...(remote ? { onRoll: (pool: TrayPool, modifier: number) => { const dice = traySelection(trayPoolByDie(pool)); return dice !== null && (view?.onlineControls()?.rollDice(dice, modifier) ?? false) }, maxDice: DICE_LIMITS.dicePerRoll } : {})}
             />
           )}
         </div>

@@ -1,105 +1,85 @@
 /**
- * VisionTab — Dynamic vision settings for a collection.
- *
- * Values are stored in game units (feet/meters/units) matching the grid
- * settings. The conversion to world pixels happens in collectVisionSources().
+ * VisionTab — What new tokens of a collection start with (sight range, vision cone, senses),
+ * and the senses its tokens can have. Vision itself stays off until switched on per token.
  */
 
-import React from 'react';
-import type { VisionSettings } from '../../../types/collectionSettingsTypes';
-
-const DEFAULT_VISION: VisionSettings = {
-  enabled: false,
-  defaultInnerRadius: 30,   // 30 game units (e.g. 30 ft — standard D&D darkvision)
-  defaultOuterRadius: 60,   // 60 game units
-};
+import React, { useState } from 'react';
+import { unitLabelFor } from '../../../grid/measurementFormat';
+import { hasVisionDefaults } from '../../../gameSystems/visionDefaults';
+import {
+  VISION_FIELDS,
+  visionDefaultsForm,
+  visionDefaultsFromForm,
+  visionFieldLabel,
+  type VisionDefaultsForm,
+} from '../../../lighting/tokenLighting';
+import { NumberOverrideField } from '../../../pixi/token-renderer/NumberOverrideField';
+import type { CollectionGridDefaults } from '../../../types/collectionSettingsTypes';
+import type { TokenVisionDefaults } from '../../../types/lightingTypes';
+import type { SenseDefinition } from '../../../types/senseTypes';
+import { SensesEditor } from '../senses/SensesEditor';
+import { SenseDefinitionList } from './SenseDefinitionList';
 
 interface VisionTabProps {
-  vision: VisionSettings | undefined;
-  onChange: (vision: VisionSettings) => void;
-  /** Grid unit label (e.g. "ft", "m", "") derived from grid settings */
-  unitLabel?: string;
+  gridDefaults: CollectionGridDefaults;
+  vision: TokenVisionDefaults | undefined;
+  onChange: (vision: TokenVisionDefaults | undefined) => void;
+  /** The senses of the collection: its own, else those of its game system. */
+  senses: readonly SenseDefinition[];
+  /** The whole list after the GM added, changed or deleted a sense of the collection's own. */
+  onSensesChange: (senses: readonly SenseDefinition[]) => void;
 }
 
-export function VisionTab({ vision, onChange, unitLabel = 'ft' }: VisionTabProps): React.ReactElement {
-  const settings = vision ?? DEFAULT_VISION;
+export function VisionTab({ gridDefaults, vision, onChange, senses, onSensesChange }: VisionTabProps): React.ReactElement {
+  const [form, setForm] = useState<VisionDefaultsForm>(() => visionDefaultsForm(vision, senses));
+  // The default this form shows; it differs from `vision` only when the draft changed it from outside, e.g. loaded after mount.
+  const [shown, setShown] = useState(vision);
+  const unit = unitLabelFor(gridDefaults.unitType);
 
-  const update = (partial: Partial<VisionSettings>): void => {
-    onChange({ ...settings, ...partial });
+  if (vision !== shown) {
+    setShown(vision);
+    setForm(visionDefaultsForm(vision, senses));
+  }
+
+  const update = (next: VisionDefaultsForm): void => {
+    const defaults = visionDefaultsFromForm(next);
+    const edited = hasVisionDefaults(defaults) ? defaults : undefined;
+    setForm(next);
+    setShown(edited);
+    onChange(edited);
   };
 
-  const unit = unitLabel ? ` (${unitLabel})` : '';
+  // New tokens cannot start with a sense the collection no longer has.
+  const dropDefault = (sense: SenseDefinition): void => {
+    if (form.senses.some((row) => row.id === sense.id)) update({ ...form, senses: form.senses.filter((row) => row.id !== sense.id) });
+  };
 
   return (
     <>
       <p className="atlas-csm-hint">
-        Enable dynamic vision to restrict what players can see based on token
-        sight lines and walls. Distances use the same units as your grid
-        settings{unitLabel ? ` (${unitLabel})` : ''}.
+        New tokens start with these values; vision itself stays off until you switch it on for a token.
       </p>
-
-      {/* Enable toggle */}
-      <div className="atlas-csm-toggle-row">
-        <div>
-          <div className="atlas-csm-toggle-label">Enable Dynamic Vision</div>
-          <div className="atlas-csm-hint">
-            Tokens will only reveal areas within their vision radius
-          </div>
-        </div>
-        <label className="atlas-csm-switch">
-          <input
-            type="checkbox"
-            checked={settings.enabled}
-            onChange={(e) => update({ enabled: e.target.checked })}
-          />
-          <span className="atlas-csm-switch-track" />
-        </label>
-      </div>
-
-      {/* Radius inputs — only shown when vision is enabled */}
-      {settings.enabled && (
-        <>
-          <div className="atlas-csm-field">
-            <label className="atlas-csm-label">Bright Vision Range{unit}</label>
-            <p className="atlas-csm-hint">
-              How far tokens can see clearly (default: 30{unitLabel ? ` ${unitLabel}` : ''})
-            </p>
-            <input
-              type="number"
-              className="atlas-csm-input atlas-csm-input--number"
-              min={1}
-              value={settings.defaultInnerRadius}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                if (!Number.isNaN(val)) update({ defaultInnerRadius: Math.max(1, val) });
-              }}
-            />
-          </div>
-
-          <div className="atlas-csm-field">
-            <label className="atlas-csm-label">Dim Vision Range{unit}</label>
-            <p className="atlas-csm-hint">
-              How far tokens can see dimly — leave blank to disable
-            </p>
-            <input
-              type="number"
-              className="atlas-csm-input atlas-csm-input--number"
-              min={1}
-              placeholder="—"
-              value={settings.defaultOuterRadius ?? ''}
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw === '') {
-                  update({ defaultOuterRadius: undefined });
-                } else {
-                  const val = Number(raw);
-                  if (!Number.isNaN(val)) update({ defaultOuterRadius: Math.max(1, val) });
-                }
-              }}
-            />
-          </div>
-        </>
-      )}
+      {VISION_FIELDS.map((field) => (
+        <NumberOverrideField
+          key={field.key}
+          label={visionFieldLabel(field, unit)}
+          value={form[field.key]}
+          onChange={(value) => update({ ...form, [field.key]: value })}
+          placeholder={field.placeholder}
+          resetLabel={field.resetLabel}
+          {...(field.hint && { hint: field.hint })}
+          {...(field.min !== undefined && { min: field.min })}
+          {...(field.max !== undefined && { max: field.max })}
+        />
+      ))}
+      <SensesEditor
+        senses={form.senses}
+        onChange={(rows) => update({ ...form, senses: rows ?? [] })}
+        definitions={senses}
+        unit={unit}
+        emptyText="New tokens start without senses."
+      />
+      <SenseDefinitionList senses={senses} unit={unit} onChange={onSensesChange} onDelete={dropDefault} />
     </>
   );
 }

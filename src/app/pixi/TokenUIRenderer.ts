@@ -1,25 +1,25 @@
 import type { AtlasSettings } from '../services/SettingsService';
-import { Container, Graphics, Text, TextStyle, Texture, type Ticker } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle, type Ticker } from 'pixi.js';
 import type { Character, BaseToken } from '../types';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
-import { colors, barDimensions, getHealthColor } from '../styles/designTokens';
+import { barDimensions } from '../styles/designTokens';
 import { TokenConditionsUI, type TokenConditionsLayout } from './token-renderer/TokenConditionsUI';
-import { tokenHp, tokenStress } from './token-renderer/tokenResources';
 import { isNameplateVisible } from './token-renderer/nameplateVisibility';
 import type { ConditionDefinition } from '../types/collectionSettingsTypes';
 import type { TokenGestureEventDetail } from '../types/atlasWindowEvents';
-import { AnimatedBarFill } from './token-renderer/AnimatedBarFill';
-import { ResourceBarLabel } from './ResourceBarLabel';
+import { ResourceStack, type ResourceSlot } from './token-renderer/resources/ResourceStack';
+import { ResourceWheels } from './token-renderer/resources/ResourceWheels';
+import { wheelAnchor } from './token-renderer/resources/wheelAnchor';
+import type { ResourceDefsProvider, ResourceViewer, VisibleResource } from '../resources/resourceTypes';
+import { isDefeated, isSpent } from '../resources/resourceValues';
+import { shapeOf, visibleResources } from '../resources/visibleResources';
 import { destroyTree } from './utils/destroyTree';
 import { computeTokenStrokeWidth, restingTokenUIScale, selectedTokenUIScale } from './token-renderer/tokenSizing';
 import { getTokenRingCenterRadius } from './token-renderer/tokenRingMetrics';
 import { ValueTransition } from './utils/ValueTransition';
 import { MOTION_SLOW_MS, prefersReducedMotion } from '../utils/motion';
-import {
-  BAR_BORDER, BAR_STYLE, barFillRect, barInnerRect, barTickXs, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect, tokenBarRects,
-  type UiRect,
-} from './token-renderer/tokenUiLayout';
+import { NAMEPLATE, NAMEPLATE_STYLE, nameplateRect } from './token-renderer/tokenUiLayout';
 
 /**
  * Text is drawn at scale 0.333 and the viewport zooms to at most 5x, so a
@@ -30,24 +30,34 @@ import {
 const TEXT_RESOLUTION = 3;
 const MAX_TEXT_RESOLUTION = 12;
 
+/**
+ * Every token's UI lies in one layer. A selected token's lies above the others,
+ * so a neighbour never covers the bars and wheels being edited.
+ */
+const RESTING_Z_INDEX = 10;
+const SELECTED_Z_INDEX = 11;
+
 function textResolutionFor(uiScale: number): number {
   return Math.min(TEXT_RESOLUTION * Math.max(1, uiScale), MAX_TEXT_RESOLUTION);
 }
 
 export class TokenUIRenderer {
-  private barTextureCache: Map<string, Texture> = new Map();
-
   private container: Container;
+  /** `update` found a bar, nameplate or condition to show. */
+  private hasContent = true;
+  private hiddenWithToken = false;
   /** Bars and nameplate, anchored at the token's bottom edge and scaled with the token. */
   private belowToken: Container;
   /** Eases the UI between its resting scale (0) and a selected token's on-screen size (1). */
   private emphasis: ValueTransition;
-  private hpBar: Graphics;
-  private hpFill: AnimatedBarFill;
-  private hpText: ResourceBarLabel;
-  private stressBar: Graphics;
-  private stressFill: AnimatedBarFill;
-  private stressText: ResourceBarLabel;
+  /** The resources of the bar slots, one view per resource. */
+  private resources: ResourceStack;
+  /** Anchor past the right resize button on the token's bottom edge (`wheelAnchor`), scaled like `belowToken`; holds the wheels of the right side. */
+  private besideToken: Container;
+  /** The mirror of `besideToken` past the left resize button; holds the wheels of the left side. */
+  private leftOfToken: Container;
+  /** The resources of the wheel slots, shown on hover and selection. */
+  private wheels = new ResourceWheels();
   private difficultyBadge: Container;
   private difficultyText: Text;
   private defeatedOverlay: Graphics;
@@ -82,6 +92,8 @@ export class TokenUIRenderer {
   /** Condition badges on the token's ring and the card naming them on hover. */
   private conditionUI = new TokenConditionsUI();
   public conditionDefsProvider: (() => ConditionDefinition[]) | null = null;
+  /** The resources of the map's collection, in the order they show. */
+  public resourceDefsProvider: ResourceDefsProvider = () => [];
   /** Viewport zoom, for the constant on-screen size of a selected token's UI; none in the player view. */
   public zoomProvider: (() => number) | null = null;
   /** Receives every new UI scale, so the +/- controls can match the bars. */
@@ -95,32 +107,20 @@ export class TokenUIRenderer {
     // The container sits at the token centre in world units; the UI itself lives in
     // anchors on the token's edges, laid out in UI units and scaled with the token.
     this.container = new Container();
-    this.container.zIndex = 10; // UI is above token and ring
+    this.container.zIndex = RESTING_Z_INDEX;
     this.belowToken = new Container();
     this.belowToken.sortableChildren = true;
-    // Conditions come last, so the hover card covers the bars of a neighbouring selected token
-    this.container.addChild(this.belowToken, this.conditionUI.container);
+    this.besideToken = new Container();
+    this.besideToken.addChild(this.wheels.right);
+    this.leftOfToken = new Container();
+    this.leftOfToken.addChild(this.wheels.left);
+    // Conditions come last, so the hover card lies above this token's own bars and wheels
+    this.container.addChild(this.belowToken, this.besideToken, this.leftOfToken, this.conditionUI.container);
     this.emphasis = new ValueTransition(0, MOTION_SLOW_MS, () => this.layoutUIScale());
     
-    // Create HP bar
-    this.hpBar = new Graphics();
-    this.hpBar.zIndex = 10; // HP bar above status badges
-    this.hpFill = new AnimatedBarFill((fraction) => getHealthColor(fraction * 100), ticker);
-    this.hpFill.view.zIndex = 11; // HP fill above bar background
-    this.hpText = new ResourceBarLabel();
-    this.hpText.zIndex = 12; // Text on top of HP bar
-    this.hpText.alpha = 0; // Start with text hidden
-    
-    // Create stress bar
-    this.stressBar = new Graphics();
-    this.stressBar.zIndex = 10; // Stress bar above status badges
-    this.stressFill = new AnimatedBarFill(() => colors.stress.fill, ticker);
-    this.stressFill.view.zIndex = 11; // Stress fill above bar background
-    this.stressText = new ResourceBarLabel();
-    this.stressText.zIndex = 12; // Text on top of stress bar
-    this.stressText.alpha = 0; // Start with text hidden
-    // Event mode not set - let events propagate naturally
-    
+    this.resources = new ResourceStack(ticker);
+    this.resources.view.zIndex = 10; // Above the nameplate, below the defeated overlay
+
     // Create difficulty badge
     this.difficultyBadge = new Container();
     this.difficultyBadge.zIndex = 5; // Not used anymore but keeping for compatibility
@@ -177,12 +177,7 @@ export class TokenUIRenderer {
     this.belowToken.addChild(this.nameBadge); // z: 1 - name badge at bottom
     this.belowToken.addChild(this.nameText); // z: 2 - name text
     this.belowToken.addChild(this.editCursor); // z: 3 - edit cursor
-    this.belowToken.addChild(this.hpBar); // z: 10
-    this.belowToken.addChild(this.hpFill.view); // z: 11
-    this.belowToken.addChild(this.hpText); // z: 12
-    this.belowToken.addChild(this.stressBar); // z: 10
-    this.belowToken.addChild(this.stressFill.view); // z: 11
-    this.belowToken.addChild(this.stressText); // z: 12
+    this.belowToken.addChild(this.resources.view); // z: 10
     this.belowToken.addChild(this.difficultyBadge); // z: 20
     this.belowToken.addChild(this.difficultyText); // z: 21
     this.belowToken.addChild(this.defeatedOverlay); // z: 30 - on top
@@ -218,13 +213,9 @@ export class TokenUIRenderer {
     if (this.currentToken && resizingTokenIds.includes(this.currentToken.id)) {
       this.isHiddenDuringResize = true;
       
-      // Hide HP/stress bars and status badges during resize
-      this.hpBar.visible = false;
-      this.hpFill.view.visible = false;
-      this.hpText.visible = false;
-      this.stressBar.visible = false;
-      this.stressFill.view.visible = false;
-      this.stressText.visible = false;
+      // Hide resources and status badges during resize
+      this.resources.view.visible = false;
+      this.setWheelsVisible(false);
       this.nameBadge.visible = false;
       this.nameText.visible = false;
       this.conditionUI.setHidden(true);
@@ -259,13 +250,9 @@ export class TokenUIRenderer {
     if (this.currentToken && rotatingTokenIds.includes(this.currentToken.id)) {
       this.isHiddenDuringRotation = true;
       
-      // Hide HP/stress bars and status badges during rotation
-      this.hpBar.visible = false;
-      this.hpFill.view.visible = false;
-      this.hpText.visible = false;
-      this.stressBar.visible = false;
-      this.stressFill.view.visible = false;
-      this.stressText.visible = false;
+      // Hide resources and status badges during rotation
+      this.resources.view.visible = false;
+      this.setWheelsVisible(false);
       this.defeatedOverlay.visible = false;
       this.nameBadge.visible = false;
       this.nameText.visible = false;
@@ -319,37 +306,36 @@ export class TokenUIRenderer {
   
   
   /** Redraws the UI for `token`, whose sprite is `spriteWidth` world pixels wide. */
-  public update(token: BaseToken & Partial<Character>, spriteWidth: number, playerSettings?: Pick<AtlasSettings['localPlayerView'], 'showTokenHP' | 'showTokenStress' | 'showTokenNameplates'>): void {
-    // Get token settings from store
-    const tokenSettings = playerSettings ? {
-      showHPBars: playerSettings.showTokenHP,
-      showStressBars: playerSettings.showTokenStress,
-      showNameplates: playerSettings.showTokenNameplates,
-    } : this.store?.getState().tokenSettings || {
-      showNameplates: false,
-      showHPBars: true,
-      showStressBars: true,
-      tokenRingSize: 1
-    };
-    
-    // Quick change detection without JSON stringify
-    const hpString = token.hp === undefined ? 'no-hp' : (typeof token.hp === 'object' ? `${token.hp.current}/${token.hp.max}` : String(token.hp));
-    const stressString = token.stress === undefined ? 'no-stress' : (typeof token.stress === 'object' ? `${token.stress.current}/${token.stress.max}` : `${token.stress}/${token.maxStress ?? 10}`);
-    const showNameplate = playerSettings ? playerSettings.showTokenNameplates : isNameplateVisible(token, tokenSettings.showNameplates);
+  public update(token: BaseToken & Partial<Character>, spriteWidth: number, playerSettings?: Pick<AtlasSettings['localPlayerView'], 'showTokenNameplates'>): void {
+    const tokenSettings = this.store?.getState().tokenSettings;
+    // Players see the resources their definitions allow, whatever the DM hides on this map.
+    const viewer: ResourceViewer = playerSettings ? 'player' : 'dm';
+    const definitions = this.resourceDefsProvider();
+    // The map's own switches hide resources from the GM; the player view never reads them
+    const hidden = playerSettings ? [] : tokenSettings?.hiddenResources ?? [];
+    const shown = visibleResources(token, definitions, viewer).filter(({ definition }) => !hidden.includes(definition.key));
+
+    const bars = shown.filter(({ slot }) => shapeOf(slot) === 'bar');
+    // Wheels answer the game master's hover and selection; the player view has neither
+    const wheels = playerSettings ? [] : shown.filter(({ slot }) => shapeOf(slot) === 'wheel');
+
+    const resourcesKey = shown.map(({ definition, value, slot }) =>
+      `${definition.key}:${slot}:${definition.name}:${definition.color}:${value.current}/${value.max}`).join('|');
+    const showNameplate = playerSettings ? playerSettings.showTokenNameplates : isNameplateVisible(token, tokenSettings?.showNameplates ?? false);
     const conditionsKey = `${token.conditions?.join(',') ?? ''}${JSON.stringify(token.conditionValues ?? {})}`;
-    const updateKey = `${hpString}_${stressString}_${spriteWidth}_${this.isHovered}_${this.isSelected}_${token.name || ''}_${showNameplate}_${token.statblockName || ''}_${tokenSettings.showHPBars}_${tokenSettings.showStressBars}_${conditionsKey}`;
-    
+    const defeated = isDefeated(token, definitions);
+    // The ring's size setting moves the resize buttons, and with them the wheels
+    const ringScale = tokenSettings?.tokenRingSize ?? 1;
+    const updateKey = `${resourcesKey}_${defeated}_${spriteWidth}_${ringScale}_${this.isHovered}_${this.isSelected}_${token.name || ''}_${showNameplate}_${token.statblockName || ''}_${conditionsKey}`;
+
     // Skip update if nothing has changed
     if (this.lastUpdateData === updateKey) {
       return;
     }
-    
+
     this.lastUpdateData = updateKey;
-    
-    
+
     // Clear previous graphics
-    this.hpBar.clear();
-    this.stressBar.clear();
     this.difficultyBadge.removeChildren();
     this.defeatedOverlay.clear();
     this.nameBadge.clear();
@@ -357,10 +343,7 @@ export class TokenUIRenderer {
     
     // Check if we have any data to display
     const hasStatblock = !!token.statblockPath;
-    const hpValue = tokenSettings.showHPBars ? tokenHp(token) : null;
-    const stressResource = tokenSettings.showStressBars ? tokenStress(token) : null;
-    const hasHP = hpValue !== null;
-    const hasStress = stressResource !== null;
+    const hasResources = bars.length > 0 || wheels.length > 0;
     // showNameplate is already calculated above for change detection
 
     const hasConditions = (token.conditions?.length ?? 0) > 0;
@@ -371,39 +354,27 @@ export class TokenUIRenderer {
 
     // Anchor the UI on the token's edges; everything below is laid out from there in UI units
     this.belowToken.position.set(0, spriteWidth / 2);
+    const anchor = this.wheelAnchor();
+    this.besideToken.position.set(anchor.x, anchor.y);
+    this.leftOfToken.position.set(-anchor.x, anchor.y);
     this.layoutUIScale();
     this.refreshConditions();
     this.conditionUI.setHidden(this.isHiddenDuringResize || this.isHiddenDuringRotation);
 
-    if (!hasHP && !hasStress && !showNameplate && !hasConditions) {
-      this.container.visible = false;
-      return;
-    }
-    
-    this.container.visible = true;
+    // Before the early return: the controls lay out from the stack's slots, which must empty with it
+    const baseGap = 2; // Gap between token and first bar
+    this.resources.update(bars, baseGap, this.canAnimateValues());
+    this.wheels.update(wheels);
 
-    // Bars below the token, laid out in UI units by the layout the online player view shares
-    const bars = tokenBarRects(hpValue !== null, stressResource !== null);
+    this.hasContent = hasResources || showNameplate || hasConditions;
+    this.container.visible = this.hasContent && !this.hiddenWithToken;
+    if (!this.hasContent) return;
 
-    if (hpValue && bars.hp) {
-      const hpPercentage = Math.max(0, Math.min(100, (hpValue.current / hpValue.max) * 100));
-      this.drawBarFrame(this.hpBar, bars.hp);
-      this.hpFill.set(hpPercentage / 100, barFillRect(barInnerRect(bars.hp)), this.canAnimateValues());
-      this.hpText.setValue(hpValue);
-      this.hpText.position.set(0, bars.hp.y + bars.hp.height / 2);
-      // Defeated overlay - just darken the HP bar, no X icon
-      if (hpValue.current <= 0) {
-        this.defeatedOverlay.roundRect(bars.hp.x, bars.hp.y, bars.hp.width, bars.hp.height, barDimensions.token.radius)
-          .fill({ color: 0x000000, alpha: BAR_STYLE.defeatedAlpha });
-      }
-    }
-
-    if (stressResource && bars.stress) {
-      const stressPercentage = Math.max(0, Math.min(100, (stressResource.current / stressResource.max) * 100));
-      this.drawBarFrame(this.stressBar, bars.stress);
-      this.stressFill.set(stressPercentage / 100, barFillRect(barInnerRect(bars.stress)), this.canAnimateValues());
-      this.stressText.setValue({ current: stressResource.current, max: stressResource.max });
-      this.stressText.position.set(0, bars.stress.y + bars.stress.height / 2);
+    // A defeated token's first defeating bar is darkened
+    const defeatedSlot = defeated ? this.defeatedSlot(shown) : undefined;
+    if (defeatedSlot) {
+      this.defeatedOverlay.roundRect(defeatedSlot.left, defeatedSlot.top, defeatedSlot.width, defeatedSlot.height, barDimensions.token.radius)
+        .fill({ color: 0x000000, alpha: 0.4 });
     }
 
     // Name badge - only show if showNameplate is true AND there's a meaningful name
@@ -442,41 +413,43 @@ export class TokenUIRenderer {
 
     // Hide unused elements (but respect resize and rotation hidden state)
     const isHidden = this.isHiddenDuringResize || this.isHiddenDuringRotation;
-    this.hpBar.visible = hasHP && !isHidden;
-    this.hpFill.view.visible = hasHP && !isHidden;
-    this.hpText.visible = hasHP && !isHidden;
-    this.stressBar.visible = hasStress && !isHidden;
-    this.stressFill.view.visible = hasStress && !isHidden;
-    this.stressText.visible = hasStress && !isHidden;
+    this.resources.view.visible = bars.length > 0 && !isHidden;
+    this.setWheelsVisible(!isHidden);
     this.difficultyBadge.visible = false; // Never show difficulty badge
-    // Check if token is defeated (matches TokenRenderer logic)
-    const hp = token.hp;
-    const isDefeated = hasHP && hp !== undefined && (
-      (typeof hp === 'object' && hp.current <= 0) ||
-      (typeof hp === 'number' && hp <= 0)
-    );
-    this.defeatedOverlay.visible = isDefeated && !isHidden;
+    this.defeatedOverlay.visible = defeatedSlot !== undefined && !isHidden;
     const hasDisplayName = showNameplate && !!displayName;
     this.nameBadge.visible = hasDisplayName && !isHidden; // Only show if enabled, has name, and not hidden
     this.nameText.visible = hasDisplayName && !isHidden; // Only show if enabled, has name, and not hidden
   }
   
-  private canAnimateValues(): boolean {
-    return !prefersReducedMotion(document.body);
+  /** The bar of the first shown resource whose spending defeated the token. */
+  private defeatedSlot(shown: readonly VisibleResource[]): ResourceSlot | undefined {
+    const key = shown.find(({ definition, value, slot }) => definition.defeatedWhenSpent && shapeOf(slot) === 'bar'
+      && isSpent(definition, value))?.definition.key;
+    return key === undefined ? undefined : this.resources.layout().find((slot) => slot.key === key);
   }
 
-  /** A bar's thin grey outline, its dark inside and a tick mark every tenth. */
-  private drawBarFrame(graphics: Graphics, bar: UiRect): void {
-    graphics.roundRect(bar.x, bar.y, bar.width, bar.height, bar.height / 2)
-      .stroke({ width: BAR_BORDER, color: BAR_STYLE.border, alpha: 1 });
-    const inner = barInnerRect(bar);
-    graphics.roundRect(inner.x, inner.y, inner.width, inner.height, inner.height / 2)
-      .fill({ color: BAR_STYLE.inside, alpha: 1 });
-    for (const tickX of barTickXs(inner)) {
-      graphics.moveTo(tickX, inner.y + 1);
-      graphics.lineTo(tickX, inner.y + inner.height - 1);
-      graphics.stroke({ width: BAR_STYLE.tickWidth, color: BAR_STYLE.tick, alpha: BAR_STYLE.tickAlpha });
-    }
+  /** Where each shown resource sits: bars in units of the bottom-edge anchor, wheels in units of their side's anchor. */
+  public getResourceSlots(): readonly ResourceSlot[] {
+    return [
+      ...(this.resources.view.visible ? this.resources.layout() : []),
+      ...(this.besideToken.visible ? this.wheels.layout() : []),
+    ];
+  }
+
+  /**
+   * How far this token's bars reach below it while it is selected, in world units; the
+   * selection frame encloses them. The wheels stand outside the frame. Taken at the selected
+   * size itself, not at the size the UI is still growing from, so the frame drawn when the
+   * selection changes fits.
+   */
+  public getBarsReach(): number {
+    const bars = this.resources.view.visible ? this.resources.layout() : [];
+    return Math.max(0, ...bars.map((slot) => slot.top + slot.height)) * this.selectedScale();
+  }
+
+  private canAnimateValues(): boolean {
+    return !prefersReducedMotion(document.body);
   }
 
   public getContainer(): Container {
@@ -507,13 +480,35 @@ export class TokenUIRenderer {
    * selection; the hover card keeps a constant screen size, like a tooltip.
    */
   private conditionsLayout(): TokenConditionsLayout {
-    const state = this.store?.getState();
-    const gridSize = state?.grid?.size ?? 70;
-    const ringScale = state?.tokenSettings?.tokenRingSize ?? 1;
-    const ringRadius = getTokenRingCenterRadius(this.currentTokenSize * ringScale, computeTokenStrokeWidth(gridSize), ringScale);
-    const badgeScale = restingTokenUIScale(gridSize);
+    const badgeScale = restingTokenUIScale(this.store?.getState().grid?.size ?? 70);
     const zoom = this.zoomProvider?.();
-    return { ringRadius, badgeScale, cardScale: zoom ? 1 / zoom : badgeScale };
+    return { ringRadius: this.ringRadius(), badgeScale, cardScale: zoom ? 1 / zoom : badgeScale };
+  }
+
+  /** Radius of the middle of the token's ring, in world units. */
+  private ringRadius(): number {
+    const state = this.store?.getState();
+    const ringScale = state?.tokenSettings?.tokenRingSize ?? 1;
+    return getTokenRingCenterRadius(this.currentTokenSize * ringScale, computeTokenStrokeWidth(state?.grid?.size ?? 70), ringScale);
+  }
+
+  private wheelAnchor(): { x: number; y: number } {
+    const state = this.store?.getState();
+    return wheelAnchor(this.currentTokenSize, state?.grid?.size ?? 70, state?.tokenSettings?.tokenRingSize ?? 1);
+  }
+
+  /**
+   * The canvas leaves the token out (hidden, or unseen by the players in session view): its UI
+   * stays hidden through every `update`, until the token shows again.
+   */
+  public setHiddenWithToken(hidden: boolean): void {
+    this.hiddenWithToken = hidden;
+    this.container.visible = this.hasContent && !hidden;
+  }
+
+  /** Whether the UI has something to show: what the GM's view shows of it. */
+  public get showsContent(): boolean {
+    return this.hasContent;
   }
 
   /** Marks the pointer as down on this token; a held or dragged token keeps its UI at rest. */
@@ -532,16 +527,23 @@ export class TokenUIRenderer {
     else this.emphasis.animateTo(target);
   }
 
+  /** The scale of a selected token's UI: its constant size on screen, never below the resting size. */
+  private selectedScale(): number {
+    const resting = restingTokenUIScale(this.store?.getState().grid?.size ?? 70);
+    const zoom = this.zoomProvider?.();
+    return zoom ? selectedTokenUIScale(resting, zoom) : resting;
+  }
+
   /**
    * Scales both anchors between `restingTokenUIScale` and `selectedTokenUIScale` by the
    * current emphasis. The selected size follows the zoom, so it is recomputed on every call.
    */
   private layoutUIScale(): void {
     const resting = restingTokenUIScale(this.store?.getState().grid?.size ?? 70);
-    const zoom = this.zoomProvider?.();
-    const selected = zoom ? selectedTokenUIScale(resting, zoom) : resting;
-    const scale = resting + (selected - resting) * this.emphasis.value;
+    const scale = resting + (this.selectedScale() - resting) * this.emphasis.value;
     this.belowToken.scale.set(scale);
+    this.besideToken.scale.set(scale);
+    this.leftOfToken.scale.set(scale);
     // A selected token's text keeps a constant screen size, which the resting resolution covers
     this.setTextResolution(textResolutionFor(resting));
     this.onScaleChange?.(scale);
@@ -550,8 +552,8 @@ export class TokenUIRenderer {
   /** Re-rasterises the nameplate and bar numbers only when their resolution changes. */
   private setTextResolution(resolution: number): void {
     if (this.nameText.resolution !== resolution) this.nameText.resolution = resolution;
-    this.hpText.setResolution(resolution);
-    this.stressText.setResolution(resolution);
+    this.resources.setResolution(resolution);
+    this.wheels.setResolution(resolution);
   }
   
   public setVisibility(visible: boolean): void {
@@ -573,11 +575,24 @@ export class TokenUIRenderer {
   public setSelectionState(selected: boolean): void {
     if (this.isSelected === selected) return;
     this.isSelected = selected;
+    this.container.zIndex = selected ? SELECTED_Z_INDEX : RESTING_Z_INDEX;
     this.updateEmphasis();
     this.updateConditionCard();
     this.updateTextVisibility();
   }
   
+  /** Shows or hides the wheels of both sides, e.g. during a resize. */
+  private setWheelsVisible(visible: boolean): void {
+    this.besideToken.visible = visible;
+    this.leftOfToken.visible = visible;
+  }
+
+  /** Bar numbers and wheels show together, on hover and selection. */
+  private setRevealAlpha(alpha: number): void {
+    this.resources.setTextAlpha(alpha);
+    this.wheels.setAlpha(alpha);
+  }
+
   private updateTextVisibility(): void {
     const shouldShowText = this.isHovered || this.isSelected;
     const targetAlpha = shouldShowText ? 1 : 0;
@@ -590,21 +605,19 @@ export class TokenUIRenderer {
     
     // Animate the text alpha
     const animate = () => {
-      const currentAlpha = this.hpText.alpha;
+      const currentAlpha = this.resources.getTextAlpha();
       const diff = targetAlpha - currentAlpha;
       
       // If we're close enough, just set the final value
       if (Math.abs(diff) < 0.05) {
-        this.hpText.alpha = targetAlpha;
-        this.stressText.alpha = targetAlpha;
+        this.setRevealAlpha(targetAlpha);
         this.fadeAnimation = null;
         return;
       }
       
       // Smooth animation with easing
       const step = diff * 0.15; // Adjust this value to control animation speed
-      this.hpText.alpha = currentAlpha + step;
-      this.stressText.alpha = currentAlpha + step;
+      this.setRevealAlpha(currentAlpha + step);
       
       // Continue animation
       this.fadeAnimation = window.requestAnimationFrame(animate);
@@ -623,8 +636,8 @@ export class TokenUIRenderer {
     // End any active editing
     this.endNameEdit();
     this.emphasis.cancel();
-    this.hpFill.destroy();
-    this.stressFill.destroy();
+    this.resources.destroy();
+    this.wheels.destroy();
     
     // Cancel any pending animation
     if (this.fadeAnimation !== null) {
@@ -653,13 +666,6 @@ export class TokenUIRenderer {
     // Clear references
     this.currentToken = null;
     this.currentTokenSize = 0;
-
-    for (const texture of this.barTextureCache.values()) {
-      if (texture && !texture.destroyed) {
-        texture.destroy(true);
-      }
-    }
-    this.barTextureCache.clear();
 
     // Destroy container and children
     destroyTree(this.container);

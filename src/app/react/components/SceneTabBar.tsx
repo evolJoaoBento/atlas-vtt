@@ -120,10 +120,7 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
                   }
                 }}
               >
-                <LabelTooltip side="bottom" label={tab.filePath}>
-                  <span className="atlas-scene-tab__name">{tab.displayName}</span>
-                </LabelTooltip>
-                {tab.isDirty && <span className="atlas-scene-tab__dirty" />}
+                {/* Show and close sit at opposite ends, so one is never clicked for the other */}
                 <TabActionButton
                   icon={isPresented && hosting ? EyeOff : Eye}
                   label={presentLabel(tab, isPresented)}
@@ -132,6 +129,10 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
                   onClick={() => (isPresented && hosting ? stopPresenting() : onPresentTab(tab.id))}
                   onContextMenu={onPresentTabMenu && ((position) => onPresentTabMenu(tab.id, position))}
                 />
+                <LabelTooltip side="bottom" label={tab.filePath}>
+                  <span className="atlas-scene-tab__name">{tab.displayName}</span>
+                </LabelTooltip>
+                {tab.isDirty && <span className="atlas-scene-tab__dirty" />}
                 <TabActionButton icon={X} label={`Close ${tab.displayName}`} onClick={() => onCloseTab(tab.id)} />
               </div>
             );

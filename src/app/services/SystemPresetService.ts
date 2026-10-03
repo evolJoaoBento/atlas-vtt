@@ -37,7 +37,15 @@ export class SystemPresetService {
   }
 
   update(id: string, rules: SystemRules): void {
-    this.modify(id, (stored) => ({ ...stored, rules: { ...asRecord(stored.rules), ...structuredClone(rules) } }));
+    this.modify(id, (stored) => {
+      const merged = { ...asRecord(stored.rules), ...structuredClone(rules) };
+      // The rules hold no default vision, senses, light presets or initiative rules when the system sets none, so stored ones must not survive.
+      if (!rules.defaultTokenVision) delete merged.defaultTokenVision;
+      if (!rules.senses) delete merged.senses;
+      if (!rules.lightPresets) delete merged.lightPresets;
+      if (!rules.initiative) delete merged.initiative;
+      return { ...stored, rules: merged };
+    });
   }
 
   rename(id: string, name: string): void {

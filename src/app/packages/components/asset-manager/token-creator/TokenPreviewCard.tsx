@@ -2,11 +2,12 @@ import { TokenRingToggle } from './TokenRingToggle';
 import { TokenSizeSelect } from './TokenSizeSelect';
 import tokenRingImageUrl from '../../../../assets/token-ring.webp';
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Check, Loader2, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Check, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '../../../../../utils/cn';
 import { Button } from '../../primitives/button';
 import { Slider } from '../../primitives/slider';
 import { LabelTooltip } from '../../primitives/tooltip';
+import { Skeleton } from '../../primitives/Skeleton';
 import { clampImagePosition, cropReset } from './cropMath';
 import type { ImageAspect } from './cropMath';
 import { clampZoom, ZOOM_MAX, ZOOM_MIN, ZOOM_STEP } from './types';
@@ -15,10 +16,12 @@ import type { CreatorMode, ImagePosition, TokenPreview, TokenPreviewPatch } from
 interface TokenPreviewCardProps {
   preview: TokenPreview;
   mode: CreatorMode;
-  index: number;
-  onChange: (patch: TokenPreviewPatch) => void;
-  onToggleSelected: () => void;
-  onRemove: () => void;
+  /** The card's place in the stagger of cards entering together, or null to show it without the enter animation. */
+  enterIndex?: number | null;
+  /** Stable callbacks that take the preview's id, so an unchanged card never renders again. */
+  onChange: (id: string, patch: TokenPreviewPatch) => void;
+  onToggleSelected: (id: string) => void;
+  onRemove: (id: string) => void;
 }
 
 const WHEEL_ZOOM_SENSITIVITY = 0.0025;
@@ -54,13 +57,44 @@ function useWellSize(element: HTMLDivElement | null): number {
   return size;
 }
 
+function pixels(size: { width: number; height: number }): string {
+  return `${size.width} × ${size.height}`;
+}
+
+/**
+ * What the conversion did to the upload. A map that lost pixels says so with
+ * its new size, since small labels may no longer be readable; token art always
+ * shrinks to token size, so there the saved file size is the news.
+ */
+function ConversionBadge({ preview, mode }: Pick<TokenPreviewCardProps, 'preview' | 'mode'>): React.JSX.Element | null {
+  const { scaledDown, compressionRatio } = preview;
+  if (mode === 'map' && scaledDown) {
+    return (
+      <LabelTooltip label={`Scaled down from ${pixels(scaledDown.from)} px to the largest size a map can have`}>
+        <div className="atlas-token-card__badge atlas-token-card__badge--scaled">{pixels(scaledDown.to)} px</div>
+      </LabelTooltip>
+    );
+  }
+  if (compressionRatio === undefined || compressionRatio <= 0) return null;
+  return (
+    <LabelTooltip label="Size reduction from optimization">
+      <div className="atlas-token-card__badge">−{compressionRatio}%</div>
+    </LabelTooltip>
+  );
+}
+
 /**
  * One preview in the grid. Tokens get a crop editor (drag to reposition, wheel
  * or slider to zoom, double-click to reset) with the image beyond the circle
  * dimmed rather than hidden; maps show whole. Positions are fractions of the
- * well so the export can reproduce the preview exactly.
+ * well so the export can reproduce the preview exactly. Memoized: a large
+ * import changes a few cards at a time, and rendering every card for each
+ * change made thousands of previews crawl.
  */
-export function TokenPreviewCard({ preview, mode, index, onChange, onToggleSelected, onRemove }: TokenPreviewCardProps): React.JSX.Element {
+export const TokenPreviewCard = React.memo(function TokenPreviewCard({ preview, mode, enterIndex = 0, onChange: onChangePreview, onToggleSelected, onRemove }: TokenPreviewCardProps): React.JSX.Element {
+  const onChange = (patch: TokenPreviewPatch): void => onChangePreview(preview.id, patch);
+  // Decided once, at mount: switching it later would cut the enter animation short
+  const [entrance] = useState(enterIndex);
   const nameLabelId = useId();
   const [artElement, setArtElement] = useState<HTMLDivElement | null>(null);
   const previewRef = useRef(preview);
@@ -147,6 +181,8 @@ export function TokenPreviewCard({ preview, mode, index, onChange, onToggleSelec
         style={imageStyle}
         onPointerDown={isCropEditable ? handlePointerDown : undefined}
       />
+      {/* The card never shows the upload itself: its place is held until the converted image is there. */}
+      {preview.isOptimizing && <Skeleton className="atlas-token-card__pending" live />}
       {isCropEditable && <><div className="atlas-token-card__mask" /><img className="atlas-token-card__ring" src={tokenRingImageUrl} alt="" /></>}
 
       <LabelTooltip label={`Select ${preview.name}`}>
@@ -155,7 +191,7 @@ export function TokenPreviewCard({ preview, mode, index, onChange, onToggleSelec
           className={cn('atlas-token-card__check', preview.isSelected && 'atlas-checked')}
           role="checkbox"
           aria-checked={preview.isSelected}
-          onClick={(e) => { e.stopPropagation(); onToggleSelected(); }}
+          onClick={(e) => { e.stopPropagation(); onToggleSelected(preview.id); }}
         >
           <Check />
         </button>
@@ -165,32 +201,20 @@ export function TokenPreviewCard({ preview, mode, index, onChange, onToggleSelec
           variant="ghost"
           size="icon"
           className="atlas-token-card__remove"
-          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          onClick={(e) => { e.stopPropagation(); onRemove(preview.id); }}
         >
           <Trash2 />
         </Button>
       </LabelTooltip>
 
-      {preview.isOptimizing && (
-        <div className="atlas-token-card__busy">
-          <Loader2 />
-          <span>Optimizing</span>
-        </div>
-      )}
-      {preview.compressionRatio !== undefined && preview.compressionRatio > 0 && (
-        <LabelTooltip label="Size reduction from optimization">
-          <div className="atlas-token-card__badge">
-            −{preview.compressionRatio}%
-          </div>
-        </LabelTooltip>
-      )}
+      <ConversionBadge preview={preview} mode={mode} />
     </div>
   );
 
   return (
     <div
-      className={cn('atlas-token-card', `atlas-token-card--${mode}`, preview.isSelected && 'atlas-selected', !isCropEditable && 'atlas-token-card--unframed')}
-      style={{ '--atlas-enter-index': Math.min(index, ENTER_STAGGER_CAP) } as React.CSSProperties}
+      className={cn('atlas-token-card', `atlas-token-card--${mode}`, preview.isSelected && 'atlas-selected', !isCropEditable && 'atlas-token-card--unframed', entrance === null && 'atlas-token-card--settled')}
+      style={{ '--atlas-enter-index': Math.min(entrance ?? 0, ENTER_STAGGER_CAP) } as React.CSSProperties}
     >
       {isCropEditable ? <LabelTooltip label="Drag to reposition · Scroll to zoom · Double-click to reset">{art}</LabelTooltip> : art}
 
@@ -244,4 +268,4 @@ export function TokenPreviewCard({ preview, mode, index, onChange, onToggleSelec
       )}
     </div>
   );
-}
+});

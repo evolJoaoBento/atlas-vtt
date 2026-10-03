@@ -1,4 +1,5 @@
 import { resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
+import { collectionConeAngle } from '../gameSystems/coneAngle';
 import type { ViewAtlasState } from '../storeFactory';
 import type { CollectionGridDefaults } from '../types/collectionSettingsTypes';
 import type { AssetService } from './AssetService';
@@ -15,5 +16,8 @@ export function mapMeasurementSettings(
   state: Pick<ViewAtlasState, 'mapPath' | 'grid' | 'remoteScene'>,
 ): MeasurementSettings {
   if (state.remoteScene) return state.remoteScene.measurement;
-  return resolveMeasurementSettings(collectionGridDefaultsFor(assetService, state.mapPath) ?? undefined, state.grid);
+  const collectionId = state.mapPath ? assetService.getCollectionForMap(state.mapPath) : null;
+  if (!collectionId) return resolveMeasurementSettings(undefined, state.grid);
+  const { gridDefaults, systemPresetId } = assetService.getCollectionSettings(collectionId);
+  return { ...resolveMeasurementSettings(gridDefaults, state.grid), coneAngle: collectionConeAngle(gridDefaults, systemPresetId) };
 }

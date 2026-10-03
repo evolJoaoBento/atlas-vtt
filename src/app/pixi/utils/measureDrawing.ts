@@ -7,7 +7,7 @@
 import { Text, type Graphics } from 'pixi.js';
 import type { Point } from '../../grid/hexGeometry';
 import {
-  MEASURE_LABEL_COLORS, MEASURE_LABEL_FONT_SIZE, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW, measureLabelBox,
+  MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_LABEL_FONT_SIZE, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW, measureLabelBox,
 } from '../measureGeometry';
 
 export { measureLabelFontSize, pathMidpoint } from '../measureGeometry';
@@ -29,6 +29,14 @@ export function drawMeasurePoint(graphics: Graphics, color: number, point: Point
   graphics.circle(point.x, point.y, radius + halo).fill({ color: MEASURE_SHADOW, alpha: haloAlpha });
   graphics.circle(point.x, point.y, radius).fill({ color, alpha: fillAlpha });
   graphics.circle(point.x, point.y, radius - ringInset).stroke({ width: ringWidth, color, alpha: 1 });
+}
+
+/** A circular area around `center`: a translucent fill, an accent outline and a bright inner ring. */
+export function drawMeasureCircle(graphics: Graphics, color: number, center: Point, radius: number): void {
+  const { fillAlpha, strokeWidth, strokeAlpha, highlightWidth, highlightInset } = MEASURE_AREA;
+  graphics.circle(center.x, center.y, radius).fill({ color, alpha: fillAlpha });
+  graphics.circle(center.x, center.y, radius).stroke({ width: strokeWidth, color, alpha: strokeAlpha });
+  graphics.circle(center.x, center.y, Math.max(0, radius - highlightInset)).stroke({ width: highlightWidth, color, alpha: 1 });
 }
 
 export function createMeasureLabelText(): Text {

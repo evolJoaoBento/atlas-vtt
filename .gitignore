@@ -77,3 +77,7 @@ party/
 
 # Online player page build output
 dist-online/
+
+# GPU test failure artifacts
+**/__screenshots__/
+.vitest-attachments/

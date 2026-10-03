@@ -4,6 +4,7 @@
  * their colours. Shared by `TokenUIRenderer` and the online player view; no PIXI imports.
  */
 import { barDimensions } from '../../styles/designTokens';
+import { NAMEPLATE_HEIGHT } from './tokenSizing';
 
 export interface UiRect {
   x: number;
@@ -38,7 +39,7 @@ export const NAMEPLATE = {
   textAlpha: 0.85,
   padding: 6,
   minWidth: 40,
-  height: 14,
+  height: NAMEPLATE_HEIGHT,
 } as const;
 
 export const NAMEPLATE_STYLE = {
