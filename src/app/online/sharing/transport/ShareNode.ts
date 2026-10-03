@@ -48,7 +48,14 @@ export interface ShareNodeOptions {
 
 type Pending =
   | { kind: 'list'; to: string; timer: number; resolve(items: CatalogueItem[]): void; reject(error: ShareError): void }
-  | { kind: 'pull'; to: string; expect: ShareKind; timer: number; resolve(item: PulledItem): void; reject(error: ShareError): void };
+  | {
+    kind: 'pull'; to: string; expect: ShareKind;
+    /** The version asked for (the listed one, or an image's fingerprint): what the bytes must be. */
+    wanted: string | undefined;
+    /** The transfer this pull opened, as this side sees it; one per pull. */
+    transfer: { hop: string; handle: number } | null;
+    timer: number; resolve(item: PulledItem): void; reject(error: ShareError): void;
+  };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 type Routed = ShareMessage & { from: string };
@@ -80,9 +87,14 @@ export class ShareNode {
     });
   }
 
-  pull(to: string, item: string, expect: ShareKind): Promise<PulledItem> {
+  /**
+   * Pulls an item. The bytes must be the `version` the caller listed (an image's is in its ref);
+   * without one, only that they match what the sender announced.
+   */
+  pull(to: string, item: string, expect: ShareKind, version?: string): Promise<PulledItem> {
     return new Promise((resolve, reject) => {
-      const req = this.open({ kind: 'pull', to, expect, resolve, reject });
+      const wanted = item.includes('/') ? item.slice(item.indexOf('/') + 1) : version;
+      const req = this.open({ kind: 'pull', to, expect, wanted, transfer: null, resolve, reject });
       this.sendMessage({ v: 1, type: 'share-pull', to, req, item });
     });
   }
@@ -115,7 +127,14 @@ export class ShareNode {
       }
       case 'share-start': {
         const pending = this.pending.get(message.req);
-        if (pending?.kind === 'pull' && pending.to === from && pending.expect === message.kind && this.incoming.start(hop, from, message)) {
+        const asked = pending?.kind === 'pull' && pending.to === from && pending.expect === message.kind && pending.transfer === null;
+        if (asked && pending.wanted !== undefined && pending.wanted !== message.version) {
+          // Not what was asked for, whatever its bytes hash to.
+          this.forget(message.req);
+          pending.reject(new ShareError('failed'));
+        }
+        if (asked && this.pending.get(message.req) === pending && this.incoming.start(hop, from, message)) {
+          pending.transfer = { hop, handle: message.handle };
           this.touch(message.req, SHARE_LIMITS.stallMs);
         } else {
           this.sendMessage({ v: 1, type: 'share-cancel', to: from, handle: message.handle });
@@ -135,10 +154,7 @@ export class ShareNode {
         break;
       case 'share-denied': {
         const pending = this.pending.get(message.req);
-        if (pending && pending.to === from) {
-          this.forget(message.req);
-          pending.reject(new ShareError(message.reason));
-        }
+        if (pending && pending.to === from) this.end(message.req, pending, new ShareError(message.reason));
         break;
       }
     }
@@ -196,10 +212,18 @@ export class ShareNode {
     if (!pending) return;
     window.clearTimeout(pending.timer);
     pending.timer = window.setTimeout(() => {
-      if (this.pending.get(req) !== pending) return;
-      this.forget(req);
-      pending.reject(new ShareError('timeout'));
+      if (this.pending.get(req) === pending) this.end(req, pending, new ShareError('timeout'));
     }, ms);
+  }
+
+  /** A request ends in failure. A pull whose transfer had started closes it and tells the sender to stop (a relay forgets its mapping then). */
+  private end(req: string, pending: Pending, error: ShareError): void {
+    this.forget(req);
+    if (pending.kind === 'pull' && pending.transfer) {
+      this.incoming.release(pending.transfer.hop, pending.transfer.handle);
+      this.sendMessage({ v: 1, type: 'share-cancel', to: pending.to, handle: pending.transfer.handle });
+    }
+    pending.reject(error);
   }
 
   private forget(req: string): void {
@@ -251,14 +275,15 @@ export class ShareNode {
       return;
     }
     queue.size++;
-    queue.tail = queue.tail.then(() => this.serve(from, req, item)).catch(() => undefined).finally(() => { queue.size--; });
+    queue.tail = queue.tail.then(() => this.serve(queue, from, req, item)).catch(() => undefined).finally(() => { queue.size--; });
     this.queues.set(from, queue);
   }
 
   /** One item to one person; the next waits until this one went out, was cancelled or they left. */
-  private async serve(from: string, req: string, item: string): Promise<void> {
+  private async serve(queue: object, from: string, req: string, item: string): Promise<void> {
     const payload = await this.options.catalogue.open(from, item).catch(() => null);
-    if (this.stopped || !this.queues.has(from)) return;
+    // A queue dropped when the person left is not the one a rejoined person has.
+    if (this.stopped || this.queues.get(from) !== queue) return;
     if (!payload) {
       this.deny(from, req, 'not-shared');
       return;

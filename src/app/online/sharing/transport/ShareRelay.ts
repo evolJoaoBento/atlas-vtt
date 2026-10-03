@@ -4,6 +4,8 @@
  * handle mappings, never bytes: each chunk is re-framed and sent the moment it arrives, and
  * the sender's window bounds what the receiver's channel can hold. Mappings go when a transfer
  * ends, is cancelled, or either side leaves; one player has at most `relayedPerSender` open.
+ * Honest senders keep to the window; one that ignores acks is stopped by the receiver's channel
+ * buffer (`relayBufferBytes`, about 2 MiB plus a chunk), not by a count per mapping.
  *
  * Handles tell a cancel's direction: senders' handles are below `RELAY_HANDLES.min`, the relay's
  * own (what receivers see) at or above it, so a person who sends one transfer and receives another

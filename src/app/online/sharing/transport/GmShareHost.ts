@@ -82,7 +82,10 @@ export class GmShareHost implements SessionHandler {
   }
 
   onAdmitted(player: SessionPlayer): void {
+    // Admitted again without leaving: a take-over, which fires no `onGone`. The old link's transfers are over.
+    const takeOver = this.admitted.has(player.playerId);
     this.admitted.set(player.playerId, ++this.admissions);
+    if (takeOver) this.release(player);
   }
 
   onAssetData(player: SessionPlayer, data: unknown): void {
@@ -107,8 +110,13 @@ export class GmShareHost implements SessionHandler {
 
   onGone(player: SessionPlayer): void {
     this.admitted.delete(player.playerId);
+    this.release(player);
+  }
+
+  /** Ends a person's transfers and requests, unless another device of theirs is connected. */
+  private release(player: SessionPlayer): void {
     const person = player.personId;
-    if (!person || this.taking().some((other) => other.personId === person)) return;
+    if (!person || this.taking().some((other) => other.personId === person && other.playerId !== player.playerId)) return;
     this.relay.gone(person);
     this.node.peerGone(person);
   }

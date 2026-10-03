@@ -91,6 +91,11 @@ export class IncomingTransfers {
     if (incoming && incoming.from === from) this.close(key, incoming, { ok: false, reason: 'gone' });
   }
 
+  /** Closes a transfer without an outcome: its request has already ended. */
+  release(hop: string, handle: number): void {
+    this.open.delete(`${hop}:${handle}`);
+  }
+
   /** Fails every transfer from `from`, or from everyone with `null`. */
   dropFrom(from: string | null): void {
     for (const [key, incoming] of [...this.open]) if (from === null || incoming.from === from) this.close(key, incoming, { ok: false, reason: 'gone' });
