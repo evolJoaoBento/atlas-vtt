@@ -67,8 +67,8 @@ Context:
     - `nonce` is `randomId()`, one per join (kept across that join's reconnects).
   - **Table proof:**
     - Fields: `{ id, key, personId, gmName, sig }`.
-    - Signed text: `atlas-table-v1|<table id>|<player nonce>|<personId>`.
-  - The player accepts a table proof only when its key hashes to the link's table id and the signature checks.
+    - Signed text: `atlas-table-v1|<table id>|<GM host id>|<device id>|<player nonce>|<personId>` (the Task 1 ruling: bound to the host and to the device it is for, so a proof relayed by another player or another host fails).
+  - The player accepts a table proof only when its key hashes to the link's table id, the host id is the link's host, the device id is its own key id, and the signature checks.
   - The GM accepts a device proof only when the table is its own, the host id is its current host id and the signature checks.
   - A failed device proof is denied with the reason `denied`. A failed table proof leaves the session playable with sharing off.
   - **Keys:**
@@ -346,7 +346,7 @@ The GM's Atlas gets a table key, and its join links carry the table id. An Obsid
     - `interface TableIdentity { id: string; keys: KeyPairJwk }`
     - `interface IdentityCrypto { generate(): Promise<KeyPairJwk>; sign(privateKey, text): Promise<string>; verify(publicKey, text, signature): Promise<boolean>; keyId(publicKey): Promise<string> }`
     - `webIdentityCrypto`, `fromBase64Url(text): Uint8Array<ArrayBuffer>`
-  - From `proofs.ts`: `deviceProofText`, `tableProofText`, `makeDeviceProof(crypto, keys, table, hostId, nonce)`, `checkDeviceProof(crypto, proof, table, hostId): Promise<string | null>` (the device id), `makeTableProof(crypto, table, nonce, personId, gmName)`, `checkTableProof(crypto, proof, tableId, nonce): Promise<boolean>`.
+  - From `proofs.ts`: `deviceProofText`, `tableProofText`, `makeDeviceProof(crypto, keys, table, hostId, nonce)`, `checkDeviceProof(crypto, proof, table, hostId): Promise<string | null>` (the device id), `makeTableProof(crypto, table, binding, personId, gmName)`, `checkTableProof(crypto, proof, tableId, binding): Promise<boolean>`, where `binding` is `{ hostId, deviceId, nonce }` (the ruled form).
   - From `deviceKeys.ts`: `interface KeyValueStore { get(key): unknown; set(key, value): void }`, `memoryKeyValueStore()`, `obsidianLocalStore(app)`, `DEVICE_KEYS_STORAGE`, `class DeviceKeys { forTable(tableId): Promise<KeyPairJwk> }`.
   - From `tableKey.ts`: `ensureTableIdentity(settings, crypto): Promise<TableIdentity>`.
   - From `protocol.ts`:
@@ -869,6 +869,8 @@ export function deviceProofText(table: string, hostId: string, nonce: string): s
   return `atlas-device-v1|${table}|${hostId}|${nonce}`;
 }
 
+// Superseded by the Task 1 ruling: the shipped text is `atlas-table-v1|${table}|${binding.hostId}|${binding.deviceId}|${binding.nonce}|${personId}`
+// and `tableProofText`, `makeTableProof` and `checkTableProof` take a `binding: { hostId, deviceId, nonce }` instead of `nonce`. See `identity/proofs.ts`.
 export function tableProofText(table: string, nonce: string, personId: string): string {
   return `atlas-table-v1|${table}|${nonce}|${personId}`;
 }
