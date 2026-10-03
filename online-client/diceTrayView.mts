@@ -1,14 +1,17 @@
 // online-client/diceTrayView.mts
 /**
- * The dice tray on the join page, like Atlas's: its dice with their icons and counts, the
- * formula, a modifier, Clear selection and Roll. A click adds a die; a right-click or a
- * long-press removes one. The tray's rules live in `DiceTray` (`src/app/online/page/diceTray.ts`).
+ * The dice tray on the join page, in Atlas's tray look (`DiceTray.tsx`): seven drawn dice, each a
+ * surface a click or tap adds one to, a "−" under every die that holds any (always there, since a
+ * control that shows only under the pointer is none on a phone), a modifier with steppers, the
+ * formula, Roll and Clear. The tray's rules live in `DiceTray` (`src/app/online/page/diceTray.ts`).
  */
 import {
-  CLEAR_SELECTION_LABEL, DiceTray, dieHint, LONG_PRESS_MS, MODIFIER_LABEL, ROLL_LABEL,
+  addDieLabel, CLEAR_LABEL, DiceTray, EMPTY_TRAY_TEXT, MODIFIER_LABEL, removeDieLabel, ROLL_LABEL,
 } from '../src/app/online/page/diceTray';
-import { dieIconUrl, toolIconUrl } from '../src/app/online/page/toolIcons';
-import { DICE_TYPES, type DiceSelection, type DieType } from '../src/app/tools/diceRolling';
+import { DIE_ART } from '../src/app/online/page/dieArt';
+import { toolIconUrl } from '../src/app/online/page/toolIcons';
+import { MAX_MODIFIER, TRAY_DICE, type TrayDie } from '../src/app/react/components/dice/diceTrayPool';
+import type { DiceSelection } from '../src/app/tools/diceRolling';
 import { iconElement } from './icons.mts';
 
 export interface DiceTrayViewOptions {
@@ -19,61 +22,78 @@ export interface DiceTrayViewOptions {
   onClose(): void;
 }
 
-/** After a removal by long-press or right-click, the click or contextmenu the browser adds is ignored for this long. */
-const AFTER_REMOVAL_MS = 800;
-const ROLL_WAIT_NOTE = 'Wait a moment before rolling again.';
+const ROLL_WAIT_NOTE = "Couldn't send the roll. Wait a moment, or check your connection.";
+
+function button(className: string, label: string): HTMLButtonElement {
+  const element = document.createElement('button');
+  element.type = 'button';
+  element.className = className;
+  element.setAttribute('aria-label', label);
+  return element;
+}
+
+function dieFace(sides: TrayDie): HTMLElement {
+  const face = document.createElement('span');
+  face.className = sides === 100 ? 'die-face die-face--percentile' : 'die-face';
+  face.setAttribute('aria-hidden', 'true');
+  for (const src of DIE_ART[sides]) {
+    const art = document.createElement('img');
+    art.className = 'die-face__art';
+    art.src = src;
+    art.alt = '';
+    art.draggable = false;
+    face.append(art);
+  }
+  return face;
+}
 
 export class DiceTrayView {
   readonly tray = new DiceTray();
-  private readonly dice = new Map<DieType, { button: HTMLButtonElement; badge: HTMLElement }>();
+  private readonly dice = new Map<TrayDie, { face: HTMLButtonElement; count: HTMLElement; grip: HTMLButtonElement }>();
   private readonly formula: HTMLElement;
-  private readonly modifier: HTMLInputElement;
-  private readonly clearButton: HTMLButtonElement;
+  private readonly modifierValue: HTMLElement;
+  private readonly decrease: HTMLButtonElement;
+  private readonly increase: HTMLButtonElement;
   private readonly rollButton: HTMLButtonElement;
+  private readonly clearButton: HTMLButtonElement;
   private readonly note: HTMLElement;
-  private pressTimer: number | null = null;
-  private ignoreUntil = 0;
 
   constructor(private readonly options: DiceTrayViewOptions) {
-    const grid = document.createElement('div');
-    grid.className = 'dice-grid';
-    for (const die of DICE_TYPES) grid.append(this.cell(die));
-    this.formula = document.createElement('span');
-    this.formula.className = 'dice-formula';
-    this.modifier = document.createElement('input');
-    this.modifier.type = 'number';
-    this.modifier.inputMode = 'numeric';
-    this.modifier.step = '1';
-    this.modifier.min = '-1000';
-    this.modifier.max = '1000';
-    this.modifier.placeholder = '+0';
-    this.modifier.className = 'dice-modifier';
-    this.modifier.setAttribute('aria-label', MODIFIER_LABEL);
-    this.modifier.addEventListener('input', () => {
-      this.tray.setModifier(this.modifier.value);
-      this.render();
-    });
-    this.clearButton = document.createElement('button');
-    this.clearButton.type = 'button';
-    this.clearButton.className = 'tool-button dice-clear';
-    this.clearButton.setAttribute('aria-label', CLEAR_SELECTION_LABEL);
-    this.clearButton.dataset.label = CLEAR_SELECTION_LABEL;
-    this.clearButton.append(iconElement(toolIconUrl('x')));
-    this.clearButton.addEventListener('click', () => this.empty());
-    this.rollButton = document.createElement('button');
-    this.rollButton.type = 'button';
-    this.rollButton.className = 'dice-roll';
-    const rollText = document.createElement('span');
-    rollText.textContent = ROLL_LABEL;
-    this.rollButton.append(iconElement(toolIconUrl('dices')), rollText);
+    const row = document.createElement('div');
+    row.className = 'tray-dice';
+    for (const sides of TRAY_DICE) row.append(this.die(sides));
+
+    const modifier = document.createElement('div');
+    modifier.className = 'tray-modifier';
+    const label = document.createElement('span');
+    label.className = 'tray-modifier-label';
+    label.textContent = MODIFIER_LABEL;
+    this.decrease = this.stepper('Decrease modifier', 'minus', -1);
+    this.increase = this.stepper('Increase modifier', 'plus', 1);
+    this.modifierValue = document.createElement('span');
+    this.modifierValue.className = 'tray-modifier-value';
+    modifier.append(label, this.decrease, this.modifierValue, this.increase);
+
+    // Always there, even empty: a region that appears with its content goes unheard by screen readers.
+    this.formula = document.createElement('p');
+    this.formula.className = 'tray-formula';
+    this.formula.setAttribute('role', 'status');
+    this.formula.setAttribute('aria-live', 'polite');
+
+    const actions = document.createElement('div');
+    actions.className = 'tray-actions';
+    this.rollButton = button('tray-roll', ROLL_LABEL);
+    this.rollButton.textContent = ROLL_LABEL;
     this.rollButton.addEventListener('click', () => this.roll());
-    const bar = document.createElement('div');
-    bar.className = 'dice-formula-bar';
-    bar.append(this.formula, this.modifier, this.clearButton, this.rollButton);
+    this.clearButton = button('secondary tray-clear', CLEAR_LABEL);
+    this.clearButton.textContent = CLEAR_LABEL;
+    this.clearButton.addEventListener('click', () => this.empty());
+    actions.append(this.rollButton, this.clearButton);
+
     this.note = document.createElement('p');
     this.note.className = 'dice-note';
     this.note.setAttribute('role', 'status');
-    options.root.replaceChildren(grid, bar, this.note);
+    options.root.replaceChildren(row, modifier, this.formula, actions, this.note);
     this.render();
   }
 
@@ -87,62 +107,44 @@ export class DiceTrayView {
     if (!open) this.empty();
   }
 
-  private cell(die: DieType): HTMLElement {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'dice-button';
-    button.dataset.die = die;
-    button.dataset.label = dieHint(die);
-    button.setAttribute('aria-label', dieHint(die));
-    const badge = document.createElement('span');
-    badge.className = 'dice-badge';
-    badge.hidden = true;
-    button.append(iconElement(dieIconUrl(die)), badge);
-    button.addEventListener('click', () => {
-      if (Date.now() < this.ignoreUntil) return;
-      this.tray.add(die);
-      this.render();
+  private die(sides: TrayDie): HTMLElement {
+    const face = button('tray-face', addDieLabel(sides, 0));
+    face.dataset.die = `d${sides}`;
+    face.dataset.label = `d${sides}`;
+    const count = document.createElement('span');
+    count.className = 'tray-count';
+    count.setAttribute('aria-hidden', 'true');
+    face.append(dieFace(sides), count);
+    face.addEventListener('click', () => {
+      if (this.tray.add(sides)) this.render();
     });
-    button.addEventListener('contextmenu', (event) => {
-      event.preventDefault();
-      if (Date.now() < this.ignoreUntil) return;
-      this.cancelPress();
-      this.removeOne(die);
+    const grip = button('tray-grip', removeDieLabel(sides));
+    grip.append(iconElement(toolIconUrl('minus')));
+    grip.addEventListener('click', () => {
+      if (this.tray.remove(sides)) this.render();
     });
-    button.addEventListener('pointerdown', (event) => {
-      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return;
-      this.cancelPress();
-      this.pressTimer = window.setTimeout(() => {
-        this.pressTimer = null;
-        this.removeOne(die);
-      }, LONG_PRESS_MS);
-    });
-    for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) button.addEventListener(type, () => this.cancelPress());
-    const label = document.createElement('span');
-    label.className = 'dice-label';
-    label.textContent = die;
     const cell = document.createElement('div');
-    cell.className = 'dice-cell';
-    cell.append(button, label);
-    this.dice.set(die, { button, badge });
+    cell.className = 'tray-die';
+    cell.append(face, grip);
+    this.dice.set(sides, { face, count, grip });
     return cell;
   }
 
-  private removeOne(die: DieType): void {
-    this.ignoreUntil = Date.now() + AFTER_REMOVAL_MS;
-    this.tray.remove(die);
-    this.render();
-  }
-
-  private cancelPress(): void {
-    if (this.pressTimer !== null) window.clearTimeout(this.pressTimer);
-    this.pressTimer = null;
+  private stepper(label: string, icon: 'minus' | 'plus', delta: number): HTMLButtonElement {
+    const step = button('tray-grip tray-step', label);
+    step.append(iconElement(toolIconUrl(icon)));
+    step.addEventListener('click', () => {
+      this.tray.step(delta);
+      this.render();
+    });
+    return step;
   }
 
   private roll(): void {
-    if (!this.tray.canRoll()) return;
-    if (!this.options.roll(this.tray.selection, this.tray.modifier)) {
-      // Not sent (too fast, or not connected): the dice stay selected so the player can roll again.
+    const roll = this.tray.roll();
+    if (!roll) return;
+    if (!this.options.roll(roll.dice, roll.modifier)) {
+      // Not sent (too fast, or not connected): the tray keeps its dice for another try.
       this.note.textContent = ROLL_WAIT_NOTE;
       return;
     }
@@ -151,24 +153,30 @@ export class DiceTrayView {
   }
 
   private empty(): void {
-    this.cancelPress();
     this.tray.clear();
-    this.modifier.value = '';
     this.render();
   }
 
   private render(): void {
     this.note.textContent = '';
-    const full = this.tray.isFull();
-    for (const [die, { button, badge }] of this.dice) {
-      const count = this.tray.count(die);
-      button.classList.toggle('is-selected', count > 0);
-      button.setAttribute('aria-disabled', String(full));
-      badge.hidden = count === 0;
-      badge.textContent = String(count);
+    for (const [sides, { face, count, grip }] of this.dice) {
+      const held = this.tray.count(sides);
+      face.disabled = !this.tray.canAdd(sides);
+      face.setAttribute('aria-label', addDieLabel(sides, held));
+      count.hidden = held === 0;
+      count.textContent = String(held);
+      // The place under the die stays even when empty, so the dice never shift under a finger.
+      grip.classList.toggle('is-empty', held === 0);
+      grip.disabled = held === 0;
     }
-    this.formula.textContent = this.tray.text();
-    this.clearButton.disabled = !this.tray.canRoll() && this.tray.modifier === 0;
-    this.rollButton.disabled = !this.tray.canRoll();
+    const modifier = this.tray.modifier;
+    this.modifierValue.textContent = modifier > 0 ? `+${modifier}` : String(modifier);
+    this.decrease.disabled = modifier <= -MAX_MODIFIER;
+    this.increase.disabled = modifier >= MAX_MODIFIER;
+    const formula = this.tray.formula();
+    this.formula.textContent = formula === '' ? EMPTY_TRAY_TEXT : formula;
+    this.formula.classList.toggle('is-empty', formula === '');
+    this.rollButton.disabled = formula === '';
+    this.clearButton.hidden = this.tray.isEmpty();
   }
 }

@@ -1,8 +1,14 @@
 import { render } from '@testing-library/react';
-import { ChevronDown, Circle, Dices, Ellipsis, Flashlight, Hand, Ruler, Triangle, X } from 'lucide-react';
+import { ChevronDown, Circle, Dices, Ellipsis, Flashlight, Hand, Minus, Plus, Ruler, Triangle, X } from 'lucide-react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { dieIconUrl, TOOL_ICON_MARKUP, toolIconUrl, type ToolIconName } from '../../../src/app/online/page/toolIcons';
+import { DIE_ART } from '../../../src/app/online/page/dieArt';
+import { TOOL_ICON_MARKUP, toolIconUrl, type ToolIconName } from '../../../src/app/online/page/toolIcons';
+import { DieFace } from '../../../src/app/react/components/dice/DieFace';
+import { TRAY_DICE } from '../../../src/app/react/components/dice/diceTrayPool';
+
 
 type Shape = [tag: string, attributes: Record<string, string>, text: string];
 
@@ -24,7 +30,7 @@ describe('the join page icons', () => {
   it("are the Lucide icons of Atlas's toolbar", () => {
     const icons: Record<ToolIconName, React.ComponentType> = {
       hand: Hand, ruler: Ruler, circle: Circle, triangle: Triangle, flashlight: Flashlight, dices: Dices, ellipsis: Ellipsis,
-      'chevron-down': ChevronDown, x: X,
+      'chevron-down': ChevronDown, x: X, minus: Minus, plus: Plus,
     };
     for (const [name, Icon] of Object.entries(icons)) {
       expect(parsed(TOOL_ICON_MARKUP[name as ToolIconName]), name).toEqual(rendered(<Icon />));
@@ -34,6 +40,15 @@ describe('the join page icons', () => {
   it('become CSS mask images of a 24 px glyph', () => {
     expect(toolIconUrl('hand')).toMatch(/^url\("data:image\/svg\+xml,/);
     expect(decodeURIComponent(toolIconUrl('hand'))).toContain('stroke-linecap="round"');
-    expect(decodeURIComponent(dieIconUrl('d20'))).toContain('viewBox="0 0 24 24"');
+  });
+
+  it("draws the tray's dice with the drawings of Atlas's tray, d100 as two d10s", () => {
+    // Atlas inlines its drawings; the page links the same files.
+    const asData = (src: string): string => `data:image/webp;base64,${readFileSync(join(process.cwd(), src)).toString('base64')}`;
+    for (const sides of TRAY_DICE) {
+      const atlas = [...render(<DieFace sides={sides} />).container.querySelectorAll('img')].map((img) => img.getAttribute('src'));
+      expect(DIE_ART[sides].map(asData), `d${sides}`).toEqual(atlas);
+    }
+    expect(DIE_ART[100]).toEqual([DIE_ART[10][0], DIE_ART[10][0]]);
   });
 });

@@ -1,13 +1,12 @@
 /**
- * Atlas's own icons for the join page: the Lucide icons of Atlas's toolbar (lucide-react 0.503),
- * and the dice of its dice tray (`DiceIcons.tsx`), as SVG markup. The page shows them as CSS mask
- * images, so they take the colour of their button. This is static markup only: nothing from the
- * network ever goes into an SVG. `tests/unit/online/toolIcons.test.tsx` checks them against
- * Atlas's components.
+ * Atlas's own icons for the join page: the Lucide icons of Atlas's toolbar and dice tray
+ * (lucide-react), as SVG markup. The page shows them as CSS mask images, so they take the colour
+ * of their button. This is static markup only: nothing from the network ever goes into an SVG.
+ * The tray's dice are Atlas's drawings (`dieArt.ts`). `tests/unit/online/toolIcons.test.tsx`
+ * checks both against Atlas's components.
  */
-import type { DieType } from '../../tools/diceRolling';
-
-export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x';
+export type ToolIconName = 'hand' | 'ruler' | 'circle' | 'triangle' | 'flashlight' | 'dices' | 'ellipsis' | 'chevron-down' | 'x'
+  | 'minus' | 'plus';
 
 /** Each Lucide icon's children. */
 export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
@@ -26,28 +25,12 @@ export const TOOL_ICON_MARKUP: Record<ToolIconName, string> = {
   ellipsis: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
-};
-
-const OUTLINE = 'stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"';
-const GUIDE = 'stroke="currentColor" stroke-width="1" opacity="0.5"';
-const D10_BODY = 'M12 2L18 6v4l-6 10-6-10V6l6-4Z';
-
-/** Each dice tray icon's children, as `DiceIcons.tsx` renders them. */
-export const DICE_ICON_MARKUP: Record<DieType, string> = {
-  d4: `<path d="M12 2L3 20h18L12 2Z" ${OUTLINE}/><path d="M12 2v18" ${GUIDE}/>`,
-  d6: '<rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>'
-    + '<circle cx="12" cy="12" r="2" fill="currentColor"/>',
-  d8: `<path d="M12 2L20 8v8l-8 6-8-6V8l8-6Z" ${OUTLINE}/><path d="M12 2v20" ${GUIDE}/><path d="M4 8l8 6 8-6" ${GUIDE}/>`,
-  d10: `<path d="${D10_BODY}" ${OUTLINE}/><path d="M6 6l6 14 6-14" ${GUIDE}/>`,
-  d12: `<path d="M12 2L19 7v10l-7 5-7-5V7l7-5Z" ${OUTLINE}/><polygon points="12,2 19,7 15,12 12,10 9,12 5,7" ${GUIDE} fill="none"/>`,
-  d20: `<path d="M12 2L21 8.5L17 19H7L3 8.5L12 2Z" ${OUTLINE}/><path d="M12 2v17" ${GUIDE}/><path d="M3 8.5L12 19L21 8.5" ${GUIDE}/>`,
-  d100: `<path d="${D10_BODY}" ${OUTLINE}/>`
-    + '<text x="12" y="13" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">%</text>',
+  minus: '<path d="M5 12h14"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
 };
 
 const LUCIDE_ROOT = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
-const DICE_ROOT = 'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"';
 
 function maskUrl(root: string, children: string): string {
   return `url("data:image/svg+xml,${encodeURIComponent(`<svg ${root}>${children}</svg>`)}")`;
@@ -56,8 +39,4 @@ function maskUrl(root: string, children: string): string {
 /** The icon as a CSS `url()` for a mask image. */
 export function toolIconUrl(name: ToolIconName): string {
   return maskUrl(LUCIDE_ROOT, TOOL_ICON_MARKUP[name]);
-}
-
-export function dieIconUrl(die: DieType): string {
-  return maskUrl(DICE_ROOT, DICE_ICON_MARKUP[die]);
 }

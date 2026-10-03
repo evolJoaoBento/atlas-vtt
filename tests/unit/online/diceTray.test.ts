@@ -1,55 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { DiceTray, dieHint } from '../../../src/app/online/page/diceTray';
+import { DiceTray } from '../../../src/app/online/page/diceTray';
+import { MAX_MODIFIER } from '../../../src/app/react/components/dice/diceTrayPool';
+import { DICE_LIMITS } from '../../../src/app/online/tools/toolMessages';
 
-describe('the join page dice tray', () => {
-  it("writes the picked dice and modifier as Atlas's tray does", () => {
+describe("the join page dice tray (Atlas's tray rules)", () => {
+  it("writes Atlas's tray formula, dice in ascending order whatever the picking order", () => {
     const tray = new DiceTray();
-    expect(tray.text()).toBe('Select dice to roll');
-    expect(tray.canRoll()).toBe(false);
-    tray.add('d20');
-    tray.add('d6');
-    tray.add('d6');
-    expect(tray.text()).toBe('d20 + 2d6');
-    expect(tray.selection).toEqual({ d20: 1, d6: 2 });
-    expect(tray.setModifier('3')).toBe(3);
-    expect(tray.text()).toBe('d20 + 2d6 + 3');
-    tray.setModifier('-4');
-    expect(tray.text()).toBe('d20 + 2d6 - 4');
-    expect(tray.canRoll()).toBe(true);
+    expect(tray.formula()).toBe('');
+    tray.add(20);
+    tray.add(6);
+    tray.add(6);
+    tray.step(3);
+    expect(tray.formula()).toBe('2d6 + 1d20 + 3');
+    expect(tray.roll()).toEqual({ dice: { d6: 2, d20: 1 }, modifier: 3 });
   });
 
-  it('keeps the modifier a whole number within 1000', () => {
+  it('holds at most the 20 dice the GM accepts, and a modifier within ±20', () => {
     const tray = new DiceTray();
-    expect(tray.setModifier('5000')).toBe(1000);
-    expect(tray.setModifier('-5000')).toBe(-1000);
-    expect(tray.setModifier('2.7')).toBe(2);
-    expect(tray.setModifier('abc')).toBe(0);
-    expect(tray.setModifier('')).toBe(0);
+    for (let i = 0; i < 25; i++) tray.add(6);
+    expect(tray.total()).toBe(DICE_LIMITS.dicePerRoll);
+    expect(tray.canAdd(4)).toBe(false);
+    for (let i = 0; i < 30; i++) tray.step(-1);
+    expect(tray.modifier).toBe(-MAX_MODIFIER);
   });
 
-  it('removes one die at a time and forgets a die at zero', () => {
+  it('takes one back, rolls nothing without dice, and clears dice and modifier', () => {
     const tray = new DiceTray();
-    tray.add('d6');
-    tray.add('d6');
-    tray.add('d8');
-    expect(tray.remove('d6')).toBe(true);
-    expect(tray.count('d6')).toBe(1);
-    tray.remove('d6');
-    expect(tray.selection).toEqual({ d8: 1 });
-    expect(tray.remove('d4')).toBe(false);
-  });
-
-  it('takes at most 20 dice, as the GM accepts', () => {
-    const tray = new DiceTray();
-    for (let i = 0; i < 20; i++) expect(tray.add(i % 2 ? 'd6' : 'd8')).toBe(true);
-    expect(tray.isFull()).toBe(true);
-    expect(tray.add('d20')).toBe(false);
-    expect(tray.total()).toBe(20);
+    expect(tray.remove(8)).toBe(false);
+    tray.add(8);
+    expect(tray.remove(8)).toBe(true);
+    tray.step(2);
+    expect(tray.roll()).toBeNull();
+    expect(tray.isEmpty()).toBe(false);
     tray.clear();
-    expect([tray.total(), tray.modifier, tray.text()]).toEqual([0, 0, 'Select dice to roll']);
-  });
-
-  it("hints each die like Atlas's tray", () => {
-    expect(dieHint('d20')).toBe('D20 • Left: add • Right: remove');
+    expect(tray.isEmpty()).toBe(true);
   });
 });

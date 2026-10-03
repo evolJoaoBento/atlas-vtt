@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DiceTrayView } from '../../../online-client/diceTrayView.mts';
-import { LONG_PRESS_MS } from '../../../src/app/online/page/diceTray';
 import type { DiceSelection } from '../../../src/app/tools/diceRolling';
 
 function setup(sends = true) {
@@ -18,91 +17,69 @@ function setup(sends = true) {
   });
   view.setOpen(true);
   const die = (name: string): HTMLButtonElement => root.querySelector<HTMLButtonElement>(`[data-die="${name}"]`)!;
-  const text = (): string => root.querySelector('.dice-formula')!.textContent ?? '';
-  return { root, view, rolls, closed: () => closed, die, text };
-}
-function fire(target: EventTarget, type: string, pointerType = 'touch'): MouseEvent {
-  const event = new MouseEvent(type, { bubbles: true, cancelable: true, button: type === 'contextmenu' ? 2 : 0 });
-  Object.defineProperties(event, { pointerType: { value: pointerType }, pointerId: { value: 1 } });
-  target.dispatchEvent(event);
-  return event;
+  const named = (label: string): HTMLButtonElement => root.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!;
+  const text = (): string => root.querySelector('.tray-formula')!.textContent ?? '';
+  return { root, view, rolls, closed: () => closed, die, named, text };
 }
 
 describe('the join page dice tray', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
-
-  it('keeps the tray open and says so when the roll was not sent', () => {
-    const t = setup(false);
-    t.die('d20').click();
-    t.root.querySelector<HTMLButtonElement>('.dice-roll')!.click();
-    expect(t.closed()).toBe(0);
-    expect(t.view.isOpen).toBe(true);
-    expect(t.text()).toBe('d20');
-    expect(t.root.querySelector('.dice-note')?.textContent).toBe('Wait a moment before rolling again.');
-    t.die('d20').click();
-    expect(t.root.querySelector('.dice-note')?.textContent).toBe('');
+  it("draws Atlas's dice: seven faces, d100 as two d10 drawings", () => {
+    const t = setup();
+    expect(t.root.querySelectorAll('.tray-face')).toHaveLength(7);
+    expect(t.die('d100').querySelectorAll('img')).toHaveLength(2);
+    expect(t.die('d6').querySelector('img')?.getAttribute('src')).toContain('d6.webp');
+    expect(t.text()).toBe('The tray is empty.');
   });
 
-  it("adds a die on a click and removes one on a right-click, showing Atlas's formula", () => {
+  it("adds a die on a tap and takes one back with its −, showing Atlas's formula and count", () => {
     const t = setup();
     t.die('d6').click();
     t.die('d6').click();
     t.die('d20').click();
-    expect(fire(t.die('d6'), 'contextmenu', 'mouse').defaultPrevented).toBe(true);
-    expect(t.text()).toBe('d6 + d20');
-    expect(t.die('d6').querySelector('.dice-badge')?.textContent).toBe('1');
-    expect(t.die('d4').querySelector<HTMLElement>('.dice-badge')?.hidden).toBe(true);
-  });
-
-  it("removes one die per long-press, even with the browser's contextmenu", () => {
-    const t = setup();
-    for (let i = 0; i < 4; i++) t.die('d8').click();
-    // The hold removes one; the contextmenu and click the browser may add are ignored.
-    fire(t.die('d8'), 'pointerdown');
-    vi.advanceTimersByTime(LONG_PRESS_MS);
-    fire(t.die('d8'), 'contextmenu');
-    fire(t.die('d8'), 'pointerup');
-    t.die('d8').click();
-    expect(t.view.tray.count('d8')).toBe(3);
-    vi.advanceTimersByTime(1000);
-    // The browser's contextmenu comes first: it removes one, and the hold adds nothing.
-    fire(t.die('d8'), 'pointerdown');
-    vi.advanceTimersByTime(LONG_PRESS_MS - 100);
-    fire(t.die('d8'), 'contextmenu');
-    vi.advanceTimersByTime(200);
-    fire(t.die('d8'), 'pointerup');
-    expect(t.view.tray.count('d8')).toBe(2);
+    expect(t.die('d6').getAttribute('aria-label')).toBe('Add a d6, 2 in the tray');
+    t.named('Take one d6 back').click();
+    expect(t.text()).toBe('1d6 + 1d20');
+    expect(t.die('d6').querySelector<HTMLElement>('.tray-count')?.textContent).toBe('1');
+    expect(t.die('d4').querySelector<HTMLElement>('.tray-count')?.hidden).toBe(true);
+    expect(t.named('Take one d4 back').disabled).toBe(true);
   });
 
   it('rolls the dice with the modifier, then empties and asks to close; Roll needs dice', () => {
     const t = setup();
-    const roll = t.root.querySelector<HTMLButtonElement>('.dice-roll')!;
+    const roll = t.root.querySelector<HTMLButtonElement>('.tray-roll')!;
     expect(roll.disabled).toBe(true);
     t.die('d20').click();
-    const modifier = t.root.querySelector<HTMLInputElement>('[aria-label="Modifier"]')!;
-    modifier.value = '3';
-    modifier.dispatchEvent(new Event('input'));
-    expect(t.text()).toBe('d20 + 3');
+    for (let i = 0; i < 3; i++) t.named('Increase modifier').click();
+    t.named('Decrease modifier').click();
+    expect(t.text()).toBe('1d20 + 2');
     roll.click();
-    expect(t.rolls).toEqual([{ dice: { d20: 1 }, modifier: 3 }]);
-    expect(t.view.tray.total()).toBe(0);
-    expect(modifier.value).toBe('');
+    expect(t.rolls).toEqual([{ dice: { d20: 1 }, modifier: 2 }]);
+    expect(t.view.tray.isEmpty()).toBe(true);
+    expect(t.root.querySelector('.tray-modifier-value')?.textContent).toBe('0');
     expect(t.closed()).toBe(1);
   });
 
-  it('keeps the dice when the roll could not be sent', () => {
+  it('keeps the tray open with its dice and says so when the roll was not sent', () => {
     const t = setup(false);
     t.die('d20').click();
-    t.root.querySelector<HTMLButtonElement>('.dice-roll')!.click();
-    expect(t.view.tray.total()).toBe(1);
+    t.root.querySelector<HTMLButtonElement>('.tray-roll')!.click();
     expect(t.closed()).toBe(0);
+    expect(t.view.isOpen).toBe(true);
+    expect(t.view.tray.total()).toBe(1);
+    expect(t.root.querySelector('.dice-note')?.textContent).toContain("Couldn't send the roll");
+    t.die('d20').click();
+    expect(t.root.querySelector('.dice-note')?.textContent).toBe('');
   });
 
-  it('takes no more dice at 20', () => {
+  it('takes no more dice at 20, and Clear empties dice and modifier', () => {
     const t = setup();
     for (let i = 0; i < 25; i++) t.die('d6').click();
     expect(t.view.tray.total()).toBe(20);
-    expect(t.die('d4').getAttribute('aria-disabled')).toBe('true');
+    expect(t.die('d4').disabled).toBe(true);
+    const clear = t.root.querySelector<HTMLButtonElement>('.tray-clear')!;
+    expect(clear.hidden).toBe(false);
+    clear.click();
+    expect(t.view.tray.isEmpty()).toBe(true);
+    expect(clear.hidden).toBe(true);
   });
 });
