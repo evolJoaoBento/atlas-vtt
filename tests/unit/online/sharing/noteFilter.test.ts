@@ -172,6 +172,7 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
     ['a fence in a list', '%%[!private]%%\n- item\n  ```\n  %%[!end]%%\n  ```\n  LEAK\n  ```\n  %%[!private]%%\n  ```\n%%[!end]%%'],
     ['a link label', '%%[!private]%%\n[x %%[!end]%%](u) LEAK [y %%[!private]%%](v)\n%%[!end]%%'],
     ['a wiki alias', '%%[!private]%%\n[[Note|a %%[!end]%%]] LEAK [[Other|b %%[!private]%%]]\n%%[!end]%%'],
+    ['a link destination', '%%[!private]%%\n[x](u %%[!end]%%) LEAK [y](v %%[!private]%%)\n%%[!end]%%'],
     ['a code span across lines', '%%[!private]%%\nsee `the\n%%[!end]%% tag` LEAK `and\n%%[!private]%% too`\n%%[!end]%%'],
   ];
 
@@ -195,6 +196,7 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
     expect(forPerson('ben', source)).toBe('Run `npm test`  done `y`');
     expect(partProblemsInNote(source).tagInCodeOrLink).toBe(false);
     expect(forPerson('ben', '```\ncode\n```\n%%[!private]%%s%%[!end]%% [a](b) after')).toBe('```\ncode\n```\n a after');
+    expect(forPerson('ben', 'See [x](https://e.org/a_(b)) %%[!private]%%s%%[!end]%% after')).toBe('See [x](https://e.org/a_(b))  after');
   });
 });
 

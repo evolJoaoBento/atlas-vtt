@@ -2,7 +2,8 @@
  * Whether a place in a note is possibly inside code or a link, where Obsidian shows a tag as plain text:
  * inside a code fence (``` or ~~~, behind any quote, list or indent prefix, unclosed to the end), inside a
  * code span (backtick runs from the start of the paragraph, or an odd number of backticks before it on its
- * line), or inside a link label or wiki link (`[` not yet closed in its paragraph: `[x …](u)`, `[[a|…]]`).
+ * line), inside a link label or wiki link (`[` not yet closed in its paragraph: `[x …](u)`, `[[a|…]]`), or
+ * inside a link destination (a `](` on its line not yet closed by `)`).
  * Detection is deliberately loose: a false "maybe" only hides more (the filter's backstop), while a tag
  * counted where Obsidian shows text could pair with a real one and share a part.
  */
@@ -65,6 +66,19 @@ export function codeOrLinkTest(text: string, ranges: readonly TextRange[]): (ran
     const paragraph = masked.slice(lines[first]?.start ?? line.start, range.start);
     const onLine = masked.slice(line.start, range.start);
     if (codeSpanOpen(paragraph) || (onLine.match(/`/g) ?? []).length % 2 === 1) return true;
-    return (paragraph.match(/\[/g) ?? []).length > (paragraph.match(/\]/g) ?? []).length;
+    return (paragraph.match(/\[/g) ?? []).length > (paragraph.match(/\]/g) ?? []).length || linkDestinationOpen(onLine);
   };
+}
+
+/** Whether a `](` on the line is still open (no `)` closing it yet): the place is inside a link destination. */
+function linkDestinationOpen(onLine: string): boolean {
+  let depth = 0;
+  for (let index = 0; index < onLine.length; index++) {
+    if (depth === 0 && onLine[index] === ']' && onLine[index + 1] === '(') {
+      depth = 1;
+      index++;
+    } else if (depth > 0 && onLine[index] === '(') depth++;
+    else if (depth > 0 && onLine[index] === ')') depth--;
+  }
+  return depth > 0;
 }
