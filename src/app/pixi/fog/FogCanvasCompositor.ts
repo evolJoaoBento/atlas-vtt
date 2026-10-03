@@ -6,9 +6,10 @@
  * fills use fillRect.  Erasing is achieved via `destination-out` composite
  * mode (Canvas 2D, not PIXI — avoids PixiJS v8 erase-blend bug #11377).
  *
- * Compositing is sequential, so everything before the latest operation is kept in a second
- * canvas: while those operations stay the same records (a brush stroke under way, a lit scene's
- * darkness that changes on its own), a composite is one copy of it and the latest operation.
+ * Compositing is sequential. With `cachePrefix` (the Obsidian online scene, whose darkness
+ * changes on its own), everything before the latest operation is kept in a second canvas: while
+ * those operations stay the same records, a composite is one copy of it and the latest operation.
+ * Without it (every other view) no second canvas is ever allocated.
  */
 import type { FogBounds, FogOperation } from '../../types/fogTypes';
 import { renderOperation } from './fogRenderUtils';
@@ -21,7 +22,7 @@ export class FogCanvasCompositor {
   /** All operations but the latest, composited, and which records they were. */
   private prefix: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; ops: FogOperation[] } | null = null;
 
-  constructor(bounds: FogBounds, scale = 0.5) {
+  constructor(bounds: FogBounds, scale = 0.5, private readonly cachePrefix = false) {
     this.bounds = bounds;
     this.scale = scale;
     this.canvas = createEl('canvas');
@@ -39,6 +40,10 @@ export class FogCanvasCompositor {
   compositeAll(ops: FogOperation[]): void {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     const sorted = [...ops].sort((a, b) => a.timestamp - b.timestamp);
+    if (!this.cachePrefix) {
+      for (const op of sorted) renderOperation(this.ctx, op, this.bounds, this.scale, op.offsetX ?? 0, op.offsetY ?? 0);
+      return;
+    }
     const latest = sorted.pop();
     if (!latest) return;
     const prefix = this.prefixOf(sorted);

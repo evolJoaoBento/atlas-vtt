@@ -61,7 +61,7 @@ describe('a darkness change costs the same however much fog the GM painted', () 
     const restore = stubJsdomGraphics();
     const gmFog = heavyFog(200);
     const store = createStore(() => ({
-      isPlayerView: true, isGMView: false, isMapLoading: false, activeTool: 'select', mapPath: 'remote',
+      isPlayerView: true, isGMView: false, isMapLoading: false, activeTool: 'select', mapPath: 'remote', remoteScene: {},
       objects: { fog: { ...gmFog, [DARKNESS_FOG_ID]: darknessOp(300) } },
     }));
     const renderer = new FogOfWarRenderer(new Container() as never, { canvas: createEl('canvas') } as never, new EventEmitter(), store as never);

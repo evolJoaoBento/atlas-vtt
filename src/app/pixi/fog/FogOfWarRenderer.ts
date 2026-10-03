@@ -105,7 +105,8 @@ export class FogOfWarRenderer {
 
     // ── Preview compositor + texture (used during drawing only) ──────
     const bounds = this.calculateFogBounds();
-    this.compositor = new FogCanvasCompositor(bounds);
+    // Only the Obsidian online scene (its darkness changes on its own) keeps the prefix canvas; every other view allocates what upstream did.
+    this.compositor = new FogCanvasCompositor(bounds, undefined, Boolean(this.store.getState().remoteScene));
 
     this.previewTexture = PIXI.Texture.from(this.compositor.getCanvas());
     this.previewSprite = new PIXI.Sprite(this.previewTexture);
