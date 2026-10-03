@@ -90,6 +90,7 @@ async function atlas(name: string, seed: Record<string, string>, bare = false) {
   const plugin = {
     app, addCommand: (command: Command) => { commands.push(command); return command; },
     registerEvent: () => {}, register: (dispose: () => void) => { disposers.push(dispose); },
+    registerEditorExtension: () => {}, registerMarkdownPostProcessor: () => {},
   } as never;
   const register = (joins: InstanceType<typeof OnlineJoinService>, sessions: InstanceType<typeof OnlineSessionService>): void => registerSharing(plugin, {
     joins, people: PeopleBook.forApp(app), items: ShareItems.forApp(app), pulled: PulledItems.forApp(app), settings, sessions,

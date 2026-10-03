@@ -1,0 +1,49 @@
+// Share tags in notes (editor, reading view, the Share with… preview): a label per start tag, the covered
+// text highlighted in the label's colour. Notes live outside any Atlas view, so main.scss imports this at the root.
+@use '../../../../../styles/tokens' as *;
+
+$share-tag-tones: (
+  private: --color-red-rgb,
+  public: --color-green-rgb,
+  only: --color-blue-rgb,
+  except: --color-orange-rgb,
+);
+
+.atlas-share-tag {
+  display: inline-block;
+  // An inline capsule in running text: vertical padding would grow the line, so it is smaller than the side padding.
+  padding: 0 0.5em;
+  border-radius: $radius-s;
+  font-size: var(--font-smallest);
+  font-weight: $font-weight-medium;
+  line-height: 1.6;
+  vertical-align: baseline;
+  white-space: nowrap;
+  margin-inline-end: $spacing-xs;
+  cursor: text;
+}
+
+@each $tone, $rgb in $share-tag-tones {
+  .atlas-share-tag--#{$tone} {
+    background-color: rgba(var(#{$rgb}), 0.2);
+    color: rgb(var(#{$rgb}));
+  }
+
+  .atlas-share-tag-hl--#{$tone},
+  .atlas-share-tag-block--#{$tone} {
+    background-color: rgba(var(#{$rgb}), 0.12);
+  }
+}
+
+// Covered text reads as normal text, never as a greyed comment (real comments inside it stay grey).
+.atlas-share-tag-hl.cm-comment {
+  color: inherit;
+}
+
+.atlas-share-tag-hl {
+  border-radius: $radius-xs;
+}
+
+.atlas-share-tag-block {
+  border-radius: $radius-s;
+}

@@ -25,6 +25,7 @@
 - The Atlas dashboard has a **Join online session** tile that opens the Join dialog, as the command does.
 - Keep part of a shared note back from the editor: select text, right-click and pick **Share part: Private**, **Only…** or **Except…** (Only and Except list the people in your session), or **Share part: Everyone** to share a selection again. The same are commands for hotkeys: **Mark selection as private**, **Share selection only with…**, **Share selection with everyone except…** and **Share selection with everyone**. Atlas marks the part with tags hidden in comments, `%%[!private]%%`, `%%[!only|Ana, Ben]%%` or `%%[!except|Cara]%%` up to `%%[!end]%%`, which you can also type, inline or on their own lines, and nest.
 - Parts meant only for you arrive marked, so if you share the note on, they stay with you and the sender.
+- Share tags in your notes now look clean in the editor, reading view and the **Share with…** preview: each part starts with a coloured label (**Private** red, **Public** green, **Only Ana, Ben** blue, **Except Cara** orange), the text it covers is highlighted in the same colour, and end tags are not shown. Put the cursor on a label to edit the tag. `%%[!public]%%` marks a part shared with everyone the note is shared with.
 
 ## Fixed
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '../../../packages/components/primitives/button';
 import type { MapShareMode } from '../model/mapShare';
+import { TaggedText } from '../display/TaggedText';
 import { LabelledCheck } from './LabelledCheck';
 
 /** A person to tick: a known person by key, or a name the note uses that the list does not know (`name:<name>`). */
@@ -104,7 +105,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
               {known.map((row) => <option key={row.key} value={row.key}>{row.name}</option>)}
             </select>
           </label>
-          {previewText !== null && <pre className="atlas-share__preview">{previewText}</pre>}
+          {previewText !== null && <pre className="atlas-share__preview"><TaggedText text={previewText} /></pre>}
           {hint && <p className="atlas-share__hint">{hint}</p>}
         </section>
       )}

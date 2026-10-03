@@ -16,6 +16,8 @@
 
 // Notices live outside any Atlas view, so this file is imported at the root, not in the scope below.
 @use '../src/app/online/ui/online-session';
+// Share tags show in notes, outside any Atlas view, so they are imported at the root too.
+@use '../src/app/online/sharing/display/share-tags';
 
 // Registered so `atlas-scrollbar-while-scrolling` can fade the thumb. At-rules
 // must stay at the root: inside the scope block below they would be invalid.
