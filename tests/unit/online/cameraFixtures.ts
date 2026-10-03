@@ -40,7 +40,7 @@ export class FakeViewport implements CameraViewport {
 }
 
 export type CameraSceneState = Pick<ViewAtlasState,
-  'background' | 'grid' | 'objects' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen' | 'isMapLoading'
+  'background' | 'grid' | 'objects' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen' | 'isMapLoading' | 'mapLoaded' | 'mapPath'
 >;
 
 export function emptySceneState(isMapLoading = false): CameraSceneState {
@@ -53,6 +53,9 @@ export function emptySceneState(isMapLoading = false): CameraSceneState {
     initiative: createDefaultInitiativeState(),
     initiativeTrackerOpen: false,
     isMapLoading,
+    // The view holds Tavern's map, as a loaded view of the Tavern tab does.
+    mapLoaded: true,
+    mapPath: 'maps/tavern.atlasmap',
   };
 }
 

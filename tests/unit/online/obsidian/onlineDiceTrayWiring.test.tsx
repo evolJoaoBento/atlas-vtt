@@ -133,17 +133,19 @@ vi.mock('../../../../src/app/react/components/dice/DiceDropdownMenu', () => ({
 import { MainToolbar } from '../../../../src/app/packages/components/MainToolbar';
 
 describe('the online scene dice tray in the toolbar', () => {
-  it('sends the picks as a dice-roll with modifier 0, within the GM limit', () => {
+  // The online scene is a player view, so Atlas's dice toasts (`DiceRollDisplay`) are not mounted there.
+  it('sends the picks and the modifier as a dice-roll, within the GM limit', () => {
     render(<MainToolbar viewId="view-1" />);
-    const { onRoll, showToasts, maxDice } = trayProps.current as { onRoll(s: Record<string, number>): boolean; showToasts: boolean; maxDice: number };
-    expect(showToasts).toBe(false);
+    const { onRoll, maxDice } = trayProps.current as { onRoll(pool: Record<number, number>, modifier: number): boolean; maxDice: number };
     expect(maxDice).toBe(20);
-    expect(onRoll({ d6: 2, d20: 0 })).toBe(true);
+    expect(onRoll({ 6: 2, 20: 0 }, 0)).toBe(true);
     expect(rollDice).toHaveBeenCalledWith({ d6: 2 }, 0);
+    expect(onRoll({ 6: 1 }, 3)).toBe(true);
+    expect(rollDice).toHaveBeenLastCalledWith({ d6: 1 }, 3);
     rollDice.mockClear();
-    expect(onRoll({ d6: 21 })).toBe(false);
+    expect(onRoll({ 6: 21 }, 0)).toBe(false);
     expect(rollDice).not.toHaveBeenCalled();
     rollDice.mockReturnValueOnce(false);
-    expect(onRoll({ d6: 1 })).toBe(false);
+    expect(onRoll({ 6: 1 }, 0)).toBe(false);
   });
 });

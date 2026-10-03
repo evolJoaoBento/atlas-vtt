@@ -29,7 +29,7 @@ function expectCoverage<K extends string, T>(table: CoverageTable<K>, variants: 
 }
 
 const RULES: PlayerViewRules = {
-  showGrid: true, showTokenHP: true, showTokenStress: true, showTokenNameplates: true, showWidgets: true, showInitiative: true,
+  showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true,
 };
 // One id per path for the whole file, so a changed image path always gets a different id.
 const assets = fakeAssetIds();
@@ -40,10 +40,11 @@ const project = (state: ProjectedState): unknown => projectForPlayers(state, {
 const TOKEN: Character = {
   id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'art/hero.png', name: '', size: 1, rotation: 0, layer: 0,
   showRing: true, ringColor: '#ff0000', conditions: ['frightened'], conditionValues: { frightened: 2 }, isHidden: false,
-  hp: { current: 7, max: 10 }, stress: 2, maxStress: 6, maxHpOverridden: false, maxStressOverridden: false,
-  hope: { current: 1, max: 6 }, difficulty: '3', notePath: 'notes/hero.md', statblockPath: 'statblocks/hero.md', statblockName: 'Hero',
-  playerLinked: false, playerId: 'p1', playerCharacterId: 'c1', statblockResources: { focus: { current: 1, max: 3 } },
-  tags: ['party'], hasVision: true, showNameplate: false, visionInnerRadius: 100, visionOuterRadius: 200, instanceNumber: 1,
+  resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } }, overriddenMax: ['hp'],
+  difficulty: '3', notePath: 'notes/hero.md', statblockPath: 'statblocks/hero.md', statblockName: 'Hero',
+  playerLinked: false, playerId: 'p1', playerCharacterId: 'c1', side: 'players',
+  tags: ['party'], vision: { enabled: true, range: 200 }, showNameplate: false, instanceNumber: 1,
+  light: { bright: 20, dim: 40, color: '#ffcc88', intensity: 1, animation: 'none' },
 };
 const TEXT: TextElement = {
   id: 'tx', kind: 'text', x: 50, y: 50, text: 'Tavern', fontSize: 24, fontFamily: 'serif', color: '#000000',
@@ -60,16 +61,15 @@ const GRID: GridState = {
 };
 const COUNTER = { id: 'w1', type: 'counter', label: 'Torches', icon: 'flame', visible: true, visibleToPlayers: true, value: 1, order: 0 } as AnyWidget;
 const ENTRY: InitiativeEntry = {
-  id: 'e1', tokenId: 'hero', name: 'Hero', initiative: 15, initiativeModifier: 1, hp: { current: 7, max: 10 },
-  stress: { current: 2, max: 6 }, imagePath: 'art/hero.png', statblockPath: 'statblocks/hero.md',
-  isActive: true, isDefeated: false, isNPC: false, order: 0,
+  id: 'e1', tokenId: 'hero', name: 'Hero', initiative: 15, initiativeModifier: 1, imagePath: 'art/hero.png', statblockPath: 'statblocks/hero.md',
+  isActive: true, isNPC: false, order: 0,
 };
 
 function sceneState(overrides: Partial<ProjectedState> = {}): ProjectedState {
   return {
     background: 'maps/tavern.png',
     grid: GRID,
-    objects: { tokens: { hero: TOKEN }, fog: {}, pins: {}, texts: { tx: TEXT }, drawings: { d1: DRAWING }, walls: {}, lights: {}, audios: {} },
+    objects: { tokens: { hero: TOKEN }, fog: {}, pins: {}, texts: { tx: TEXT }, drawings: { d1: DRAWING }, walls: {}, lights: {}, lightZones: {}, audios: {} },
     widgetSettings: { widgets: { w1: COUNTER }, globalVisible: true, position: 'top', scale: 1 },
     widgetValues: { w1: 3 },
     initiative: { ...createDefaultInitiativeState(), isActive: true, round: 2, entries: [ENTRY] },
@@ -97,6 +97,7 @@ describe('coverage of map objects', () => {
       pins: add('pins', { id: 'extra', kind: 'pin', x: 1, y: 1, notePath: 'notes/secret.md' }),
       walls: add('walls', { id: 'extra' }),
       lights: add('lights', { id: 'extra' }),
+      lightZones: add('lightZones', { id: 'extra' }),
       audios: add('audios', { id: 'extra' }),
     };
     expectCoverage(OBJECT_COVERAGE, variants, sceneState(), project);
@@ -113,13 +114,11 @@ describe('coverage of token fields', () => {
       conditions: set({ conditions: ['prone'] }), conditionValues: set({ conditionValues: { frightened: 3 } }),
       isHidden: set({ isHidden: true }), name: set({ name: 'Bob' }),
       statblockPath: ({ statblockPath: _path, ...token }) => token, statblockName: set({ statblockName: 'Orc' }),
-      hp: set({ hp: { current: 3, max: 10 } }), stress: set({ stress: 4 }), maxStress: set({ maxStress: 8 }),
+      resources: set({ resources: { hp: { current: 3, max: 10 } } }), overriddenMax: set({ overriddenMax: [] }),
       showNameplate: set({ showNameplate: true }), tags: set({ tags: ['secret'] }), notePath: set({ notePath: 'notes/other.md' }),
-      difficulty: set({ difficulty: '5' }), hope: set({ hope: { current: 2, max: 6 } }),
-      statblockResources: set({ statblockResources: { focus: { current: 2, max: 3 } } }),
-      maxHpOverridden: set({ maxHpOverridden: true }), maxStressOverridden: set({ maxStressOverridden: true }),
+      difficulty: set({ difficulty: '5' }), side: set({ side: 'opponents' }),
       playerLinked: set({ playerLinked: true }), playerId: set({ playerId: 'p2' }), playerCharacterId: set({ playerCharacterId: 'c2' }),
-      hasVision: set({ hasVision: false }), visionInnerRadius: set({ visionInnerRadius: 150 }), visionOuterRadius: set({ visionOuterRadius: 250 }),
+      vision: set({ vision: { enabled: false } }), light: ({ light: _light, ...token }) => token,
       instanceNumber: set({ instanceNumber: 2 }),
     };
     expectCoverage(TOKEN_FIELD_COVERAGE, variants, TOKEN, (token) => project(withToken(token)));
@@ -210,6 +209,7 @@ describe('coverage of the measurement', () => {
     const variants: Variants<keyof CollectionGridDefaults, CollectionGridDefaults> = {
       unitType: set({ unitType: 'meters' }), unitDistance: set({ unitDistance: 10 }), measurementMode: set({ measurementMode: 'metric' }),
       abstractRangeBands: set({ abstractRangeBands: [{ name: 'Far', maxSquares: 6 }] }), diagonalRule: set({ diagonalRule: 'alternating' }),
+      coneAngle: set({ coneAngle: 60 }),
     };
     expectCoverage(MEASUREMENT_FIELD_COVERAGE, variants, base, (collectionGrid) => projectForPlayers(sceneState(), {
       sceneId: 'scene-1', rules: RULES, coverage: coverageOfFog({}), assets, mapSize: { width: 1000, height: 800 },

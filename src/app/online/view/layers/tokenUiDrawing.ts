@@ -10,7 +10,7 @@ import {
   BAR_BORDER, BAR_STYLE, barFillRect, barInnerRect, barTickXs, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect, tokenBarRects,
   type UiRect,
 } from '../../../pixi/token-renderer/tokenUiLayout';
-import { barDimensions, colors, getHealthColor } from '../../../styles/designTokens';
+import { barDimensions, colors } from '../../../styles/designTokens';
 import type { PlayerCondition, PlayerResource, PlayerToken } from '../../scene/sceneTypes';
 import type { ViewSurface } from '../ViewSurface';
 
@@ -44,6 +44,12 @@ export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: 
   if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, scale);
 }
 
+/** An HP bar's colour by the share left: healthy, injured below 70%, critical below 30%. */
+function healthColor(filled: number): number {
+  if (filled >= 0.7) return colors.health.healthy;
+  return filled >= 0.3 ? colors.health.injured : colors.health.critical;
+}
+
 const share = (resource: PlayerResource): number =>
   (resource.max > 0 ? Math.max(0, Math.min(1, resource.current / resource.max)) : 0);
 
@@ -51,13 +57,13 @@ function drawBars(surface: ViewSurface, hp: PlayerResource | null, stress: Playe
   const bars = tokenBarRects(hp !== null, stress !== null);
   if (hp && bars.hp) {
     const filled = share(hp);
-    drawBar(surface, bars.hp, filled, cssColor(getHealthColor(filled * 100)));
+    drawBar(surface, bars.hp, filled, cssColor(healthColor(filled)));
     if (hp.current <= 0) {
       surface.roundRect(bars.hp.x, bars.hp.y, bars.hp.width, bars.hp.height, barDimensions.token.radius,
         { fill: '#000000', alpha: BAR_STYLE.defeatedAlpha });
     }
   }
-  if (stress && bars.stress) drawBar(surface, bars.stress, share(stress), cssColor(colors.stress.fill));
+  if (stress && bars.stress) drawBar(surface, bars.stress, share(stress), cssColor(BAR_STYLE.stressFill));
 }
 
 function drawBar(surface: ViewSurface, bar: UiRect, filled: number, color: string): void {

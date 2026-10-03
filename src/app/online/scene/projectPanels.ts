@@ -5,7 +5,7 @@
 import type { ViewAtlasState } from '../../storeFactory';
 import { isSteppedWidget, readCounterValue } from '../../utils/counterWidget';
 import { isWidgetOn } from '../../utils/widgetActivation';
-import { finiteOr, hpOrNull, oneOf, textOr, textOrNull } from './coerce';
+import { finiteOr, oneOf, textOr, textOrNull } from './coerce';
 import type { PlayerViewRules } from './playerViewRules';
 import { PLAYER_WIDGET_TYPES, SCENE_LIMITS, type PlayerInitiative, type PlayerWidget } from './sceneTypes';
 import { isSceneId } from './sceneValidation';
@@ -48,7 +48,8 @@ export function projectInitiative(
       tokenId: entry.tokenId,
       initiative: finiteOr(entry.initiative, 0),
       name: rules.showTokenNameplates ? textOrNull(entry.name) : null,
-      hp: rules.showTokenHP ? hpOrNull(entry.hp) : null,
+      // Entries keep no HP since Atlas 0.5: it is a token resource, not sent yet.
+      hp: null,
       isActive: combat && entry.isActive === true,
     }));
   return { round: finiteOr(initiative.round, 0), active: combat, entries };

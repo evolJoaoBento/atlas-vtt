@@ -23,6 +23,8 @@ const ui = vi.hoisted(() => ({
   renderer: {
     getViewportInstance: (): unknown => null,
     setBackgroundSprite: () => undefined,
+    // The renderer takes the sprite off the viewport (and destroys it)
+    removeBackgroundSprite: (sprite: { parent: { removeChild: (child: unknown) => void } | null }) => sprite.parent?.removeChild(sprite),
     getGridSystem: (): unknown => ({}),
     initGrid: () => undefined,
   },

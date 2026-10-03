@@ -63,6 +63,14 @@ export function whenMapLoaded(store: StoreApi<ViewAtlasState>): Promise<void> {
   });
 }
 
+/** Whether the view's store holds `tabId`'s scene completely: its map, loaded and drawn. */
+function showsTab(view: PresentedView, tabId: string): boolean {
+  const state = view.atlasStore.getState();
+  if (!state.mapLoaded || state.isMapLoading) return false;
+  const tab = view.tabMetaStore.getState().tabs.find((entry) => entry.id === tabId);
+  return tab !== undefined && state.mapPath === tab.filePath;
+}
+
 /** The background's size, read from the renderer; 0 × 0 while none is loaded. */
 export function loadedMapSize(view: PresentedView): MapSize {
   const sprite = view.renderer?.getBackgroundSprite() ?? null;
@@ -79,7 +87,7 @@ export function presentedTabIdIn(scene: PresentedSceneInfo | null, tabStore: Tab
  * Which scene players see: one for the local player window and online players.
  * While the GM shows the presented view another tab the scene is held, since
  * the view's store then holds that other map; once the presented tab is active
- * again and its map has loaded, the scene is presented again (`resumed`).
+ * again and the store holds its map, loaded, the scene is presented again (`resumed`).
  */
 export class PresentedScene {
   private scene: PresentedSceneInfo | null = null;
@@ -87,6 +95,8 @@ export class PresentedScene {
   /** Invalidates resume waits that a later tab change made stale. */
   private resumeToken = 0;
   private stopWatching: (() => void) | null = null;
+  /** Stops waiting for the presented tab's scene to load again. */
+  private stopResuming: (() => void) | null = null;
   private readonly listeners = new Set<PresentedSceneListener>();
   private readonly viewsClearingOnClose = new WeakSet<PresentedView>();
 
@@ -108,6 +118,7 @@ export class PresentedScene {
     // Its close callback already ran, so nothing would ever clear the scene.
     if (view.isClosed) return;
     this.stopWatching?.();
+    this.stopResuming?.();
     const scene: PresentedSceneInfo = {
       view, tabId, store: view.atlasStore,
       mapSize: () => loadedMapSize(view),
@@ -131,6 +142,7 @@ export class PresentedScene {
     if (!previous) return;
     this.stopWatching?.();
     this.stopWatching = null;
+    this.stopResuming?.();
     this.scene = null;
     this.held = false;
     this.resumeToken++;
@@ -145,6 +157,7 @@ export class PresentedScene {
     }
     if (activeTabId !== scene.tabId) {
       this.resumeToken++;
+      this.stopResuming?.();
       if (this.held) return;
       this.held = true;
       this.emit((listener) => listener.held?.(scene));
@@ -153,18 +166,32 @@ export class PresentedScene {
     if (this.held) this.resumeWhenLoaded(scene, ++this.resumeToken);
   }
 
-  /** Views switch the active tab before loading its map, so loading is checked again after each wait. */
+  /**
+   * Views switch the active tab before its map starts loading, so the store may still hold the
+   * scene the GM browsed, and a retry after a failed load changes no tab. The store is watched
+   * until it holds the presented tab's map, loaded: players never get another scene meanwhile.
+   */
   private resumeWhenLoaded(scene: PresentedSceneInfo, token: number): void {
-    void whenMapLoaded(scene.store).then(() => {
-      if (this.scene !== scene || !this.held || token !== this.resumeToken) return;
-      if (scene.store.getState().isMapLoading) {
-        this.resumeWhenLoaded(scene, token);
+    this.stopResuming?.();
+    const stop = (): void => {
+      unsubscribe();
+      if (this.stopResuming === stop) this.stopResuming = null;
+    };
+    const check = (): void => {
+      if (this.scene !== scene || !this.held || token !== this.resumeToken
+        || scene.view.tabMetaStore.getState().activeTabId !== scene.tabId) {
+        stop();
         return;
       }
-      if (scene.view.tabMetaStore.getState().activeTabId !== scene.tabId) return;
+      if (!showsTab(scene.view, scene.tabId)) return;
+      stop();
       this.held = false;
       this.emit((listener) => listener.presented?.(scene, true));
-    });
+    };
+    const unsubscribe = scene.store.subscribe(check);
+    this.stopResuming = stop;
+    // After the tab change has settled: a load the switch starts right away is seen first.
+    void Promise.resolve().then(check);
   }
 
   private clearOnClose(view: PresentedView): void {

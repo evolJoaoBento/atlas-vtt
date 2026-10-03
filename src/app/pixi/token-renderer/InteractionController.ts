@@ -873,7 +873,7 @@ export class InteractionController implements ITokenInteractionController {
   }
 
   destroyAll(): void {
-    this.eventBus.off(ONLINE_DRAG_CANCEL, this.cancelDrag);
+    if (this.isPlayerView) this.eventBus.off(ONLINE_DRAG_CANCEL, this.cancelDrag);
     // Clean up all hover handlers
     for (const tokenId in this.hoverHandlers) {
       delete this.hoverHandlers[tokenId];

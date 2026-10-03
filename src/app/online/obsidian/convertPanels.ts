@@ -52,10 +52,8 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
     name: entry.name ?? '',
     initiative: entry.initiative,
     initiativeModifier: 0,
-    hp: entry.hp ? { current: entry.hp.current, max: entry.hp.max } : { current: 0, max: 0 },
     imagePath: Object.hasOwn(tokens, entry.tokenId) ? tokens[entry.tokenId]?.imagePath ?? '' : '',
     isActive: entry.isActive,
-    isDefeated: entry.hp !== null && entry.hp.current <= 0,
     isNPC: true,
     order,
   }));
@@ -66,7 +64,6 @@ export function atlasInitiative(initiative: PlayerInitiative | null, tokens: Rea
       round: initiative.round,
       isActive: initiative.active,
       config: { ...DEFAULT_INITIATIVE_CONFIG },
-      removedTokenIds: [],
     },
     initiativeTrackerOpen: true,
   };

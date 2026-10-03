@@ -6,7 +6,7 @@
 
 import { pathLengthInCells, type GridGeometry } from '../../grid/gridDistance';
 import type { Point } from '../../grid/hexGeometry';
-import { formatDistance, type MeasurementSettings } from '../../grid/measurementFormat';
+import { formatDistance, type DistanceSettings } from '../../grid/measurementFormat';
 
 /** Atlas's key for adding a waypoint while dragging a token. */
 export const WAYPOINT_KEY = ' ';
@@ -59,6 +59,6 @@ export class DragRulerPath {
 }
 
 /** The ruler's label: the path's length in the measurement's units or range bands. */
-export function dragRulerLabel(grid: GridGeometry, points: readonly Point[], settings: MeasurementSettings): string {
+export function dragRulerLabel(grid: GridGeometry, points: readonly Point[], settings: DistanceSettings): string {
   return formatDistance(pathLengthInCells(grid, points, settings.diagonalRule), settings);
 }

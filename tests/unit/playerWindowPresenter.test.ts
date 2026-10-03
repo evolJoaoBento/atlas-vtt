@@ -375,6 +375,8 @@ describe('PlayerWindowPresenter', () => {
     const tavern = first.view.tabMetaStore.getState().addTab('maps/tavern.md', 'Tavern');
     const keep = second.view.tabMetaStore.getState().addTab('maps/keep.md', 'Keep');
     const cellar = second.view.tabMetaStore.getState().addTab('maps/cellar.md', 'Cellar');
+    // The second view holds Keep's map: browsing Cellar in this test loads nothing.
+    second.atlasStore.setState({ mapPath: 'maps/keep.md' });
     serviceMock.isWindowOpen.mockReturnValue(true);
     await presentTabInPlayerWindow({} as any, first.view, tavern);
     serviceMock.presentCanvas.mockClear();

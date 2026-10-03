@@ -32,8 +32,8 @@ const gmOnly = (reason: string): Coverage => ({ status: 'gm-only', reason });
 const notYet = (piece: string): Coverage => ({ status: 'not-yet', piece });
 
 const KIND = gmOnly('the record kind; players get each kind in its own list');
-const WALLS_AND_LIGHTING = notYet('walls and lighting (behind WALLS_AND_LIGHTING_ENABLED)');
-const BARS_ONLY = gmOnly('the player window shows only the HP and stress bars');
+const DYNAMIC_LIGHTING = notYet('dynamic lighting and vision (an experimental feature since Atlas 0.5)');
+const TOKEN_RESOURCES = notYet('token resources (Atlas 0.5), shown to players by their visibleToPlayers');
 const LOCAL_PLAYER_LINK = gmOnly('links the token to a local player character, not to an online player');
 
 export const OBJECT_COVERAGE: CoverageTable<keyof ViewAtlasState['objects']> = {
@@ -42,8 +42,9 @@ export const OBJECT_COVERAGE: CoverageTable<keyof ViewAtlasState['objects']> = {
   texts: SENT,
   drawings: SENT,
   pins: gmOnly('note pins link GM notes; the player window hides them'),
-  walls: WALLS_AND_LIGHTING,
-  lights: WALLS_AND_LIGHTING,
+  walls: DYNAMIC_LIGHTING,
+  lights: DYNAMIC_LIGHTING,
+  lightZones: DYNAMIC_LIGHTING,
   audios: notYet('ambient audio (behind AMBIENT_AUDIO_ENABLED)'),
 };
 
@@ -64,23 +65,18 @@ export const TOKEN_FIELD_COVERAGE: CoverageTable<KeysOfUnion<TokenEntity>> = {
   name: SENT,
   statblockPath: SENT,
   statblockName: SENT,
-  hp: SENT,
-  stress: SENT,
-  maxStress: SENT,
+  resources: TOKEN_RESOURCES,
+  overriddenMax: gmOnly('records which maximums the GM set by hand'),
   showNameplate: gmOnly('players see nameplates by the Show nameplates player view setting, as in the player window'),
   tags: gmOnly('tags organise the GM\'s tokens'),
   notePath: gmOnly('note links stay on the GM\'s machine'),
   difficulty: gmOnly('the statblock rating is shown to the GM only'),
-  hope: BARS_ONLY,
-  statblockResources: BARS_ONLY,
-  maxHpOverridden: gmOnly('records that the GM set the maximum; the maximum itself is sent with the HP'),
-  maxStressOverridden: gmOnly('records that the GM set the maximum; the maximum itself is sent with the stress'),
   playerLinked: LOCAL_PLAYER_LINK,
   playerId: LOCAL_PLAYER_LINK,
   playerCharacterId: LOCAL_PLAYER_LINK,
-  hasVision: WALLS_AND_LIGHTING,
-  visionInnerRadius: WALLS_AND_LIGHTING,
-  visionOuterRadius: WALLS_AND_LIGHTING,
+  vision: DYNAMIC_LIGHTING,
+  light: DYNAMIC_LIGHTING,
+  side: notYet('initiative by sides (Atlas 0.5)'),
   instanceNumber: notYet('instance badges, with the scene\'s Show instance badges setting (a later piece)'),
 };
 
@@ -176,4 +172,5 @@ export const MEASUREMENT_FIELD_COVERAGE: CoverageTable<keyof CollectionGridDefau
   measurementMode: SENT,
   abstractRangeBands: SENT,
   diagonalRule: SENT,
+  coneAngle: notYet("the game system's cone angle (Atlas 0.5); players' cones open 90 degrees"),
 };

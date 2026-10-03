@@ -7,13 +7,12 @@
  */
 import { resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { DEFAULT_HEX_NUMBER_OPACITY, isHexNumberFormat } from '../../grid/hexNumbering';
-import { tokenHp, tokenStress } from '../../pixi/token-renderer/tokenResources';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { Character, TokenEntity } from '../../types';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
 import type { AssetIds } from './AssetRegistry';
-import { finiteOr, finiteOrNull, hpOrNull, oneOf, positiveOr, resourceOrNull, textOr, textOrNull, unitOr } from './coerce';
+import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -128,8 +127,10 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     ring: token.showRing === false ? null : textOr(token.ringColor, DEFAULT_RING),
     conditions: character ? projectConditions(token) : [],
     name: character && rules.showTokenNameplates ? displayName(character) : null,
-    hp: character && rules.showTokenHP ? hpOrNull(tokenHp(character)) : null,
-    stress: character && rules.showTokenStress ? resourceOrNull(tokenStress(character)) : null,
+    // Token resources (Atlas 0.5) replace HP and stress and are not sent yet: each collection
+    // defines its own, shown to players by their `visibleToPlayers` (see `docs/online-play-features.md`).
+    hp: null,
+    stress: null,
   };
 }
 

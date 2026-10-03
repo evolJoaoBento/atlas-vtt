@@ -17,7 +17,7 @@ function makeController(options: { player: boolean; remoteScene: RemoteSceneStat
   } as any;
   const state = {
     activeTool: 'move', selectedIds: options.selectedIds ?? [], setSelection, setIsDragging: vi.fn(),
-    setTokenPositions: vi.fn(), moveToken: vi.fn(), grid: { snapToGrid: false },
+    setTokenPositions: vi.fn(), dropTokens: vi.fn(), heldTokens: {}, setHeldTokens: vi.fn(), grid: { snapToGrid: false },
     objects: { tokens: { a: { id: 'a', x: 35, y: 35 }, b: { id: 'b', x: 105, y: 35 } } },
     remoteScene: options.remoteScene,
   };
@@ -104,7 +104,7 @@ describe('dragging in the online scene', () => {
     t.press('b');
     expect(t.setSelection).not.toHaveBeenCalled();
     t.dragTo(175, 105);
-    expect(t.state.setTokenPositions).toHaveBeenLastCalledWith([{ id: 'a', x: 105, y: 105 }, { id: 'b', x: 175, y: 105 }]);
+    expect(t.state.dropTokens).toHaveBeenLastCalledWith([{ id: 'a', x: 105, y: 105 }, { id: 'b', x: 175, y: 105 }]);
     expect(t.drops).toEqual([]);
   });
 });

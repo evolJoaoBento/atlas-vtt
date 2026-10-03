@@ -30,6 +30,9 @@ afterEach(() => {
   ui.view = null;
 });
 
+/** The tray's d6 (its tooltip names it "d6"; `aria-label` says what a click does). */
+const addD6 = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[aria-label^="Add a d6"]')!;
+
 describe('rolling again and from the tray', () => {
   it("rolls a logged roll's dice and modifier again, when the tray can", () => {
     expect(rollOfResult(diceLogResults([ENTRY])[0]!)).toEqual({ dice: { d6: 2 }, modifier: 1 });
@@ -48,25 +51,28 @@ describe('rolling again and from the tray', () => {
   it('stops adding dice at the limit, and keeps the tray open when the roll could not go', () => {
     const onToggle = vi.fn();
     const onRoll = vi.fn(() => false);
-    render(<DiceDropdownMenu diceTool={{ rollDice: vi.fn() } as never} isOpen onToggle={onToggle} onRoll={onRoll} maxDice={2} showToasts={false} />);
-    const d6 = document.querySelectorAll('.atlas-dice-btn')[1]!;
+    render(<DiceDropdownMenu diceTool={{ rollDice: vi.fn() } as never} isOpen onToggle={onToggle} onRoll={onRoll} maxDice={2} />);
+    fireEvent.click(addD6());
+    fireEvent.click(addD6());
+    const d6 = addD6();
+    expect(d6.disabled).toBe(true);
     fireEvent.click(d6);
-    fireEvent.click(d6);
-    fireEvent.click(d6);
-    expect(screen.getByRole('status').textContent).toBe('A roll has at most 2 dice.');
-    fireEvent.click(screen.getByRole('button', { name: /Roll/ }));
-    expect(onRoll).toHaveBeenCalledWith({ d6: 2 });
+    fireEvent.click(screen.getByRole('button', { name: /^Roll$/ }));
+    expect(onRoll).toHaveBeenCalledWith({ 6: 2 }, 0);
     expect(onToggle).not.toHaveBeenCalled();
-    expect(screen.getByRole('status').textContent).toMatch(/send the roll/);
+    expect(screen.getByText(/send the roll/)).toBeTruthy();
+    // The tray keeps its dice for another try
+    expect(addD6().getAttribute('aria-label')).toBe('Add a d6, 2 in the tray');
   });
 
   it('sends the picked dice instead of rolling them, and shows no toasts', () => {
     const rollDice = vi.fn();
     const onRoll = vi.fn(() => true);
-    render(<DiceDropdownMenu diceTool={{ rollDice } as never} isOpen onToggle={() => {}} onRoll={onRoll} showToasts={false} />);
-    fireEvent.click(document.querySelectorAll('.atlas-dice-btn')[1]!);
-    fireEvent.click(screen.getByRole('button', { name: /Roll/ }));
-    expect(onRoll).toHaveBeenCalledWith({ d6: 1 });
+    render(<DiceDropdownMenu diceTool={{ rollDice } as never} isOpen onToggle={() => {}} onRoll={onRoll} />);
+    fireEvent.click(addD6());
+    fireEvent.click(screen.getByRole('button', { name: 'Increase modifier' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Roll$/ }));
+    expect(onRoll).toHaveBeenCalledWith({ 6: 1 }, 1);
     expect(rollDice).not.toHaveBeenCalled();
     expect(screen.queryByText('toasts')).toBeNull();
   });

@@ -28,6 +28,8 @@ export const BAR_STYLE = {
   tickWidth: 0.5,
   /** Darkens the HP bar of a token at 0 HP or less. */
   defeatedAlpha: 0.4,
+  /** The online player view's stress bar; Atlas's own bars take their resource's colour. */
+  stressFill: 0xa855f7,
 } as const;
 
 export const NAMEPLATE = {

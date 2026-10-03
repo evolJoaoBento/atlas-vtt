@@ -101,7 +101,10 @@ describe('playerSceneToAtlasState', () => {
       },
     });
     const parts = playerSceneToAtlasState(scene, images);
-    expect(parts.measurement).toEqual({ mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }] });
+    // The cone angle is not sent yet: the online scene's cones open as without a game system.
+    expect(parts.measurement).toEqual({
+      mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 90,
+    });
     expect(parts.state.grid).toMatchObject({ snapToGrid: false, measurementType: 'abstract' });
     expect(parts.state.grid).not.toHaveProperty('unitType');
   });
@@ -130,7 +133,7 @@ describe('playerSceneToAtlasState', () => {
     });
     const state = playerSceneToAtlasState(scene, images).state;
     expect(state.initiativeTrackerOpen).toBe(true);
-    expect(state.initiative).toMatchObject({ round: 3, isActive: true, currentIndex: 0, removedTokenIds: [] });
+    expect(state.initiative).toMatchObject({ round: 3, isActive: true, currentIndex: 0 });
     expect(state.initiative.entries).toEqual([{
       id: 'e1', tokenId: 't1', name: 'Anna', initiative: 15, initiativeModifier: 0, hp: { current: 0, max: 9 },
       imagePath: 'blob:token/asset-1', isActive: true, isDefeated: true, isNPC: true, order: 0,

@@ -5,7 +5,7 @@
  * fields). The UI reaches the view's actions through `AtlasView.onlineControls()`.
  */
 import type { StoreApi } from 'zustand';
-import type { MeasurementSettings } from '../../grid/measurementFormat';
+import { DEFAULT_CONE_ANGLE, type MeasurementSettings } from '../../grid/measurementFormat';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { DiceSelection } from '../../tools/diceRolling';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
@@ -64,6 +64,8 @@ export function atlasMeasurement(measurement: PlayerMeasurement): MeasurementSet
     unitDistance: measurement.unitDistance,
     diagonalRule: measurement.diagonalRule,
     rangeBands: measurement.rangeBands.map((band) => ({ name: band.name, maxSquares: band.maxSquares })),
+    // Not sent yet: the online scene's cones open as a collection without a game system's do.
+    coneAngle: DEFAULT_CONE_ANGLE,
   };
 }
 

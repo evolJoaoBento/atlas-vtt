@@ -20,7 +20,7 @@ import { fingerprintOf, memoryImageFiles, nodeHash, type MemoryImageFiles } from
 import { fogRect, playerScene } from './sceneFixtures';
 
 type SceneState = Pick<ViewAtlasState,
-  'background' | 'grid' | 'objects' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen' | 'isMapLoading'
+  'background' | 'grid' | 'objects' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen' | 'isMapLoading' | 'mapLoaded' | 'mapPath'
 > & { camera: { x: number; y: number; scale: number } };
 
 function character(id: string, x: number, overrides: Partial<Character> = {}): Character {
@@ -37,6 +37,9 @@ function sceneState(tokens: Record<string, Character>, fog: Record<string, FogOp
     initiative: createDefaultInitiativeState(),
     initiativeTrackerOpen: false,
     isMapLoading: false,
+    // The view holds Tavern's map, as a loaded view of the Tavern tab does.
+    mapLoaded: true,
+    mapPath: 'maps/tavern.atlasmap',
     camera: { x: 0, y: 0, scale: 1 },
   };
 }

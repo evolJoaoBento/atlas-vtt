@@ -3,10 +3,13 @@ import { createStore } from 'zustand/vanilla';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
 import { PresentedScene, type PresentedView } from '../../src/app/services/PresentedScene';
 
+/** What the presented scene reads of a view's store: whether, and which, map it holds. */
+interface SceneState { isMapLoading: boolean; mapLoaded: boolean; mapPath: string | null }
+
 interface FakeView {
   view: PresentedView;
   tabs: ReturnType<typeof createTabMetaStore>;
-  store: ReturnType<typeof createStore<{ isMapLoading: boolean }>>;
+  store: ReturnType<typeof createStore<SceneState>>;
   register: ReturnType<typeof vi.fn>;
   close(): void;
   tavern: string;
@@ -15,7 +18,8 @@ interface FakeView {
 
 function fakeView(renderer?: PresentedView['renderer']): FakeView {
   const tabs = createTabMetaStore();
-  const store = createStore<{ isMapLoading: boolean }>(() => ({ isMapLoading: false }));
+  // The view holds Tavern's map; browsing other tabs in these tests never loads another one.
+  const store = createStore<SceneState>(() => ({ isMapLoading: false, mapLoaded: true, mapPath: 'maps/tavern.atlasmap' }));
   const closers: Array<() => void> = [];
   const register = vi.fn((callback: () => void) => { closers.push(callback); });
   const tavern = tabs.getState().addTab('maps/tavern.atlasmap', 'Tavern');
