@@ -22,3 +22,9 @@
 - Online players' cones open with your game system's cone angle, on the join page and in the Online scene tab, and a player-safe map you share opens its cones the same way.
 - Online players see the initiative list exactly as your player window shows it, on the join page and in the Online scene tab: grouped under **Players** and **Opponents** for a collection that fights by sides (the side that acts first on top, the side whose turn it is marked, combatants that sit out faded), and with no initiative numbers where the player window shows none. Changing the collection's initiative rules reaches players as you do it. A player-safe map you share lists initiative the same way.
 - Exporting a collection no longer takes the `atlas-share` property with its notes, and installing a bundle drops it from its notes, so a note you share with your online players is not shared with someone else's.
+- The Atlas dashboard has a **Join online session** tile that opens the Join dialog, as the command does.
+
+## Fixed
+
+- Rolling from the dice tray in the Online scene tab no longer fails with "Couldn't send the roll" while the tab shows you connected. When a roll cannot go, the tray and the dice log now say why: the GM has not let you in yet, Atlas is reconnecting, the connection was lost, or the session ended.
+- Settings → Online play: the own server's host, port and path sit on their own row under the setting's name, so its description no longer wraps one word per line, and other rows with wide fields move them below the text in a narrow window. The own server fields are shown disabled while **PeerJS cloud (free)** is chosen.
