@@ -39,7 +39,7 @@ function setup(options: { lit?: boolean; mode?: 'player-safe' | 'full' } = {}): 
     isFile: (path) => path in notes || path === 'maps/inn.png',
     resolveLink: (linkpath) => (`Notes/${linkpath}.md` in notes ? `Notes/${linkpath}.md` : null),
     shareable: () => [],
-    rules: () => ({ showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
+    rules: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
     collectionGrid: () => null,
   };
   return { catalogue: new SenderCatalogue(sources, items, people, nodeHash, async () => ({ width: 100, height: 100 })), items, notes };
@@ -97,10 +97,12 @@ describe('SenderCatalogue', () => {
     const map = (await before.catalogue.list(ben)).find((item) => item.kind === 'map')!;
     const payload = JSON.parse(text((await before.catalogue.open(ben, map.item))!.bytes));
     const { catalogue } = setup({ lit: true });
-    expect((await catalogue.list(ben)).map((item) => item.kind)).toEqual(['note']);
+    // Neither the map nor the notes ticked on it are listed: a refused share offers nothing of what it carries
+    expect((await catalogue.list(ben)).map((item) => item.kind)).toEqual([]);
     expect(await catalogue.open(ben, map.item)).toBeNull();
     expect(await catalogue.open(ben, `${map.item}/${payload.images[0]}`)).toBeNull();
     const full = setup({ lit: true, mode: 'full' });
     expect((await full.catalogue.list(ben)).find((item) => item.kind === 'map')).toMatchObject({ mode: 'full' });
+    expect((await full.catalogue.list(ben)).map((item) => item.kind)).toContain('note');
   });
 });

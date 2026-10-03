@@ -233,4 +233,42 @@ describe('scene limits', () => {
     const fits = { round: 1, active: true, entries: entries.slice(1) };
     expect(decodeRaw({ ...patch, set: { initiative: fits } }).kind).toBe('message');
   });
+
+  describe('token resources', () => {
+    const patchWith = (token: object): ReturnType<typeof decodeControl> => decodeRaw({
+      v: 1, type: 'scene-patch', seq: 2, set: {}, upsert: { tokens: { t1: token } }, remove: {},
+    });
+    const bar = { color: '#22c55e', share: 0.5, spent: false };
+    const tokenWith = (extra: object): object => ({ ...playerToken(), ...extra });
+
+    it('accepts bars and the downed mark, and a token from before them', () => {
+      expect(patchWith(tokenWith({ resources: [bar, { ...bar, color: '#A855F7', share: 0, spent: true }], downed: true })).kind).toBe('message');
+      expect(patchWith(playerToken()).kind).toBe('message');
+      // A GM of an older version sent no bars and an HP bar of its own, which is still validated
+      const { resources: _resources, ...older } = tokenWith({ hp: { current: 3, max: 8 }, stress: null }) as Record<string, unknown>;
+      expect(patchWith(older).kind).toBe('message');
+      const { hp: _hp, stress: _stress, ...without } = playerToken() as unknown as Record<string, unknown>;
+      expect(patchWith(without).kind).toBe('message');
+    });
+
+    it('refuses malformed bars: the colour, the share, the flag, the count and the type', () => {
+      const bad = [
+        [{ ...bar, color: 'red' }], [{ ...bar, color: 'url(x)' }], [{ ...bar, color: '#12345' }], [{ ...bar, color: '#22c55e00' }], [{ ...bar, color: 5 }],
+        [{ ...bar, share: 1.01 }], [{ ...bar, share: -0.1 }], [{ ...bar, share: Number.NaN }], [{ ...bar, share: '0.5' }],
+        [{ ...bar, spent: 1 }], [{ color: bar.color, share: bar.share }], ['bar'], [null], { 0: bar }, 'bars',
+        Array.from({ length: SCENE_LIMITS.resources + 1 }, () => bar),
+      ];
+      for (const resources of bad) expect(patchWith(tokenWith({ resources })).kind, JSON.stringify(resources)).toBe('invalid');
+      expect(patchWith(tokenWith({ resources: Array.from({ length: SCENE_LIMITS.resources }, () => bar) })).kind).toBe('message');
+      expect(patchWith(tokenWith({ downed: 'yes' })).kind).toBe('invalid');
+    });
+
+    it('checks the initiative bar: a share from 0 to 1, or none', () => {
+      const entry = { id: 'e', tokenId: 't', initiative: 1, name: null, hp: null, isActive: false };
+      const initiative = (extra: object): object => ({ round: 1, active: true, entries: [{ ...entry, ...extra }] });
+      const patch = (value: object): ReturnType<typeof decodeControl> => decodeRaw({ v: 1, type: 'scene-patch', seq: 2, upsert: {}, remove: {}, set: { initiative: value } });
+      for (const ok of [{}, { hpShare: null }, { hpShare: 0 }, { hpShare: 1 }, { hpShare: 0.4 }]) expect(patch(initiative(ok)).kind).toBe('message');
+      for (const bad of [{ hpShare: 1.5 }, { hpShare: -1 }, { hpShare: '1' }]) expect(patch(initiative(bad)).kind).toBe('invalid');
+    });
+  });
 });

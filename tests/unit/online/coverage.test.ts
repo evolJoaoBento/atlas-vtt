@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, INITIATIVE_COVERAGE, INITIATIVE_ENTRY_COVERAGE, MEASUREMENT_FIELD_COVERAGE,
-  OBJECT_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, TOKEN_SETTINGS_COVERAGE, type CoverageTable, type KeysOfUnion,
+  OBJECT_COVERAGE, RESOURCE_DEFINITION_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, TOKEN_SETTINGS_COVERAGE, type CoverageTable, type KeysOfUnion,
 } from '../../../src/app/online/coverage';
 import { projectForPlayers, type ProjectedState } from '../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo, projectDrawings, projectFog, projectTexts } from '../../../src/app/online/scene/projectRecords';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
 import type { GridState } from '../../../src/app/services/MapPersistence';
 import type { ViewAtlasState } from '../../../src/app/storeFactory';
+import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { Character, DrawingStroke, TextElement } from '../../../src/app/types';
 import type { CollectionGridDefaults } from '../../../src/app/types/collectionSettingsTypes';
 import type { FogBrushStroke, FogOperation, FogRectangleFill } from '../../../src/app/types/fogTypes';
@@ -33,14 +34,20 @@ const RULES: PlayerViewRules = {
 };
 // One id per path for the whole file, so a changed image path always gets a different id.
 const assets = fakeAssetIds();
-const project = (state: ProjectedState): unknown => projectForPlayers(state, {
+/** The collection's resources: HP defeats the token and shows in the first socket, stress fills in the second; players see both. */
+const DEFINITIONS: readonly ResourceDefinition[] = [
+  { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true, slot: 0 },
+  { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7', visibleToPlayers: true, slot: 1 },
+];
+const project = (state: ProjectedState, resources: readonly ResourceDefinition[] = DEFINITIONS): unknown => projectForPlayers(state, {
   sceneId: 'scene-1', rules: RULES, coverage: coverageOfFog({}), assets, mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(),
+  resources,
 });
 
 const TOKEN: Character = {
   id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'art/hero.png', name: '', size: 1, rotation: 0, layer: 0,
   showRing: true, ringColor: '#ff0000', conditions: ['frightened'], conditionValues: { frightened: 2 }, isHidden: false,
-  resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } }, overriddenMax: ['hp'],
+  resources: { hp: { current: 2, max: 10 }, stress: { current: 2, max: 6 } }, overriddenMax: ['hp'],
   difficulty: '3', notePath: 'notes/hero.md', statblockPath: 'statblocks/hero.md', statblockName: 'Hero',
   playerLinked: false, playerId: 'p1', playerCharacterId: 'c1', side: 'players',
   tags: ['party'], vision: { enabled: true, range: 200 }, showNameplate: false, instanceNumber: 1,
@@ -122,6 +129,20 @@ describe('coverage of token fields', () => {
       instanceNumber: set({ instanceNumber: 2 }),
     };
     expectCoverage(TOKEN_FIELD_COVERAGE, variants, TOKEN, (token) => project(withToken(token)));
+  });
+});
+
+describe('coverage of the collection resources', () => {
+  it('sends every definition field marked sent and nothing of the others', () => {
+    // HP is nearly spent (red, whatever its colour, as it defeats the token); stress shows its own colour
+    const set = (index: number, patch: Partial<ResourceDefinition>) => (defs: readonly ResourceDefinition[]): readonly ResourceDefinition[] =>
+      defs.map((definition, at) => (at === index ? { ...definition, ...patch } : definition));
+    const variants: Variants<keyof ResourceDefinition, readonly ResourceDefinition[]> = {
+      key: set(0, { key: 'health' }), name: set(0, { name: 'Hit points' }), field: set(0, { field: 'stats.0' }),
+      direction: set(0, { direction: 'static' }), color: set(1, { color: '#3b82f6' }),
+      defeatedWhenSpent: set(0, { defeatedWhenSpent: false }), visibleToPlayers: set(0, { visibleToPlayers: false }), slot: set(0, { slot: 3 }),
+    };
+    expectCoverage(RESOURCE_DEFINITION_COVERAGE, variants, DEFINITIONS, (defs) => project(sceneState(), defs));
   });
 });
 

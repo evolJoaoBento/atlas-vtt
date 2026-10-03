@@ -66,7 +66,7 @@ export async function readSharedMap(read: (path: string) => Promise<string>, map
       initiative: stored.initiative ?? null, initiativeTrackerOpen: stored.initiativeTrackerOpen === true,
     } as unknown as ProjectedState;
     const extra = Object.fromEntries(FULL_FIELDS.flatMap((key) => (stored[key] === undefined ? [] : [[key, stored[key]]])));
-    return { map, state, extra, lit: readSceneLighting(stored.lighting).enabled === true };
+    return { map, state, extra, lit: Boolean(readSceneLighting(stored.lighting).enabled) };
   } catch {
     return null;
   }

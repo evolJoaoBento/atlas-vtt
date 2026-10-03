@@ -21,6 +21,8 @@ interface InitiativeScene {
   /** Initiative tokens players may see, joined into a key so edits to other tokens compare equal. */
   visibleTokenIds: string;
   mapPath: string | null;
+  /** The online scene's list: the GM decided which combatants show a bar, and sent it (`remoteScene.initiativeHealth`). */
+  remote: boolean;
   /** What the list shows of every initiative token (`EntryToken`), in entry order, as a key that changes when one of them does. */
   tokens: string;
 }
@@ -49,7 +51,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
     super({ cls: 'atlas-player-initiative-container' }, settings);
   }
 
-  protected select({ initiative, initiativeTrackerOpen, objects, mapPath }: ViewAtlasState): InitiativeScene {
+  protected select({ initiative, initiativeTrackerOpen, objects, mapPath, remoteScene }: ViewAtlasState): InitiativeScene {
     const tokens = objects?.tokens;
     const entries = initiative?.entries ?? [];
     const visibleTokenIds = entries
@@ -58,9 +60,10 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       .join(TOKEN_ID_SEPARATOR);
     const entryTokens = JSON.stringify(entries.map((entry): EntryToken => {
       const token = tokens?.[entry.tokenId];
-      return { hp: token?.resources?.hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
+      const hp = remoteScene ? remoteScene.initiativeHealth[entry.tokenId] : token?.resources?.hp;
+      return { hp: hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
     }));
-    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, tokens: entryTokens };
+    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, remote: remoteScene != null, tokens: entryTokens };
   }
 
   protected render(container: HTMLElement, scene: InitiativeScene, settings: PlayerSettings): void {
@@ -69,7 +72,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
     const visibleTokenIds = new Set(scene.visibleTokenIds.split(TOKEN_ID_SEPARATOR));
     const tokenOf = JSON.parse(scene.tokens) as EntryToken[];
     // Players see HP where the map's collection shows it to them
-    const hpVisible = mapResources(AssetService.getInstance(this.app), scene.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
+    const hpVisible = scene.remote || mapResources(AssetService.getInstance(this.app), scene.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
     const combatants = initiative.entries
       .map((entry, index): Combatant => {
         const token = tokenOf[index] ?? { hp: null, showRing: true, side: 'opponents' };

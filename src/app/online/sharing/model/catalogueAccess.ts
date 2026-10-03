@@ -44,7 +44,9 @@ export async function accessFor(sources: AccessSources, recipient: Recipient, pe
     if (!mapShareReaches(entry.share, recipient, people)) continue;
     const source = await sources.readMap(entry.mapPath);
     if (!source) continue;
-    const offered = new Set(offeredNotes(source.map, entry.share.mode).map((note) => note.path));
+    // A lit map shared player-safe is refused (`SenderCatalogue`): its ticked notes are not offered either.
+    const refused = entry.share.mode !== 'full' && source.lit;
+    const offered = new Set(refused ? [] : offeredNotes(source.map, entry.share.mode).map((note) => note.path));
     const linked = entry.share.notes.filter((path) => {
       const note = offered.has(path) ? sources.note(path) : null;
       if (!note || note.rule.private) return false;

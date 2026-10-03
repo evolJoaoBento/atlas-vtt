@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONTROLLED_RING_COLOR, createTokensLayer, TOKEN_MARKER_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
+import { CONTROLLED_RING_COLOR, createTokensLayer, DOWNED_VEIL, TOKEN_MARKER_COLOR } from '../../../src/app/online/view/layers/tokensLayer';
 import { NEUTRAL_BADGE_COLOR } from '../../../src/app/online/view/layers/tokenUiDrawing';
 import type { PlayerToken } from '../../../src/app/online/scene/sceneTypes';
 import { decodedImage, frame, RecordingSurface } from './recordingSurface';
@@ -32,23 +32,44 @@ describe('tokens layer', () => {
     ]);
   });
 
-  it('draws the nameplate and the HP and stress bars below the token at the resting UI size', () => {
-    const surface = draw({ t1: playerToken({ name: 'Hero', hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } }) });
+  it('draws the nameplate and the resource bars below the token at the resting UI size, in the colours it was sent', () => {
+    const resources = [{ color: '#22c55e', share: 0.7, spent: false }, { color: '#3b82f6', share: 0.25, spent: false }];
+    const surface = draw({ t1: playerToken({ name: 'Hero', resources }) });
     expect(surface.ops('push')[1]).toEqual({ op: 'push', x: 100, y: 131, rotation: 0, scale: 1 });
     const fills = surface.ops('roundRect').flatMap(({ style }) => (style.fill ? [style.fill] : []));
-    expect(fills).toEqual(['#2a2a2a', '#1a1a1a', '#22c55e', '#1a1a1a', '#a855f7']);
-    const hpFill = surface.ops('roundRect').find(({ style }) => style.fill === '#22c55e')!;
-    expect(hpFill).toMatchObject({ x: -30.625, y: 3.375, height: 7.25 });
-    expect(hpFill.width).toBeCloseTo(61.25 * 0.7);
+    expect(fills).toEqual(['#2a2a2a', '#1a1a1a', '#22c55e', '#1a1a1a', '#3b82f6']);
+    const first = surface.ops('roundRect').find(({ style }) => style.fill === '#22c55e')!;
+    expect(first).toMatchObject({ x: -30.625, y: 3.375, height: 7.25 });
+    expect(first.width).toBeCloseTo(61.25 * 0.7);
+    const second = surface.ops('roundRect').find(({ style }) => style.fill === '#3b82f6')!;
+    expect(second).toMatchObject({ y: 15.375, height: 7.25 });
+    expect(second.width).toBeCloseTo(61.25 * 0.25);
     expect(surface.ops('roundRect').find(({ style }) => style.fill === '#2a2a2a')).toMatchObject({ x: -20, y: -14, width: 40, height: 14 });
+    // No numbers: the player window shows a bar and nothing else
     expect(surface.ops('text')).toEqual([{ op: 'text', text: 'Hero', x: 0, y: 0, style: expect.objectContaining({ align: 'center', alpha: 0.85 }) }]);
   });
 
-  it('darkens the HP bar of a token at 0 HP and leaves it empty', () => {
-    const surface = draw({ t1: playerToken({ hp: { current: 0, max: 10 } }) });
+  it('draws only the first two bars, as the window does, and none for a token without any', () => {
+    const bar = (color: string): { color: string; share: number; spent: boolean } => ({ color, share: 1, spent: false });
+    const surface = draw({ t1: playerToken({ resources: [bar('#111111'), bar('#222222'), bar('#333333')] }), t2: playerToken({ x: 300 }) });
+    const fills = surface.ops('roundRect').flatMap(({ style }) => (style.fill ? [style.fill] : []));
+    expect(fills).toEqual(['#1a1a1a', '#111111', '#1a1a1a', '#222222']);
+  });
+
+  it('darkens the bar whose spending defeats the token, and leaves it empty', () => {
+    const surface = draw({ t1: playerToken({ resources: [{ color: '#ef4444', share: 0, spent: true }] }) });
     const fills = surface.ops('roundRect').map(({ style }) => style);
     expect(fills).toContainEqual({ fill: '#000000', alpha: 0.4 });
-    expect(fills.some((style) => style.fill === '#ef4444')).toBe(false);
+    expect(fills.filter((style) => style.fill === '#ef4444')).toEqual([]);
+  });
+
+  it('greys a downed token out and marks it with a skull, upright, whether or not it shows a bar', () => {
+    const surface = draw({ t1: playerToken({ rotation: 90, downed: true }) }, true);
+    expect(surface.ops('circle').find(({ style }) => style.fill === DOWNED_VEIL.color)).toMatchObject({ x: 100, y: 100, style: { alpha: DOWNED_VEIL.alpha } });
+    expect(surface.calls.filter((call) => call.op === 'icon')).toEqual([
+      expect.objectContaining({ op: 'icon', name: 'skull', x: 100, y: 100 }),
+    ]);
+    expect(draw({ t1: playerToken() }).calls.some((call) => call.op === 'icon')).toBe(false);
   });
 
   it('draws neutral condition badges on the ring with the value in a pip, the last slot counting the rest', () => {

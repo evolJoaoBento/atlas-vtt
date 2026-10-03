@@ -43,9 +43,24 @@ export interface PlayerGrid {
   hexNumberOpacity: number | null;
 }
 
-export interface PlayerResource {
+/** The HP and stress bars of a GM before Atlas 0.5, still validated and never read: bars are `PlayerResource` now. */
+export interface PlayerLegacyBar {
   current: number;
   max: number;
+}
+
+/**
+ * One resource bar as the player window draws it, and no more: no name, no numbers (the window
+ * shows none to players) and the share in hundredths. The colour is the one the window shows,
+ * warning tints included. Bars come in the order the window stacks them, from the token's bottom edge.
+ */
+export interface PlayerResource {
+  /** `#rrggbb`. */
+  color: string;
+  /** How much of the bar is filled, from 0 to 1. */
+  share: number;
+  /** The window darkens this bar: a resource that defeats the token is spent. At most one bar per token. */
+  spent: boolean;
 }
 
 export interface PlayerCondition {
@@ -66,8 +81,14 @@ export interface PlayerToken {
   ring: string | null;
   conditions: PlayerCondition[];
   name: string | null;
-  hp: PlayerResource | null;
-  stress: PlayerResource | null;
+  /** Always null since Atlas 0.5; older players still require the field. */
+  hp: PlayerLegacyBar | null;
+  /** Always null since Atlas 0.5; older players still require the field. */
+  stress: PlayerLegacyBar | null;
+  /** The bars the window draws on the token; absent from a GM of an older version, which sent none. */
+  resources?: PlayerResource[];
+  /** The window greys the token out and marks it with a skull: a resource that defeats it is spent, whether players see that resource or not. */
+  downed?: boolean;
 }
 
 /** A fog operation with its drag offset applied and its points simplified. */
@@ -129,7 +150,10 @@ export interface PlayerInitiativeEntry {
   tokenId: string;
   initiative: number;
   name: string | null;
-  hp: PlayerResource | null;
+  /** Always null since Atlas 0.5; older players still require the field. */
+  hp: PlayerLegacyBar | null;
+  /** How full the bar after the name is (the token's `hp` resource, where players see it); null without one. Absent from an older GM. */
+  hpShare?: number | null;
   isActive: boolean;
 }
 
@@ -208,6 +232,8 @@ export const SCENE_LIMITS = {
   points: 5_000,
   records: 10_000,
   conditions: 64,
+  /** A token has this many resource sockets; the window draws the first two. */
+  resources: 6,
   widgets: 64,
   initiativeEntries: 200,
   rangeBands: 32,

@@ -5,19 +5,17 @@ import type { VisibleResource } from '../../../resources/resourceTypes';
 import { ResourceBarLabel } from '../../ResourceBarLabel';
 import { destroyTree } from '../../utils/destroyTree';
 import { AnimatedBarFill } from '../AnimatedBarFill';
+import { BAR_BORDER, BAR_FILL_INSET, BAR_STYLE, barFillRect, barInnerRect, barTickXs, type UiRect } from '../tokenUiLayout';
 
 /** The look every resource shares, bar or wheel: a thin grey border, a dark track, a fill set in from the border, faint ticks. */
 export const BAR_LOOK = {
-  border: 0.75,
-  borderColor: 0x888888,
-  trackColor: 0x1a1a1a,
-  fillInset: 1,
-  tickColor: 0x333333,
-  tickAlpha: 0.5,
+  border: BAR_BORDER,
+  borderColor: BAR_STYLE.border,
+  trackColor: BAR_STYLE.inside,
+  fillInset: BAR_FILL_INSET,
+  tickColor: BAR_STYLE.tick,
+  tickAlpha: BAR_STYLE.tickAlpha,
 } as const;
-
-const BORDER = BAR_LOOK.border;
-const FILL_INSET = BAR_LOOK.fillInset;
 
 /** `#rrggbb` as the number PIXI takes. */
 export function colorNumber(color: string): number {
@@ -44,19 +42,14 @@ export class ResourceBarView {
   update({ definition, value }: VisibleResource, top: number, animate: boolean): number {
     const { width, height } = barDimensions.token;
     this.color = colorNumber(resourceColor(definition, value));
-    const inner = { x: -width / 2 + BORDER / 2, y: top + BORDER / 2, width: width - BORDER, height: height - BORDER };
+    const inner = barInnerRect({ x: -width / 2, y: top, width, height });
     if (this.drawnTop !== top) {
       this.drawnTop = top;
       this.drawTrack(top, inner);
     }
     // A static value fills its bar: there is no share of it to show
     const fixed = definition.direction === 'static';
-    this.fill.set(fixed ? 1 : value.max > 0 ? value.current / value.max : 0, {
-      x: inner.x + FILL_INSET,
-      y: inner.y + FILL_INSET,
-      width: inner.width - FILL_INSET * 2,
-      height: inner.height - FILL_INSET * 2,
-    }, animate);
+    this.fill.set(fixed ? 1 : value.max > 0 ? value.current / value.max : 0, barFillRect(inner), animate);
     if (fixed) this.label.setFixed(value.max);
     else this.label.setValue(value);
     this.label.position.set(0, top + height / 2);
@@ -80,19 +73,18 @@ export class ResourceBarView {
     destroyTree(this.view);
   }
 
-  private drawTrack(top: number, inner: { x: number; y: number; width: number; height: number }): void {
+  private drawTrack(top: number, inner: UiRect): void {
     const { width, height } = barDimensions.token;
     this.track.clear()
       .roundRect(-width / 2, top, width, height, height / 2)
-      .stroke({ width: BORDER, color: BAR_LOOK.borderColor, alpha: 1 })
+      .stroke({ width: BAR_BORDER, color: BAR_LOOK.borderColor, alpha: 1 })
       .roundRect(inner.x, inner.y, inner.width, inner.height, inner.height / 2)
       .fill({ color: BAR_LOOK.trackColor, alpha: 1 });
-    const tick = inner.width / 10;
-    for (let i = 1; i < 10; i++) {
+    for (const x of barTickXs(inner)) {
       this.track
-        .moveTo(inner.x + tick * i, inner.y + 1)
-        .lineTo(inner.x + tick * i, inner.y + inner.height - 1)
-        .stroke({ width: 0.5, color: BAR_LOOK.tickColor, alpha: BAR_LOOK.tickAlpha });
+        .moveTo(x, inner.y + 1)
+        .lineTo(x, inner.y + inner.height - 1)
+        .stroke({ width: BAR_STYLE.tickWidth, color: BAR_LOOK.tickColor, alpha: BAR_LOOK.tickAlpha });
     }
   }
 }

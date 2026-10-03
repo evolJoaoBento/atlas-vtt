@@ -73,8 +73,20 @@ function isPoints(value: unknown, min: number): boolean {
   return Array.isArray(value) && value.length >= min && value.length <= SCENE_LIMITS.points
     && value.every((point) => isPoint(point));
 }
-function isResource(value: unknown): boolean {
+function isLegacyBar(value: unknown): boolean {
   return isFields(value) && isNumber(value.current) && isNumber(value.max);
+}
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const isUnit = inRange([0, 1]);
+function isResource(value: unknown): boolean {
+  return isFields(value) && typeof value.color === 'string' && HEX_COLOR.test(value.color) && isUnit(value.share) && isBoolean(value.spent);
+}
+function isResources(value: unknown): boolean {
+  return Array.isArray(value) && value.length <= SCENE_LIMITS.resources && value.every((bar) => isResource(bar));
+}
+/** An optional field: a GM of an older version sends none. */
+function optional(check: Check): Check {
+  return (value) => value === undefined || check(value);
 }
 function isCondition(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && (value.value === null || isNumber(value.value));
@@ -98,7 +110,8 @@ function isPlayerToken(value: unknown): boolean {
     && isNumber(value.layer) && nullable(isString)(value.image) && nullable(isString)(value.ring)
     && Array.isArray(value.conditions) && value.conditions.length <= SCENE_LIMITS.conditions
     && value.conditions.every((condition) => isCondition(condition))
-    && nullable(isString)(value.name) && nullable(isResource)(value.hp) && nullable(isResource)(value.stress);
+    && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp) && optional(nullable(isLegacyBar))(value.stress)
+    && optional(isResources)(value.resources) && optional(isBoolean)(value.downed);
 }
 
 function isPlayerFogOp(value: unknown): boolean {
@@ -136,8 +149,8 @@ function isPlayerWidgets(value: unknown): boolean {
 
 function isInitiativeEntry(value: unknown): boolean {
   return isFields(value) && isText(value.id, SCENE_LIMITS.idLength) && isText(value.tokenId, SCENE_LIMITS.idLength)
-    && isNumber(value.initiative) && nullable(isString)(value.name) && nullable(isResource)(value.hp)
-    && isBoolean(value.isActive);
+    && isNumber(value.initiative) && nullable(isString)(value.name) && optional(nullable(isLegacyBar))(value.hp)
+    && optional(nullable(isUnit))(value.hpShare) && isBoolean(value.isActive);
 }
 function isPlayerInitiative(value: unknown): boolean {
   return isFields(value) && isNumber(value.round) && isBoolean(value.active) && Array.isArray(value.entries)

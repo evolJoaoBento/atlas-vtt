@@ -5,7 +5,7 @@ import { DEFAULT_TEXT_PADDING, textBackground, textFontStyle, textFontWeight, te
 import { badgePositions, badgeSlots, CONDITION_BADGE, fitBadges } from '../../src/app/pixi/token-renderer/conditionBadgeLayout';
 import { getTokenRingCenterRadius } from '../../src/app/pixi/token-renderer/tokenRingMetrics';
 import { computeTokenPixelSize, computeTokenStrokeWidth, restingTokenUIScale } from '../../src/app/pixi/token-renderer/tokenSizing';
-import { barFillRect, barInnerRect, barTickXs, nameplateRect, tokenBarRects } from '../../src/app/pixi/token-renderer/tokenUiLayout';
+import { barFillRect, barInnerRect, barStackRects, barTickXs, nameplateRect } from '../../src/app/pixi/token-renderer/tokenUiLayout';
 
 describe('scene layer order', () => {
   it('stacks map and grid at the bottom, then the zIndex layers in ascending order', () => {
@@ -18,10 +18,10 @@ describe('scene layer order', () => {
 });
 
 describe('token UI layout', () => {
-  it('stacks the HP bar, then the stress bar, below the token', () => {
-    expect(tokenBarRects(true, false)).toEqual({ hp: { x: -32, y: 2, width: 64, height: 10 }, stress: null });
-    expect(tokenBarRects(true, true).stress).toEqual({ x: -32, y: 14, width: 64, height: 10 });
-    expect(tokenBarRects(false, true).stress).toEqual({ x: -32, y: 2, width: 64, height: 10 });
+  it('stacks the bars below the token, the first two units under its edge and a gap between them', () => {
+    expect(barStackRects(0)).toEqual([]);
+    expect(barStackRects(1)).toEqual([{ x: -32, y: 2, width: 64, height: 10 }]);
+    expect(barStackRects(2)[1]).toEqual({ x: -32, y: 14, width: 64, height: 10 });
   });
 
   it('insets the dark inside by half the border and the fill by one unit', () => {

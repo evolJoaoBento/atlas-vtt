@@ -6,13 +6,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   DRAWING_FIELD_COVERAGE, FOG_FIELD_COVERAGE, GRID_FIELD_COVERAGE, MEASUREMENT_FIELD_COVERAGE, OBJECT_COVERAGE,
-  SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type Coverage, type CoverageTable, type KeysOfUnion,
+  RESOURCE_DEFINITION_COVERAGE, SCENE_FIELD_COVERAGE, TEXT_FIELD_COVERAGE, TOKEN_FIELD_COVERAGE, type Coverage, type CoverageTable, type KeysOfUnion,
 } from '../../../../src/app/online/coverage';
 import { playerSceneToAtlasState, type RemoteSceneParts } from '../../../../src/app/online/obsidian/playerSceneToAtlasState';
 import type { RemoteImages } from '../../../../src/app/online/obsidian/remoteScene';
 import { projectForPlayers, type ProjectedState } from '../../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo } from '../../../../src/app/online/scene/projectRecords';
 import type { PlayerScene } from '../../../../src/app/online/scene/sceneTypes';
+import type { ResourceDefinition } from '../../../../src/app/resources/resourceTypes';
 import type { GridState } from '../../../../src/app/services/MapPersistence';
 import type { Character, DrawingStroke, TextElement, Token, TokenEntity } from '../../../../src/app/types';
 import type { CollectionGridDefaults } from '../../../../src/app/types/collectionSettingsTypes';
@@ -29,12 +30,15 @@ const IMAGES: RemoteImages = {
 const hero: Character = {
   id: 'hero', kind: 'character', x: 140, y: 210, imagePath: 'art/hero.png', size: 2, rotation: 45, layer: 3,
   showRing: true, ringColor: '#3366ff', conditions: ['prone', 'frightened'], conditionValues: { frightened: 2 },
-  name: 'Anna', resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } },
+  name: 'Anna', resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 }, mana: { current: 1, max: 2 } },
   statblockPath: 'Bestiary/Anna.md', statblockName: 'Anna (statblock)', notePath: 'GM/anna.md', tags: ['pc'],
 };
 const goblin: Character = { id: 'goblin', kind: 'character', x: 350, y: 70, imagePath: 'art/goblin.png', name: '', statblockPath: 'Bestiary/Goblin.md', statblockName: 'Goblin' };
 const imp: Character = { id: 'imp', kind: 'character', x: 560, y: 70, imagePath: 'art/imp.png', name: '', statblockPath: 'Bestiary/Imp.md' };
 const crate: Token = { id: 'crate', kind: 'token', x: 420, y: 70, imagePath: 'art/crate.png', showRing: false };
+// Spent hit points, drawn red and darkened, and a resource players never see that downs its token
+const fallen: Character = { id: 'fallen', kind: 'character', x: 630, y: 70, imagePath: 'art/fallen.png', name: 'Fallen', resources: { hp: { current: 0, max: 10 } } };
+const ghoul: Character = { id: 'ghoul', kind: 'character', x: 700, y: 70, imagePath: 'art/ghoul.png', name: 'Ghoul', resources: { doom: { current: 0, max: 5 } } };
 const spy: Character = { id: 'spy', kind: 'character', x: 490, y: 70, imagePath: 'art/spy.png', name: 'Spy', isHidden: true };
 
 const sign: TextElement = {
@@ -55,6 +59,13 @@ const lasso: FogOperation = { id: 'lasso', kind: 'fog', type: 'lasso', timestamp
 // Painted far from everything, so it hides nothing the checks look at.
 const rect: FogOperation = { id: 'rect', kind: 'fog', type: 'rectangle', timestamp: 3, isErasing: false, x: 2000, y: 2000, width: 100, height: 50 };
 
+/** HP (first bar), stress (second bar), a wheel and a resource players never see that defeats a token when spent. */
+const DEFINITIONS: readonly ResourceDefinition[] = [
+  { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true, slot: 0 },
+  { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7', visibleToPlayers: true, slot: 1 },
+  { key: 'mana', name: 'Mana', field: 'mana', direction: 'drains', color: '#3b82f6', visibleToPlayers: true, slot: 2 },
+  { key: 'doom', name: 'Doom', field: 'doom', direction: 'drains', color: '#111111', defeatedWhenSpent: true, visibleToPlayers: false, slot: 3 },
+];
 const GM_GRID: GridState = {
   enabled: true, visible: true, snapToGrid: false, type: 'hex-vertical', size: 70, offsetX: 5, offsetY: 7, color: '#222222',
   opacity: 0.4, lineType: 'dashed', lineWidth: 2, hexNumbers: 'column-row', hexNumberOpacity: 0.6,
@@ -70,19 +81,19 @@ const WIDGETS: Record<string, AnyWidget> = {
   secret: { id: 'secret', type: 'counter', label: 'Secret', icon: 'star', visible: true, visibleToPlayers: false, value: 1, order: 3 },
 };
 
-interface Variant { collection?: CollectionGridDefaults | null; grid?: GridState; trackerOpen?: boolean }
+interface Variant { collection?: CollectionGridDefaults | null; grid?: GridState; trackerOpen?: boolean; definitions?: readonly ResourceDefinition[] }
 interface Trip { back: RemoteSceneParts; sent: PlayerScene }
-interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip }
+interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip; renamedHp: Trip; staticHp: Trip }
 type Check = (trips: Trips) => void;
 type Checks<K extends PropertyKey> = { readonly [P in K]?: Check };
 
-function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true }: Variant = {}): Trip {
+function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true, definitions = DEFINITIONS }: Variant = {}): Trip {
   const fog = { brush, lasso, rect };
   const state: ProjectedState = {
     background: 'atlas-vtt/assets/tavern.png',
     grid,
     objects: {
-      tokens: { hero, goblin, imp, crate, spy }, fog, texts: { sign }, drawings: { line, stamp },
+      tokens: { hero, goblin, imp, crate, fallen, ghoul, spy }, fog, texts: { sign }, drawings: { line, stamp },
       pins: {}, walls: {}, lights: {}, audios: {},
     },
     widgetSettings: { widgets: WIDGETS, globalVisible: true, position: 'top', scale: 1 },
@@ -100,7 +111,7 @@ function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true }: V
     sceneId: 'scene-1',
     rules: { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
     coverage: coverageOfFog(fog), assets: fakeAssetIds(), mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(),
-    collectionGrid: collection,
+    collectionGrid: collection, resources: definitions,
   });
   return { back: playerSceneToAtlasState(sent, IMAGES), sent };
 }
@@ -111,13 +122,15 @@ const TRIPS: Trips = {
   disabledGrid: trip({ grid: { ...GM_GRID, enabled: false } }),
   hiddenGrid: trip({ grid: { ...GM_GRID, visible: false } }),
   closedTracker: trip({ trackerOpen: false }),
+  renamedHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, key: 'health' } : definition)) }),
+  staticHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, direction: 'static' as const } : definition)) }),
 };
 
 const tokenOf = (t: Trip, id: string): Record<string, unknown> => t.back.state.objects.tokens[id] as unknown as Record<string, unknown>;
 const field = (id: string, key: string, value: unknown): Check => (t) => expect(tokenOf(t.full, id)[key]).toEqual(value);
 
 const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
-  id: (t) => expect(Object.keys(t.full.back.state.objects.tokens).sort()).toEqual(['crate', 'goblin', 'hero', 'imp']),
+  id: (t) => expect(Object.keys(t.full.back.state.objects.tokens).sort()).toEqual(['crate', 'fallen', 'ghoul', 'goblin', 'hero', 'imp']),
   kind: (t) => {
     expect(tokenOf(t.full, 'hero').kind).toBe('character');
     expect(tokenOf(t.full, 'crate').kind).toBe('token');
@@ -145,6 +158,37 @@ const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
     for (const token of Object.values(t.full.back.state.objects.tokens)) expect(token).not.toHaveProperty('statblockPath');
   },
   statblockName: field('goblin', 'name', 'Goblin'),
+  // The two first resources are bars, filled to their share out of 100 and drawn from stand-in definitions of the colour the window shows
+  resources: (t) => {
+    expect(tokenOf(t.full, 'hero').resources).toEqual({ bar0: { current: 70, max: 100 }, bar1: { current: 33, max: 100 } });
+    expect(t.full.back.resources.hero).toEqual([
+      expect.objectContaining({ key: 'bar0', color: '#22c55e', direction: 'drains', slot: 0, visibleToPlayers: true }),
+      expect.objectContaining({ key: 'bar1', color: '#a855f7', slot: 1, visibleToPlayers: true }),
+    ]);
+    expect(tokenOf(t.full, 'crate')).not.toHaveProperty('resources');
+    // A spent HP bar is darkened by Atlas and red; the downed state rides on a resource players never see
+    expect(tokenOf(t.full, 'fallen').resources).toEqual({ bar0: { current: 0, max: 100 }, downed: { current: 0, max: 1 } });
+    expect(t.full.back.resources.fallen?.[0]).toMatchObject({ key: 'bar0', defeatedWhenSpent: true, direction: 'drains' });
+    expect(t.full.back.resources.ghoul).toEqual([expect.objectContaining({ key: 'downed', visibleToPlayers: false, defeatedWhenSpent: true })]);
+    expect(tokenOf(t.full, 'ghoul').resources).toEqual({ downed: { current: 0, max: 1 } });
+  },
+};
+
+/** What each definition field decides, seen on the Atlas store the online scene draws. */
+const RESOURCE_CHECKS: Checks<keyof ResourceDefinition> = {
+  key: (t) => {
+    expect(Object.keys(tokenOf(t.renamedHp, 'hero').resources as object)).toEqual(['bar0']);
+    expect(t.renamedHp.back.initiativeHealth).toEqual({});
+  },
+  direction: (t) => expect(tokenOf(t.staticHp, 'hero').resources).toMatchObject({ bar0: { current: 100, max: 100 } }),
+  color: (t) => expect(t.full.back.resources.hero?.map((definition) => definition.color)).toEqual(['#22c55e', '#a855f7']),
+  defeatedWhenSpent: (t) => {
+    expect(t.full.back.resources.fallen?.[0]?.color).toBe('#ef4444');
+    expect(t.full.back.resources.hero?.[0]).not.toHaveProperty('defeatedWhenSpent');
+  },
+  visibleToPlayers: (t) => expect(Object.keys(tokenOf(t.full, 'hero').resources as object)).not.toContain('bar3'),
+  // A resource in a wheel socket is not drawn for players: the window has no wheels for them
+  slot: (t) => expect(Object.keys(tokenOf(t.full, 'hero').resources as object)).toEqual(['bar0', 'bar1']),
 };
 
 const TEXT_SAME = [
@@ -232,7 +276,7 @@ const SCENE_CHECKS: Checks<keyof ProjectedState> = {
     expect(t.full.back.state.background).not.toBeNull();
   },
   grid: (t) => expect(gridOf(t.full)).toMatchObject({ enabled: true, visible: true }),
-  objects: (t) => expect(Object.keys(t.full.back.state.objects.tokens)).toHaveLength(4),
+  objects: (t) => expect(Object.keys(t.full.back.state.objects.tokens)).toHaveLength(6),
   widgetSettings: (t) => {
     expect(Object.keys(t.full.back.state.widgetSettings.widgets)).toEqual(['torches', 'doom', 'fuse']);
     expect(t.full.back.state.widgetSettings.widgets.fuse).toMatchObject({ type: 'timer', value: 90 });
@@ -243,6 +287,8 @@ const SCENE_CHECKS: Checks<keyof ProjectedState> = {
     expect(t.full.back.state.initiative.entries).toMatchObject([
       { tokenId: 'hero', initiative: 17, name: 'Anna', isActive: true, imagePath: tokenOf(t.full, 'hero').imagePath },
     ]);
+    // The bar after the name is the token's hp resource, at its share
+    expect(t.full.back.initiativeHealth).toEqual({ hero: { current: 70, max: 100 } });
   },
   initiativeTrackerOpen: (t) => {
     expect(t.full.back.state.initiativeTrackerOpen).toBe(true);
@@ -273,6 +319,7 @@ describe('the converter covers every sent field', () => {
   it('drawing fields', () => everySentField('DRAWING_FIELD_COVERAGE', DRAWING_FIELD_COVERAGE, DRAWING_CHECKS));
   it('fog fields', () => everySentField('FOG_FIELD_COVERAGE', FOG_FIELD_COVERAGE, FOG_CHECKS));
   it('grid fields', () => everySentField('GRID_FIELD_COVERAGE', GRID_FIELD_COVERAGE, GRID_CHECKS));
+  it('resource definition fields', () => everySentField('RESOURCE_DEFINITION_COVERAGE', RESOURCE_DEFINITION_COVERAGE, RESOURCE_CHECKS));
   it('measurement fields', () => everySentField('MEASUREMENT_FIELD_COVERAGE', MEASUREMENT_FIELD_COVERAGE, MEASUREMENT_CHECKS));
   it('scene fields', () => everySentField('SCENE_FIELD_COVERAGE', SCENE_FIELD_COVERAGE, SCENE_CHECKS));
 

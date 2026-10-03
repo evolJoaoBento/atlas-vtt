@@ -24,7 +24,7 @@ function world(state: CameraSceneState = emptySceneState()) {
   });
   gm.start();
   const rules: PlayerViewRules = {
-    showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
+    showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true,
   };
   const settings = { getLocalPlayerViewSettings: (): PlayerViewRules => rules, onChange: (): (() => void) => () => {} };
   const presented = new PresentedScene();

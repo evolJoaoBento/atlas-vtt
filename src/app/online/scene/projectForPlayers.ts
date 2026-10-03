@@ -10,6 +10,7 @@ import { DEFAULT_HEX_NUMBER_OPACITY, isHexNumberFormat } from '../../grid/hexNum
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { Character, TokenEntity } from '../../types';
+import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
 import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
@@ -19,6 +20,7 @@ import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
+import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
   type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
@@ -50,9 +52,15 @@ export interface ProjectionContext {
   memo: ProjectionMemo;
   /** The grid defaults of the map's collection, which decide the measurement; without them the map's grid does. */
   collectionGrid?: CollectionGridDefaults | null;
+  /**
+   * The resources of the map's collection, which decide the bars players see (`projectBars`); without
+   * them nothing is shown, so a map whose collection is unknown shows no resource.
+   */
+  resources?: readonly ResourceDefinition[];
 }
 
 const DEFAULT_RING = '#ffffff';
+const NO_RESOURCES: readonly ResourceDefinition[] = [];
 const DEFAULT_GRID_OPACITY = 0.7;
 
 export function projectForPlayers(state: ProjectedState, context: ProjectionContext): PlayerScene {
@@ -73,7 +81,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
     drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
     widgets: projectWidgets(state, context.rules),
-    initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules),
+    initiative: projectInitiative(state, new Set(Object.keys(tokens)), context.rules, context.resources ?? NO_RESOURCES),
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid),
   };
 }
@@ -133,6 +141,7 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   if (context.coverage.isCovered(tokenBounds({ x, y, size }, cellSize))) return null;
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
+  const definitions = context.resources ?? NO_RESOURCES;
   return {
     x: finiteOr(x, 0, SCENE_RANGES.coordinate),
     y: finiteOr(y, 0, SCENE_RANGES.coordinate),
@@ -143,10 +152,11 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
     ring: token.showRing === false ? null : textOr(token.ringColor, DEFAULT_RING),
     conditions: character ? projectConditions(token) : [],
     name: character && rules.showTokenNameplates ? displayName(character) : null,
-    // Token resources (Atlas 0.5) replace HP and stress and are not sent yet: each collection
-    // defines its own, shown to players by their `visibleToPlayers` (see `docs/online-play-features.md`).
+    // Atlas 0.5 replaced HP and stress with the collection's resources; the old fields stay null for older players.
     hp: null,
     stress: null,
+    resources: character ? projectBars(character, definitions) : [],
+    downed: isDowned(token, definitions),
   };
 }
 

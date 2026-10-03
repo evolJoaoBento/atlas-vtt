@@ -9,6 +9,7 @@ import { memoryImageFiles, nodeHash } from './assetFixtures';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { PeerLink, ClientTransport } from '../../../src/app/online/transport/types';
 import { PresentedScene, type PresentedView } from '../../../src/app/services/PresentedScene';
+import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import { createTabMetaStore } from '../../../src/app/stores/tabMetaStore';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
@@ -17,6 +18,10 @@ type SceneState = Pick<ViewAtlasState,
   'background' | 'grid' | 'objects' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen' | 'isMapLoading' | 'mapLoaded' | 'mapPath'
 >;
 type Objects = SceneState['objects'];
+
+const HP: ResourceDefinition = {
+  key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false,
+};
 
 /** Everything the GM keeps that must never leave the GM's machine carries one of these. */
 const SECRETS = ['SECRET', 'secret/', 'notes/', '.md', 'art/', 'maps/', 'dmNote', 'statblock'];
@@ -32,11 +37,11 @@ function tavernObjects(): Objects {
   // The DM-only fields (notes, statblocks, tags, hidden) are not all on the public token type.
   const tokens = {
     hero: {
-      id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'art/hero.png', name: 'Hero', hp: { current: 7, max: 10 },
+      id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'art/hero.png', name: 'Hero', resources: { hp: { current: 7, max: 10 } },
       notePath: 'notes/SECRET-hero.md', statblockPath: 'secret/hero.md', dmNotePath: 'secret/dm.md', tags: ['SECRET'], conditions: ['prone'],
     },
-    orc: { id: 'orc', kind: 'character', x: 400, y: 140, imagePath: 'art/SECRET-orc.png', name: 'SECRET orc', isHidden: true, hp: 5 },
-    goblin: { id: 'goblin', kind: 'character', x: 1050, y: 1050, imagePath: 'art/goblin.png', name: 'Goblin', hp: { current: 3, max: 6 } },
+    orc: { id: 'orc', kind: 'character', x: 400, y: 140, imagePath: 'art/SECRET-orc.png', name: 'SECRET orc', isHidden: true, resources: { hp: { current: 5, max: 5 } } },
+    goblin: { id: 'goblin', kind: 'character', x: 1050, y: 1050, imagePath: 'art/goblin.png', name: 'Goblin', resources: { hp: { current: 3, max: 6 } } },
   } as unknown as Objects['tokens'];
   return {
     tokens,
@@ -82,9 +87,10 @@ function world() {
     title: 'Vault', onJoinRequest: (player) => requests.push(player), onRequestClosed: () => {}, onPlayersChanged: () => {},
   });
   gm.start();
-  let rules: PlayerViewRules = {
-    showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
-  };
+  let rules: PlayerViewRules = { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true };
+  // The collection's HP, kept from players until the GM shows it
+  let definitions: readonly ResourceDefinition[] = [HP];
+  const resourceListeners = new Set<() => void>();
   const listeners = new Set<() => void>();
   const settings = {
     getLocalPlayerViewSettings: (): PlayerViewRules => rules,
@@ -93,7 +99,10 @@ function world() {
   const presented = new PresentedScene();
   const notices: string[] = [];
   const assets = new AssetRegistry({ files: memoryImageFiles().source, notify: (message) => notices.push(message), hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
+  const broadcaster = new SceneBroadcaster({
+    session: gm, presented, settings, assets, notify: (message) => notices.push(message), resources: () => definitions,
+    watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
+  });
   broadcaster.start();
 
   const tabs = createTabMetaStore();
@@ -133,6 +142,10 @@ function world() {
     setRules(next: Partial<PlayerViewRules>): void {
       rules = { ...rules, ...next };
       listeners.forEach((listener) => listener());
+    },
+    setResources(next: readonly ResourceDefinition[]): void {
+      definitions = next;
+      resourceListeners.forEach((listener) => listener());
     },
     tick: (): Promise<void> => vi.advanceTimersByTimeAsync(SCENE_TICK_MS + 5),
     /** Every given player has exactly the scene the GM projected last. */
@@ -181,10 +194,16 @@ describe('scene sync end to end', () => {
     w.expectInSync('brush', early, late);
     expect(early.scene!.tokens.hero).toBeUndefined();
 
-    w.setRules({ showTokenHP: true, showTokenNameplates: true });
+    expect(early.scene!.tokens.goblin?.resources).toEqual([]);
+    w.setRules({ showTokenNameplates: true });
     await w.tick();
     w.expectInSync('rules', early, late);
-    expect(early.scene!.tokens.goblin?.hp?.current).toBe(3);
+    expect(early.scene!.tokens.goblin?.name).toBe('Goblin');
+    // The GM shows HP to players in the collection's settings
+    w.setResources([{ ...HP, visibleToPlayers: true }]);
+    await w.tick();
+    w.expectInSync('resources', early, late);
+    expect(early.scene!.tokens.goblin?.resources).toEqual([{ color: '#eab308', share: 0.5, spent: false }]);
 
     patchToken(w.store, 'goblin', { isHidden: true });
     await w.tick();
@@ -250,7 +269,8 @@ describe('scene sync end to end', () => {
     const w = world();
     await w.join('A');
     w.presented.present(w.view, w.tavern);
-    w.setRules({ showTokenHP: true, showTokenStress: true, showTokenNameplates: true });
+    w.setRules({ showTokenNameplates: true });
+    w.setResources([{ ...HP, visibleToPlayers: true }]);
     patchToken(w.store, 'hero', { x: 200 });
     addFog(w.store, 'e1', { type: 'rectangle', timestamp: 3, isErasing: true, x: 950, y: 950, width: 200, height: 200 });
     await w.tick();

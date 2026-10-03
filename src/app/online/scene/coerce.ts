@@ -3,7 +3,7 @@
  * shape (a string HP, a missing font size, NaN), and one bad value would make
  * a whole snapshot invalid for players, so the projection reads values through these.
  */
-import { SCENE_LIMITS, SCENE_RANGES, type PlayerResource } from './sceneTypes';
+import { SCENE_LIMITS, SCENE_RANGES } from './sceneTypes';
 
 /** Inclusive bounds; pass one of `SCENE_RANGES` so GM output always passes the player validator. */
 export type NumberRange = readonly [min: number, max: number];
@@ -54,19 +54,4 @@ export function textOrNull(value: unknown, max: number = SCENE_LIMITS.stringLeng
 
 export function oneOf<T extends string>(values: readonly T[], value: unknown, fallback: T): T {
   return typeof value === 'string' && (values as readonly string[]).includes(value) ? (value as T) : fallback;
-}
-
-/** `{ current, max }` with both finite; else null. */
-export function resourceOrNull(value: unknown): PlayerResource | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const { current, max } = value as { current?: unknown; max?: unknown };
-  const currentValue = finiteOr(current, Number.NaN);
-  const maxValue = finiteOr(max, Number.NaN);
-  return Number.isFinite(currentValue) && Number.isFinite(maxValue) ? { current: currentValue, max: maxValue } : null;
-}
-
-/** Hit points as the player window shows them: only with a maximum above 0. */
-export function hpOrNull(value: unknown): PlayerResource | null {
-  const resource = resourceOrNull(value);
-  return resource && resource.max > 0 ? resource : null;
 }

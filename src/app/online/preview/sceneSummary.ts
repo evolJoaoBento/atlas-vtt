@@ -15,7 +15,8 @@ export function initiativeLines(initiative: PlayerInitiative | null): string[] {
   const lines = initiative.active ? [`Round ${initiative.round}`] : [];
   for (const entry of initiative.entries) {
     const turn = entry.isActive ? '▶ ' : '';
-    const hp = entry.hp ? ` · ${entry.hp.current}/${entry.hp.max} HP` : '';
+    // The player window draws a bar with no numbers: the share is all the list says too
+    const hp = typeof entry.hpShare === 'number' ? ` · HP ${Math.round(entry.hpShare * 100)}%` : '';
     lines.push(`${turn}${entry.initiative} · ${entry.name ?? 'Unnamed'}${hp}`);
   }
   return lines;

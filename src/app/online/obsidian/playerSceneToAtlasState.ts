@@ -8,6 +8,7 @@ import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { DrawingStroke, TextElement, TokenEntity } from '../../types';
+import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import type { FogOperation } from '../../types/fogTypes';
 import { DEFAULT_GRID_SIZE } from '../scene/objectBounds';
@@ -18,6 +19,7 @@ import {
 } from '../scene/sceneTypes';
 import { atlasInitiative, atlasWidgets } from './convertPanels';
 import { atlasDrawing, atlasFog, atlasText } from './convertShapes';
+import { atlasInitiativeHealth, atlasResourceDefinitions } from './convertResources';
 import { atlasToken, neutralConditions } from './convertTokens';
 import { atlasMeasurement, type RemoteImages } from './remoteScene';
 
@@ -32,6 +34,10 @@ export interface RemoteSceneParts {
   measurement: MeasurementSettings;
   /** For `remoteScene.conditions`: the badges. */
   conditions: ConditionDefinition[];
+  /** For `remoteScene.resources`: the bars, and the downed state. */
+  resources: Record<string, readonly ResourceDefinition[]>;
+  /** For `remoteScene.initiativeHealth`: the bar after a combatant's name. */
+  initiativeHealth: Record<string, ResourceValue>;
 }
 
 /** Builds each record kind; the applier passes builders that reuse unchanged records. */
@@ -119,6 +125,8 @@ export function playerSceneToAtlasState(scene: PlayerScene, images: RemoteImages
     },
     measurement: atlasMeasurement(scene.measurement),
     conditions: neutralConditions(scene.tokens),
+    resources: atlasResourceDefinitions(scene.tokens),
+    initiativeHealth: atlasInitiativeHealth(scene.initiative),
   };
 }
 
@@ -135,5 +143,7 @@ export function emptyRemoteScene(builders: RecordBuilders): RemoteSceneParts {
     },
     measurement: atlasMeasurement(measurement),
     conditions: [],
+    resources: {},
+    initiativeHealth: {},
   };
 }

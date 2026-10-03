@@ -20,6 +20,7 @@ import type { CollectionGridDefaults } from '../types/collectionSettingsTypes';
 import type { FogOperation } from '../types/fogTypes';
 import type { InitiativeEntry, InitiativeState } from '../types/initiativeTypes';
 import type { SceneLighting } from '../types/lightingTypes';
+import type { ResourceDefinition } from '../resources/resourceTypes';
 import type { ProjectedState } from './scene/projectForPlayers';
 
 export type Coverage =
@@ -39,7 +40,6 @@ const gmOnly = (reason: string): Coverage => ({ status: 'gm-only', reason });
 const notYet = (piece: string): Coverage => ({ status: 'not-yet', piece });
 
 const KIND = gmOnly('the record kind; players get each kind in its own list');
-const TOKEN_RESOURCES = notYet('token resources (Atlas 0.5), shown to players by their visibleToPlayers');
 const LOCAL_PLAYER_LINK = gmOnly('links the token to a local player character, not to an online player');
 const INITIATIVE_SIDES = notYet('initiative by sides (Atlas 0.5)');
 /** Only how the player window draws what it shows (tints, looks): never what it shows or hides. */
@@ -74,8 +74,9 @@ export const TOKEN_FIELD_COVERAGE: CoverageTable<KeysOfUnion<TokenEntity>> = {
   name: SENT,
   statblockPath: SENT,
   statblockName: SENT,
-  resources: TOKEN_RESOURCES,
-  overriddenMax: gmOnly('records which maximums the GM set by hand'),
+  // The bars the window draws (`projectBars`), and whether the token is downed; the collection's definitions decide which (`RESOURCE_DEFINITION_COVERAGE`).
+  resources: SENT,
+  overriddenMax: gmOnly('records which maximums the GM set by hand; the values it protects are what players see'),
   showNameplate: gmOnly('players see nameplates by the Show nameplates player view setting, as in the player window'),
   tags: gmOnly('tags organise the GM\'s tokens'),
   notePath: gmOnly('note links stay on the GM\'s machine'),
@@ -204,10 +205,10 @@ export const LIGHTING_STATE_COVERAGE: CoverageTable<LightingStoreField> = {
 export const LIGHTING_SLICE_FIELDS: readonly LightingStoreField[] = (Object.keys(LIGHTING_STATE_COVERAGE) as LightingStoreField[])
   .filter((field) => LIGHTING_STATE_COVERAGE[field].status === 'lighting');
 
-/** A map's token display settings (`tokenSettings`), saved with the map; the projection reads none of them yet. */
+/** A map's token display settings (`tokenSettings`), saved with the map; the projection reads none of them. */
 export const TOKEN_SETTINGS_COVERAGE: CoverageTable<keyof ViewAtlasState['tokenSettings']> = {
   showNameplates: gmOnly('players see nameplates by the Show nameplates player view setting, as in the player window'),
-  hiddenResources: TOKEN_RESOURCES,
+  hiddenResources: gmOnly("the map hides resources from the GM's own view; the player window ignores it and follows each resource's player setting"),
   showInstanceBadges: notYet('instance badges, with the Show instance badges setting (a later piece)'),
   tokenRingSize: notYet('the token ring size of the scene (a later piece); players draw rings at the default size'),
 };
@@ -226,6 +227,22 @@ export const SCENE_LIGHTING_COVERAGE: CoverageTable<keyof SceneLighting> = {
   brightThreshold: LIGHTING,
   darkSightLook: LIGHTING_LOOK,
   darkSightTint: LIGHTING_LOOK,
+};
+
+/**
+ * The resources of the map's collection (`ProjectionContext.resources`, which the broadcaster re-reads when
+ * the collection's settings change), which decide the bars and the downed state players see. The window
+ * draws no label and no numbers, so what a resource is called and where its maximum comes from stay with the GM.
+ */
+export const RESOURCE_DEFINITION_COVERAGE: CoverageTable<keyof ResourceDefinition> = {
+  key: SENT,
+  name: gmOnly('players see a bar, never what it is called'),
+  field: gmOnly('the statblock field that supplies the maximum; players see only the share'),
+  direction: SENT,
+  color: SENT,
+  defeatedWhenSpent: SENT,
+  visibleToPlayers: SENT,
+  slot: SENT,
 };
 
 export const INITIATIVE_COVERAGE: CoverageTable<keyof InitiativeState> = {

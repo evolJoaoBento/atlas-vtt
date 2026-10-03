@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FogBrushStroke, FogLassoFill, FogOperation, FogRectangleFill } from '../../../src/app/types/fogTypes';
-import { finiteOr, finiteOrNull, hpOrNull, oneOf, positiveOr, positiveOrNull, resourceOrNull, textOr, textOrNull, unitOr } from '../../../src/app/online/scene/coerce';
+import { finiteOr, finiteOrNull, oneOf, positiveOr, positiveOrNull, textOr, textOrNull, unitOr } from '../../../src/app/online/scene/coerce';
 import { FOG_CELL_SIZE, FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { SCENE_LIMITS, SCENE_RANGES } from '../../../src/app/online/scene/sceneTypes';
 import { simplifyPoints, wirePoints } from '../../../src/app/online/scene/simplifyPoints';
@@ -37,9 +37,6 @@ describe('coerce', () => {
     expect(textOr('x'.repeat(600), '')).toHaveLength(SCENE_LIMITS.stringLength);
     expect(textOrNull('')).toBeNull();
     expect(oneOf(['a', 'b'] as const, 'c', 'a')).toBe('a');
-    expect(resourceOrNull({ current: '7', max: 10 })).toEqual({ current: 7, max: 10 });
-    expect(resourceOrNull('7')).toBeNull();
-    expect(hpOrNull({ current: 3, max: 0 })).toBeNull();
   });
 
   it('clamps wire numbers into the player validator ranges', () => {

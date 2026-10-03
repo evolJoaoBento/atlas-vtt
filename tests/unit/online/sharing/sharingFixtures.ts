@@ -83,7 +83,7 @@ export function noteCatalogue(notes: Record<string, { text: string; share: unkno
     isFile: (path) => path in notes,
     resolveLink: (linkpath) => Object.keys(notes).find((path) => title(path) === linkpath) ?? null,
     shareable: () => [],
-    rules: () => ({ showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
+    rules: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
     collectionGrid: () => null,
   };
   return new SenderCatalogue(sources, items, testPeople(people), nodeHash, async () => null);

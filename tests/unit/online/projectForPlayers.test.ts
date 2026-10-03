@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { Character, Token } from '../../../src/app/types';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
@@ -11,12 +12,13 @@ import { projectForPlayers, type ProjectedState, type ProjectionContext } from '
 import { createProjectionMemo } from '../../../src/app/online/scene/projectRecords';
 import { coverageOfFog } from './sceneFixtures';
 
-const ALL_ON: PlayerViewRules = {
-  showGrid: true, showTokenHP: true, showTokenStress: true, showTokenNameplates: true, showWidgets: true, showInitiative: true,
-};
-const ALL_OFF: PlayerViewRules = {
-  showGrid: false, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: false, showInitiative: false,
-};
+const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
+const ALL_OFF: PlayerViewRules = { showGrid: false, showTokenNameplates: false, showWidgets: false, showInitiative: false };
+/** HP (a bar that defeats the token) and stress (a second bar), both shown to players, as a collection with the two sets them up. */
+const DEFINITIONS: readonly ResourceDefinition[] = [
+  { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: true },
+  { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7', visibleToPlayers: true },
+];
 
 function gmState(overrides: Partial<ProjectedState> = {}): ProjectedState {
   return {
@@ -37,13 +39,13 @@ function withTokens(tokens: Record<string, Token | Character>, extra: Partial<Pr
 function context(overrides: Partial<ProjectionContext> = {}): ProjectionContext {
   return {
     sceneId: 'scene-1', rules: ALL_ON, coverage: FogCoverage.EMPTY, assets: fakeAssetIds(),
-    mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(), ...overrides,
+    mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(), resources: DEFINITIONS, ...overrides,
   };
 }
 function hero(overrides: Partial<Character> = {}): Character {
   return {
     id: 'hero', kind: 'character', x: 140, y: 140, imagePath: 'atlas-vtt/assets/hero.png', name: 'Anna',
-    hp: { current: 7, max: 10 }, stress: 2, maxStress: 6, ringColor: '#3366ff', conditions: ['prone'], ...overrides,
+    resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } }, ringColor: '#3366ff', conditions: ['prone'], ...overrides,
   };
 }
 const fogOver = (x: number, y: number, width: number, height: number): FogCoverage => coverageOfFog({
@@ -66,7 +68,8 @@ describe('projectForPlayers', () => {
     const scene = projectForPlayers(withTokens({ hero: hero() }), context());
     expect(scene.tokens.hero).toEqual({
       x: 140, y: 140, size: 1, rotation: 0, layer: 0, image: expect.any(String), ring: '#3366ff',
-      conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 },
+      conditions: [{ id: 'prone', value: null }], name: 'Anna', hp: null, stress: null,
+      resources: [{ color: '#22c55e', share: 0.7, spent: false }, { color: '#a855f7', share: 0.33, spent: false }], downed: false,
     });
     expect(scene.tokens.hero?.image).not.toContain('hero');
   });
@@ -76,18 +79,16 @@ describe('projectForPlayers', () => {
     expect(Object.keys(scene.tokens)).toEqual(['hero']);
   });
 
-  it('follows the name, HP and stress settings', () => {
+  it('follows the name setting', () => {
     const scene = projectForPlayers(withTokens({ hero: hero() }), context({ rules: ALL_OFF }));
-    expect(scene.tokens.hero).toMatchObject({ name: null, hp: null, stress: null });
-    const noMax = projectForPlayers(withTokens({ hero: hero({ hp: { current: 3, max: 0 } }) }), context());
-    expect(noMax.tokens.hero?.hp).toBeNull();
+    expect(scene.tokens.hero?.name).toBeNull();
     const statblock = projectForPlayers(withTokens({ hero: hero({ name: '', statblockName: 'Goblin boss', statblockPath: 'b.md' }) }), context());
     expect(statblock.tokens.hero?.name).toBe('Goblin boss');
   });
 
-  it('never gives a plain token a name, HP or stress, and drops a hidden ring', () => {
+  it('never gives a plain token a name or bars, and drops a hidden ring', () => {
     const plain: Token = { id: 'rock', kind: 'token', x: 0, y: 0, imagePath: 'rock.png', showRing: false };
-    expect(projectForPlayers(withTokens({ rock: plain }), context()).tokens.rock).toMatchObject({ name: null, hp: null, stress: null, ring: null });
+    expect(projectForPlayers(withTokens({ rock: plain }), context()).tokens.rock).toMatchObject({ name: null, resources: [], downed: false, ring: null });
     const white: Token = { id: 'rock', kind: 'token', x: 0, y: 0, imagePath: 'rock.png' };
     expect(projectForPlayers(withTokens({ rock: white }), context()).tokens.rock?.ring).toBe('#ffffff');
   });
@@ -189,15 +190,17 @@ describe('projectForPlayers', () => {
       'hasVision', 'visionInnerRadius', 'visionOuterRadius', 'instanceNumber', 'showNameplate', 'hope', 'difficulty',
       'maxHpOverridden', 'maxStressOverridden', 'statblockResources', 'conditionValues', 'imagePath', 'kind', 'futureField',
       'pins', 'gmOnly', 'hex', 'walls', 'lights', 'audios', 'dmNotePath', 'diceLog', 'pinnedNotePreviews', 'lootRoller',
-      'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'color',
+      'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
+      'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
     ];
     const keys = keysOf({ ...scene, grid: null, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);
     expect(scene.initiative?.entries[0]).not.toHaveProperty('stress');
+    expect(keysOf(scene.widgets).has('color')).toBe(false);
   });
 
   it('projects messy map data into messages players accept', () => {
-    const messyHero = hero({ hp: { current: '7', max: '10' } as unknown as { current: number; max: number }, rotation: Number.NaN, size: -2 });
+    const messyHero = hero({ resources: { hp: { current: '7', max: '10' } } as unknown as Character['resources'], rotation: Number.NaN, size: -2 });
     const lost = hero({ id: 'lost', x: Number.NaN });
     const sneaky = { ...hero({ id: 'sneaky' }), isHidden: 1 } as unknown as Character;
     const state = {
@@ -214,7 +217,7 @@ describe('projectForPlayers', () => {
 
     const scene = projectForPlayers(state, context());
     expect(Object.keys(scene.tokens)).toEqual(['hero']);
-    expect(scene.tokens.hero).toMatchObject({ hp: { current: 7, max: 10 }, rotation: 0, size: 1 });
+    expect(scene.tokens.hero).toMatchObject({ resources: [{ color: '#22c55e', share: 0.7, spent: false }], rotation: 0, size: 1 });
     const { fog, drawings, ...body } = scene;
     const snapshot = decodeControl(encodeControl({ v: 1, type: 'scene-snapshot', seq: 1, scene: body, fogParts: 1, drawingParts: 1 }));
     const fogPart = decodeControl(encodeControl({ v: 1, type: 'scene-fog', seq: 2, part: 0, records: fog }));

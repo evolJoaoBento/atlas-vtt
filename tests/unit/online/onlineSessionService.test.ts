@@ -16,11 +16,11 @@ import { emptySceneState, FakeViewport, viewWithViewport } from './cameraFixture
 import { createTabMetaStore } from '../../../src/app/stores/tabMetaStore';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
 
-const app = { vault: { getName: () => 'My Vault', getAbstractFileByPath: () => null, on: () => ({}), offref: () => {} } } as never;
+const app = { workspace: { on: () => ({}), offref: () => {} }, vault: { getName: () => 'My Vault', getAbstractFileByPath: () => null, on: () => ({}), offref: () => {} } } as never;
 const settings = {
   getOnlineSettings: () => DEFAULT_ONLINE_SETTINGS,
   getLocalPlayerViewSettings: () => ({
-    showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
+    showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true,
   }),
   onChange: () => () => {},
 } as never;
@@ -282,7 +282,7 @@ describe('OnlineSessionService', () => {
     const logging = {
       getOnlineSettings: () => ({ ...DEFAULT_ONLINE_SETTINGS, logEvents: true }),
       getLocalPlayerViewSettings: () => ({
-        showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
+        showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true,
       }),
       onChange: () => () => {},
     } as never;

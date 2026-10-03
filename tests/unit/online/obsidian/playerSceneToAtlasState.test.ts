@@ -29,22 +29,37 @@ describe('playerSceneToAtlasState', () => {
     expect(state.objects.tokens.t1?.imagePath).toBe('');
   });
 
-  it('makes a token with a name, HP or stress a character, with a plate only for a sent name', () => {
+  it('makes a token with a name, a bar or a downed mark a character, with a plate only for a sent name', () => {
+    const bar = { color: '#22c55e', share: 0.7, spent: false };
     const scene = playerScene({
       tokens: {
-        named: playerToken({ name: 'Anna', hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 }, ring: null }),
-        unnamed: playerToken({ hp: { current: 3, max: 8 } }),
+        named: playerToken({ name: 'Anna', resources: [bar], ring: null }),
+        unnamed: playerToken({ resources: [{ color: '#a855f7', share: 0.25, spent: false }] }),
+        downed: playerToken({ downed: true }),
+        plain: playerToken(),
       },
     });
-    const { tokens } = playerSceneToAtlasState(scene, images).state.objects;
-    expect(tokens.named).toMatchObject({
-      kind: 'character', name: 'Anna', showNameplate: true, hp: { current: 7, max: 10 },
-      stress: { current: 2, max: 6 }, maxStress: 6, showRing: false,
-    });
+    const parts = playerSceneToAtlasState(scene, images);
+    const { tokens } = parts.state.objects;
+    expect(tokens.named).toMatchObject({ kind: 'character', name: 'Anna', showNameplate: true, resources: { bar0: { current: 70, max: 100 } }, showRing: false });
     expect(tokens.named).not.toHaveProperty('ringColor');
-    expect(tokens.unnamed).toMatchObject({ kind: 'character', name: '' });
+    expect(tokens.unnamed).toMatchObject({ kind: 'character', name: '', resources: { bar0: { current: 25, max: 100 } } });
     expect(tokens.unnamed).not.toHaveProperty('showNameplate');
-    expect(tokens.unnamed).not.toHaveProperty('stress');
+    expect(tokens.downed).toMatchObject({ kind: 'character', resources: { downed: { current: 0, max: 1 } } });
+    expect(tokens.plain).toMatchObject({ kind: 'token' });
+    // Atlas draws each bar from a stand-in definition of the colour sent; nothing of the GM's definitions
+    expect(parts.resources.named).toEqual([expect.objectContaining({ key: 'bar0', color: '#22c55e', slot: 0, visibleToPlayers: true })]);
+    expect(parts.resources.downed).toEqual([expect.objectContaining({ key: 'downed', visibleToPlayers: false, defeatedWhenSpent: true })]);
+    expect(parts.resources).not.toHaveProperty('plain');
+  });
+
+  it('leaves hp and stress alone: a GM of an older version sent them, and nothing draws them any more', () => {
+    const scene = playerScene({ tokens: { old: playerToken({ name: 'Old', hp: { current: 3, max: 8 }, stress: { current: 1, max: 4 } }) } });
+    const old = playerSceneToAtlasState(scene, images).state.objects.tokens.old;
+    expect(old).toMatchObject({ kind: 'character', name: 'Old' });
+    expect(old).not.toHaveProperty('resources');
+    expect(old).not.toHaveProperty('hp');
+    expect(old).not.toHaveProperty('stress');
   });
 
   it('gives conditions neutral definitions, valued where a value was sent', () => {
@@ -129,15 +144,17 @@ describe('playerSceneToAtlasState', () => {
 
   it("opens the initiative order players may see, each entry with its token's art", () => {
     const scene = playerScene({
-      initiative: { round: 3, active: true, entries: [{ id: 'e1', tokenId: 't1', initiative: 15, name: 'Anna', hp: { current: 0, max: 9 }, isActive: true }] },
+      initiative: { round: 3, active: true, entries: [{ id: 'e1', tokenId: 't1', initiative: 15, name: 'Anna', hp: null, hpShare: 0.4, isActive: true }] },
     });
     const state = playerSceneToAtlasState(scene, images).state;
     expect(state.initiativeTrackerOpen).toBe(true);
     expect(state.initiative).toMatchObject({ round: 3, isActive: true, currentIndex: 0 });
     expect(state.initiative.entries).toEqual([{
-      id: 'e1', tokenId: 't1', name: 'Anna', initiative: 15, initiativeModifier: 0, hp: { current: 0, max: 9 },
-      imagePath: 'blob:token/asset-1', isActive: true, isDefeated: true, isNPC: true, order: 0,
+      id: 'e1', tokenId: 't1', name: 'Anna', initiative: 15, initiativeModifier: 0,
+      imagePath: 'blob:token/asset-1', isActive: true, isNPC: true, order: 0,
     }]);
+    // The bar after the name comes with the scene, by token, for the initiative list to draw
+    expect(playerSceneToAtlasState(scene, images).initiativeHealth).toEqual({ t1: { current: 40, max: 100 } });
     const closed = playerSceneToAtlasState(playerScene({ initiative: null }), images).state;
     expect(closed.initiativeTrackerOpen).toBe(false);
     expect(closed.initiative.entries).toEqual([]);

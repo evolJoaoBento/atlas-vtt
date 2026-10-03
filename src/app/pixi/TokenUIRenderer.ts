@@ -19,7 +19,7 @@ import { computeTokenStrokeWidth, restingTokenUIScale, selectedTokenUIScale } fr
 import { getTokenRingCenterRadius } from './token-renderer/tokenRingMetrics';
 import { ValueTransition } from './utils/ValueTransition';
 import { MOTION_SLOW_MS, prefersReducedMotion } from '../utils/motion';
-import { NAMEPLATE, NAMEPLATE_STYLE, nameplateRect } from './token-renderer/tokenUiLayout';
+import { BAR_STYLE, FIRST_BAR_GAP, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect } from './token-renderer/tokenUiLayout';
 
 /**
  * Text is drawn at scale 0.333 and the viewport zooms to at most 5x, so a
@@ -308,16 +308,17 @@ export class TokenUIRenderer {
   /** Redraws the UI for `token`, whose sprite is `spriteWidth` world pixels wide. */
   public update(token: BaseToken & Partial<Character>, spriteWidth: number, playerSettings?: Pick<AtlasSettings['localPlayerView'], 'showTokenNameplates'>): void {
     const tokenSettings = this.store?.getState().tokenSettings;
-    // Players see the resources their definitions allow, whatever the DM hides on this map.
-    const viewer: ResourceViewer = playerSettings ? 'player' : 'dm';
-    const definitions = this.resourceDefsProvider();
+    // Players, and the online scene (which is the players' view), see the resources their definitions allow, whatever the DM hides on this map.
+    const playerView = playerSettings !== undefined || this.isRemote();
+    const viewer: ResourceViewer = playerView ? 'player' : 'dm';
+    const definitions = this.resourceDefsProvider(token.id);
     // The map's own switches hide resources from the GM; the player view never reads them
-    const hidden = playerSettings ? [] : tokenSettings?.hiddenResources ?? [];
+    const hidden = playerView ? [] : tokenSettings?.hiddenResources ?? [];
     const shown = visibleResources(token, definitions, viewer).filter(({ definition }) => !hidden.includes(definition.key));
 
     const bars = shown.filter(({ slot }) => shapeOf(slot) === 'bar');
     // Wheels answer the game master's hover and selection; the player view has neither
-    const wheels = playerSettings ? [] : shown.filter(({ slot }) => shapeOf(slot) === 'wheel');
+    const wheels = playerView ? [] : shown.filter(({ slot }) => shapeOf(slot) === 'wheel');
 
     const resourcesKey = shown.map(({ definition, value, slot }) =>
       `${definition.key}:${slot}:${definition.name}:${definition.color}:${value.current}/${value.max}`).join('|');
@@ -362,8 +363,7 @@ export class TokenUIRenderer {
     this.conditionUI.setHidden(this.isHiddenDuringResize || this.isHiddenDuringRotation);
 
     // Before the early return: the controls lay out from the stack's slots, which must empty with it
-    const baseGap = 2; // Gap between token and first bar
-    this.resources.update(bars, baseGap, this.canAnimateValues());
+    this.resources.update(bars, FIRST_BAR_GAP, this.canAnimateValues());
     this.wheels.update(wheels);
 
     this.hasContent = hasResources || showNameplate || hasConditions;
@@ -374,7 +374,7 @@ export class TokenUIRenderer {
     const defeatedSlot = defeated ? this.defeatedSlot(shown) : undefined;
     if (defeatedSlot) {
       this.defeatedOverlay.roundRect(defeatedSlot.left, defeatedSlot.top, defeatedSlot.width, defeatedSlot.height, barDimensions.token.radius)
-        .fill({ color: 0x000000, alpha: 0.4 });
+        .fill({ color: 0x000000, alpha: BAR_STYLE.defeatedAlpha });
     }
 
     // Name badge - only show if showNameplate is true AND there's a meaningful name
@@ -593,8 +593,13 @@ export class TokenUIRenderer {
     this.wheels.setAlpha(alpha);
   }
 
+  /** Whether this is the online scene, whose players see what the player window shows: bars, no numbers. */
+  private isRemote(): boolean {
+    return this.store?.getState().remoteScene != null;
+  }
+
   private updateTextVisibility(): void {
-    const shouldShowText = this.isHovered || this.isSelected;
+    const shouldShowText = (this.isHovered || this.isSelected) && !this.isRemote();
     const targetAlpha = shouldShowText ? 1 : 0;
     
     // Cancel any existing animation

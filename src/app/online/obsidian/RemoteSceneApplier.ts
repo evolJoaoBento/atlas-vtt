@@ -70,6 +70,8 @@ const NO_POSITION = (): ScenePoint | null => null;
 const NO_INPUT = (): string => '';
 const pointKey = (point: ScenePoint | null): string => (point ? `${point.x},${point.y}` : '');
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
+/** What the GM's scene decides of `remoteScene`, besides the session's own state. */
+const REMOTE_PARTS = ['measurement', 'conditions', 'resources', 'initiativeHealth'] as const;
 
 export class RemoteSceneApplier {
   private scene: PlayerScene | null = null;
@@ -141,9 +143,9 @@ export class RemoteSceneApplier {
     if (!sameValue(state.initiative, next.initiative)) update.initiative = next.initiative;
     if (state.initiativeTrackerOpen !== next.initiativeTrackerOpen) update.initiativeTrackerOpen = next.initiativeTrackerOpen;
     const remote = state.remoteScene;
-    if (remote && (!sameValue(remote.measurement, parts.measurement) || !sameValue(remote.conditions, parts.conditions))) {
-      update.remoteScene = { ...remote, measurement: parts.measurement, conditions: parts.conditions };
-    }
+    const { measurement, conditions, resources, initiativeHealth } = parts;
+    const scene = { measurement, conditions, resources, initiativeHealth };
+    if (remote && REMOTE_PARTS.some((key) => !sameValue(remote[key], scene[key]))) update.remoteScene = { ...remote, ...scene };
     return update;
   }
 }

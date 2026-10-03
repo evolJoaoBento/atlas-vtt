@@ -5,6 +5,7 @@
  * fields). The UI reaches the view's actions through `AtlasView.onlineControls()`.
  */
 import type { StoreApi } from 'zustand';
+import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
 import { DEFAULT_CONE_ANGLE, type MeasurementSettings } from '../../grid/measurementFormat';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { DiceSelection } from '../../tools/diceRolling';
@@ -31,6 +32,10 @@ export interface RemoteSceneState {
   measurement: MeasurementSettings;
   /** Neutral definitions for the condition ids the scene shows. */
   conditions: readonly ConditionDefinition[];
+  /** The stand-in resource definitions of each token that shows bars or is downed, by token id (`convertResources.ts`). */
+  resources: Readonly<Record<string, readonly ResourceDefinition[]>>;
+  /** How full the initiative list's bar is for each combatant's token, by token id: the share out of 100. */
+  initiativeHealth: Readonly<Record<string, ResourceValue>>;
   status: OnlineSceneStatus;
   /** Whether the camera follows the GM; Follow GM and Fit map show while it does not. */
   following: boolean;
@@ -74,6 +79,8 @@ export function initialRemoteScene(): RemoteSceneState {
     movableTokenIds: [],
     measurement: atlasMeasurement(withMeasurementDefaults(undefined)),
     conditions: [],
+    resources: {},
+    initiativeHealth: {},
     status: { title: DEFAULT_TABLE_TITLE, connection: 'Connecting…', tone: 'pending', message: null, reconnect: false },
     following: true,
     notice: null,

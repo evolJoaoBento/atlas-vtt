@@ -6,6 +6,7 @@
 import type { BaseToken, Character, Token, TokenEntity } from '../../types';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import { setOwn } from '../scene/sceneDiff';
+import { atlasBars } from './convertResources';
 import type { PlayerCondition, PlayerToken, ScenePoint } from '../scene/sceneTypes';
 import { NEUTRAL_BADGE_COLOR } from '../view/layers/tokenUiDrawing';
 
@@ -40,7 +41,8 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     ...(token.ring !== null ? { ringColor: token.ring } : {}),
     ...conditionFields(token.conditions),
   };
-  if (token.name === null && token.hp === null && token.stress === null) {
+  const bars = atlasBars(token);
+  if (token.name === null && bars === null) {
     const plain: Token = { ...base, kind: 'token' };
     return plain;
   }
@@ -50,10 +52,8 @@ export function atlasToken(id: string, token: PlayerToken, imagePath: string, po
     name: token.name ?? '',
     // The map's nameplate setting stays off: a plate shows only where the GM sent a name.
     ...(token.name !== null ? { showNameplate: true } : {}),
-    ...(token.hp !== null ? { hp: { current: token.hp.current, max: token.hp.max } } : {}),
-    ...(token.stress !== null
-      ? { stress: { current: token.stress.current, max: token.stress.max }, maxStress: token.stress.max }
-      : {}),
+    // The bars and the downed state, which `viewResourceDefinitions` draws from the scene's stand-in definitions
+    ...(bars ? { resources: bars.values } : {}),
   };
   return character;
 }

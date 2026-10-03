@@ -21,7 +21,7 @@ import type { FollowViewport } from './ViewportFollower';
 /** The GM's player view rules were applied before sending: show everything that arrives. */
 const SHOW_WHAT_ARRIVES: PlayerSettingsSource = {
   getLocalPlayerViewSettings: () => ({
-    showToolbar: true, showTokenHP: true, showTokenStress: true, showTokenNameplates: true, showNotePreviews: false,
+    showToolbar: true, showTokenNameplates: true, showNotePreviews: false,
     showGrid: true, showWidgets: true, showInitiative: true, showDiceRolls: false, showCommandPalette: false,
   }),
   onChange: () => () => undefined,

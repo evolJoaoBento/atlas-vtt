@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DrawingStroke, TextElement } from '../../../src/app/types';
+import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
+import type { Character, DrawingStroke, TextElement } from '../../../src/app/types';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import type { AnyWidget } from '../../../src/app/types/widgetTypes';
 import type { InitiativeEntry } from '../../../src/app/types/initiativeTypes';
@@ -13,12 +14,8 @@ import { isDrawingRecords, isFogRecords, isPlayerSceneBody } from '../../../src/
 import { coverageOfFog } from './sceneFixtures';
 import { projectInitiative, projectWidgets } from '../../../src/app/online/scene/projectPanels';
 
-const ALL_ON: PlayerViewRules = {
-  showGrid: true, showTokenHP: true, showTokenStress: true, showTokenNameplates: true, showWidgets: true, showInitiative: true,
-};
-const ALL_OFF: PlayerViewRules = {
-  showGrid: false, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: false, showInitiative: false,
-};
+const ALL_ON: PlayerViewRules = { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true };
+const ALL_OFF: PlayerViewRules = { showGrid: false, showTokenNameplates: false, showWidgets: false, showInitiative: false };
 
 const fogBlock = (x: number, y: number, width: number, height: number): FogCoverage => coverageOfFog({
   f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x, y, width, height },
@@ -38,9 +35,9 @@ function widget(overrides: Partial<AnyWidget> & { id: string }): AnyWidget {
 }
 function entry(overrides: Partial<InitiativeEntry> & { id: string; tokenId: string }): InitiativeEntry {
   return {
-    name: 'Goblin', initiative: 12, initiativeModifier: 1, hp: { current: 5, max: 7 }, stress: { current: 1, max: 6 },
+    name: 'Goblin', initiative: 12, initiativeModifier: 1,
     imagePath: 'atlas-vtt/assets/goblin.png', statblockPath: 'Bestiary/Goblin.md',
-    isActive: false, isDefeated: false, isNPC: true, order: 0, ...overrides,
+    isActive: false, isNPC: true, order: 0, ...overrides,
   };
 }
 
@@ -58,11 +55,11 @@ describe('object bounds', () => {
 });
 
 describe('player view rules', () => {
-  it('keeps the six settings the projection follows', () => {
-    const settings = { ...ALL_ON, showToolbar: true, showDiceRolls: true } as PlayerViewRules;
+  it('keeps the four settings the projection follows (resources follow the collection, not the settings)', () => {
+    const settings = { ...ALL_ON, showToolbar: true, showDiceRolls: true, showTokenHP: true } as PlayerViewRules;
     expect(pickPlayerViewRules(settings)).toEqual(ALL_ON);
     expect(samePlayerViewRules(ALL_ON, { ...ALL_ON })).toBe(true);
-    expect(samePlayerViewRules(ALL_ON, { ...ALL_ON, showTokenHP: false })).toBe(false);
+    expect(samePlayerViewRules(ALL_ON, { ...ALL_ON, showTokenNameplates: false })).toBe(false);
   });
 });
 
@@ -155,18 +152,35 @@ describe('initiative projection', () => {
   };
   const visible = new Set(['goblin', 'orc']);
 
-  it('lists entries of visible tokens with names and HP as the settings allow', () => {
-    const projected = projectInitiative({ initiative, initiativeTrackerOpen: true }, visible, ALL_ON);
+  const goblin = { id: 'goblin', kind: 'character', x: 0, y: 0, imagePath: '', resources: { hp: { current: 5, max: 7 } } } as unknown as Character;
+  const orc = { ...goblin, id: 'orc', resources: { hp: { current: 7, max: 7 } } } as Character;
+  const objects = { tokens: { goblin, orc }, fog: {}, pins: {}, texts: {}, drawings: {}, walls: {}, lights: {}, audios: {} };
+  const hp = (visibleToPlayers: boolean): ResourceDefinition[] => [
+    { key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers },
+  ];
+
+  it('lists entries of visible tokens with names, and the HP bar as the collection shows it', () => {
+    const state = { initiative, initiativeTrackerOpen: true, objects };
+    const projected = projectInitiative(state, visible, ALL_ON, hp(true));
     expect(projected).toEqual({
       round: 3, active: true,
       entries: [
-        { id: 'e1', tokenId: 'goblin', initiative: 12, name: 'Goblin', hp: { current: 5, max: 7 }, isActive: false },
-        { id: 'e2', tokenId: 'orc', initiative: 12, name: 'Orc', hp: { current: 5, max: 7 }, isActive: true },
+        { id: 'e1', tokenId: 'goblin', initiative: 12, name: 'Goblin', hp: null, hpShare: 0.71, isActive: false },
+        { id: 'e2', tokenId: 'orc', initiative: 12, name: 'Orc', hp: null, hpShare: 1, isActive: true },
       ],
     });
     expect(JSON.stringify(projected)).not.toMatch(/stress|statblock|imagePath|Lich/);
-    const plain = projectInitiative({ initiative, initiativeTrackerOpen: true }, visible, { ...ALL_ON, showTokenNameplates: false, showTokenHP: false });
-    expect(plain?.entries[0]).toMatchObject({ name: null, hp: null });
+    const plain = projectInitiative(state, visible, { ...ALL_ON, showTokenNameplates: false }, hp(true));
+    expect(plain?.entries[0]).toMatchObject({ name: null, hpShare: 0.71 });
+  });
+
+  it('draws no bar where players do not see HP: hidden, not defined, or a token without it', () => {
+    const state = { initiative, initiativeTrackerOpen: true, objects };
+    for (const definitions of [hp(false), [], hp(true).map((definition) => ({ ...definition, key: 'health' }))]) {
+      expect(projectInitiative(state, visible, ALL_ON, definitions)?.entries.map((line) => line.hpShare)).toEqual([null, null]);
+    }
+    const bare = { ...state, objects: { ...objects, tokens: { goblin: { ...goblin, resources: { hp: { current: 5, max: 0 } } }, orc: { ...orc, resources: undefined } } } };
+    expect(projectInitiative(bare as never, visible, ALL_ON, hp(true))?.entries.map((line) => line.hpShare)).toEqual([null, null]);
   });
 
   it('sends no tracker when it is closed or hidden, and no turn outside combat', () => {

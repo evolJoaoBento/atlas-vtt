@@ -13,10 +13,10 @@ import { PresentedScene } from '../../../../src/app/services/PresentedScene';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { nodeIdentityCrypto as crypto, testTable } from './sharingFixtures';
 
-const app = { vault: { getName: () => 'Vault', getAbstractFileByPath: () => null, on: () => ({}), offref: () => {} } } as never;
+const app = { workspace: { on: () => ({}), offref: () => {} }, vault: { getName: () => 'Vault', getAbstractFileByPath: () => null, on: () => ({}), offref: () => {} } } as never;
 const settings = {
   getOnlineSettings: () => ({ ...DEFAULT_ONLINE_SETTINGS, playerName: 'Morgan' }),
-  getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
+  getLocalPlayerViewSettings: () => ({ showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true }),
   onChange: () => () => {},
 } as never;
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));

@@ -70,16 +70,16 @@ describe('scene summary', () => {
     ])).toEqual(['Torches: 3', 'Torch: 02:05', 'clock: 2']);
   });
 
-  it('lists initiative with the round, the active turn, names and HP', () => {
+  it('lists initiative with the round, the active turn, names and the HP share (the window shows no numbers)', () => {
     const lines = initiativeLines({
       round: 2,
       active: true,
       entries: [
-        { id: 'e1', tokenId: 't1', initiative: 18, name: 'Anna', hp: { current: 5, max: 10 }, isActive: true },
+        { id: 'e1', tokenId: 't1', initiative: 18, name: 'Anna', hp: null, hpShare: 0.5, isActive: true },
         { id: 'e2', tokenId: 't2', initiative: 12, name: null, hp: null, isActive: false },
       ],
     });
-    expect(lines).toEqual(['Round 2', '▶ 18 · Anna · 5/10 HP', '12 · Unnamed']);
+    expect(lines).toEqual(['Round 2', '▶ 18 · Anna · HP 50%', '12 · Unnamed']);
     expect(initiativeLines({ round: 0, active: false, entries: [] })).toEqual([]);
     expect(initiativeLines(null)).toEqual([]);
   });

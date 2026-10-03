@@ -1,6 +1,9 @@
 import { Notice, type App } from 'obsidian';
 import { AssetService } from '../services/AssetService';
+import { mapResources } from '../resources/collectionResources';
+import type { ResourceDefinition } from '../resources/resourceTypes';
 import { collectionGridDefaultsFor } from '../services/mapMeasurementSettings';
+import { watchCollectionResources } from './watchCollectionResources';
 import { presentedScene } from '../services/PresentedScene';
 import type { SettingsService } from '../services/SettingsService';
 import type { CollectionGridDefaults } from '../types/collectionSettingsTypes';
@@ -52,6 +55,10 @@ interface Deps {
   images?: ImageFiles;
   /** The grid defaults of a map's collection; Atlas's asset index unless a test passes its own. */
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
+  /** The resources of a map's collection; Atlas's asset index unless a test passes its own. */
+  resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  /** Tells when those resources may have changed; the collection settings events unless a test passes its own. */
+  watchResources?: (listener: () => void) => () => void;
   /** Atlas's dice rolls; the `atlas-dice-rolled` document event unless a test passes its own. */
   diceFeed?: DiceFeed;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
@@ -90,6 +97,8 @@ export class OnlineSessionService {
   private readonly showRequest: NonNullable<Deps['showRequest']>;
   private readonly isJoined: () => boolean;
   private readonly collectionGrid: (mapPath: string | null) => CollectionGridDefaults | null;
+  private readonly resources: (mapPath: string | null) => readonly ResourceDefinition[];
+  private readonly watchResources: (listener: () => void) => () => void;
   private readonly loadTable: () => Promise<TableIdentity | null>;
   private readonly identityCrypto: IdentityCrypto;
   private currentTable: HostedTable | null = null;
@@ -107,6 +116,8 @@ export class OnlineSessionService {
     this.images = deps.images ?? vaultImageFiles(app);
     this.collectionGrid = deps.collectionGrid
       ?? ((mapPath) => (mapPath ? collectionGridDefaultsFor(AssetService.getInstance(app), mapPath) : null));
+    this.resources = deps.resources ?? ((mapPath) => mapResources(AssetService.getInstance(app), mapPath));
+    this.watchResources = deps.watchResources ?? ((listener) => watchCollectionResources(app, listener));
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
     this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.settings, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
@@ -207,6 +218,7 @@ export class OnlineSessionService {
     const scenes = loggedSession(session, log);
     const broadcaster = new SceneBroadcaster({
       session: scenes, presented: this.presented, settings: this.settings, assets: registry, notify, collectionGrid: this.collectionGrid,
+      resources: this.resources, watchResources: this.watchResources,
     });
     // The GM's view of the presented scene, which players follow by default; registered after the broadcaster.
     const cameraSender = new CameraSender({ session: scenes, presented: this.presented, projection: broadcaster });

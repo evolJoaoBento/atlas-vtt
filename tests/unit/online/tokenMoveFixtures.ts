@@ -93,7 +93,7 @@ export function moveWorld(options: { state?: CameraSceneState; mapSize?: { width
   });
   gm.start();
   const rules: PlayerViewRules = {
-    showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true, ...options.rules,
+    showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true, ...options.rules,
   };
   const settings = { getLocalPlayerViewSettings: (): PlayerViewRules => rules, onChange: (): (() => void) => () => {} };
   const presented = new PresentedScene();

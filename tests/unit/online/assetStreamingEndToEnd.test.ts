@@ -25,7 +25,7 @@ type Objects = SceneState['objects'];
 
 const MB = 1024 * 1024;
 const RULES: PlayerViewRules = {
-  showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
+  showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true,
 };
 const MAP = imageBytes(300_000, 1);
 const HERO = imageBytes(1000, 2);

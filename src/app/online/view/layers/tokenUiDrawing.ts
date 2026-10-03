@@ -1,16 +1,18 @@
 /**
  * A token's resource bars, nameplate and condition badges, laid out by the modules
  * Atlas's `TokenUIRenderer` and `ConditionBadgeRing` use, at Atlas's resting token UI
- * size. Players receive condition ids and values only, so badges are neutral discs
- * with the value in a pip.
+ * size. The bars are what the player window shows: a track, a fill in the colour it
+ * sends and no numbers. Players receive condition ids and values only, so badges are
+ * neutral discs with the value in a pip.
  */
 import { badgePositions, CONDITION_BADGE, fitBadges } from '../../../pixi/token-renderer/conditionBadgeLayout';
 import { restingTokenUIScale } from '../../../pixi/token-renderer/tokenSizing';
+import { BAR_SLOTS } from '../../../resources/resourceTypes';
 import {
-  BAR_BORDER, BAR_STYLE, barFillRect, barInnerRect, barTickXs, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect, tokenBarRects,
+  BAR_BORDER, BAR_STYLE, barFillRect, barInnerRect, barStackRects, barTickXs, NAMEPLATE, NAMEPLATE_STYLE, nameplateRect,
   type UiRect,
 } from '../../../pixi/token-renderer/tokenUiLayout';
-import { barDimensions, colors } from '../../../styles/designTokens';
+import { barDimensions } from '../../../styles/designTokens';
 import type { PlayerCondition, PlayerResource, PlayerToken } from '../../scene/sceneTypes';
 import type { ViewSurface } from '../ViewSurface';
 
@@ -34,36 +36,29 @@ export interface TokenUiGeometry {
 
 export function drawTokenUi(surface: ViewSurface, token: PlayerToken, geometry: TokenUiGeometry): void {
   const scale = restingTokenUIScale(geometry.cellSize);
-  if (token.hp || token.stress || token.name) {
+  // The window draws the first sockets as bars; a token's others (wheels) never reach players' view.
+  const bars = (token.resources ?? []).slice(0, BAR_SLOTS);
+  if (bars.length > 0 || token.name) {
     // Anchored on the token's bottom edge, in UI units, like Atlas's `belowToken` container.
     surface.push(token.x, token.y + geometry.size / 2, 0, scale);
     if (token.name) drawNameplate(surface, token.name);
-    drawBars(surface, token.hp, token.stress);
+    drawBars(surface, bars);
     surface.pop();
   }
   if (token.conditions.length > 0) drawBadges(surface, token, geometry.ringRadius, scale);
 }
 
-/** An HP bar's colour by the share left: healthy, injured below 70%, critical below 30%. */
-function healthColor(filled: number): number {
-  if (filled >= 0.7) return colors.health.healthy;
-  return filled >= 0.3 ? colors.health.injured : colors.health.critical;
-}
-
-const share = (resource: PlayerResource): number =>
-  (resource.max > 0 ? Math.max(0, Math.min(1, resource.current / resource.max)) : 0);
-
-function drawBars(surface: ViewSurface, hp: PlayerResource | null, stress: PlayerResource | null): void {
-  const bars = tokenBarRects(hp !== null, stress !== null);
-  if (hp && bars.hp) {
-    const filled = share(hp);
-    drawBar(surface, bars.hp, filled, cssColor(healthColor(filled)));
-    if (hp.current <= 0) {
-      surface.roundRect(bars.hp.x, bars.hp.y, bars.hp.width, bars.hp.height, barDimensions.token.radius,
-        { fill: '#000000', alpha: BAR_STYLE.defeatedAlpha });
+function drawBars(surface: ViewSurface, bars: readonly PlayerResource[]): void {
+  const rects = barStackRects(bars.length);
+  bars.forEach((bar, index) => {
+    const rect = rects[index];
+    if (!rect) return;
+    drawBar(surface, rect, bar.share, bar.color);
+    // The window darkens the bar whose spending defeats the token.
+    if (bar.spent) {
+      surface.roundRect(rect.x, rect.y, rect.width, rect.height, barDimensions.token.radius, { fill: '#000000', alpha: BAR_STYLE.defeatedAlpha });
     }
-  }
-  if (stress && bars.stress) drawBar(surface, bars.stress, share(stress), cssColor(BAR_STYLE.stressFill));
+  });
 }
 
 function drawBar(surface: ViewSurface, bar: UiRect, filled: number, color: string): void {

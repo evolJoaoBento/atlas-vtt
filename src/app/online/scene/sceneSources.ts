@@ -3,6 +3,7 @@ import { LIGHTING_SLICE_FIELDS } from '../coverage';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
 import type { PresentedSceneInfo, PresentedSceneListener } from '../../services/PresentedScene';
+import type { ResourceDefinition } from '../../resources/resourceTypes';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes';
 import type { FogOperation } from '../../types/fogTypes';
@@ -41,6 +42,10 @@ export interface SceneBroadcasterOptions {
   notify(message: string): void;
   /** The grid defaults of the collection holding the map at `mapPath`; tests leave it out. */
   collectionGrid?: (mapPath: string | null) => CollectionGridDefaults | null;
+  /** The resources of the collection holding the map at `mapPath`, which decide the bars players see; without it none show. */
+  resources?: (mapPath: string | null) => readonly ResourceDefinition[];
+  /** Calls `listener` when a collection's settings change or the asset index loads (the resources may differ); returns the stop. */
+  watchResources?: (listener: () => void) => () => void;
 }
 
 export type Slice = readonly unknown[];
@@ -108,7 +113,12 @@ export class FogCoverageCache {
 /** What the projection needs of the presented scene besides its store's slice. */
 export function sceneContext(
   scene: PresentedSceneInfo,
-  options: Pick<SceneBroadcasterOptions, 'collectionGrid'>,
-): Pick<ProjectionContext, 'mapSize' | 'collectionGrid'> {
-  return { mapSize: scene.mapSize(), collectionGrid: options.collectionGrid?.(scene.store.getState().mapPath ?? null) ?? null };
+  options: Pick<SceneBroadcasterOptions, 'collectionGrid' | 'resources'>,
+): Pick<ProjectionContext, 'mapSize' | 'collectionGrid' | 'resources'> {
+  const mapPath = scene.store.getState().mapPath ?? null;
+  return {
+    mapSize: scene.mapSize(),
+    collectionGrid: options.collectionGrid?.(mapPath) ?? null,
+    resources: options.resources?.(mapPath) ?? [],
+  };
 }

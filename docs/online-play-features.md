@@ -32,9 +32,24 @@ With dynamic lighting on (an experimental feature) and the presented scene lit, 
 
 A new lighting input that changes what the player window shows must reach `PlayerLighting` (or the store fields `sliceOf` watches), never the wire.
 
+## 2b. Token resources
+
+Online players get the bars of the resources the player window draws, and no more (`projectResources.ts`, from the collection's definitions that `SceneBroadcaster` reads through `options.resources(mapPath)`; `OnlineSessionService` passes the asset index's `mapResources`). The window's rules, which `projectBars` follows by going through `visibleResources`:
+
+- Only resources the collection shows to players (`visibleToPlayers`) with a maximum above 0; the map's own `hiddenResources` do not apply to players.
+- Only the bars (sockets 0 and 1): the window has no wheels for players, so a resource in a wheel socket is not sent. Bars stack in the order they are shown, whatever their sockets.
+- A bar has no label and no numbers in the window, so it goes out as `{ color, share, spent }`: the colour the window shows (a resource that defeats its token warns yellow below 70% and red below 30%, computed on the GM's side from the exact values), the fill in hundredths (a static value is full) and whether the window darkens the bar (the first spent bar that defeats the token). Names, keys, fields, maximums and the other resources never leave.
+- A creature whose defeating resource is spent is greyed out with a skull in the window, whether players see that resource or not: `downed` is sent for it (`isDowned`).
+- The window's initiative list draws a bar after the name from the token's `hp` resource where the collection shows `hp` to players, from any socket (`initiativeShare`, sent as the entry's `hpShare`).
+- Nothing depends on the player or on controlled tokens: one projection goes to everyone, as with the window.
+- Edits reach players: the broadcaster watches the collection's settings (`atlas-vtt:collection-settings-changed`, and the asset index loading) through `options.watchResources`, which is not in the store, and projects again.
+- Shares (section 11) call `projectForPlayers` without definitions, so a player-safe map shares no bars.
+
+The Obsidian client cannot give Atlas the GM's definitions, so `convertResources.ts` makes stand-in definitions for each token (`remoteScene.resources`, by token id): one per bar, in the colour sent, filled to the share out of 100, and a hidden `downed` resource for a downed token. `viewResourceDefinitions` answers for a token from them (as `viewConditionDefinitions` does for badges), `TokenUIRenderer` treats the online scene as the player view (no wheels, `hiddenResources` ignored, no numbers on hover or selection), and `PlayerInitiativePanel` reads `remoteScene.initiativeHealth`. The join page draws the bars with `barStackRects` and the other shared layout of `tokenUiLayout.ts`, which `ResourceBarView` uses too.
+
 ## 3. Wire type and validation
 
-Add the field to `src/app/online/scene/sceneTypes.ts` as `T | null`, never optional: JSON drops `undefined`. Validate it in `sceneValidation.ts`. Players running an older page ignore fields they do not know, so a new field needs no new protocol version. A changed meaning does.
+Add the field to `src/app/online/scene/sceneTypes.ts` as `T | null`, never optional: JSON drops `undefined`. The exception is a field added after players already ran: make it optional, validate it as absent-or-valid (`optional()` in `sceneValidation.ts`) and read it with a default, so older GMs and players keep working (`PlayerToken.resources`, `downed` and `PlayerInitiativeEntry.hpShare` are like this; `hp` and `stress` stay in the type, always null, because older pages require them). Validate it in `sceneValidation.ts`, with bounds on every count and string. Players running an older page ignore fields they do not know, so a new field needs no new protocol version. A changed meaning does.
 
 ## 4. Draw it on the player's side
 
@@ -122,6 +137,7 @@ Players can also join from Atlas in Obsidian (`src/app/online/obsidian/`). Their
   - the tokens the player may drag;
   - the GM's measurement;
   - neutral condition badges;
+  - the stand-in resource definitions of each token and the initiative bars (section 2b);
   - the status bar;
   - whether the camera follows the GM.
 

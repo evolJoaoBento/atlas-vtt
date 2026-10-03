@@ -13,6 +13,7 @@ import type { PeerLink } from '../../../src/app/online/transport/types';
 import { PresentedScene, type PresentedView } from '../../../src/app/services/PresentedScene';
 import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import { createTabMetaStore } from '../../../src/app/stores/tabMetaStore';
+import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
 import type { Character, DrawingStroke } from '../../../src/app/types';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
@@ -24,7 +25,7 @@ type SceneState = Pick<ViewAtlasState,
 > & { camera: { x: number; y: number; scale: number } };
 
 function character(id: string, x: number, overrides: Partial<Character> = {}): Character {
-  return { id, kind: 'character', x, y: 140, imagePath: `art/${id}.png`, name: id, hp: { current: 7, max: 10 }, ...overrides };
+  return { id, kind: 'character', x, y: 140, imagePath: `art/${id}.png`, name: id, resources: { hp: { current: 7, max: 10 } }, ...overrides };
 }
 
 function sceneState(tokens: Record<string, Character>, fog: Record<string, FogOperation> = {}): SceneState {
@@ -91,9 +92,14 @@ function moveToken(store: StoreApi<SceneState>, id: string, x: number): void {
   }));
 }
 
-const DEFAULT_RULES: PlayerViewRules = {
-  showGrid: true, showTokenHP: false, showTokenStress: false, showTokenNameplates: false, showWidgets: true, showInitiative: true,
+const DEFAULT_RULES: PlayerViewRules = { showGrid: true, showTokenNameplates: false, showWidgets: true, showInitiative: true };
+
+/** The collection's HP: a bar that defeats the token, kept from players until the GM shows it. */
+const HP: ResourceDefinition = {
+  key: 'hp', name: 'HP', field: 'hp', direction: 'drains', color: '#22c55e', defeatedWhenSpent: true, visibleToPlayers: false,
 };
+const SHOWN_HP: ResourceDefinition = { ...HP, visibleToPlayers: true };
+const HP_BAR = { color: '#22c55e', share: 0.7, spent: false };
 
 interface Harness {
   files: MemoryImageFiles;
@@ -104,6 +110,8 @@ interface Harness {
   broadcaster: SceneBroadcaster;
   notices: string[];
   setRules(next: Partial<PlayerViewRules>): void;
+  /** The GM edits the collection's resources; the broadcaster is told, as the collection settings event does. */
+  setResources(next: readonly ResourceDefinition[]): void;
 }
 
 function setup(options: { start?: boolean; images?: Record<string, string | Uint8Array> } = {}): Harness {
@@ -123,13 +131,23 @@ function setup(options: { start?: boolean; images?: Record<string, string | Uint
   const notices: string[] = [];
   const files = memoryImageFiles(options.images ?? {});
   const assets = new AssetRegistry({ files: files.source, notify: (message) => notices.push(message), hash: nodeHash });
-  const broadcaster = new SceneBroadcaster({ session: gm, presented, settings, assets, notify: (message) => notices.push(message) });
+  let definitions: readonly ResourceDefinition[] = [HP];
+  const resourceListeners = new Set<() => void>();
+  const broadcaster = new SceneBroadcaster({
+    session: gm, presented, settings, assets, notify: (message) => notices.push(message),
+    resources: () => definitions,
+    watchResources: (listener) => { resourceListeners.add(listener); return () => { resourceListeners.delete(listener); }; },
+  });
   if (options.start !== false) broadcaster.start();
   const setRules = (next: Partial<PlayerViewRules>): void => {
     rules = { ...rules, ...next };
     listeners.forEach((listener) => listener());
   };
-  return { network, gm, requests, presented, broadcaster, notices, setRules, files };
+  const setResources = (next: readonly ResourceDefinition[]): void => {
+    definitions = next;
+    resourceListeners.forEach((listener) => listener());
+  };
+  return { network, gm, requests, presented, broadcaster, notices, setRules, setResources, files };
 }
 
 /** A player through `PlayerSession`, admitted by the GM. */
@@ -221,15 +239,51 @@ describe('SceneBroadcaster', () => {
     expect(raw.received.filter((message) => 'seq' in message).map((message) => (message as { seq: number }).seq)).toEqual([1, 2]);
   });
 
-  it('sends HP to players when the GM turns it on mid-session', async () => {
+  it('sends a resource to players when the GM shows it to them mid-session, and takes it back', async () => {
     const h = setup();
     const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140) }));
     h.presented.present(view, tavern);
     const player = await join(h);
-    expect(player.scene?.tokens.hero?.hp).toBeNull();
-    h.setRules({ showTokenHP: true });
+    expect(player.scene?.tokens.hero?.resources).toEqual([]);
+    h.setResources([SHOWN_HP]);
     await tick();
-    expect(player.scene?.tokens.hero?.hp).toEqual({ current: 7, max: 10 });
+    expect(player.scene?.tokens.hero?.resources).toEqual([HP_BAR]);
+    h.setResources([HP]);
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([]);
+  });
+
+  it('follows the GM editing a resource in the collection settings: colour, socket, order', async () => {
+    const h = setup();
+    const stress: ResourceDefinition = { key: 'stress', name: 'Stress', field: 'stress', direction: 'fills', color: '#a855f7', visibleToPlayers: true, slot: 1 };
+    const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140, { resources: { hp: { current: 7, max: 10 }, stress: { current: 3, max: 6 } } }) }));
+    h.presented.present(view, tavern);
+    const player = await join(h);
+    h.setResources([{ ...SHOWN_HP, slot: 0 }, stress]);
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([HP_BAR, { color: '#a855f7', share: 0.5, spent: false }]);
+    h.setResources([{ ...SHOWN_HP, slot: 1, color: '#3b82f6' }, { ...stress, slot: 0 }]);
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false }, { color: '#3b82f6', share: 0.7, spent: false }]);
+    // Moved to a wheel socket, the window no longer draws it
+    h.setResources([{ ...SHOWN_HP, slot: 4 }, stress]);
+    await tick();
+    expect(player.scene?.tokens.hero?.resources).toEqual([{ color: '#a855f7', share: 0.5, spent: false }]);
+  });
+
+  it('follows the GM editing a token\'s resource, and sends no resource of a hidden token', async () => {
+    const h = setup();
+    h.setResources([SHOWN_HP]);
+    const { view, store, tavern } = fakeView(sceneState({ hero: character('hero', 140), spy: character('spy', 300, { isHidden: true }) }));
+    h.presented.present(view, tavern);
+    const player = await join(h);
+    expect(Object.keys(player.scene?.tokens ?? {})).toEqual(['hero']);
+    store.setState((state) => ({
+      objects: { ...state.objects, tokens: { ...state.objects.tokens, hero: { ...state.objects.tokens.hero!, resources: { hp: { current: 0, max: 10 } } } } },
+    }));
+    await tick();
+    expect(player.scene?.tokens.hero).toMatchObject({ resources: [{ color: '#ef4444', share: 0, spent: true }], downed: true });
+    expect(JSON.stringify(player.scene)).not.toContain('spy');
   });
 
   it('removes a token the GM hides', async () => {
@@ -337,13 +391,13 @@ describe('SceneBroadcaster', () => {
     tabs.getState().setActiveTab(dungeon);
     store.setState({ isMapLoading: true });
     store.setState(sceneState({ villain: character('villain', 600) }));
-    h.setRules({ showTokenHP: true });
+    h.setResources([SHOWN_HP]);
     await tick();
     expect(sceneTypes(raw.received)).toEqual(['scene-snapshot']);
 
     const late = await join(h, 'key-late');
     expect(Object.keys(late.scene?.tokens ?? {})).toEqual(['hero']);
-    expect(late.scene?.tokens.hero?.hp).toBeNull();
+    expect(late.scene?.tokens.hero?.resources).toEqual([]);
     raw.link.send('control', encodeControl({ v: 1, type: 'scene-resync', seq: 1 }));
     const resent = raw.received.at(-1);
     expect(resent?.type === 'scene-snapshot' ? Object.keys(resent.scene.tokens) : []).toEqual(['hero']);
@@ -354,7 +408,7 @@ describe('SceneBroadcaster', () => {
     store.setState({ ...sceneState({ hero: character('hero', 140) }), isMapLoading: false });
     await vi.advanceTimersByTimeAsync(0);
     expect(late.scene?.sceneId).toBe(heldId);
-    expect(late.scene?.tokens.hero?.hp).toEqual({ current: 7, max: 10 });
+    expect(late.scene?.tokens.hero?.resources).toEqual([HP_BAR]);
   });
 
   it('sends a scene presented before the session started', async () => {
