@@ -100,13 +100,14 @@ export function bodyLinesFor(body: string, allows: (rule: PartRule) => boolean, 
     }
     const blocked = [...markup.comments, ...covers, ...stop];
     const candidates = marks
-      ? markup.parts.filter((part) => !hidden.has(part) && part.tag.kind === 'open' && part.tag.rule.kind !== 'private')
+      ? markup.parts.filter((part) => !hidden.has(part) && part.tag.kind === 'open' && 'names' in part.tag.rule)
       : [];
     const broken = candidates.filter((part) => [part.tag, part.close].some((tag) => !tag || blocked.some((range) => inside(spanOf(tag), range))));
     if (broken.length > 0) {
       broken.forEach((part) => hidden.add(part));
       continue;
     }
+    // Public parts carry no rule of their own: their tags go like comments.
     const marked = candidates;
     const markedStarts = new Set(marked.flatMap((part) => [part.tag.start, part.close?.start]));
     const replacements: TextRange[] = marked.flatMap((part) => (part.tag.kind === 'open' && part.close
@@ -145,5 +146,5 @@ export function partProblemsIn(body: string, blocks: BlockContext): PartProblems
 
 /** The names `only` and `except` tags use, in order of appearance. */
 export function partNamesIn(body: string): string[] {
-  return scanMarkup(body, 'inline-only').tags.flatMap((tag) => (tag.kind === 'open' && tag.rule.kind !== 'private' ? tag.rule.names : []));
+  return scanMarkup(body, 'inline-only').tags.flatMap((tag) => (tag.kind === 'open' && 'names' in tag.rule ? tag.rule.names : []));
 }

@@ -1,7 +1,8 @@
 /**
  * The tags that mark parts of a note, written as Obsidian comments so they never show and never leave:
- * `%%[!private]%%`, `%%[!only|Ana, Ben]%%` and `%%[!except|Cara]%%`, each closed by `%%[!end]%%`, which
- * closes the innermost open part. Keywords are case-insensitive and whitespace inside the comment is fine.
+ * `%%[!private]%%`, `%%[!only|Ana, Ben]%%`, `%%[!except|Cara]%%` and `%%[!public]%%` (everyone the note is shared
+ * with: no rule of its own, an outer part still applies), each closed by `%%[!end]%%`, which closes the innermost
+ * open part. Keywords are case-insensitive and whitespace inside the comment is fine.
  *
  * Tags are found first, as whole tokens (`%% [!…] %%` on one line), and comments are paired only in the
  * gaps between them: a `%%` that Obsidian shows as code (`` `%%` ``) cannot shift which `%%` pairs with
@@ -12,7 +13,7 @@
 import { codeOrLinkTest, type BlockContext } from './codeContext';
 import { scanComments, type CommentSpan, type TextRange } from './commentFilter';
 
-export type PartRule = { kind: 'private' } | { kind: 'only' | 'except'; names: string[] };
+export type PartRule = { kind: 'private' | 'public' } | { kind: 'only' | 'except'; names: string[] };
 
 /** A tag in a text, `[start, end)` covering the whole token. */
 export type PartTag =
@@ -35,14 +36,14 @@ export interface NoteMarkup {
 
 export const END_TAG = '%%[!end]%%';
 const TOKEN = /%%[ \t]*(\[[ \t]*![^\]\n]*\])[ \t]*%%/g;
-const TAG = /^\[!\s*(private|only|except|end)\s*(?:\|([^\]]*))?\]$/i;
+const TAG = /^\[!\s*(private|public|only|except|end)\s*(?:\|([^\]]*))?\]$/i;
 /** Text that reads as an attempt at a tag: it starts like one, or names a keyword after `[!`. */
 const TAG_START = /^\[\s*!/;
 export const TAG_MENTION = /\[\s*!\s*(?:private|only|except|public|end)/i;
 
 /** The tag text for a rule, names as given. */
 export function openTag(rule: PartRule): string {
-  return rule.kind === 'private' ? '%%[!private]%%' : `%%[!${rule.kind}|${rule.names.join(', ')}]%%`;
+  return 'names' in rule ? `%%[!${rule.kind}|${rule.names.join(', ')}]%%` : `%%[!${rule.kind}]%%`;
 }
 
 /** Whether text looks like a tag, or like an attempt at one. */
@@ -57,7 +58,7 @@ function tagOf(content: string, start: number, end: number): PartTag {
   const kind = (match[1] ?? '').toLowerCase();
   const names = match[2];
   if (kind === 'end') return names === undefined ? { kind: 'end', start, end } : malformed;
-  if (kind === 'private') return names === undefined ? { kind: 'open', rule: { kind: 'private' }, start, end } : malformed;
+  if (kind === 'private' || kind === 'public') return names === undefined ? { kind: 'open', rule: { kind }, start, end } : malformed;
   const list = (names ?? '').split(',').map((name) => name.trim()).filter(Boolean);
   if (list.length === 0) return malformed;
   return { kind: 'open', rule: { kind: kind === 'only' ? 'only' : 'except', names: list }, start, end };

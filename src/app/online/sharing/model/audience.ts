@@ -41,9 +41,9 @@ export function ruleReaches(rule: ShareRule, recipient: Recipient, people: NameR
   return resolve(rule.only, people).known.some((person) => isPerson(person, recipient));
 }
 
-/** Whether a part tag lets the recipient in: unknown names in `only` match nobody, in `except` hide from everyone. */
+/** Whether a part tag lets the recipient in (public: anyone the note reaches): unknown names in `only` match nobody, in `except` hide from everyone. */
 export function partAllows(rule: PartRule, recipient: Recipient, people: NameResolver): boolean {
-  if (rule.kind === 'private') return false;
+  if (!('names' in rule)) return rule.kind === 'public';
   const names = resolve(rule.names, people, rule.kind === 'except');
   if (rule.kind === 'only') return names.known.some((person) => isPerson(person, recipient));
   return names.unknown === 0 && !names.known.some((person) => isPerson(person, recipient));
