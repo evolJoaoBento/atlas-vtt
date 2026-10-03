@@ -91,7 +91,17 @@ export function rewriteContent(file: BundleFile, raw: ArrayBuffer, rewrites: Pat
   const text = decoder.decode(raw);
   // Only here, never in `rewriteText`: moving a scene to another collection rewrites the user's own notes in place.
   const rewritten = rewriteText(file, withoutNoteSharing(file, text), rewrites);
-  return rewritten === text ? raw : toBuffer(rewritten);
+  if (rewritten === text) return raw;
+  // The shared decoder drops a byte order mark (JSON path rewrites rely on that), so a note gets its own back.
+  return toBuffer(isNote(file) && startsWithByteOrderMark(raw) ? BYTE_ORDER_MARK + rewritten : rewritten);
+}
+
+const BYTE_ORDER_MARK = '\uFEFF';
+
+/** Whether `raw` starts with the UTF-8 byte order mark (EF BB BF). */
+function startsWithByteOrderMark(raw: ArrayBuffer): boolean {
+  const head = new Uint8Array(raw, 0, Math.min(3, raw.byteLength));
+  return head.length === 3 && head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf;
 }
 
 /** Whether the file is text that refers to other files or records: JSON, a statblock note that shows artwork, or a loot base. */

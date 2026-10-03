@@ -72,3 +72,32 @@ describe('loot bases', () => {
     expect(rewriteContent(base, raw, moves)).toBe(raw);
   });
 });
+
+describe('notes with a byte order mark', () => {
+  const note: BundleFile = { vaultPath: 'B/n.md', role: 'linked-note' } as BundleFile;
+  const bytes = (buffer: ArrayBuffer): number[] => [...new Uint8Array(buffer)];
+
+  it('keep the mark when atlas-share is stripped, and read back the same text', () => {
+    const out = rewriteContent(note, encode('\uFEFF---\r\natlas-share: public\r\ntitle: x\r\n---\r\nBody'), new Map());
+    expect(bytes(out).slice(0, 3)).toEqual([0xef, 0xbb, 0xbf]);
+    expect(bytes(out).slice(3, 6)).not.toEqual([0xef, 0xbb, 0xbf]);
+    expect(decode(out)).toBe('---\r\ntitle: x\r\n---\r\nBody');
+  });
+
+  it('are not given one when the note had none', () => {
+    const out = rewriteContent(note, encode('---\natlas-share: public\n---\n'), new Map());
+    expect(bytes(out).slice(0, 3)).toEqual([...new TextEncoder().encode('---')]);
+  });
+
+  it('stay byte for byte when there is nothing to strip', () => {
+    const raw = encode('\uFEFF---\ntitle: x\n---\n');
+    expect(rewriteContent(note, raw, new Map())).toBe(raw);
+  });
+
+  it('are not added to JSON, whose decoder drops them', () => {
+    const json: BundleFile = { vaultPath: 'B/a.json', role: 'asset-file' } as BundleFile;
+    const out = rewriteContent(json, encode('\uFEFF{"path":"B/g.png"}'), new Map([['B/g.png', 'C/g.png']]));
+    expect(decode(out)).toContain('C/g.png');
+    expect(bytes(out)[0]).toBe('{'.charCodeAt(0));
+  });
+});
