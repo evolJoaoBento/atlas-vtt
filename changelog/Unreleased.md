@@ -14,7 +14,3 @@
 - Play from Obsidian: players with Atlas run **Join online session…**, paste your join link and enter a name. Once you let them in, an **Online scene** tab shows the presented scene drawn by Atlas, with Atlas's own tools: drag their tokens with the drag ruler, measure, point the laser and roll from the dice tray into the shared dice log. They follow your view, with **Follow GM** and **Fit map**, and see why a session ended, with **Reconnect** after a lost connection. Nothing goes into their vault. Your online panel marks players who joined from Obsidian.
 - Share notes and maps between Atlas users in a session: **Share with…** on a note or map, `atlas-share` in a note's properties, private, only and except parts (and `%%` comments) that never leave your Atlas, player-safe or full maps with their linked notes, and a preview per person. **Shared with me…** lists what others share with you; **Pull** saves it into your vault, and pulling again offers keep both, keep mine, take theirs, a merge page or auto merge, with undo. **Ask to pull…** lets a sender nudge you. Items between players pass through the GM's Atlas, which stores none of them but sees them in clear.
 - Join requests from Atlas players show whether you know them (**(known)**/**(new)**), flag a new device using a known name, and let you **Link** it. **People…** manages the people Atlas knows from sessions.
-
-## Fixed
-
-- Rolling several kinds of dice at once, such as 2d6 + 3d8, no longer adds the second die's count to the total.

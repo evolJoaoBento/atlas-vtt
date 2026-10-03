@@ -453,7 +453,7 @@ export class InteractionController implements ITokenInteractionController {
     this.dragState.hasMoved = false;
     this.lastDragStreamSentAt = 0;
     delete this.dragState.clickToken;
-    this.onTokensHeldChange?.([]);
+    this.reportHeld([]);
   };
 
   private cleanupDragListeners(): void {

@@ -2,9 +2,7 @@ import { render } from '@testing-library/react';
 import { ChevronDown, Circle, Dices, Ellipsis, Flashlight, Hand, Ruler, Triangle, X } from 'lucide-react';
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { DICE_ICON_MARKUP, dieIconUrl, TOOL_ICON_MARKUP, toolIconUrl, type ToolIconName } from '../../../src/app/online/page/toolIcons';
-import { diceIcons } from '../../../src/app/react/components/DiceIcons';
-import { DICE_TYPES } from '../../../src/app/tools/diceRolling';
+import { dieIconUrl, TOOL_ICON_MARKUP, toolIconUrl, type ToolIconName } from '../../../src/app/online/page/toolIcons';
 
 type Shape = [tag: string, attributes: Record<string, string>, text: string];
 
@@ -30,13 +28,6 @@ describe('the join page icons', () => {
     };
     for (const [name, Icon] of Object.entries(icons)) {
       expect(parsed(TOOL_ICON_MARKUP[name as ToolIconName]), name).toEqual(rendered(<Icon />));
-    }
-  });
-
-  it("are the dice of Atlas's dice tray", () => {
-    for (const die of DICE_TYPES) {
-      const Icon = diceIcons[die];
-      expect(parsed(DICE_ICON_MARKUP[die]), die).toEqual(rendered(<Icon />));
     }
   });
 

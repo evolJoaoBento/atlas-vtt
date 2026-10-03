@@ -1,7 +1,7 @@
 /**
  * Atlas's dice: the dice its tray offers, the formula a selection makes, rolling a formula, and
  * what players may see of a roll. Shared with the online GM side and the join page, so it
- * imports nothing but the pure dice maths (`diceFormula.ts`, `diceCrit.ts`).
+ * imports only pure dice maths: `diceFormula.ts`, `diceCrit.ts` and the dice rules they read (`gameSystems/diceRules`).
  */
 import { getDiceCrit, type DiceCrit } from './diceCrit';
 import { rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';

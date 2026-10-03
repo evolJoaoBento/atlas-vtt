@@ -64,7 +64,7 @@ export function whenMapLoaded(store: StoreApi<ViewAtlasState>): Promise<void> {
 }
 
 /** Whether the view's store holds `tabId`'s scene completely: its map, loaded and drawn. */
-function showsTab(view: PresentedView, tabId: string): boolean {
+export function showsTab(view: PresentedView, tabId: string): boolean {
   const state = view.atlasStore.getState();
   if (!state.mapLoaded || state.isMapLoading) return false;
   const tab = view.tabMetaStore.getState().tabs.find((entry) => entry.id === tabId);

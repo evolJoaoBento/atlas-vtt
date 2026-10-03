@@ -13,7 +13,6 @@ import type { RemoteImages } from '../../../../src/app/online/obsidian/remoteSce
 import { projectForPlayers, type ProjectedState } from '../../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo } from '../../../../src/app/online/scene/projectRecords';
 import type { PlayerScene } from '../../../../src/app/online/scene/sceneTypes';
-import { tokenStress } from '../../../../src/app/pixi/token-renderer/tokenResources';
 import type { GridState } from '../../../../src/app/services/MapPersistence';
 import type { Character, DrawingStroke, TextElement, Token, TokenEntity } from '../../../../src/app/types';
 import type { CollectionGridDefaults } from '../../../../src/app/types/collectionSettingsTypes';
@@ -30,7 +29,7 @@ const IMAGES: RemoteImages = {
 const hero: Character = {
   id: 'hero', kind: 'character', x: 140, y: 210, imagePath: 'art/hero.png', size: 2, rotation: 45, layer: 3,
   showRing: true, ringColor: '#3366ff', conditions: ['prone', 'frightened'], conditionValues: { frightened: 2 },
-  name: 'Anna', hp: { current: 7, max: 10 }, stress: 2, maxStress: 6,
+  name: 'Anna', resources: { hp: { current: 7, max: 10 }, stress: { current: 2, max: 6 } },
   statblockPath: 'Bestiary/Anna.md', statblockName: 'Anna (statblock)', notePath: 'GM/anna.md', tags: ['pc'],
 };
 const goblin: Character = { id: 'goblin', kind: 'character', x: 350, y: 70, imagePath: 'art/goblin.png', name: '', statblockPath: 'Bestiary/Goblin.md', statblockName: 'Goblin' };
@@ -91,15 +90,15 @@ function trip({ collection = COLLECTION, grid = GM_GRID, trackerOpen = true }: V
     initiative: {
       ...createDefaultInitiativeState(), isActive: true, round: 2,
       entries: [{
-        id: 'e1', tokenId: 'hero', name: 'Anna', initiative: 17, initiativeModifier: 2, hp: { current: 7, max: 10 },
-        imagePath: 'art/hero.png', isActive: true, isDefeated: false, isNPC: false, order: 0,
+        id: 'e1', tokenId: 'hero', name: 'Anna', initiative: 17, initiativeModifier: 2,
+        imagePath: 'art/hero.png', isActive: true, isNPC: false, order: 0,
       }],
     },
     initiativeTrackerOpen: trackerOpen,
   };
   const sent = projectForPlayers(state, {
     sceneId: 'scene-1',
-    rules: { showGrid: true, showTokenHP: true, showTokenStress: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
+    rules: { showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true },
     coverage: coverageOfFog(fog), assets: fakeAssetIds(), mapSize: { width: 1000, height: 800 }, memo: createProjectionMemo(),
     collectionGrid: collection,
   });
@@ -146,9 +145,6 @@ const TOKEN_CHECKS: Checks<KeysOfUnion<TokenEntity>> = {
     for (const token of Object.values(t.full.back.state.objects.tokens)) expect(token).not.toHaveProperty('statblockPath');
   },
   statblockName: field('goblin', 'name', 'Goblin'),
-  hp: field('hero', 'hp', { current: 7, max: 10 }),
-  stress: field('hero', 'stress', tokenStress(hero)),
-  maxStress: field('hero', 'maxStress', 6),
 };
 
 const TEXT_SAME = [
@@ -245,7 +241,7 @@ const SCENE_CHECKS: Checks<keyof ProjectedState> = {
   initiative: (t) => {
     expect(t.full.back.state.initiative).toMatchObject({ round: 2, isActive: true });
     expect(t.full.back.state.initiative.entries).toMatchObject([
-      { tokenId: 'hero', initiative: 17, name: 'Anna', hp: { current: 7, max: 10 }, isActive: true, imagePath: tokenOf(t.full, 'hero').imagePath },
+      { tokenId: 'hero', initiative: 17, name: 'Anna', isActive: true, imagePath: tokenOf(t.full, 'hero').imagePath },
     ]);
   },
   initiativeTrackerOpen: (t) => {

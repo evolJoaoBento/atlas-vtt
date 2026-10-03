@@ -8,7 +8,7 @@ import type { SceneTab } from '../types/sceneTabTypes';
 import type { PlayerFrameSource } from './PlayerFrameMirror';
 import { PlayerWindowService } from './PlayerWindowService';
 import { rendersOnChange, requestRender, setBeforeRender } from '../pixi/RenderScheduler';
-import { presentedScene, whenMapLoaded } from './PresentedScene';
+import { presentedScene, showsTab, whenMapLoaded } from './PresentedScene';
 
 /** Set once the player window follows the presented scene; it starts with the first presentation through it. */
 let followingPresentedScene = false;
@@ -146,6 +146,8 @@ async function showPresentedScene(view: AtlasView, tabId: string, resumed: boole
   if (!source || !service || view.tabMetaStore.getState().activeTabId !== tabId) return;
   const current = presentedScene.current();
   if (current?.view !== view || current.tabId !== tabId) return;
+  // Coming back to the tab: another map may have started loading during the wait for the frames.
+  if (resumed && !showsTab(view, tabId)) return;
   // A held frame of this very scene goes live again; anything else re-targets the window.
   if (resumed && isStreaming(view, tabId)) service.releaseHeldFrame(source);
   else service.presentCanvas(source, tabId, findTab(view, tabId)?.filePath);
