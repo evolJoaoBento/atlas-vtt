@@ -200,6 +200,59 @@ describe('a tag written inside code or a link is never a tag (T-R2)', () => {
   });
 });
 
+describe('indented code, brackets, HTML, math, autolinks and reference definitions (T-R3)', () => {
+  const P = '%%[!private]%%';
+  const E = '%%[!end]%%';
+  const marked = (personId: string, source: string): string => filterNoteFor(source, {
+    recipient: { tableId: T, personId }, people, shareable: [], links: () => null, marks: { openTag: () => '%%[!only|@x]%%' },
+  });
+  const leaks: Array<[string, string]> = [
+    ['indented code (spaces)', `${P}\nsecret\n\n    ${E}\n\nLEAK\n\n    ${P}\n\n${E}`],
+    ['indented code (tab)', `${P}\nsecret\n\n\t${E}\n\nLEAK\n\n\t${P}\n\n${E}`],
+    ['indented code in a list', `- item\n\n  ${P}\n  s\n\n        ${E}\n\n  LEAK\n\n        ${P}\n\n  ${E}`],
+    ['indented code in a quote', `${P}\n> a\n>\n>     ${E}\n\nLEAK\n\n>     ${P}\n\n${E}`],
+    ['a stray ] before a link label', `${P}\na ] [x ${E}](u) LEAK [y ${P}](v)\n${E}`],
+    ['a pre block', `${P}\n<pre>\n${E}\n</pre>\nLEAK\n<pre>\n${P}\n</pre>\n${E}`],
+    ['inline code HTML', `${P}\n<code>${E}</code> LEAK <code>${P}</code>\n${E}`],
+    ['$$ math', `${P}\n$$\n${E}\n$$\nLEAK\n$$\n${P}\n$$\n${E}`],
+    ['$ math', `${P}\n$${E}$ LEAK $${P}$\n${E}`],
+    ['autolinks', `${P}\n<https://a.b/${E}> LEAK <https://c.d/${P}>\n${E}`],
+    ['reference definition with <>', `${P}\n[r]: <u ${E}>\nLEAK\n[s]: <v ${P}>\n${E}`],
+    ['reference definition', `${P}\n[r]: u ${E}\nLEAK\n[s]: v ${P}\n${E}`],
+  ];
+
+  it('each repro leaks nothing, marked or not, and warns', () => {
+    for (const [label, source] of leaks) {
+      for (const personId of everyone) {
+        expect(forPerson(personId, source), label).not.toContain('LEAK');
+        expect(marked(personId, source), `${label}, marked`).not.toContain('LEAK');
+      }
+      expect(partProblemsInNote(source).tagInCodeOrLink, label).toBe(true);
+    }
+  });
+
+  it('real block tags in lists, at the list content column, still work', () => {
+    expect(forPerson('ben', `- item\n  ${P}\n  secret\n  ${E}\n- next`)).toBe('- item\n- next');
+    expect(forPerson('ben', `- a\n  - b\n    ${P}\n    secret\n    ${E}\n- c`)).toBe('- a\n  - b\n- c');
+    expect(forPerson('ben', `- a\n  - b\n\n    ${P}\n    secret\n    ${E}\n\n- c`)).toBe('- a\n  - b\n\n\n- c');
+    expect(forPerson('ben', `1. one\n2. two\n   ${P}\n   secret\n   ${E}`)).toBe('1. one\n2. two');
+  });
+
+  it('a common session note keeps its real tags working', () => {
+    const note = [
+      '# Session 12', '', 'The party reached [[Thornwick]] at dusk. See the [map](https://example.org/map) and `/roll d20`.', '',
+      '## Scenes', '- Arrival at the inn', `  %%[!only|Ana]%%`, '  Ana recognises the innkeeper.', `  ${E}`, '- The bargain',
+      `  - Price: 50 gp ${P}(real: 30)${E}`, '', '> [!note] Weather', '> Rain all night.', '', '```dice', '1d20 + 3', '```', '',
+      `${P}`, 'The innkeeper is the cult leader.', '', 'Clues: the ring, the ledger.', E, '', 'Next time: the crypt.',
+    ].join('\n');
+    expect(partProblemsInNote(note).tagInCodeOrLink).toBe(false);
+    const forBen = forPerson('ben', note);
+    for (const secret of ['recognises', 'real: 30', 'cult leader', 'ledger']) expect(forBen).not.toContain(secret);
+    expect(forBen).toContain('Next time: the crypt.');
+    expect(forPerson('ana', note)).toContain('Ana recognises the innkeeper.');
+  });
+});
+
 describe('private part tags', () => {
   it('inline: a private part never goes, the rest of the line stays', () => {
     expect(forPerson('ana', 'The door %%[!private]%%is trapped %%[!end]%%opens.')).toBe('The door opens.');
