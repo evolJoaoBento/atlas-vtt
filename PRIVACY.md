@@ -23,7 +23,30 @@ Players open the join page from `evoljoaobento.github.io` (GitHub Pages) by defa
 
 With **Keep images on this device** on (the default), the join page keeps the images it received in the player's browser storage for later sessions, up to 500 MB, until the player switches it off or chooses **Clear saved images**; with it off, images are kept only while the page is open. Browsers give every site under `evoljoaobento.github.io` the same storage, so the join page should stay the only site published there, or move to its own address.
 
-When you join a session from Atlas (**Join online session…**), Atlas connects to the signaling and relay servers the join link names, the STUN server, and directly to the GM, only while the Join dialog waits for the GM and while the Online scene tab is open. The GM receives the name you enter, that you joined from Atlas, and the same things a web player sends. Nothing you receive is written into your vault: the scene is kept in memory only. With **Keep online images on this device** on (the default), the images are kept in Obsidian's browser storage on this device, outside the vault and shared by all vaults on the device, up to 500 MB. Switching it off deletes them. Atlas remembers the last name you joined with in its settings.
+When you join a session from Atlas (**Join online session…**), Atlas connects to the signaling and relay servers the join link names, the STUN server, and directly to the GM, only while the Join dialog waits for the GM and while the Online scene tab is open. The GM receives the name you enter, that you joined from Atlas, and the same things a web player sends. Nothing you receive is written into your vault unless you pull it (see [Sharing notes and maps](#sharing-notes-and-maps)): the scene is kept in memory only. With **Keep online images on this device** on (the default), the images are kept in Obsidian's browser storage on this device, outside the vault and shared by all vaults on the device, up to 500 MB. Switching it off deletes them. Atlas remembers the last name you joined with in its settings.
+
+### Sharing notes and maps
+
+When you and others play from Atlas in Obsidian, Atlas identifies each of you with a key that stays on your device. Joining sends a signature made with it, never the key.
+
+- **The GM's table key** is kept in Atlas's settings (`atlas-vtt/.atlas-data/settings.json`), so it travels with the vault: anyone who can read the vault, or a copy or sync of it, can act as that table. Using one vault on several machines keeps it one table.
+- **A player's device key** is kept in Obsidian's local storage, one per table, never in the vault. Obsidian keeps local storage per vault on each device, so a second vault or device is a new device to the GM, who can link it to the person.
+- **The people list** (names, device ids, when they were last seen) is kept in `atlas-vtt/.atlas-data/sharing/people.json`: the GM's for everyone admitted, a player's for the people they met.
+
+Nothing is shared until you share it, and only with the people you pick. What leaves your Atlas is decided on your computer, before anything is sent:
+
+- `[!private]` parts, parts meant for other people, and `%% comments %%` are removed. Comments are removed everywhere, including inside code, and an unclosed `%%` removes the rest of the note.
+- Text that cannot be read fails closed: a private part or an `atlas-share` entry Atlas cannot read is kept back rather than sent, and a name after `except` that is not in your people list hides that part from everyone.
+- Properties are removed except those listed under **Shared note properties**, and the `atlas-share` property itself is never sent. Links to notes the person does not get become plain text.
+- File paths never leave your Atlas. Shared items get random ids, and a map's paths are cleared or replaced by references.
+- A player-safe map holds what online players see. Pins under fog of war, GM-only pins and pins whose note you did not tick are left out. A full map holds the whole map as a co-GM would see it, including hidden tokens, GM-only pins, walls and lights, so Atlas asks you to confirm it.
+- Sharing settings are not part of collection bundles: exporting a collection leaves them out and importing one drops them.
+
+Items go only to someone who pulls them, during a session, over the same encrypted connection as the game.
+
+Items between two players pass through the GM's Atlas. It forwards them piece by piece and stores none of them: it writes nothing to its vault and keeps no record once the transfer ends. But each connection is encrypted separately, so the GM's Atlas handles those items in clear while it forwards them, and the GM could read anything players share with each other. There is no end-to-end encryption between players.
+
+What you pull is written into your vault: notes into `Shared/<person>/`, maps and their images into the **Shared with me** collection. Atlas also keeps, in `atlas-vtt/.atlas-data/sharing/` (which Obsidian does not index), the last pulled version of each note, its merge history and a list of what you pulled from whom. Removing a person from your people list does not delete what you already pulled.
 
 ## Files outside the vault
 
@@ -58,4 +81,4 @@ the report to your clipboard without sending it. See
 
 ## Clipboard and local storage
 
-The clipboard is written only when you choose a copy action (for example "Copy image"). Interface state such as the music queue is kept in local storage on your device.
+The clipboard is written only when you choose a copy action (for example "Copy image"). Interface state such as the music queue is kept in local storage on your device. So are the device keys Atlas uses to join online sessions (see [Sharing notes and maps](#sharing-notes-and-maps)).
