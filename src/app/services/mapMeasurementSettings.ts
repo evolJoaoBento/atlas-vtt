@@ -10,9 +10,15 @@ function collectionSettingsFor(assetService: AssetService, mapPath: string | nul
   return collectionId ? assetService.getCollectionSettings(collectionId) : null;
 }
 
-/** The grid defaults of the collection holding the map at `mapPath`; null for a map outside a collection. */
+/**
+ * The grid defaults of the collection holding the map at `mapPath`, with the cone angle the GM's
+ * measure tool uses (`collectionConeAngle`: a collection set up before cone angles takes its
+ * system's), so online players' cones open as the GM's; null for a map outside a collection.
+ */
 export function collectionGridDefaultsFor(assetService: AssetService, mapPath: string | null): CollectionGridDefaults | null {
-  return collectionSettingsFor(assetService, mapPath)?.gridDefaults ?? null;
+  const settings = collectionSettingsFor(assetService, mapPath);
+  const gridDefaults = settings?.gridDefaults;
+  return gridDefaults ? { ...gridDefaults, coneAngle: collectionConeAngle(gridDefaults, settings.systemPresetId) } : null;
 }
 
 /** Measurement settings for the map in `state`: its collection's, or, in the online scene, the GM's. */

@@ -27,14 +27,23 @@ describe('the tools overlay', () => {
 
   it('draws circles and cones with a faint fill and an outline, and never a negative radius', () => {
     const surface = new RecordingSurface();
-    drawTools(surface, { ...NONE, measure: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, label: '0ft' } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'circle', start: { x: 0, y: 0 }, end: { x: 0, y: 0 }, label: '0ft', coneOpening: Math.PI / 2 } }, 1);
     expect(surface.ops('circle').every(({ radius }) => radius >= 0)).toBe(true);
     surface.clear();
-    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft' } }, 1);
+    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: Math.PI / 2 } }, 1);
     const [fill, outline] = surface.ops('paths');
     expect(fill).toMatchObject({ closed: true, style: { fill: MEASURE_ACCENT, alpha: 0.1 } });
     expect(outline).toMatchObject({ closed: false, style: { stroke: MEASURE_ACCENT, lineWidth: 3, alpha: 0.8 } });
     expect(outline!.paths).toHaveLength(3);
+  });
+
+  it("opens a cone by the GM's cone angle", () => {
+    const surface = new RecordingSurface();
+    const opening = (53.13 * Math.PI) / 180;
+    drawTools(surface, { ...NONE, measure: { shape: 'cone', start: { x: 0, y: 0 }, end: { x: 100, y: 0 }, label: '5ft', coneOpening: opening } }, 1);
+    const [left, right] = surface.ops('paths')[1]!.paths;
+    const angle = (path: readonly { x: number; y: number }[] | undefined): number => Math.atan2(path![1]!.y, path![1]!.x);
+    expect(angle(right) - angle(left)).toBeCloseTo(opening);
   });
 
   it('draws the drag ruler through its waypoints, marking all but the end, labelled halfway', () => {

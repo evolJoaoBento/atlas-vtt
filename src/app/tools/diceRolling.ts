@@ -26,6 +26,8 @@ export interface DiceRollResult {
   total: number;
   /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
   crit?: DiceCrit;
+  /** Dice the roll had beyond those in `rolls`: an online player's log lists at most 100 of a roll's dice. */
+  unlistedDice?: number;
   player?: string;
   /** Who rolled it when it was not the GM: an online player's name. */
   rolledBy?: string;

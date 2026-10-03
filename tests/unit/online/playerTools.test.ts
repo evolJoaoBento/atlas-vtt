@@ -69,11 +69,20 @@ describe('PlayerTools', () => {
     tools.select('measure');
     expect(tools.grab({ x: 100, y: 100 }, 'mouse')).toBe(true);
     tools.move({ x: 250, y: 100 });
-    expect(tools.overlay().measure).toEqual({ shape: 'line', start: { x: 105, y: 105 }, end: { x: 245, y: 105 }, label: '10ft' });
+    expect(tools.overlay().measure).toEqual({ shape: 'line', start: { x: 105, y: 105 }, end: { x: 245, y: 105 }, label: '10ft', coneOpening: Math.PI / 2 });
     tools.drop({ x: 250, y: 100 });
     expect(tools.overlay().measure).toBeNull();
     expect(sent).toEqual([]);
     expect(moved).toEqual([]);
+  });
+
+  it("opens the measured cone by the GM's cone angle", () => {
+    const { tools } = setup();
+    tools.setScene(playerScene({ measurement: { ...playerScene().measurement, coneAngle: 60 } }));
+    tools.selectShape('cone');
+    tools.grab({ x: 100, y: 100 }, 'mouse');
+    tools.move({ x: 240, y: 100 });
+    expect(tools.overlay().measure?.coneOpening).toBeCloseTo(Math.PI / 3);
   });
 
   it('measures unsnapped on a square grid of the cell size when the grid is hidden from players', () => {
@@ -81,7 +90,7 @@ describe('PlayerTools', () => {
     tools.selectShape('circle');
     tools.grab({ x: 100, y: 100 }, 'mouse');
     tools.move({ x: 240, y: 100 });
-    expect(tools.overlay().measure).toEqual({ shape: 'circle', start: { x: 100, y: 100 }, end: { x: 240, y: 100 }, label: '10ft' });
+    expect(tools.overlay().measure).toEqual({ shape: 'circle', start: { x: 100, y: 100 }, end: { x: 240, y: 100 }, label: '10ft', coneOpening: Math.PI / 2 });
   });
 
   it("sends the laser in batches, shows it here at once in this player's colour, and fades it after release", () => {

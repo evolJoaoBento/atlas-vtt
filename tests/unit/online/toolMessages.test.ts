@@ -56,6 +56,23 @@ describe('player tool messages', () => {
     expect(log([entry({ id: '__proto__' })])).toBe(false);
   });
 
+  it('takes the flags of a logged die, the crit, the unlisted count and mine only in their own shapes', () => {
+    const log = (overrides: object): boolean => valid({ v: 1, type: 'dice-log', entries: [{ ...entry(), ...overrides }], replay: false });
+    const dice = (flags: object): object => ({ dice: [{ die: 'd6', value: 6, ...flags }] });
+    expect(log(dice({ exploded: true, negative: true }))).toBe(true);
+    expect(log(dice({ exploded: false }))).toBe(false);
+    expect(log(dice({ negative: 1 }))).toBe(false);
+    expect(log({ crit: 'high' })).toBe(true);
+    expect(log({ crit: 'low' })).toBe(true);
+    expect(log({ crit: null })).toBe(false);
+    expect(log({ crit: 'max' })).toBe(false);
+    expect(log({ unlisted: 50 })).toBe(true);
+    expect(log({ unlisted: 0 })).toBe(false);
+    expect(log({ unlisted: 1.5 })).toBe(false);
+    expect(log({ mine: true })).toBe(true);
+    expect(log({ mine: 'yes' })).toBe(false);
+  });
+
   it('holds a laser to 64 points in range, and checks the from of a relayed one', () => {
     expect(valid(laser({ points: Array.from({ length: 64 }, () => ({ x: 0, y: 0 })) }))).toBe(true);
     expect(valid(laser({ points: Array.from({ length: 65 }, () => ({ x: 0, y: 0 })) }))).toBe(false);
@@ -102,9 +119,25 @@ describe('diceLogEntry', () => {
     const big = { ...result, formula: 'd6+'.repeat(100), rolls: Array.from({ length: 150 }, () => ({ die: 'd6', value: 3, max: 6 })), total: 450 };
     const logged = diceLogEntry(big, 'x'.repeat(90));
     expect(logged?.dice).toHaveLength(100);
+    expect(logged?.unlisted).toBe(50);
     expect(logged?.formula).toHaveLength(200);
     expect(logged?.name).toHaveLength(80);
     expect(logged?.total).toBe(450);
+  });
+
+  it('keeps exploded and subtracted dice in their order, with the crit', () => {
+    const rolls = [
+      { die: 'd6', value: 6, max: 6 }, { die: 'd6', value: 2, max: 6, exploded: true as const }, { die: 'd4', value: 1, max: 4, negative: true as const },
+    ];
+    expect(diceLogEntry({ ...result, rolls, crit: 'high' }, 'Anna')).toEqual(entry({
+      dice: [{ die: 'd6', value: 6 }, { die: 'd6', value: 2, exploded: true }, { die: 'd4', value: 1, negative: true }], crit: 'high',
+    }));
+    expect(diceLogEntry({ ...result, crit: null }, 'Anna')).toEqual(entry());
+  });
+
+  it('lists no dice of a roll with a die players cannot take, and counts them unlisted', () => {
+    const logged = diceLogEntry({ ...result, rolls: [...result.rolls, { die: 'd20000', value: 5, max: 20000 }] }, 'Anna');
+    expect(logged).toMatchObject({ dice: [], unlisted: 3, total: 11 });
   });
 
   it('makes no entry of a roll players would refuse', () => {

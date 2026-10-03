@@ -6,9 +6,9 @@
  */
 import type { StoreApi } from 'zustand';
 import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
-import { DEFAULT_CONE_ANGLE, type MeasurementSettings } from '../../grid/measurementFormat';
+import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ViewAtlasState } from '../../storeFactory';
-import type { DiceSelection } from '../../tools/diceRolling';
+import type { DiceRollResult, DiceSelection } from '../../tools/diceRolling';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import { withMeasurementDefaults, type PlayerMeasurement } from '../scene/sceneTypes';
 
@@ -41,6 +41,8 @@ export interface RemoteSceneState {
   following: boolean;
   /** `Move not allowed.` for a while after a refusal; null otherwise. */
   notice: string | null;
+  /** The player's latest own roll, which the view throws as dice once (by id); null before the first. */
+  ownRoll: DiceRollResult | null;
 }
 
 /** What the online scene's UI asks of its view. */
@@ -69,8 +71,7 @@ export function atlasMeasurement(measurement: PlayerMeasurement): MeasurementSet
     unitDistance: measurement.unitDistance,
     diagonalRule: measurement.diagonalRule,
     rangeBands: measurement.rangeBands.map((band) => ({ name: band.name, maxSquares: band.maxSquares })),
-    // Not sent yet: the online scene's cones open as a collection without a game system's do.
-    coneAngle: DEFAULT_CONE_ANGLE,
+    coneAngle: measurement.coneAngle,
   };
 }
 
@@ -84,6 +85,7 @@ export function initialRemoteScene(): RemoteSceneState {
     status: { title: DEFAULT_TABLE_TITLE, connection: 'Connecting…', tone: 'pending', message: null, reconnect: false },
     following: true,
     notice: null,
+    ownRoll: null,
   };
 }
 

@@ -136,4 +136,74 @@ describe('DiceHost', () => {
     new DiceTool(new EventEmitter()).rollDice('d8');
     expect(heard).toEqual(['d20', 'd6']);
   });
+  it("rolls a player's roll by the dice rules of the presented scene's collection", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    // `default` explosions and crits look only at the default roll's dice: the d20, never the d6.
+    w.setDiceRules({ defaultRoll: '1d20', crit: 'natural', explode: { dice: 'default', repeats: false, highFaces: 1, lowFaces: 0 } });
+    w.setRandom(() => 0.999);
+    a.session.sendDiceRoll({ d6: 1, d20: 1 }, 0);
+    expect(w.rulesAsked).toEqual(['maps/tavern.atlasmap']);
+    const [rolled] = w.feed.published;
+    expect(rolled?.rolls).toEqual([
+      { die: 'd6', value: 6, max: 6 }, { die: 'd20', value: 20, max: 20 }, { die: 'd20', value: 20, max: 20, exploded: true },
+    ]);
+    expect(rolled?.crit).toBe('high');
+    expect(w.logs(a).at(-1)?.entries[0]).toMatchObject({
+      dice: [{ die: 'd6', value: 6 }, { die: 'd20', value: 20 }, { die: 'd20', value: 20, exploded: true }], total: 46, crit: 'high',
+    });
+    w.finish();
+  });
+
+  it("follows a doubles rule, and a player's roll without the rule's default dice never crits", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    w.setDiceRules({ defaultRoll: '2d12', crit: 'doubles' });
+    a.session.sendDiceRoll({ d12: 2 }, 0);
+    vi.advanceTimersByTime(1000);
+    a.session.sendDiceRoll({ d20: 1 }, 0);
+    expect(w.feed.published.map((roll) => roll.crit)).toEqual(['high', null]);
+    expect(w.logs(a).slice(-2).map((log) => log.entries[0]?.crit)).toEqual(['high', undefined]);
+    w.finish();
+  });
+
+  it('takes the rules of the map players have while the GM holds the scene on another tab', async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    w.tabs.getState().setActiveTab(w.dungeon);
+    vi.advanceTimersByTime(1000);
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.rulesAsked).toEqual(['maps/tavern.atlasmap', 'maps/tavern.atlasmap']);
+    w.finish();
+  });
+
+  it('marks a roll mine only for the player who rolled it, live and in the replay', async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    const b = await w.join('B');
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    w.feed.publish(rollFormula('d8'));
+    expect(w.logs(a).slice(-2).map((log) => log.entries[0]?.mine)).toEqual([true, undefined]);
+    expect(w.logs(b).slice(-2).map((log) => log.entries[0]?.mine)).toEqual([undefined, undefined]);
+    const c = await w.join('C');
+    expect(w.logs(c)[0]?.entries.map((entry) => entry.mine)).toEqual([undefined, undefined]);
+    expect(JSON.stringify(c.received)).not.toContain('"mine"');
+    w.finish();
+  });
+
+  it("logs subtracted dice as negative, and keeps the GM's crit", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    w.feed.publish({ ...rollFormula('2d6-1d4', () => 0.5), crit: 'low' });
+    expect(w.logs(a).at(-1)?.entries[0]).toMatchObject({
+      dice: [{ die: 'd6', value: 4 }, { die: 'd6', value: 4 }, { die: 'd4', value: 3, negative: true }], total: 5, crit: 'low',
+    });
+    w.finish();
+  });
 });

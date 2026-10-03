@@ -217,6 +217,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .die-badge { padding: 2px 6px; border-radius: 6px; background: var(--hover); font-size: 12px; font-variant-numeric: tabular-nums; }
 .die-badge.is-max { color: #2f9e44; }
 .die-badge.is-min { color: #e03131; }
+.die-badge.is-more { color: var(--muted); }
+/* A critical roll, as Atlas's log marks it: a coloured edge. */
+.dice-entry.is-crit-success { border-color: #2f9e44; box-shadow: inset 3px 0 0 #2f9e44; }
+.dice-entry.is-crit-fail { border-color: #e03131; box-shadow: inset 3px 0 0 #e03131; }
 
 /* A new roll, at the top while the log is closed; a tap opens the log. */
 .dice-toast {

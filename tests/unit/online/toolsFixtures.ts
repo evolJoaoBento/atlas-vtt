@@ -9,6 +9,8 @@ import type { DiceFeed } from '../../../src/app/online/diceFeed';
 import { DiceHost } from '../../../src/app/online/tools/DiceHost';
 import { LaserRelay } from '../../../src/app/online/tools/LaserRelay';
 import type { DiceRollResult } from '../../../src/app/tools/diceRolling';
+import { DEFAULT_DICE_RULES } from '../../../src/app/gameSystems/diceRules';
+import type { DiceRules } from '../../../src/app/types/diceRulesTypes';
 import { moveWorld, type MovePlayer } from './tokenMoveFixtures';
 
 export type MemoryDiceFeed = DiceFeed & { readonly published: DiceRollResult[]; listening(): number };
@@ -44,12 +46,24 @@ export function toolsWorld(options: Parameters<typeof moveWorld>[0] = {}, gmColo
   const shown: RemoteLaser[] = [];
   hub.onRemote((laser) => shown.push(laser));
   Object.assign(world.view.renderer!, { getLaserHub: () => hub });
-  const dice = new DiceHost({ session: world.gm, presented: world.presented, projection: world.broadcaster, feed, random: MIDDLE_ROLL });
+  let diceRules: DiceRules = { ...DEFAULT_DICE_RULES };
+  let random = MIDDLE_ROLL;
+  /** The map paths the dice host asked the rules of, one per player roll. */
+  const rulesAsked: Array<string | null> = [];
+  const dice = new DiceHost({
+    session: world.gm, presented: world.presented, projection: world.broadcaster, feed,
+    diceRules: (mapPath) => { rulesAsked.push(mapPath); return diceRules; },
+    random: () => random(),
+  });
   const lasers = new LaserRelay({ session: world.gm, presented: world.presented, projection: world.broadcaster, ...(gmColor ? { gmColor } : {}) });
   dice.start();
   lasers.start();
   return {
-    ...world, feed, hub, shown, dice, lasers,
+    ...world, feed, hub, shown, dice, lasers, rulesAsked,
+    /** The collection's dice rules players' rolls follow from now on. */
+    setDiceRules: (rules: DiceRules): void => { diceRules = rules; },
+    /** The dice faces from now on, as `Math.random` would give them. */
+    setRandom: (next: () => number): void => { random = next; },
     /** The dice logs the GM sent `player`, in order. */
     logs: (player: MovePlayer): DiceLog[] => player.received.filter((message): message is DiceLog => message.type === 'dice-log'),
     /** The lasers the GM sent `player`, in order. */

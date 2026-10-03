@@ -40,7 +40,8 @@ export function DiceRollDisplay({ container, prepare, muted = false }: DiceRollD
     const handler = (e: Event): void => {
       const raw = (e as CustomEvent<DiceRollResult>).detail;
       const result = prepare ? prepare(raw) : raw;
-      const scene = diceSceneToShow(result, display);
+      // An online player's roll is thrown on that player's own screen; here it shows as a card.
+      const scene = result.rolledBy ? null : diceSceneToShow(result, display);
       if (!scene) {
         addToast(result);
         return;

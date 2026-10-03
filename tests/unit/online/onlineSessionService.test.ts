@@ -364,7 +364,7 @@ describe('OnlineSessionService', () => {
     link.send('control', encodeControl({ v: 1, type: 'join', name: 'Anna', playerKey: 'k', client: { kind: 'web', version: '1' } }));
     answers[0]!(true);
     const snapshot = received.find((message) => message.type === 'scene-snapshot') as Extract<ControlMessage, { type: 'scene-snapshot' }>;
-    expect(snapshot.scene.measurement).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'euclidean', rangeBands: [], snapToGrid: true });
+    expect(snapshot.scene.measurement).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'euclidean', rangeBands: [], snapToGrid: true, coneAngle: 90 });
     expect(asked).toContain('maps/tavern.atlasmap');
     svc.stop();
   });

@@ -18,12 +18,13 @@ import { DiceDropdownMenu } from '../../../../src/app/react/components/dice/Dice
 import { DiceRollLog } from '../../../../src/app/react/components/dice-log/DiceRollLog';
 import { ViewStoreProvider } from '../../../../src/app/react/ViewStoreContext';
 import { DICE_ROLLED_EVENT, rollFormula, type DiceRollResult } from '../../../../src/app/tools/diceRolling';
+import type { DiceLogEntry } from '../../../../src/app/online/tools/toolMessages';
 import { admitted, onlineSceneSetup } from './onlineSceneFixtures';
 
 // jsdom has no scrollTo; the log scrolls to its newest roll.
 Element.prototype.scrollTo = vi.fn();
 
-const ENTRY = { id: 'r1', name: 'Anna', formula: '2d6+1', dice: [{ die: 'd6', value: 4 }, { die: 'd6', value: 2 }], modifier: 1, total: 7, at: 1000 };
+const ENTRY: DiceLogEntry = { id: 'r1', name: 'Anna', formula: '2d6+1', dice: [{ die: 'd6', value: 4 }, { die: 'd6', value: 2 }], modifier: 1, total: 7, at: 1000 };
 
 afterEach(() => {
   cleanup();
@@ -40,6 +41,28 @@ describe('rolling again and from the tray', () => {
     const many: DiceRollResult = { ...diceLogResults([ENTRY])[0]!, rolls: Array.from({ length: 21 }, () => ({ die: 'd6', value: 1, max: 6 })) };
     expect(rollOfResult(many)).toBeNull();
     expect(traySelection({ d6: 2, d20: 0, x: 3 })).toEqual({ d6: 2 });
+  });
+
+  it('rolls again without the dice an explosion added, and never a roll with subtracted or unlisted dice', () => {
+    const [base] = diceLogResults([ENTRY]);
+    const exploded = { ...base!, rolls: [{ die: 'd6', value: 6, max: 6 }, { die: 'd6', value: 3, max: 6, exploded: true as const }] };
+    expect(rollOfResult(exploded)).toEqual({ dice: { d6: 1 }, modifier: 1 });
+    const downwards = { ...base!, rolls: [{ die: 'd10', value: 1, max: 10 }, { die: 'd10', value: 7, max: 10, negative: true as const, exploded: true as const }] };
+    expect(rollOfResult(downwards)).toEqual({ dice: { d10: 1 }, modifier: 1 });
+    expect(rollOfResult({ ...base!, rolls: [{ die: 'd6', value: 2, max: 6 }, { die: 'd4', value: 1, max: 4, negative: true as const }] })).toBeNull();
+    expect(rollOfResult({ ...base!, unlistedDice: 3 })).toBeNull();
+  });
+
+  it("takes a logged roll's crit, flags and unlisted dice into Atlas's roll", () => {
+    const [result] = diceLogResults([{
+      ...ENTRY, crit: 'high', unlisted: 4,
+      dice: [{ die: 'd6', value: 6 }, { die: 'd6', value: 2, exploded: true }, { die: 'd4', value: 1, negative: true }],
+    }]);
+    expect(result).toMatchObject({
+      crit: 'high', unlistedDice: 4,
+      rolls: [{ die: 'd6', value: 6, max: 6 }, { die: 'd6', value: 2, max: 6, exploded: true }, { die: 'd4', value: 1, max: 4, negative: true }],
+    });
+    expect(result?.rolls[0]).not.toHaveProperty('exploded');
   });
 
   it('sends nothing above the GM limit, and nothing empty', () => {
@@ -109,6 +132,22 @@ describe("the online scene's dice log", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Roll again' }));
     expect(controls.rollDice).not.toHaveBeenCalled();
     expect(Notice).toHaveBeenCalledWith("Can't roll that again.");
+  });
+
+  it('marks the crit, writes exploded and subtracted dice as Atlas does, and counts the dice it does not list', () => {
+    const controls = { followGm: vi.fn(), fitMap: vi.fn(), reconnect: vi.fn(), rollDice: vi.fn(() => true) };
+    ui.view = { onlineControls: () => controls };
+    const entry: DiceLogEntry = {
+      ...ENTRY, formula: '1d6-1d4', crit: 'high', unlisted: 4,
+      dice: [{ die: 'd6', value: 6 }, { die: 'd6', value: 2, exploded: true }, { die: 'd4', value: 1, negative: true }],
+    };
+    const store = create(() => ({ diceLog: diceLogResults([entry]), addDiceLogEntry: vi.fn(), clearDiceLog: vi.fn(), remoteScene: initialRemoteScene() }));
+    const { container } = render(<ViewStoreProvider store={store as never}><DiceRollLog isOpen onClose={() => {}} /></ViewStoreProvider>);
+    expect(container.querySelector('.dice-log-entry--crit-success')).not.toBeNull();
+    fireEvent.click(screen.getByText('1d6-1d4'));
+    expect(screen.getByText('d6: 6!')).toBeTruthy();
+    expect(screen.getByText('d6: 2')).toBeTruthy();
+    expect(screen.getByText('+4 more')).toBeTruthy();
   });
 
   it("does not take the player's own rolls from their other maps", () => {

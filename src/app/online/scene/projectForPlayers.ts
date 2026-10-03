@@ -5,7 +5,7 @@
  * GM's records, never spread, so anything this code does not name, including
  * fields a later Atlas adds, is left out.
  */
-import { resolveMeasurementSettings } from '../../grid/measurementFormat';
+import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { DEFAULT_HEX_NUMBER_OPACITY, isHexNumberFormat } from '../../grid/hexNumbering';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
@@ -123,6 +123,7 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     unitDistance: finiteOr(settings.unitDistance, 5, SCENE_RANGES.unitDistance),
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
     snapToGrid: grid?.snapToGrid ?? true,
+    coneAngle: isValidConeAngle(settings.coneAngle) ? settings.coneAngle : DEFAULT_CONE_ANGLE,
     rangeBands: bands.slice(0, SCENE_LIMITS.rangeBands).map((band) => {
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };

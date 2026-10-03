@@ -32,7 +32,7 @@ describe('PlayerSceneMirror', () => {
     const { measurement, ...older } = sceneBody(scene);
     mirror.receive({ v: 1, type: 'scene-snapshot', seq: 1, scene: older as never, fogParts: 0, drawingParts: 0 });
     expect(mirror.scene?.measurement).toEqual(measurement);
-    const { snapToGrid: _snap, ...noSnap } = measurement;
+    const { snapToGrid: _snap, coneAngle: _cone, ...noSnap } = measurement;
     mirror.receive({ v: 1, type: 'scene-patch', seq: 2, set: { measurement: { ...noSnap, unitDistance: 10 } as never }, upsert: {}, remove: {} });
     expect(mirror.scene?.measurement).toEqual({ ...measurement, unitDistance: 10 });
   });

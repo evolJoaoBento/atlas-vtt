@@ -30,10 +30,11 @@ function setup(): { settings: SettingsService; store: StoreApi<ViewAtlasState>; 
   return { settings, store, doc };
 }
 
-function roll(source?: DiceRollResult['source']): void {
+function roll(source?: DiceRollResult['source'], rolledBy?: string): void {
   const result: DiceRollResult = {
     id: 'roll', timestamp: 0, formula: '1d20+4', rolls: [{ die: 'd20', value: 13, max: 20 }], modifiers: 4, total: 17,
     ...(source ? { source } : {}),
+    ...(rolledBy ? { rolledBy } : {}),
   };
   act(() => { document.dispatchEvent(new CustomEvent('atlas-dice-rolled', { detail: result })); });
 }
@@ -92,5 +93,17 @@ describe('player window dice rolls', () => {
     expect(panel?.textContent).toContain('Scimitar');
     expect(panel?.textContent).not.toContain('Goblin Boss');
     expect(doc.querySelector('.atlas-dice-toast')).toBeNull();
+  });
+
+  // The same display hangs on the DM's map (UIRoot): an online player sees their roll thrown on their own screen.
+  it("shows an online player's roll as a card, never thrown, while 3D dice are on", () => {
+    const { settings, doc } = setup();
+    act(() => {
+      settings.setDiceDisplay('full');
+      settings.setLocalPlayerViewSettings({ showDiceRolls: true });
+    });
+    roll(undefined, 'Anna');
+    expect(doc.querySelector('.atlas-dice-roll')).toBeNull();
+    expect(toastText(doc)).toContain('17');
   });
 });

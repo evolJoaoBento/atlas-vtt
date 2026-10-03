@@ -122,6 +122,8 @@ export function DiceRollEntry({ result, isNew, onRepeat }: DiceRollEntryProps): 
                 {dieLabel(result.rolls, i)}
               </span>
             ))}
+            {/* An online player's log lists at most 100 dice of a roll; the total counts them all. */}
+            {result.unlistedDice ? <span className="dice-log-entry__badge">+{result.unlistedDice} more</span> : null}
           </div>
         )}
       </div>

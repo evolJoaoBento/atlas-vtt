@@ -2,10 +2,13 @@
 /**
  * The dice log on the join page: a side panel, and a bottom sheet on narrow screens. It opens
  * from the top bar's Dice log button or a tap on the toast, and closes with its close button or
- * Escape. It shows every roll's name, formula, dice and total, newest first, as text only. The
- * log's rules live in `PlayerDiceLog` (`src/app/online/page/diceLogModel.ts`).
+ * Escape. It shows every roll's name, formula, dice and total, newest first, as text only, the
+ * dice written as Atlas's log writes them (`6!` exploded, `−d10: 7` subtracted by an explosion),
+ * a critical roll marked, and "+N more" for dice a large roll does not list. The log's rules live
+ * in `PlayerDiceLog` (`src/app/online/page/diceLogModel.ts`).
  */
-import { dieExtreme, PlayerDiceLog } from '../src/app/online/page/diceLogModel';
+import { dieExtreme, entryRolls, PlayerDiceLog, type PlayerDiceLogOptions } from '../src/app/online/page/diceLogModel';
+import { dieLabel } from '../src/app/tools/diceLabels';
 import { toolIconUrl } from '../src/app/online/page/toolIcons';
 import type { DiceLogEntry } from '../src/app/online/tools/toolMessages';
 import { iconElement } from './icons.mts';
@@ -17,6 +20,8 @@ export interface DiceLogViewOptions {
   closeButton: HTMLButtonElement;
   toggleButton: HTMLButtonElement;
   toast: HTMLButtonElement;
+  /** The player's own new roll: true when it is thrown as dice instead of toasted. */
+  onOwnRoll?: PlayerDiceLogOptions['onOwnRoll'];
 }
 
 function text(className: string, content: string): HTMLSpanElement {
@@ -29,17 +34,20 @@ function text(className: string, content: string): HTMLSpanElement {
 function entryElement(entry: DiceLogEntry, tag: 'li' | 'div'): HTMLElement {
   const item = document.createElement(tag);
   item.className = 'dice-entry';
+  if (entry.crit) item.classList.add(entry.crit === 'high' ? 'is-crit-success' : 'is-crit-fail');
   const summary = document.createElement('div');
   summary.className = 'dice-entry-summary';
   summary.append(text('dice-entry-formula', entry.formula), text('dice-entry-eq', '='), text('dice-entry-total', String(entry.total)));
   const dice = document.createElement('div');
   dice.className = 'dice-entry-dice';
-  for (const die of entry.dice) {
-    const badge = text('die-badge', `${die.die}: ${die.value}`);
+  const rolls = entryRolls(entry);
+  entry.dice.forEach((die, index) => {
+    const badge = text('die-badge', dieLabel(rolls, index));
     const extreme = dieExtreme(die);
     if (extreme) badge.classList.add(`is-${extreme}`);
     dice.append(badge);
-  }
+  });
+  if (entry.unlisted) dice.append(text('die-badge is-more', `+${entry.unlisted} more`));
   item.append(text('dice-entry-name', entry.name), summary, dice);
   return item;
 }
@@ -50,7 +58,7 @@ export class DiceLogView {
   private readonly listeners = new AbortController();
 
   constructor(private readonly options: DiceLogViewOptions) {
-    this.log = new PlayerDiceLog({ onChange: () => this.render() });
+    this.log = new PlayerDiceLog({ onChange: () => this.render(), ...(options.onOwnRoll ? { onOwnRoll: options.onOwnRoll } : {}) });
     const { signal } = this.listeners;
     options.toggleButton.replaceChildren(iconElement(toolIconUrl('dices')));
     options.toggleButton.addEventListener('click', () => this.setOpen(!this.log.isOpen), { signal });

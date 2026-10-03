@@ -3,6 +3,8 @@ import { AssetService } from '../services/AssetService';
 import { mapResources } from '../resources/collectionResources';
 import type { ResourceDefinition } from '../resources/resourceTypes';
 import { collectionGridDefaultsFor } from '../services/mapMeasurementSettings';
+import { mapDiceRules } from '../services/mapDiceRules';
+import type { DiceRules } from '../types/diceRulesTypes';
 import { watchCollectionResources } from './watchCollectionResources';
 import { presentedScene } from '../services/PresentedScene';
 import type { SettingsService } from '../services/SettingsService';
@@ -61,6 +63,8 @@ interface Deps {
   watchResources?: (listener: () => void) => () => void;
   /** Atlas's dice rolls; the `atlas-dice-rolled` document event unless a test passes its own. */
   diceFeed?: DiceFeed;
+  /** The dice rules of a map's collection; Atlas's asset index unless a test passes its own. */
+  diceRules?: (mapPath: string | null) => DiceRules;
   /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
   table?: () => Promise<TableIdentity | null>;
   identityCrypto?: IdentityCrypto;
@@ -86,6 +90,7 @@ export class OnlineSessionService {
   private diceHost: DiceHost | null = null;
   private laserRelay: LaserRelay | null = null;
   private readonly diceFeed: DiceFeed;
+  private readonly diceRules: (mapPath: string | null) => DiceRules;
   private stopLog: (() => void) | null = null;
   private readonly presented: PresentedSceneSource;
   private readonly images: ImageFiles;
@@ -113,6 +118,7 @@ export class OnlineSessionService {
     this.isJoined = deps.isJoined ?? ((): boolean => isInSession(joinedSessionStore.getState()));
     this.presented = deps.presented ?? presentedScene;
     this.diceFeed = deps.diceFeed ?? documentDiceFeed();
+    this.diceRules = deps.diceRules ?? ((mapPath) => mapDiceRules(app, mapPath));
     this.images = deps.images ?? vaultImageFiles(app);
     this.collectionGrid = deps.collectionGrid
       ?? ((mapPath) => (mapPath ? collectionGridDefaultsFor(AssetService.getInstance(app), mapPath) : null));
@@ -227,7 +233,9 @@ export class OnlineSessionService {
     const tokenControlHost = new TokenControlHost({ session: scenes, presented: this.presented, projection: broadcaster });
     this.tokenControlHost = tokenControlHost;
     // Players' dice and lasers; registered after the token control host.
-    const diceHost = new DiceHost({ session: scenes, presented: this.presented, projection: broadcaster, feed: this.diceFeed });
+    const diceHost = new DiceHost({
+      session: scenes, presented: this.presented, projection: broadcaster, feed: this.diceFeed, diceRules: this.diceRules,
+    });
     this.diceHost = diceHost;
     const laserRelay = new LaserRelay({ session: scenes, presented: this.presented, projection: broadcaster, gmColor: () => this.settings.getLaserPointerSettings().color });
     this.laserRelay = laserRelay;

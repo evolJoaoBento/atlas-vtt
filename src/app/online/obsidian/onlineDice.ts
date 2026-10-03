@@ -4,28 +4,43 @@
  * never go through Atlas's document-wide dice event, which every open map would record.
  */
 import { isDieType, type DiceRollResult, type DiceSelection } from '../../tools/diceRolling';
+import { entryRolls } from '../page/diceLogModel';
 import { DICE_LIMITS, isDiceModifier, type DiceLogEntry } from '../tools/toolMessages';
 
 export function diceLogResults(entries: readonly DiceLogEntry[]): DiceRollResult[] {
-  return entries.map((entry) => ({
+  return entries.map(diceLogResult);
+}
+
+/** One entry as Atlas's roll: its dice with their sides and flags, its crit, and how many dice it did not list. */
+export function diceLogResult(entry: DiceLogEntry): DiceRollResult {
+  return {
     id: entry.id,
     timestamp: entry.at,
     formula: entry.formula,
-    rolls: entry.dice.map(({ die, value }) => ({ die, value, max: Number(die.slice(1)) })),
+    rolls: entryRolls(entry),
     modifiers: entry.modifier,
     total: entry.total,
+    crit: entry.crit ?? null,
+    ...(entry.unlisted !== undefined && { unlistedDice: entry.unlisted }),
     rolledBy: entry.name,
-  }));
+  };
 }
 
-/** The dice and modifier a logged roll used, to send it again; null when the tray cannot roll it (another die, too many dice). */
+/**
+ * The dice and modifier a logged roll used, to send it again; null when the tray cannot roll it
+ * (another die, too many dice, a subtracted die, dice left unlisted). Dice an explosion rolled are
+ * not the roll's own: the rules roll them again.
+ */
 export function rollOfResult(result: DiceRollResult): { dice: DiceSelection; modifier: number } | null {
+  if (result.unlistedDice) return null;
   const dice: DiceSelection = {};
+  let count = 0;
   for (const roll of result.rolls) {
-    if (!isDieType(roll.die)) return null;
+    if (roll.exploded) continue;
+    if (!isDieType(roll.die) || roll.negative) return null;
     dice[roll.die] = (dice[roll.die] ?? 0) + 1;
+    count++;
   }
-  const count = result.rolls.length;
   if (count === 0 || count > DICE_LIMITS.dicePerRoll || !isDiceModifier(result.modifiers)) return null;
   return { dice, modifier: result.modifiers };
 }

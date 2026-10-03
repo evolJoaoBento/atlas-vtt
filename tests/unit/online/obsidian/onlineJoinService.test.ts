@@ -49,13 +49,17 @@ function flakyClient(network: MemoryNetwork): { transport: ClientTransport; link
   };
 }
 
-function recordingSink(): OnlineSceneSink & { calls: string[]; states: PlayerSessionState[]; controls: Array<readonly string[]>; logs: number[] } {
+function recordingSink(): OnlineSceneSink & {
+  calls: string[]; states: PlayerSessionState[]; controls: Array<readonly string[]>; logs: number[]; own: string[];
+} {
   const calls: string[] = [];
+  const own: string[] = [];
   const states: PlayerSessionState[] = [];
   const controls: Array<readonly string[]> = [];
   const logs: number[] = [];
   return {
-    calls, states, controls, logs,
+    calls, states, controls, logs, own,
+    ownRoll: (entry) => { calls.push('ownRoll'); own.push(entry.id); },
     session: (state) => { calls.push('session'); states.push(state); },
     scene: () => calls.push('scene'),
     camera: () => calls.push('camera'),
@@ -140,6 +144,12 @@ describe('OnlineJoinService', () => {
     w.gm.send(playerId, { v: 1, type: 'dice-log', entries: [entry], replay: true });
     w.gm.send(playerId, { v: 1, type: 'dice-log', entries: [{ ...entry, id: 'r2' }], replay: false });
     expect(sink.logs).toEqual([0, 1, 2]);
+    // Only a live roll of this player's own is thrown: never a replay, nor someone else's.
+    w.gm.send(playerId, { v: 1, type: 'dice-log', entries: [{ ...entry, id: 'r3', mine: true }], replay: true });
+    w.gm.send(playerId, { v: 1, type: 'dice-log', entries: [{ ...entry, id: 'r4', mine: true }], replay: false });
+    w.gm.send(playerId, { v: 1, type: 'dice-log', entries: [{ ...entry, id: 'r4', mine: true }], replay: false });
+    expect(sink.own).toEqual(['r4']);
+    expect(sink.calls.slice(-2)).toEqual(['diceLog', 'ownRoll']);
     w.gm.send(playerId, { v: 1, type: 'token-move-refused', tokenId: 't1' });
     expect(sink.calls.at(-1)).toBe('moveRefused');
     detach?.();

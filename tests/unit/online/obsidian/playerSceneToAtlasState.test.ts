@@ -116,13 +116,12 @@ describe('playerSceneToAtlasState', () => {
     const scene: PlayerScene = playerScene({
       measurement: {
         mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating',
-        rangeBands: [{ name: 'Close', maxSquares: 2 }], snapToGrid: false,
+        rangeBands: [{ name: 'Close', maxSquares: 2 }], snapToGrid: false, coneAngle: 53.13,
       },
     });
     const parts = playerSceneToAtlasState(scene, images);
-    // The cone angle is not sent yet: the online scene's cones open as without a game system.
     expect(parts.measurement).toEqual({
-      mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 90,
+      mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
     });
     expect(parts.state.grid).toMatchObject({ snapToGrid: false, measurementType: 'abstract' });
     expect(parts.state.grid).not.toHaveProperty('unitType');

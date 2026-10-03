@@ -230,7 +230,7 @@ describe('projectForPlayers', () => {
   it("sends the measurement of the map's collection, or else of its grid", () => {
     const grid = { ...gmState().grid!, unitType: 'meters' as const, unitDistance: 1.5, measurementType: 'units' as const };
     expect(projectForPlayers(gmState({ grid }), context()).measurement).toEqual({
-      mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true,
+      mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90,
     });
     expect(projectForPlayers(gmState({ grid: { ...grid, snapToGrid: false } }), context()).measurement.snapToGrid).toBe(false);
     const collectionGrid = {
@@ -238,9 +238,15 @@ describe('projectForPlayers', () => {
       abstractRangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(300), maxSquares: Number.NaN }],
     };
     expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement).toEqual({
-      mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'alternating', snapToGrid: true,
+      mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'alternating', snapToGrid: true, coneAngle: 90,
       rangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(128), maxSquares: 1 }],
     });
+  });
+
+  it("sends the collection's cone angle, and a quarter circle for one players would refuse", () => {
+    const collectionGrid = { unitType: 'feet' as const, unitDistance: 5, measurementMode: 'metric' as const, coneAngle: 53.13 };
+    expect(projectForPlayers(gmState(), context({ collectionGrid })).measurement.coneAngle).toBe(53.13);
+    expect(projectForPlayers(gmState(), context({ collectionGrid: { ...collectionGrid, coneAngle: 500 } })).measurement.coneAngle).toBe(90);
   });
 });
 

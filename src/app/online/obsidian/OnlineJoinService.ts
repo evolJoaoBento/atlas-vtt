@@ -14,7 +14,7 @@ import type { Hasher } from '../assets/assetIds';
 import { openIndexedDbImageStore } from '../assets/indexedDbImageStore';
 import { parseJoinLink, type JoinTarget } from '../joinLink';
 import { onlineSessionStore } from '../onlineSessionStore';
-import { mergeDiceLog } from '../page/diceLogModel';
+import { mergeDiceLog, ownRolls } from '../page/diceLogModel';
 import type { PlayerSession, PlayerSessionState, PlayerShareHandler } from '../PlayerSession';
 import { createJoinSession } from '../preview/joinSession';
 import { normalizePlayerName } from '../protocol';
@@ -286,10 +286,12 @@ export class OnlineJoinService {
       onMoveRefused: (tokenId) => { if (current()) this.sink?.moveRefused(tokenId); },
       onDiceLog: (entries, replay) => {
         if (!current()) return;
-        const merged = mergeDiceLog(joined.dice, entries, replay).list;
-        if (merged === joined.dice) return;
-        joined.dice = merged;
-        this.sink?.diceLog(merged);
+        const { list, fresh } = mergeDiceLog(joined.dice, entries, replay);
+        if (list === joined.dice) return;
+        joined.dice = list;
+        this.sink?.diceLog(list);
+        // Only live rolls are thrown: a replay, or what `attach` hands a view, repeats old ones.
+        for (const entry of ownRolls(fresh)) this.sink?.ownRoll(entry);
       },
       onLaser: (laser) => { if (current()) this.sink?.laser(laser); },
     });

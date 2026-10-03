@@ -184,12 +184,18 @@ export interface PlayerMeasurement {
   rangeBands: PlayerRangeBand[];
   /** The GM's snap-to-grid: the drag ruler snaps to cell centres only when it is on. */
   snapToGrid: boolean;
+  /** The full opening of a cone measurement in degrees, as the GM's measure tool opens it (the game system's). */
+  coneAngle: number;
 }
 
-/** A GM from before the page's tools sent no measurement, or no snap flag: Atlas's defaults. */
+/** Atlas's cone of a collection without a cone angle (`DEFAULT_CONE_ANGLE`; a test keeps them equal), here since this file imports nothing. */
+export const PLAYER_DEFAULT_CONE_ANGLE = 90;
+
+/** A GM from before the page's tools sent no measurement, no snap flag or no cone angle: Atlas's defaults. */
 export function withMeasurementDefaults(measurement: Partial<PlayerMeasurement> | undefined): PlayerMeasurement {
   return {
-    mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, ...measurement,
+    mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true,
+    coneAngle: PLAYER_DEFAULT_CONE_ANGLE, ...measurement,
   };
 }
 

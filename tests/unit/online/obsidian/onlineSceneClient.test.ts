@@ -80,8 +80,8 @@ describe('OnlineSceneClient', () => {
       { id: 'r1', name: 'GM', formula: 'd20', dice: [{ die: 'd20', value: 11 }], modifier: 0, total: 11, at: 1000 },
     ]);
     expect(t.store.getState().diceLog).toEqual([
-      { id: 'r2', timestamp: 2000, formula: '2d6+1', rolls: [{ die: 'd6', value: 4, max: 6 }, { die: 'd6', value: 2, max: 6 }], modifiers: 1, total: 7, rolledBy: 'Anna' },
-      { id: 'r1', timestamp: 1000, formula: 'd20', rolls: [{ die: 'd20', value: 11, max: 20 }], modifiers: 0, total: 11, rolledBy: 'GM' },
+      { id: 'r2', timestamp: 2000, formula: '2d6+1', rolls: [{ die: 'd6', value: 4, max: 6 }, { die: 'd6', value: 2, max: 6 }], modifiers: 1, total: 7, crit: null, rolledBy: 'Anna' },
+      { id: 'r1', timestamp: 1000, formula: 'd20', rolls: [{ die: 'd20', value: 11, max: 20 }], modifiers: 0, total: 11, crit: null, rolledBy: 'GM' },
     ]);
   });
 

@@ -13,6 +13,8 @@ export interface MeasureOverlay {
   start: ScenePoint;
   end: ScenePoint;
   label: string;
+  /** A cone's full opening in radians. */
+  coneOpening: number;
 }
 
 export class MeasureTool {
@@ -35,6 +37,6 @@ export class MeasureTool {
 
   overlay(shape: MeasureChoice, grid: ToolGrid): MeasureOverlay | null {
     if (!this.start || !this.end) return null;
-    return { shape, start: this.start, end: this.end, label: grid.label([this.start, this.end]) };
+    return { shape, start: this.start, end: this.end, label: grid.label([this.start, this.end]), coneOpening: grid.coneOpening };
   }
 }

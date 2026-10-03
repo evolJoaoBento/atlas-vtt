@@ -1,11 +1,13 @@
 /**
  * Dice in an online session. A player's roll (`dice-roll`) is rolled here with Atlas's dice
- * code, so it cannot be faked, and joins Atlas's dice log, toasts and sounds through the dice
+ * code and the dice rules of the presented scene's collection (exploding dice, the critical
+ * rule), so it cannot be faked, and joins Atlas's dice log, toasts and sounds through the dice
  * feed under the player's name. Every roll the dice log gets, the GM's and players', goes to
- * every admitted player as `dice-log`; each admission replays the latest 50, newest first.
- * More than 2 rolls a second from one player are ignored. A `GmSession` handler, started after
- * the token control host.
+ * every admitted player as `dice-log`, marked `mine` for the player who rolled it; each
+ * admission replays the latest 50, newest first. More than 2 rolls a second from one player are
+ * ignored. A `GmSession` handler, started after the token control host.
  */
+import type { DiceRules } from '../../types/diceRulesTypes';
 import { diceFormula, rollFormula, type DiceRollResult } from '../../tools/diceRolling';
 import type { SessionHandler, SessionPlayer } from '../GmSession';
 import type { ControlMessage } from '../protocol';
@@ -13,7 +15,7 @@ import { RateLimit } from '../rateLimit';
 import type { CameraProjection } from '../scene/CameraSender';
 import type { PresentedSceneSource, SceneSession } from '../scene/sceneSources';
 import type { DiceFeed } from '../diceFeed';
-import { DICE_LIMITS, diceLogEntry, GM_ROLLER_NAME, type DiceLogEntry } from './toolMessages';
+import { DICE_LIMITS, diceLogEntry, entryFor, GM_ROLLER_NAME, type DiceLogEntry } from './toolMessages';
 
 export interface DiceHostOptions {
   session: SceneSession;
@@ -22,14 +24,19 @@ export interface DiceHostOptions {
   /** The scene players have: a roll names a token only when players see it there, by name. */
   projection: Pick<CameraProjection, 'currentProjection'>;
   feed: DiceFeed;
+  /** The dice rules of the collection holding the map at `mapPath` (Atlas's defaults outside one), read at every roll. */
+  diceRules: (mapPath: string | null) => DiceRules;
   /** Tests pass their own; `Math.random` otherwise. */
   random?: () => number;
 }
 
 export class DiceHost implements SessionHandler {
   private readonly limit = new RateLimit(DICE_LIMITS.rollsPerSecond);
-  /** The latest rolls, newest first. */
-  private readonly history: DiceLogEntry[] = [];
+  /** The latest rolls, newest first, each with the id of the player who rolled it (null: the GM's). */
+  private readonly history: Array<{ entry: DiceLogEntry; rolledBy: string | null }> = [];
+  /** Player rolls on their way through the feed, by roll id: the feed hands back only the result. */
+  private readonly rollers = new Map<string, string>();
+  private liveMapPath: string | null = null;
   private readonly stops: Array<() => void> = [];
 
   constructor(private readonly options: DiceHostOptions) {}
@@ -45,13 +52,35 @@ export class DiceHost implements SessionHandler {
 
   /** Every admission, a reconnect or a new tab included, replaces the player's log. */
   onAdmitted(player: SessionPlayer): void {
-    this.options.session.send(player.playerId, { v: 1, type: 'dice-log', entries: [...this.history], replay: true });
+    const entries = this.history.map(({ entry, rolledBy }) => entryFor(entry, rolledBy, player.playerId));
+    this.options.session.send(player.playerId, { v: 1, type: 'dice-log', entries, replay: true });
   }
 
+  /**
+   * The tray always sends dice, so the default roll never fills in a bare modifier here; it still
+   * decides which dice are the default dice a crit or a `default` explosion looks at.
+   */
   onMessage(player: SessionPlayer, message: ControlMessage): void {
     if (message.type !== 'dice-roll' || !this.limit.allow(player.playerId, Date.now())) return;
-    const result = rollFormula(diceFormula(message.dice, message.modifier), this.options.random);
-    this.options.feed.publish({ ...result, rolledBy: player.name });
+    const rules = this.options.diceRules(this.playersMapPath());
+    const result = rollFormula(diceFormula(message.dice, message.modifier), this.options.random, Date.now(), rules);
+    this.rollers.set(result.id, player.playerId);
+    try {
+      this.options.feed.publish({ ...result, rolledBy: player.name });
+    } finally {
+      this.rollers.delete(result.id);
+    }
+  }
+
+  /**
+   * The map players have: the presented scene's, or while the GM holds it (looks at another tab of
+   * the view, whose store then holds that tab's map) the one last seen live.
+   */
+  private playersMapPath(): string | null {
+    const { presented } = this.options;
+    const mapPath = presented.current()?.store.getState().mapPath ?? null;
+    if (!presented.isHeld()) this.liveMapPath = mapPath;
+    return this.liveMapPath ?? mapPath;
   }
 
   /** Drops the windows of players who left the session: a reconnect must not reset one. */
@@ -62,11 +91,13 @@ export class DiceHost implements SessionHandler {
   private rolled(result: DiceRollResult): void {
     const entry = diceLogEntry(result, this.nameOf(result));
     if (!entry) return;
-    this.history.unshift(entry);
+    const rolledBy = this.rollers.get(result.id) ?? null;
+    this.history.unshift({ entry, rolledBy });
     if (this.history.length > DICE_LIMITS.logEntries) this.history.length = DICE_LIMITS.logEntries;
     const { session } = this.options;
     for (const player of session.getPlayers()) {
-      if (player.status === 'admitted') session.send(player.playerId, { v: 1, type: 'dice-log', entries: [entry], replay: false });
+      if (player.status !== 'admitted') continue;
+      session.send(player.playerId, { v: 1, type: 'dice-log', entries: [entryFor(entry, rolledBy, player.playerId)], replay: false });
     }
   }
 

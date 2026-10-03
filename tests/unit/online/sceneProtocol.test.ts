@@ -173,8 +173,11 @@ describe('scene value bounds', () => {
     expect(valid(snapshot(withoutMeasurement))).toBe(true);
     expect(valid(snapshot({ ...body, measurement: null }))).toBe(false);
     expect(valid(snapshot(withMeasurement({ snapToGrid: 'yes' })))).toBe(false);
-    const { snapToGrid: _snap, ...olderMeasurement } = body.measurement;
+    const { snapToGrid: _snap, coneAngle: _cone, ...olderMeasurement } = body.measurement;
     expect(valid(snapshot({ ...body, measurement: olderMeasurement }))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ coneAngle: 53.13 })))).toBe(true);
+    expect(valid(snapshot(withMeasurement({ coneAngle: 360 })))).toBe(true);
+    for (const coneAngle of [0, 361, Number.NaN, '90', null]) expect(valid(snapshot(withMeasurement({ coneAngle })))).toBe(false);
   });
 
   it('patches a changed measurement as a whole', () => {

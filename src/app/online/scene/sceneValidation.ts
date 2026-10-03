@@ -166,6 +166,11 @@ function isIdList(value: unknown): boolean {
   return Array.isArray(value) && value.length <= SCENE_LIMITS.records && value.every((id) => isSceneId(id));
 }
 
+/** More than 0 and at most a full turn, in degrees, as Atlas's `isValidConeAngle`. */
+function isConeAngle(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 360;
+}
+
 function isRangeBand(value: unknown): boolean {
   return isFields(value) && isText(value.name, SCENE_LIMITS.idLength) && inRange(SCENE_RANGES.rangeBand)(value.maxSquares);
 }
@@ -174,8 +179,9 @@ function isPlayerMeasurement(value: unknown): boolean {
     && inRange(SCENE_RANGES.unitDistance)(value.unitDistance) && oneOf(PLAYER_DIAGONAL_RULES)(value.diagonalRule)
     && Array.isArray(value.rangeBands) && value.rangeBands.length <= SCENE_LIMITS.rangeBands
     && value.rangeBands.every((band) => isRangeBand(band))
-    // An older GM sends no snap flag; the mirror fills it in.
-    && (!Object.hasOwn(value, 'snapToGrid') || isBoolean(value.snapToGrid));
+    // An older GM sends no snap flag and no cone angle; the mirror fills them in.
+    && (!Object.hasOwn(value, 'snapToGrid') || isBoolean(value.snapToGrid))
+    && (!Object.hasOwn(value, 'coneAngle') || isConeAngle(value.coneAngle));
 }
 
 const FIELD_CHECKS: Record<SceneFieldKey, Check> = {

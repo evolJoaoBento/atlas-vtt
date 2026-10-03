@@ -4,6 +4,7 @@
  * toast for 7 s while the log is closed. Shared with the web page; the DOM is
  * `online-client/diceLogView.mts`.
  */
+import type { RolledDie } from '../../tools/diceFormula';
 import { DICE_LIMITS, type DiceLogEntry } from '../tools/toolMessages';
 
 /** How long a roll's toast shows: Atlas's toast time. */
@@ -11,23 +12,31 @@ export const DICE_TOAST_MS = 7000;
 
 export interface PlayerDiceLogOptions {
   onChange(): void;
+  /** The player's own new roll, live (never a replay): true when it is shown another way (thrown as dice), so no toast shows it. */
+  onOwnRoll?(entry: DiceLogEntry): boolean;
 }
 
 /**
  * A dice log after `entries` arrived: a replay replaces it; new rolls go first, each once by id,
- * at most 50. `list` is the same array when nothing was new; `newest` is the newest new roll.
+ * at most 50. `list` is the same array when nothing was new; `fresh` are the new rolls, newest
+ * first (none for a replay, which only repeats what was rolled before), `newest` the first of them.
  */
 export function mergeDiceLog(
   list: readonly DiceLogEntry[],
   entries: readonly DiceLogEntry[],
   replay: boolean,
-): { list: readonly DiceLogEntry[]; newest: DiceLogEntry | null } {
-  if (replay) return { list: entries.slice(0, DICE_LIMITS.logEntries), newest: null };
+): { list: readonly DiceLogEntry[]; fresh: readonly DiceLogEntry[]; newest: DiceLogEntry | null } {
+  if (replay) return { list: entries.slice(0, DICE_LIMITS.logEntries), fresh: [], newest: null };
   const known = new Set(list.map((entry) => entry.id));
   const fresh = entries.filter((entry) => !known.has(entry.id));
   const newest = fresh[0] ?? null;
-  if (!newest) return { list, newest: null };
-  return { list: [...fresh, ...list].slice(0, DICE_LIMITS.logEntries), newest };
+  if (!newest) return { list, fresh: [], newest: null };
+  return { list: [...fresh, ...list].slice(0, DICE_LIMITS.logEntries), fresh, newest };
+}
+
+/** The player's own new rolls among `fresh`, oldest first: the order they were thrown in. */
+export function ownRolls(fresh: readonly DiceLogEntry[]): DiceLogEntry[] {
+  return fresh.filter((entry) => entry.mine).reverse();
 }
 
 export class PlayerDiceLog {
@@ -56,7 +65,15 @@ export class PlayerDiceLog {
     const merged = mergeDiceLog(this.list, entries, replay);
     if (merged.list === this.list) return;
     this.list = merged.list;
-    if (merged.newest && !this.open) this.showToast(merged.newest);
+    const thrown = new Set(ownRolls(merged.fresh).filter((entry) => this.options.onOwnRoll?.(entry) === true));
+    if (merged.newest && !thrown.has(merged.newest) && !this.open) this.showToast(merged.newest);
+    this.options.onChange();
+  }
+
+  /** Shows `entry` in the toast while the log is closed: a new roll, or an own roll that could not be thrown. */
+  toastRoll(entry: DiceLogEntry): void {
+    if (this.open) return;
+    this.showToast(entry);
     this.options.onChange();
   }
 
@@ -87,7 +104,14 @@ export class PlayerDiceLog {
   }
 }
 
-/** A die at its highest face is 'max' and at 1 'min', as Atlas's log marks them. */
+/** A logged roll's dice as Atlas rolled them: each with its sides (`max`) and flags. */
+export function entryRolls(entry: Pick<DiceLogEntry, 'dice'>): RolledDie[] {
+  return entry.dice.map(({ die, value, negative, exploded }) => ({
+    die, value, max: Number(die.slice(1)), ...(negative && { negative }), ...(exploded && { exploded }),
+  }));
+}
+
+/** A die at its highest face is 'max' and at 1 'min', as Atlas's log marks them (`DiceRollEntry`). */
 export function dieExtreme(die: { die: string; value: number }): 'max' | 'min' | null {
   if (die.value === Number(die.die.slice(1))) return 'max';
   return die.value === 1 ? 'min' : null;

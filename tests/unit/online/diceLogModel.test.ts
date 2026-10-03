@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DICE_TOAST_MS, dieExtreme, PlayerDiceLog } from '../../../src/app/online/page/diceLogModel';
+import { DICE_TOAST_MS, dieExtreme, mergeDiceLog, ownRolls, PlayerDiceLog } from '../../../src/app/online/page/diceLogModel';
 import type { DiceLogEntry } from '../../../src/app/online/tools/toolMessages';
 
 const entry = (id: string): DiceLogEntry => ({ id, name: 'Anna', formula: 'd20', dice: [{ die: 'd20', value: 20 }], modifier: 0, total: 20, at: 0 });
@@ -38,6 +38,32 @@ describe('the join page dice log', () => {
     expect(log.toast).toBeNull();
     log.receive([entry('a')], false);
     expect(log.entries).toHaveLength(1);
+  });
+
+  it("hands over the player's own live rolls, oldest first, and toasts one only when it was not thrown", () => {
+    const thrown: string[] = [];
+    let throws = true;
+    const log = new PlayerDiceLog({ onChange: () => {}, onOwnRoll: (own) => { thrown.push(own.id); return throws; } });
+    log.receive([{ ...entry('a'), mine: true }], true);
+    expect(thrown).toEqual([]);
+    log.receive([{ ...entry('b'), mine: true }], false);
+    expect(thrown).toEqual(['b']);
+    expect(log.toast).toBeNull();
+    log.receive([entry('c')], false);
+    expect(log.toast?.id).toBe('c');
+    throws = false;
+    log.receive([{ ...entry('d'), mine: true }], false);
+    expect(log.toast?.id).toBe('d');
+    // A roll the dice could not show after all (no WebGL) goes to the toast.
+    log.toastRoll(entry('b'));
+    expect(log.toast?.id).toBe('b');
+  });
+
+  it('finds the fresh own rolls of a batch, never those of a replay or ones already known', () => {
+    const mine = (id: string): DiceLogEntry => ({ ...entry(id), mine: true });
+    expect(mergeDiceLog([], [mine('b'), mine('a')], true).fresh).toEqual([]);
+    const merged = mergeDiceLog([mine('a')], [mine('c'), entry('x'), mine('b'), mine('a')], false);
+    expect(ownRolls(merged.fresh).map(({ id }) => id)).toEqual(['b', 'c']);
   });
 
   it('keeps the newest 50', () => {

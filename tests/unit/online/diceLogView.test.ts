@@ -46,6 +46,34 @@ describe('the join page dice log', () => {
     expect(element('dice-log-empty').hidden).toBe(true);
   });
 
+  it("writes exploded and subtracted dice as Atlas's log does, marks a crit, and counts unlisted dice", () => {
+    const { view, element } = setup();
+    view.receive([{
+      ...entry('a'), formula: '1d10', crit: 'low', unlisted: 2,
+      dice: [{ die: 'd10', value: 1 }, { die: 'd10', value: 7, exploded: true, negative: true }],
+    }], true);
+    const item = element('dice-log-list').querySelector('li')!;
+    expect(item.className).toBe('dice-entry is-crit-fail');
+    expect([...item.querySelectorAll('.die-badge')].map((badge) => badge.textContent)).toEqual(['d10: 1!', '−d10: 7', '+2 more']);
+  });
+
+  it('throws its own new roll instead of toasting it, and toasts it when it could not be thrown', () => {
+    document.body.innerHTML = '';
+    const { element } = setup();
+    const thrown: string[] = [];
+    const view = new DiceLogView({
+      panel: element('dice-log'), list: element('dice-log-list'), empty: element('dice-log-empty'),
+      closeButton: element('dice-log-close'), toggleButton: element('dice-log-button'), toast: element('dice-toast'),
+      onOwnRoll: (own) => { thrown.push(own.id); return true; },
+    });
+    views.push(view);
+    view.receive([{ ...entry('a'), mine: true }], false);
+    expect(thrown).toEqual(['a']);
+    expect(element('dice-toast').hidden).toBe(true);
+    view.log.toastRoll(entry('a'));
+    expect(element('dice-toast').hidden).toBe(false);
+  });
+
   it('toasts a new roll while closed, and opens the log from the toast', () => {
     const { view, element } = setup();
     view.receive([], true);

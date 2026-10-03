@@ -2,6 +2,7 @@
  * The player tools' messages: dice rolls, the shared dice log and lasers. Their types, limits
  * and checks, shared with the web player page, so this file imports only shared modules.
  */
+import type { DiceCrit } from '../../tools/diceCrit';
 import { isDieType, type DiceRollResult, type DiceSelection } from '../../tools/diceRolling';
 import { SCENE_RANGES, type ScenePoint } from '../scene/sceneTypes';
 import { isSceneId } from '../scene/sceneValidation';
@@ -14,7 +15,7 @@ export const DICE_LIMITS = {
   rollsPerSecond: 2,
   /** Entries a player gets on admission. */
   logEntries: 50,
-  /** Dice listed in one entry; a larger GM roll lists its first 100, and its total still counts them all. */
+  /** Dice listed in one entry; a larger roll lists its first 100, says how many more it had (`unlisted`), and its total still counts them all. */
   entryDice: 100,
   nameLength: 80,
   formulaLength: 200,
@@ -26,15 +27,33 @@ export const LASER_LIMITS = { points: 64, perSecond: 30, maxGapMs: 2000 } as con
 /** The name of a roll that is neither an online player's nor that of a visible token on the live presented scene. */
 export const GM_ROLLER_NAME = 'GM';
 
+/**
+ * One die of a logged roll, as Atlas's `RolledDie` without `max` (the die's sides): `negative` when it
+ * subtracts (`2d6-1d4`, an explosion downwards), `exploded` when an explosion of the die before it rolled it.
+ */
+export interface LoggedDie {
+  die: string;
+  value: number;
+  negative?: true;
+  exploded?: true;
+}
+
 /** One roll in the shared dice log. */
 export interface DiceLogEntry {
   id: string;
   /** An online player's name ("GM (player)" for one called GM), a visible token's on the live presented scene, or "GM". */
   name: string;
   formula: string;
-  dice: Array<{ die: string; value: number }>;
+  /** In the order they were rolled: an exploded die right after the die it was rolled for. */
+  dice: LoggedDie[];
+  /** Dice the roll had beyond those listed (`DICE_LIMITS.entryDice`); absent when every die is listed. */
+  unlisted?: number;
   modifier: number;
   total: number;
+  /** The collection's critical rule decided it when rolled; absent for none. */
+  crit?: Exclude<DiceCrit, null>;
+  /** Sent only to the player who rolled it: their own roll, which their page throws as dice. */
+  mine?: true;
   /** When it was rolled: milliseconds since 1970 on the GM's clock. */
   at: number;
 }
@@ -75,16 +94,23 @@ export function isDiceModifier(value: unknown): value is number {
   return Number.isSafeInteger(value) && Math.abs(value as number) <= DICE_LIMITS.modifier;
 }
 
-function isLoggedDie(value: unknown): value is { die: string; value: number } {
+/** Absent, or exactly `true`. */
+const isFlag = (value: unknown): boolean => value === undefined || value === true;
+
+function isLoggedDie(value: unknown): value is LoggedDie {
   if (!isFields(value) || typeof value.die !== 'string') return false;
   const sides = DIE.exec(value.die)?.[1];
-  return sides !== undefined && Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= Number(sides);
+  return sides !== undefined && Number.isSafeInteger(value.value) && (value.value as number) >= 1 && (value.value as number) <= Number(sides)
+    && isFlag(value.negative) && isFlag(value.exploded);
 }
 
 export function isDiceLogEntry(value: unknown): value is DiceLogEntry {
   return isFields(value) && isSceneId(value.id) && isText(value.name, 1, DICE_LIMITS.nameLength)
     && isText(value.formula, 0, DICE_LIMITS.formulaLength)
     && Array.isArray(value.dice) && value.dice.length <= DICE_LIMITS.entryDice && value.dice.every((die) => isLoggedDie(die))
+    && (value.unlisted === undefined || (Number.isSafeInteger(value.unlisted) && (value.unlisted as number) > 0))
+    && (value.crit === undefined || value.crit === 'high' || value.crit === 'low')
+    && isFlag(value.mine)
     && isFiniteNumber(value.modifier) && isFiniteNumber(value.total) && isFiniteNumber(value.at);
 }
 
@@ -114,17 +140,32 @@ export function isLaserColor(value: unknown): value is string {
   return typeof value === 'string' && LASER_COLOR.test(value);
 }
 
-/** A roll as the dice log shows it, under `name`, clipped to the limits; null when players would refuse it anyway. */
+/**
+ * A roll as the dice log shows it, under `name`, clipped to the limits; null when players would refuse it anyway.
+ * Dice are clipped, never filtered: an exploded die must stay right after the die it was rolled for. A roll
+ * holding a die players cannot take (more than 9999 sides) lists none of its dice, and counts them all unlisted.
+ */
 export function diceLogEntry(result: DiceRollResult, name: string): DiceLogEntry | null {
-  const dice = result.rolls.map(({ die, value }) => ({ die, value })).filter((die) => isLoggedDie(die)).slice(0, DICE_LIMITS.entryDice);
+  const all = result.rolls.map(({ die, value, negative, exploded }): LoggedDie => ({
+    die, value, ...(negative && { negative }), ...(exploded && { exploded }),
+  }));
+  const dice = all.every((die) => isLoggedDie(die)) ? all.slice(0, DICE_LIMITS.entryDice) : [];
+  const unlisted = all.length - dice.length;
   const entry: DiceLogEntry = {
     id: result.id,
     name: name.slice(0, DICE_LIMITS.nameLength),
     formula: result.formula.slice(0, DICE_LIMITS.formulaLength),
     dice,
+    ...(unlisted > 0 && { unlisted }),
     modifier: result.modifiers,
     total: result.total,
+    ...(result.crit && { crit: result.crit }),
     at: result.timestamp,
   };
   return isDiceLogEntry(entry) ? entry : null;
+}
+
+/** The entry as `playerId` gets it: marked `mine` when they rolled it. */
+export function entryFor(entry: DiceLogEntry, rolledBy: string | null, playerId: string): DiceLogEntry {
+  return rolledBy === playerId ? { ...entry, mine: true } : entry;
 }

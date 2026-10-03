@@ -186,7 +186,7 @@ export const MEASUREMENT_FIELD_COVERAGE: CoverageTable<keyof CollectionGridDefau
   measurementMode: SENT,
   abstractRangeBands: SENT,
   diagonalRule: SENT,
-  coneAngle: notYet("the game system's cone angle (Atlas 0.5); players' cones open 90 degrees"),
+  coneAngle: SENT,
 };
 
 /** The store fields the view's lighting reads besides `objects`. */

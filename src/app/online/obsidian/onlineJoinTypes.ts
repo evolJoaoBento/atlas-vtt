@@ -14,6 +14,8 @@ export interface OnlineSceneSink {
   moveRefused(tokenId: string): void;
   /** The shared dice log, newest first, whole. */
   diceLog(entries: readonly DiceLogEntry[]): void;
+  /** A roll this player made just now (`mine`), after the log that lists it: thrown as the player's own dice. */
+  ownRoll(entry: DiceLogEntry): void;
   laser(laser: PlayerLaser): void;
   /** Images arrived, failed or went. */
   images(): void;

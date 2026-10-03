@@ -13,7 +13,7 @@ import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import { laserColor } from '../tools/laserColors';
 import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
-import { diceLogResults } from './onlineDice';
+import { diceLogResult, diceLogResults } from './onlineDice';
 import { OnlineLaserLink } from './OnlineLaserLink';
 import type { OnlineJoinService, OnlineSceneSink } from './OnlineJoinService';
 import { onlineSceneStatus } from './onlineSceneStatus';
@@ -128,6 +128,11 @@ export class OnlineSceneClient implements OnlineSceneSink {
 
   diceLog(entries: readonly DiceLogEntry[]): void {
     this.options.store.setState({ diceLog: diceLogResults(entries) });
+  }
+
+  /** The player's own roll: the view's roll display throws it with the player's own Atlas dice settings (`OnlineOwnRolls`). */
+  ownRoll(entry: DiceLogEntry): void {
+    updateRemoteScene(this.options.store, { ownRoll: diceLogResult(entry) });
   }
 
   /** Someone else's laser: drawn when it is on the scene this view shows, in its sender's or its place's colour. */

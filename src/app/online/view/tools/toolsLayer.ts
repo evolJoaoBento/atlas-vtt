@@ -9,7 +9,7 @@ import {
   beamRadius, beamSmoothingSpacing, beamWidth, FILAMENT_COLOR, FILAMENT_SHARE, smoothBeam, type BeamPoint,
 } from '../../../pixi/laser/laserBeamGeometry';
 import {
-  arcPoints, CONE_ANGLE, coneGeometry, MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW,
+  arcPoints, coneGeometry, MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW,
   measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../../pixi/measureGeometry';
 import { DEFAULT_LASER_POINTER_SETTINGS } from '../../../tools/laserPointerSettings';
@@ -62,7 +62,7 @@ function drawMeasurement(surface: ViewSurface, measure: MeasureOverlay, zoom: nu
   } else if (measure.shape === 'circle') {
     drawCircle(surface, start, Math.hypot(end.x - start.x, end.y - start.y));
   } else {
-    drawCone(surface, start, end, zoom);
+    drawCone(surface, start, end, measure.coneOpening, zoom);
   }
   drawPoint(surface, start);
   drawLabel(surface, measure.label, measureLabelAnchor(start, end, zoom), zoom);
@@ -89,9 +89,9 @@ function drawCircle(surface: ViewSurface, center: ScenePoint, radius: number): v
   surface.circle(center.x, center.y, Math.max(0, radius - highlightInset), { stroke: MEASURE_ACCENT, lineWidth: highlightWidth });
 }
 
-function drawCone(surface: ViewSurface, start: ScenePoint, end: ScenePoint, zoom: number): void {
-  const cone = coneGeometry(start, end);
-  const pixels = cone.radius * zoom * CONE_ANGLE;
+function drawCone(surface: ViewSurface, start: ScenePoint, end: ScenePoint, opening: number, zoom: number): void {
+  const cone = coneGeometry(start, end, opening);
+  const pixels = cone.radius * zoom * opening;
   const segments = Math.min(MAX_ARC_SEGMENTS, Math.max(MIN_ARC_SEGMENTS, Math.ceil(pixels / ARC_PIXELS_PER_SEGMENT)));
   const arc = arcPoints(start, cone.radius, cone.startAngle, cone.endAngle, segments);
   surface.paths([[start, ...arc]], true, { fill: MEASURE_ACCENT, alpha: MEASURE_AREA.fillAlpha });

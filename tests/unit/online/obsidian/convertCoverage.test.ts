@@ -72,7 +72,7 @@ const GM_GRID: GridState = {
   unitType: 'meters', unitDistance: 1.5, measurementType: 'units', scale: 1, mapScale: 1, autoDetect: false,
 };
 const COLLECTION: CollectionGridDefaults = {
-  unitType: 'yards', unitDistance: 2, measurementMode: 'abstract', abstractRangeBands: [{ name: 'Close', maxSquares: 2 }], diagonalRule: 'alternating',
+  unitType: 'yards', unitDistance: 2, measurementMode: 'abstract', abstractRangeBands: [{ name: 'Close', maxSquares: 2 }], diagonalRule: 'alternating', coneAngle: 53.13,
 };
 const WIDGETS: Record<string, AnyWidget> = {
   torches: { id: 'torches', type: 'counter', label: 'Torches', icon: 'flame', visible: true, visibleToPlayers: true, value: 0, order: 0 },
@@ -269,6 +269,7 @@ const MEASUREMENT_CHECKS: Checks<keyof CollectionGridDefaults> = {
   measurementMode: (t) => expect(t.full.back.measurement.mode).toBe('abstract'),
   abstractRangeBands: (t) => expect(t.full.back.measurement.rangeBands).toEqual([{ name: 'Close', maxSquares: 2 }]),
   diagonalRule: (t) => expect(t.full.back.measurement.diagonalRule).toBe('alternating'),
+  coneAngle: (t) => expect(t.full.back.measurement.coneAngle).toBe(53.13),
 };
 
 const SCENE_CHECKS: Checks<keyof ProjectedState> = {
