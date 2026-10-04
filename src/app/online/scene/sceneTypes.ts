@@ -30,7 +30,7 @@ export type PlayerGridLine = typeof PLAYER_GRID_LINES[number];
 /** The formats a player before Atlas 0.5.1 reads, and only on hex grids (`PlayerGrid.hexNumbers`). */
 export const PLAYER_HEX_NUMBERS = ['column-row', 'sequential'] as const;
 export type PlayerHexNumbers = typeof PLAYER_HEX_NUMBERS[number];
-/** Every format Atlas numbers cells in, as `CellNumberFormat` (a parity test keeps them equal). */
+/** Every format Atlas numbers cells in, as `CellNumberFormat`: the projection and `playerCellNumbers` assign one to the other, so the compiler keeps them equal. */
 export const PLAYER_CELL_NUMBERS = ['column-row', 'sequential', 'letter-number'] as const;
 export type PlayerCellNumbers = typeof PLAYER_CELL_NUMBERS[number];
 
