@@ -5,6 +5,7 @@ import type { WallSegment } from '../types/wallTypes';
 import type { LightSource, LightZone } from '../types/lightingTypes';
 import type { WidgetSettings } from '../types/widgetTypes';
 import type { CellNumberFormat } from '../grid/cellNumbering';
+import type { GridState } from '../types/gridStateTypes';
 import type AtlasVTTPlugin from '../../../main';
 import { migrateWidgetsToCollection, needsWidgetMigration } from '../utils/widgetMigration';
 import { lightZonesFromFile } from '../lighting/lightZones';
@@ -16,36 +17,11 @@ import { preserveDamagedSceneFile, SceneFileError } from './sceneFileProblems';
 import { SceneFileWriter } from './sceneFileWriter';
 
 // Type definitions
+export type { GridState };
 export interface CameraState {
   x: number;
   y: number;
   scale: number;
-}
-
-export interface GridState {
-  enabled: boolean;
-  visible?: boolean; // Grid visibility (separate from enabled)
-  snapToGrid?: boolean; // Whether tokens snap to grid
-  type?: 'square' | 'hex-horizontal' | 'hex-vertical';
-  size: number;
-  offsetX: number;
-  offsetY: number;
-  /** Hex colour of the grid lines. Unset lets the grid pick black or white from the map's brightness. */
-  color?: string;
-  opacity: number;
-  scale?: number;
-  mapScale?: number; // Scale factor used during grid alignment
-  unitType?: 'feet' | 'yards' | 'meters' | 'units';
-  unitDistance?: number;
-  lineType?: 'solid' | 'dashed' | 'dotted'; // Grid line style
-  lineWidth?: number; // Grid line width in pixels
-  measurementType?: 'units' | 'abstract'; // Measurement system to use
-  /** Set on new scenes: align the grid to the map image on the first load, then cleared. */
-  autoDetect?: boolean;
-  /** Numbers every cell of the grid in this format; unset shows no numbers. */
-  cellNumbers?: CellNumberFormat;
-  /** Opacity of the cell numbers (0 to 1), separate from the grid lines; unset is `DEFAULT_CELL_NUMBER_OPACITY`. */
-  cellNumberOpacity?: number;
 }
 
 import type { FogOperation } from '../types/fogTypes';

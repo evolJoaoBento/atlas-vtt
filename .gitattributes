@@ -1,0 +1,3 @@
+api-report/*.d.ts text eol=lf
+dist-packages/** text eol=lf
+*.webp binary

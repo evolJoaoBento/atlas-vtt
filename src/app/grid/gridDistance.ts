@@ -8,7 +8,7 @@
  */
 
 import type { DiagonalRule } from '../types/collectionSettingsTypes';
-import type { GridOptions } from './GridSystem';
+import type { GridOptions } from './gridTypes';
 import { axialDistance, createHexLayout, isHexGridType, nearestHexCenter, pixelToAxial, type Point } from './hexGeometry';
 
 export type GridGeometry = Pick<GridOptions, 'type' | 'size' | 'offsetX' | 'offsetY'>;

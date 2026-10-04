@@ -24,6 +24,7 @@
     "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json",
     "api:report": "tsc -p tsconfig.api.json && api-extractor run --local",
     "api:check": "npm run api:report && git diff --exit-code -- api-report && node scripts/api-version-check.js",
+    "build:packages": "npm run api:report && vite build -c vite.shared.config.mts && tsc -p tsconfig.shared.json",
     "lint:scan": "node scripts/lint-scan.js",
     "preflight": "node scripts/preflight.js"
   },
