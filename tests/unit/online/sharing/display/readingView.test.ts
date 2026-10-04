@@ -106,3 +106,26 @@ describe('reading view: share tags applied to the rendered sections', () => {
     expect(el.querySelectorAll('.atlas-share-tag')).toHaveLength(1);
   });
 });
+
+describe('reading view scales with the number of tagged sections (M6)', () => {
+  /** Decorates every section of a note of `count` one-tag paragraphs; the milliseconds it took. */
+  const timeFor = (count: number): number => {
+    const rows: string[] = [];
+    for (let index = 0; index < count; index++) rows.push(`Para ${index} with %%[!private]%%secret ${index}%%[!end]%% words and more words here.`, '');
+    const text = rows.join('\n');
+    const started = performance.now();
+    for (let index = 0; index < count; index++) {
+      const el = rendered(`<p>Para ${index} with secret ${index} words and more words here.</p>`);
+      decorateSection(el, { text, lineStart: index * 2, lineEnd: index * 2 }, () => 'inline-only');
+      expect(el.querySelector('.atlas-share-tag')?.textContent).toBe('Private');
+    }
+    return performance.now() - started;
+  };
+
+  it('grows about linearly: 4 times the sections take well under 16 times as long (it was quadratic)', () => {
+    timeFor(50);
+    const small = timeFor(200);
+    const large = timeFor(800);
+    expect(large / small).toBeLessThan(9);
+  });
+});

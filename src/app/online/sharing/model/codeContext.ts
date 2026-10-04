@@ -110,7 +110,10 @@ function inlineOpen(paragraph: string, onLine: string, line: string): boolean {
   if (count(onLine, /`/g) % 2 === 1) return true;
   if (count(paragraph, /<(?:pre|code)\b/gi) > count(paragraph, /<\/(?:pre|code)\s*>/gi)) return true;
   if (count(paragraph, /\$\$/g) % 2 === 1 || count(paragraph.replace(/\$\$/g, ''), /\$/g) % 2 === 1) return true;
-  if (depthOpen(onLine, (index) => onLine[index] === '<' && /\S/.test(onLine[index + 1] ?? ' '), '>')) return true;
+  // An autolink or HTML tag may run over lines (a multi-line attribute): count `<` depth over the paragraph,
+  // without the quote markers' `>`.
+  const noQuotes = paragraph.replace(/^(?:[ \t]*>)+/gm, (markers) => ' '.repeat(markers.length));
+  if (depthOpen(noQuotes, (index) => noQuotes[index] === '<' && /\S/.test(noQuotes[index + 1] ?? ' '), '>')) return true;
   if (REFERENCE_DEFINITION.test(lenientQuote(line).content)) return true;
   return depthOpen(paragraph, (index) => paragraph[index] === '[', ']') || linkDestinationOpen(onLine);
 }
@@ -119,8 +122,15 @@ function inlineOpen(paragraph: string, onLine: string, line: string): boolean {
 export function codeOrLinkTest(text: string, ranges: readonly TextRange[], blocks: BlockContext): (range: TextRange) => boolean {
   // Other tokens' own brackets and backticks must not count: mask them with a plain letter. The masked text
   // keeps every offset, so it is read both as written and with escapes masked.
-  let tokensMasked = text;
-  for (const range of ranges) tokensMasked = tokensMasked.slice(0, range.start) + 'x'.repeat(range.end - range.start) + tokensMasked.slice(range.end);
+  const pieces: string[] = [];
+  let at = 0;
+  for (const range of [...ranges].sort((a, b) => a.start - b.start)) {
+    if (range.start < at) continue;
+    pieces.push(text.slice(at, range.start), 'x'.repeat(range.end - range.start));
+    at = range.end;
+  }
+  pieces.push(text.slice(at));
+  const tokensMasked = pieces.join('');
   const unescaped = withoutEscapes(tokensMasked);
   const lines = tokensMasked.split('\n');
   const starts: number[] = [];
@@ -140,18 +150,26 @@ export function codeOrLinkTest(text: string, ranges: readonly TextRange[], block
       }
       first = block.startLine;
     }
-    // The token's paragraph: back to a blank line, or to the start of its list item or quote line run, since no
-    // inline span crosses those.
-    const quoteDepth = (line: string): number => (/^(?:[ \t]*>)*/.exec(line)?.[0] ?? '').split('>').length - 1;
-    for (let at = index; at >= first; at--) {
-      const line = lines[at] ?? '';
-      if (at < index && line.replace(/^(?:[ \t]*>)*/, '').trim() === '') { first = at + 1; break; }
-      if (at < index && quoteDepth(line) !== quoteDepth(lines[at + 1] ?? '')) { first = at + 1; break; }
-      if (LIST_ITEM_START.test(line.replace(QUOTE_MARKERS, ''))) { first = at; break; }
+    // The token's paragraph, read two ways, either reading open counts: back to the last blank line, and back to
+    // the start of its list item or quote line run. A span may cross the cut (a lazy line, a quote depth drop,
+    // an ordered marker that cannot interrupt a paragraph) or be paired wrongly across it, so neither alone is safe.
+    let blankFirst = first;
+    for (let at = index - 1; at >= first; at--) {
+      if ((lines[at] ?? '').replace(/^(?:[ \t]*>)*/, '').trim() === '') { blankFirst = at + 1; break; }
     }
-    const from = starts[first] ?? 0;
+    let cutFirst = blankFirst;
+    const quoteDepth = (line: string): number => (/^(?:[ \t]*>)*/.exec(line)?.[0] ?? '').split('>').length - 1;
+    for (let at = index; at >= blankFirst; at--) {
+      const line = lines[at] ?? '';
+      if (at < index && quoteDepth(line) !== quoteDepth(lines[at + 1] ?? '')) { cutFirst = at + 1; break; }
+      if (LIST_ITEM_START.test(line.replace(QUOTE_MARKERS, ''))) { cutFirst = at; break; }
+    }
     const lineStart = starts[index] ?? 0;
-    if (codeSpanOpen(tokensMasked.slice(from, range.start))) return true;
-    return [tokensMasked, unescaped].some((reading) => inlineOpen(reading.slice(from, range.start), reading.slice(lineStart, range.start), reading.slice(lineStart, lineStart + (lines[index]?.length ?? 0))));
+    const line = lines[index]?.length ?? 0;
+    return [blankFirst, cutFirst].some((paragraphLine) => {
+      const from = starts[paragraphLine] ?? 0;
+      if (codeSpanOpen(tokensMasked.slice(from, range.start))) return true;
+      return [tokensMasked, unescaped].some((reading) => inlineOpen(reading.slice(from, range.start), reading.slice(lineStart, range.start), reading.slice(lineStart, lineStart + line)));
+    });
   };
 }

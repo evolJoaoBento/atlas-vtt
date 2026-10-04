@@ -16,8 +16,20 @@ export interface SectionEvents {
   onDelete(listener: (path: string) => void): void;
 }
 
+/** Length and two 32-bit FNV-1a hashes with different offsets: equal texts match, and a different text almost never does. */
+function fingerprint(text: string): string {
+  let first = 0x811c9dc5;
+  let second = 0x050c5d1f;
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x01000193) ^ (second >>> 15);
+  }
+  return `${text.length}:${(first >>> 0).toString(36)}:${(second >>> 0).toString(36)}`;
+}
+
 export class SectionTrust {
-  /** The text each note's sections were last parsed from, by path. */
+  /** A fingerprint of the text each note's sections were last parsed from, by path (not the text: notes can be large). */
   private readonly parsed = new Map<string, string>();
   /** Notes changed since they were last parsed. */
   private readonly modified = new Set<string>();
@@ -25,7 +37,7 @@ export class SectionTrust {
   constructor(events: SectionEvents) {
     events.onModify((path) => this.modified.add(path));
     events.onParsed((path, data) => {
-      this.parsed.set(path, data);
+      this.parsed.set(path, fingerprint(data));
       this.modified.delete(path);
     });
     events.onRename((path, oldPath) => {
@@ -44,7 +56,7 @@ export class SectionTrust {
   trusted(path: string, text: string, sections: readonly NoteSection[] | null | undefined): readonly NoteSection[] | null {
     if (!sections) return null;
     const data = this.parsed.get(path);
-    if (data !== undefined) return data === text ? sections : null;
+    if (data !== undefined) return data === fingerprint(text) ? sections : null;
     return this.modified.has(path) ? null : sections;
   }
 }

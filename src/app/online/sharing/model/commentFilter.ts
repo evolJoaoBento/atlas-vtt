@@ -34,23 +34,54 @@ const CLOSERS: Record<CommentOpener, string> = { '%%': '%%', '<!--': '-->' };
  * (a gap between part tags). A comment not closed there is unclosed and runs to the end of the text.
  */
 export function scanComments(text: string, from = 0, to = text.length): CommentSpan[] {
-  const spans: CommentSpan[] = [];
-  const within = text.slice(0, to);
-  let at = from;
-  for (;;) {
-    const found = OPENERS.map((opener) => ({ opener, index: within.indexOf(opener, at) }))
-      .filter((hit) => hit.index >= 0).sort((a, b) => a.index - b.index)[0];
-    if (!found) return spans;
-    const contentStart = found.index + found.opener.length;
-    const close = within.indexOf(CLOSERS[found.opener], contentStart);
-    if (close < 0) {
-      spans.push({ start: found.index, end: text.length, opener: found.opener, content: text.slice(contentStart), closed: false });
-      return spans;
-    }
-    const end = close + CLOSERS[found.opener].length;
-    spans.push({ start: found.index, end, opener: found.opener, content: text.slice(contentStart, close), closed: true });
-    at = end;
+  return commentScanner(text)(from, to);
+}
+
+/** Every start of `needle` in `text` (overlapping ones too, as `indexOf` from each offset would find). */
+function positionsOf(text: string, needle: string): number[] {
+  const found: number[] = [];
+  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) found.push(at);
+  return found;
+}
+
+/** The first of sorted `positions` at or after `from` whose `needle` ends by `to`, or -1. */
+function nextWithin(positions: readonly number[], from: number, to: number, length: number): number {
+  let low = 0;
+  let high = positions.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if ((positions[middle] ?? 0) < from) low = middle + 1;
+    else high = middle;
   }
+  const at = positions[low];
+  return at !== undefined && at + length <= to ? at : -1;
+}
+
+/**
+ * `scanComments` for many gaps of one text: the markers are found once, so scanning every gap between a
+ * note's tags costs one pass, not one pass per tag.
+ */
+export function commentScanner(text: string): (from: number, to: number) => CommentSpan[] {
+  const positions = new Map<string, number[]>([...OPENERS, ...Object.values(CLOSERS)].map((marker) => [marker, positionsOf(text, marker)]));
+  const find = (needle: string, from: number, to: number): number => nextWithin(positions.get(needle) ?? [], from, to, needle.length);
+  return (from, to) => {
+    const spans: CommentSpan[] = [];
+    let at = from;
+    for (;;) {
+      const found = OPENERS.map((opener) => ({ opener, index: find(opener, at, to) }))
+        .filter((hit) => hit.index >= 0).sort((a, b) => a.index - b.index)[0];
+      if (!found) return spans;
+      const contentStart = found.index + found.opener.length;
+      const close = find(CLOSERS[found.opener], contentStart, to);
+      if (close < 0) {
+        spans.push({ start: found.index, end: text.length, opener: found.opener, content: text.slice(contentStart), closed: false });
+        return spans;
+      }
+      const end = close + CLOSERS[found.opener].length;
+      spans.push({ start: found.index, end, opener: found.opener, content: text.slice(contentStart, close), closed: true });
+      at = end;
+    }
+  };
 }
 
 /**

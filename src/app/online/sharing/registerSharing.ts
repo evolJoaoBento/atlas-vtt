@@ -7,6 +7,7 @@ import type { ShareItems } from './model/ShareItems';
 import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems } from './receive/PulledItems';
 import { registerTagDisplay } from './display/registerTagDisplay';
+import { sectionTrustFor } from './model/sectionTrust';
 import { registerPartCommands } from './parts/registerPartCommands';
 import { registerAskToPull } from './registerAskToPull';
 import { registerReceiving } from './registerReceiving';
@@ -24,10 +25,12 @@ export interface SharingServices {
 
 export function registerSharing(plugin: Plugin, services: SharingServices): void {
   const { joins, people, items, pulled, settings, sessions } = services;
-  const catalogue = registerShareCommands(plugin, { people, items, settings });
+  // One record of what the metadata cache parsed, for everything that reads a note's sections.
+  const sections = sectionTrustFor(plugin);
+  const catalogue = registerShareCommands(plugin, { people, items, settings, sections });
   registerPartCommands(plugin, people);
   registerTagDisplay(plugin);
-  registerAskToPull(plugin, items, people);
+  registerAskToPull(plugin, items, people, sections);
   registerReceiving(plugin, pulled, people);
   registerSessionHooks(plugin, { joins, people, sessions, catalogue });
 }

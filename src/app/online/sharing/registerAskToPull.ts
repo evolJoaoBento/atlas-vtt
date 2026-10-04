@@ -6,6 +6,7 @@ import { ruleReaches } from './model/audience';
 import { mapShareOf } from './model/mapShare';
 import { strayEndLineIn, strayEndProblem } from './model/noteFilter';
 import type { NoteSection } from './model/noteSections';
+import { trustedSections, type SectionTrust } from './model/sectionTrust';
 import type { ShareItems } from './model/ShareItems';
 import { parseShareRule, SHARE_PROPERTY } from './model/shareRule';
 import type { PeopleBook } from './people/PeopleBook';
@@ -26,7 +27,7 @@ export function pushRefusal(text: string, sections: readonly NoteSection[] | nul
   return line === null ? null : strayEndProblem(line);
 }
 
-export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor'>, people: Pick<PeopleBook, 'byName' | 'allByName' | 'ready'>): void {
+export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor'>, people: Pick<PeopleBook, 'byName' | 'allByName' | 'ready'>, sections: SectionTrust): void {
   const itemOf = async (file: TFile): Promise<PushableItem | null> => {
     if (file.extension === 'md') return { item: items.idFor(file.path), kind: 'note' };
     const scene = (await AssetService.getInstance(plugin.app).getAssets(undefined, 'scene')).find((candidate) => candidate.data?.mapPath === file.path);
@@ -40,6 +41,10 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
     const rule = parseShareRule(plugin.app.metadataCache.getFileCache(file)?.frontmatter?.[SHARE_PROPERTY]);
     return present.filter((person) => ruleReaches(rule, { tableId, personId: person.personId }, people));
   };
+  const refusalFor = async (file: TFile): Promise<string | null> => {
+    const text = await plugin.app.vault.cachedRead(file);
+    return pushRefusal(text, trustedSections(plugin.app, sections, file, text));
+  };
   const askToPull = async (file: TFile): Promise<void> => {
     const { session, people: present } = shareSessionStore.getState();
     if (!session) {
@@ -51,7 +56,7 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
       return;
     }
     const refused = file.extension === 'md'
-      ? pushRefusal(await plugin.app.vault.cachedRead(file), plugin.app.metadataCache.getFileCache(file)?.sections ?? null)
+      ? await refusalFor(file)
       : null;
     if (refused) {
       new Notice(refused);

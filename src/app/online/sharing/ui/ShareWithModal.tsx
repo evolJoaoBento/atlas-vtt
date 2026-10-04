@@ -19,6 +19,7 @@ import { partProblemsInNote, unknownNamesIn } from '../model/noteFilter';
 import type { SenderCatalogue } from '../model/SenderCatalogue';
 import { formatShareRule, parseShareRule, SHARE_PROPERTY, unknownRuleNames } from '../model/shareRule';
 import { writeNoteShare } from '../model/shareWriting';
+import { trustedSections, type SectionTrust } from '../model/sectionTrust';
 import { partError, partWarnings } from './partWarnings';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
 
@@ -36,6 +37,8 @@ export interface ShareWithDeps {
   assets: Pick<AssetService, 'updateAsset' | 'getAssets'>;
   /** This Atlas's person id at a table (`gm` at its own), for the preview's tags; undefined when unknown. */
   selfAt: (tableId: string) => string | undefined;
+  /** What the metadata cache parsed (`SectionTrust`), so the warnings read the sections the filter would. */
+  sections: SectionTrust;
 }
 
 const nameKey = (name: string): string => `name:${name}`;
@@ -71,7 +74,7 @@ class ShareWithModal extends Modal {
   private async noteWarnings(unknownInRule: readonly string[], unreadableRule: boolean): Promise<{ warnings: string[]; error: string | null }> {
     const text = await this.app.vault.cachedRead(this.file);
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
-    const problems = partProblemsInNote(text, this.app.metadataCache.getFileCache(this.file)?.sections ?? null);
+    const problems = partProblemsInNote(text, trustedSections(this.app, this.deps.sections, this.file, text));
     const warnings = [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),

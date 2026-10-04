@@ -11,7 +11,7 @@
  * hidden from everyone and never closes one, so a mistyped tag can only hide more.
  */
 import { codeOrLinkTest, type BlockContext } from './codeContext';
-import { scanComments, type CommentSpan, type TextRange } from './commentFilter';
+import { commentScanner, type CommentSpan, type TextRange } from './commentFilter';
 
 export type PartRule = { kind: 'private' | 'public' } | { kind: 'only' | 'except'; names: string[] };
 
@@ -74,15 +74,17 @@ export function scanMarkup(text: string, blocks: BlockContext): NoteMarkup {
   // A token possibly inside code or a link shows as text in Obsidian: never a tag (T-R2), it hides the rest of the note instead.
   const inCodeOrLink = codeOrLinkTest(text, tokens, blocks);
   const suspects = tokens.filter((token) => inCodeOrLink(token)).map(({ start, end }) => ({ start, end }));
-  const tags = tokens.filter((token) => !suspects.some((suspect) => suspect.start === token.start))
+  const suspectStarts = new Set(suspects.map((suspect) => suspect.start));
+  const tags = tokens.filter((token) => !suspectStarts.has(token.start))
     .map((token) => tagOf(token.content, token.start, token.end));
   const comments: CommentSpan[] = [];
+  const scanGap = commentScanner(text);
   let gapStart = 0;
-  for (const gapEnd of [...tags.map((tag) => tag.start), text.length]) {
-    const found = scanComments(text, gapStart, gapEnd);
+  for (const [index, gapEnd] of [...tags.map((tag) => tag.start), text.length].entries()) {
+    const found = scanGap(gapStart, gapEnd);
     comments.push(...found);
     if (found.some((comment) => !comment.closed)) break;
-    gapStart = tags.find((tag) => tag.start === gapEnd)?.end ?? gapEnd;
+    gapStart = tags[index]?.end ?? gapEnd;
   }
   return { tags, comments, suspects };
 }

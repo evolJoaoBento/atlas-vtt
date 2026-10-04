@@ -5,7 +5,7 @@ import type { SettingsService } from '../../services/SettingsService';
 import { followVaultChange, type VaultChange } from './model/mapShareRenames';
 import { obsidianCatalogueSources } from './model/catalogueSources';
 import { SenderCatalogue } from './model/SenderCatalogue';
-import { sectionTrustFor } from './model/sectionTrust';
+import type { SectionTrust } from './model/sectionTrust';
 import type { ShareItems } from './model/ShareItems';
 import type { PeopleBook } from './people/PeopleBook';
 import { GM_PERSON_ID } from './people/peopleTypes';
@@ -17,6 +17,8 @@ export interface ShareCommandServices {
   people: PeopleBook;
   items: ShareItems;
   settings: SettingsService;
+  /** What the metadata cache parsed, so a note's sections are used only for the text they came from. */
+  sections: SectionTrust;
 }
 
 /** Notes and maps are what can be shared. */
@@ -24,19 +26,19 @@ export const shareable = (file: TAbstractFile | null): file is TFile =>
   file instanceof TFile && (file.extension === 'md' || file.extension === 'atlasmap');
 
 /** Registers the sending commands; returns the catalogue of what this Atlas shares, which sessions answer from. */
-export function registerShareCommands(plugin: Plugin, { people, items, settings }: ShareCommandServices): SenderCatalogue {
+export function registerShareCommands(plugin: Plugin, { people, items, settings, sections }: ShareCommandServices): SenderCatalogue {
   plugin.addCommand({
     id: 'people', name: 'People…',
     callback: () => openPeopleModal(plugin.app, settings.getOnlineSettings().table?.id ?? null),
   });
   void items.ready();
-  const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings, sectionTrustFor(plugin)), items, people);
+  const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings, sections), items, people);
   const selfAt = (tableId: string): string | undefined => {
     if (settings.getOnlineSettings().table?.id === tableId) return GM_PERSON_ID;
     const session = shareSessionStore.getState().session;
     return session?.tableId === tableId ? session.self : undefined;
   };
-  const share = (file: TFile): void => openShareWithModal(plugin.app, file, { people, catalogue, assets: AssetService.getInstance(plugin.app), selfAt });
+  const share = (file: TFile): void => openShareWithModal(plugin.app, file, { people, catalogue, assets: AssetService.getInstance(plugin.app), selfAt, sections });
   plugin.addCommand({
     id: 'share-with', name: 'Share with…',
     checkCallback: (checking) => {

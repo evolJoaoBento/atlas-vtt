@@ -35,11 +35,6 @@ $share-tag-tones: (
   }
 }
 
-// Covered text reads as normal text, never as a greyed comment (real comments inside it stay grey).
-.atlas-share-tag-hl.cm-comment {
-  color: inherit;
-}
-
 .atlas-share-tag-hl {
   border-radius: $radius-xs;
 }

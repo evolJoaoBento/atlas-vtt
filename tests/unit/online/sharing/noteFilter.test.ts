@@ -337,17 +337,24 @@ describe('inline leaks of fix round 5', () => {
     ['$ across list items', lines(P, '- $5', '- $x ' + E + '$', '- LEAK', '- $y ' + P + '$', E), [['paragraph', 0, 0], ['list', 1, 4], ['paragraph', 5, 5]]],
     ['$$ math in a list item across a blank line', lines(P, '', '- item', '  $$', '', '  ' + E, '', '  LEAK', '', '  ' + P, '  $$', '', E),
       [['paragraph', 0, 0], ['list', 2, 10], ['paragraph', 12, 12]]],
+    // Fix round 6 (I1): a span runs past the item or quote cut, so the paragraph is also read back to the blank line.
+    ['a lazy quote line', lines(P, '> a `b', 'c ' + E + ' ` LEAK `d', 'e ' + P + ' `', E), [['paragraph', 0, 0], ['blockquote', 1, 3], ['paragraph', 4, 4]]],
+    ['a nested quote depth drop', lines(P, '', '> > a `b', '> c ' + E + ' ` LEAK `d', '> e ' + P + ' `', '', E), [['paragraph', 0, 0], ['blockquote', 2, 4], ['paragraph', 6, 6]]],
+    ['2. inside a paragraph', lines(P, '', 'a `b', '2. c ' + E + ' ` LEAK `d', '3. e ' + P + ' `', '', E), [['paragraph', 0, 0], ['paragraph', 2, 4], ['paragraph', 6, 6]]],
+    ['  2. inside a list item', lines(P, '', '- a `b', '  2. c ' + E + ' ` LEAK `d', '  3. e ' + P + ' `', '', E), [['paragraph', 0, 0], ['list', 2, 4], ['paragraph', 6, 6]]],
+    ['$ over a lazy quote line', lines(P, '> a $b', 'c ' + E + ' $ LEAK $d', 'e ' + P + ' $', E), [['paragraph', 0, 0], ['blockquote', 1, 3], ['paragraph', 4, 4]]],
+    // M4: an HTML attribute over lines.
+    ['a multi-line HTML attribute', lines(P, 'a <span title="', E + '"> LEAK <span title="', P + '">', E), [['paragraph', 0, 4]]],
   ];
 
   it('each repro leaks nothing to anyone, marked or not, and warns', () => {
-    for (const [label, source, blocks] of repros) {
+    // Every failing repro is listed at once, so switching one check off shows exactly the repros it guards.
+    const failed = repros.filter(([, source, blocks]) => {
       const sections = sectionsOf(source, blocks);
-      for (const personId of everyone) {
-        expect(filterWith(personId, source, sections), label).not.toContain('LEAK');
-        expect(filterWith(personId, source, sections, true), `${label}, marked`).not.toContain('LEAK');
-      }
-      expect(partProblemsInNote(source, sections).tagInCodeOrLink, label).toBe(true);
-    }
+      const leaks = everyone.some((personId) => filterWith(personId, source, sections).includes('LEAK') || filterWith(personId, source, sections, true).includes('LEAK'));
+      return leaks || !partProblemsInNote(source, sections).tagInCodeOrLink;
+    }).map(([label]) => label);
+    expect(failed).toEqual([]);
   });
 
   it('an escaped backslash before a tag leaves the tag a tag', () => {

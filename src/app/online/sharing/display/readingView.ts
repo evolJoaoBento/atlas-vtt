@@ -21,24 +21,68 @@ export interface SectionSource {
   lineEnd: number;
 }
 
+interface LabelledPart {
+  label: TagLabel;
+  highlight: TagHighlight;
+}
+
 interface NoteModel {
   text: string;
+  /** The block context the note was read with. */
+  context: string;
   display: TagDisplay;
-  /** Tags and comments: never rendered. */
+  /** Tags and comments, sorted and apart: never rendered. */
   removed: Array<{ start: number; end: number }>;
   lineStarts: number[];
+  /** Each label with the highlight it starts, sorted by where the highlight starts. */
+  parts: LabelledPart[];
+  /** The largest highlight end among `parts[0..i]`, to find the parts overlapping a section without a full scan. */
+  maxEnd: number[];
+}
+
+/** The index of the first item in sorted `items` whose `key` is at least `value`. */
+function firstAtLeast<T>(items: readonly T[], value: number, key: (item: T) => number): number {
+  let low = 0;
+  let high = items.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (key(items[middle] as T) < value) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
 
 let cached: NoteModel | null = null;
 
+/** Sorted ranges with overlapping ones merged (an unclosed comment can hold later tags), so ends are sorted too. */
+function disjoint(ranges: ReadonlyArray<{ start: number; end: number }>): Array<{ start: number; end: number }> {
+  const out: Array<{ start: number; end: number }> = [];
+  for (const { start, end } of [...ranges].sort((a, b) => a.start - b.start)) {
+    const last = out[out.length - 1];
+    if (last && start <= last.end) last.end = Math.max(last.end, end);
+    else out.push({ start, end });
+  }
+  return out;
+}
+
 /** The note's tags, read once per source text (every section of a render shares it). */
 function modelOf(text: string, blocksFor: () => BlockContext): NoteModel {
-  if (cached?.text === text) return cached;
+  // Cached by the text and the block context it was read with: sections that fit later give a new model.
   const blocks = blocksFor();
+  const context = blocks === null || blocks === 'inline-only' ? String(blocks) : JSON.stringify(blocks);
+  if (cached?.text === text && cached.context === context) return cached;
   const { tags, comments } = scanMarkup(text, blocks);
   const lineStarts = [0];
   for (let at = text.indexOf('\n'); at >= 0; at = text.indexOf('\n', at + 1)) lineStarts.push(at + 1);
-  const model: NoteModel = { text, display: tagDisplayOf(text, blocks), removed: [...tags, ...comments].sort((a, b) => a.start - b.start), lineStarts };
+  const display = tagDisplayOf(text, blocks);
+  const highlightAt = new Map(display.highlights.map((highlight) => [highlight.from, highlight]));
+  const parts = display.labels
+    .map((label) => ({ label, highlight: highlightAt.get(label.to) }))
+    .filter((pair): pair is LabelledPart => pair.highlight !== undefined)
+    .sort((a, b) => a.highlight.from - b.highlight.from);
+  const maxEnd: number[] = [];
+  parts.forEach((part, index) => maxEnd.push(Math.max(part.highlight.to, maxEnd[index - 1] ?? 0)));
+  const model: NoteModel = { text, context, display, removed: disjoint([...tags, ...comments]), lineStarts, parts, maxEnd };
   cached = model;
   return model;
 }
@@ -47,8 +91,10 @@ function modelOf(text: string, blocksFor: () => BlockContext): NoteModel {
 function shownSource(model: NoteModel, from: number, to: number): string {
   let out = '';
   let at = from;
-  for (const range of model.removed) {
-    if (range.end <= at || range.start >= to) continue;
+  for (let index = Math.max(0, firstAtLeast(model.removed, from, (range) => range.end)); index < model.removed.length; index++) {
+    const range = model.removed[index];
+    if (!range || range.start >= to) break;
+    if (range.end <= at) continue;
     out += model.text.slice(at, Math.max(at, range.start));
     at = Math.max(at, range.end);
   }
@@ -57,7 +103,11 @@ function shownSource(model: NoteModel, from: number, to: number): string {
 
 /** The first and last offsets in `[from, to)` that render as something (not whitespace, a tag or a comment). */
 function shownBounds(model: NoteModel, from: number, to: number): { first: number; last: number } | null {
-  const isShown = (offset: number): boolean => /\S/.test(model.text[offset] ?? '') && !model.removed.some((range) => offset >= range.start && offset < range.end);
+  const isShown = (offset: number): boolean => {
+    if (!/\S/.test(model.text[offset] ?? '')) return false;
+    const range = model.removed[firstAtLeast(model.removed, offset + 1, (candidate) => candidate.start) - 1];
+    return !(range && offset < range.end);
+  };
   let first = from;
   while (first < to && !isShown(first)) first++;
   if (first >= to) return null;
@@ -88,9 +138,12 @@ export function decorateSection(el: HTMLElement, source: SectionSource, blocksFo
   const sEnd = (model.lineStarts[source.lineEnd + 1] ?? model.text.length + 1) - 1;
   const section = shownBounds(model, sStart, sEnd);
   if (!section) return;
-  const pairs = model.display.labels
-    .map((label) => ({ label, highlight: model.display.highlights.find((range) => range.from === label.to) }))
-    .filter((pair): pair is { label: TagLabel; highlight: TagHighlight } => pair.highlight !== undefined);
+  // Only the parts overlapping this section: those starting before its end whose end lies after its start.
+  const pairs: LabelledPart[] = [];
+  for (let index = firstAtLeast(model.parts, sEnd, (part) => part.highlight.from) - 1; index >= 0 && (model.maxEnd[index] ?? 0) > sStart; index--) {
+    const part = model.parts[index];
+    if (part && part.highlight.to > sStart) pairs.unshift(part);
+  }
   for (const { label, highlight } of pairs) {
     const part = shownBounds(model, highlight.from, highlight.to);
     const inSection = part ? shownBounds(model, Math.max(highlight.from, sStart), Math.min(highlight.to, sEnd)) : null;
