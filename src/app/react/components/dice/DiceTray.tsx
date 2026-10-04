@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
 import { Button } from '../../../packages/components/primitives/button';
@@ -14,6 +14,8 @@ interface DiceTrayProps {
   onRoll: (formula: string, pool: TrayPool, modifier: number) => boolean;
   /** The most dice the tray holds in all, when lower than its own limit. */
   maxDice?: number;
+  /** The dice or the modifier changed. */
+  onChange?: () => void;
 }
 
 /**
@@ -23,11 +25,17 @@ interface DiceTrayProps {
  * control on a touchpad. Mixed dice are thrown together, `2d6 + 1d20 + 3`, as
  * three kinds held in one hand.
  */
-export function DiceTray({ onRoll, maxDice = MAX_DICE }: DiceTrayProps): React.ReactElement {
+export function DiceTray({ onRoll, maxDice = MAX_DICE, onChange }: DiceTrayProps): React.ReactElement {
   const [pool, setPool] = useState<TrayPool>({});
   const [modifier, setModifier] = useState(0);
 
   const formula = trayFormula(pool, modifier);
+  // A cap that is not a number (or is negative) leaves the tray's own limit.
+  const limit = Number.isFinite(maxDice) && maxDice >= 0 ? Math.min(maxDice, MAX_DICE) : MAX_DICE;
+
+  const changed = useRef(onChange);
+  changed.current = onChange;
+  useEffect(() => { changed.current?.(); }, [formula]);
   const empty = formula === '' && modifier === 0;
   const total = trayDiceCount(pool);
 
@@ -55,7 +63,7 @@ export function DiceTray({ onRoll, maxDice = MAX_DICE }: DiceTrayProps): React.R
                   type="button"
                   className="atlas-dice-tray__face"
                   onClick={() => setPool((prev) => addDie(prev, sides))}
-                  disabled={count >= MAX_PER_DIE || total >= Math.min(maxDice, MAX_DICE)}
+                  disabled={count >= MAX_PER_DIE || total >= limit}
                   aria-label={count === 0 ? `Add a d${sides}` : `Add a d${sides}, ${count} in the tray`}
                 >
                   <DieFace sides={sides} />

@@ -27,6 +27,8 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.8.0 | planned for 1.8.0 | `scenes`, `bundles` | `scenes`, `bundles` | `scenes-changed` |
 | 1.9.0 | planned for 1.9.0 | `remote-view` | `remoteViews` (optional) | none |
 
+Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
+
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ## Semver rules

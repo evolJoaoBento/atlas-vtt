@@ -231,7 +231,7 @@ declare type DiceCrit = 'high' | 'low' | null;
 export declare interface DiceRollRequest {
     /** e.g. "2d6+1d20-1"; the tray's selection is turned into this with `diceFormula` from @atlas-vtt/shared/rules. A formula without dice, such as "+3", is added to the rules' default roll. */
     formula: string;
-    /** Rolls by the rules of this map's collection (exploding dice, critical rule); Atlas's defaults otherwise. */
+    /** Rolls by the rules of this map's collection (exploding dice, critical rule); Atlas's defaults otherwise. Rules only: the roll shows in every open map's log. */
     mapPath?: string | null;
     /** Someone other than the GM: shown in the log and toasts, shown as a result card rather than thrown on the GM's map, never saved in the map file. */
     rolledBy?: string;

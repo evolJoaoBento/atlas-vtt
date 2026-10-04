@@ -54,6 +54,22 @@ describe("the dice tray's roll may be refused", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('clears the note once the dice change', async () => {
+    openTray({ onRoll: () => 'Not connected' });
+    pickD20();
+    fireEvent.click(screen.getByText('Roll'));
+    expect(await screen.findByText('Not connected')).toBeTruthy();
+    pickD20();
+    expect(screen.queryByText('Not connected')).toBeNull();
+  });
+
+  it('keeps the tray limit when maxDice is not a number', () => {
+    openTray({ maxDice: Number.NaN });
+    pickD20();
+    pickD20();
+    expect((screen.getByLabelText(/^Add a d20/) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it('holds no more dice than maxDice', () => {
     openTray({ maxDice: 2 });
     pickD20();

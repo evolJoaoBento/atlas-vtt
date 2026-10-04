@@ -6,11 +6,33 @@ import { frozenCopy } from './frozen';
 import type { Disposer } from './types/common';
 import type { DiceApi, DiceRollRequest } from './types/dice';
 
+const isString = (value: unknown): value is string => typeof value === 'string';
+const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+function isDie(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const die = value as Record<string, unknown>;
+  return isString(die.die) && isNumber(die.value) && isNumber(die.max)
+    && (die.negative === undefined || typeof die.negative === 'boolean')
+    && (die.exploded === undefined || typeof die.exploded === 'boolean');
+}
+
 function isRoll(value: unknown): value is DiceRollResult {
   if (typeof value !== 'object' || value === null) return false;
-  const roll = value as Partial<DiceRollResult>;
-  return typeof roll.id === 'string' && typeof roll.formula === 'string' && typeof roll.timestamp === 'number'
-    && typeof roll.total === 'number' && typeof roll.modifiers === 'number' && Array.isArray(roll.rolls);
+  const roll = value as Record<string, unknown>;
+  return isString(roll.id) && isString(roll.formula) && isNumber(roll.timestamp) && isNumber(roll.total) && isNumber(roll.modifiers)
+    && Array.isArray(roll.rolls) && roll.rolls.every(isDie)
+    && (roll.crit === undefined || roll.crit === null || roll.crit === 'high' || roll.crit === 'low')
+    && (roll.rolledBy === undefined || isString(roll.rolledBy))
+    && (roll.unlistedDice === undefined || isNumber(roll.unlistedDice));
+}
+
+function assertRequest(request: unknown): asserts request is DiceRollRequest {
+  const given = request as Partial<DiceRollRequest> | null;
+  const valid = typeof given === 'object' && given !== null && isString(given.formula)
+    && (given.mapPath === undefined || given.mapPath === null || isString(given.mapPath))
+    && (given.rolledBy === undefined || isString(given.rolledBy));
+  if (!valid) throw new Error('[Atlas API] roll needs { formula: string, mapPath?: string | null, rolledBy?: string }.');
 }
 
 /** `doc` is the document whose `atlas-dice-rolled` event carries Atlas's rolls; the main window's by default. */
@@ -20,6 +42,7 @@ export function diceApi(app: App, disposers: DisposerSet, doc: Document = docume
   };
   return Object.freeze({
     roll: (request: DiceRollRequest): DiceRollResult => {
+      assertRequest(request);
       const rolled = rollByRules(request.formula, mapDiceRules(app, request.mapPath ?? null));
       const result = request.rolledBy ? { ...rolled, rolledBy: request.rolledBy } : rolled;
       dispatch(result);
@@ -38,7 +61,13 @@ export function diceApi(app: App, disposers: DisposerSet, doc: Document = docume
     },
     publish: (result: DiceRollResult): void => {
       if (!isRoll(result)) throw new Error('[Atlas API] publish needs a roll: { id, timestamp, formula, rolls, modifiers, total }.');
-      dispatch(structuredClone(result));
+      let copy: DiceRollResult;
+      try {
+        copy = structuredClone(result);
+      } catch {
+        throw new Error('[Atlas API] publish needs a roll made of plain data.');
+      }
+      dispatch(copy);
     },
   });
 }

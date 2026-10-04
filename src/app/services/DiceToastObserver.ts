@@ -18,7 +18,8 @@ export class DiceToastObserver {
 
     private handleDiceRolled = (event: Event): void => {
         const result = (event as CustomEvent<DiceRollResult>).detail;
-        if (diceSceneToShow(result, this.settings.getDiceDisplay())) return;
+        // A roll by someone else is never thrown, so it makes its own card sound whatever the display.
+        if (!result.rolledBy && diceSceneToShow(result, this.settings.getDiceDisplay())) return;
         this.soundEffectService.playDiceResult(result.crit ?? null);
     };
 

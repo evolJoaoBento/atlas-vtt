@@ -101,7 +101,7 @@ describe('player window dice rolls', () => {
   });
 
   // The same display hangs on the GM's map (UIRoot): someone else sees their roll thrown on their own screen.
-  it("shows an someone else's roll as a card, never thrown, while 3D dice are on", () => {
+  it("shows someone else's roll as a card, never thrown, while 3D dice are on", () => {
     const { settings, doc } = setup();
     act(() => {
       settings.setDiceDisplay('full');

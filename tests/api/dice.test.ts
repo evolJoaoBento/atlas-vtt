@@ -91,6 +91,22 @@ describe('dice', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('publish checks the dice and the plain data of a roll', () => {
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet());
+    const made = rollFormula('1d20', () => 0.5, 1);
+    for (const bad of [{ ...made, rolls: [{}] }, { ...made, rolledBy: 42 }, { ...made, crit: 'x' }, { ...made, total: Number.NaN }]) {
+      expect(() => dice.publish(bad as unknown as DiceRollResult)).toThrow('[Atlas API] publish needs a roll');
+    }
+    expect(() => dice.publish({ ...made, extra: () => 1 } as unknown as DiceRollResult)).toThrow('plain data');
+  });
+
+  it('roll checks its request', () => {
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet());
+    for (const bad of [null, {}, { formula: 4 }, { formula: '1d4', rolledBy: 3 }, { formula: '1d4', mapPath: 3 }]) {
+      expect(() => dice.roll(bad as never)).toThrow('[Atlas API] roll needs');
+    }
+  });
+
   it('onRolled disposer stops listening', () => {
     const disposers = new DisposerSet();
     const dice = diceApi(createInMemoryApp().app, disposers);

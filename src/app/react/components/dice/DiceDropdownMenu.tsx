@@ -63,6 +63,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
     >
       <div className="atlas-dice-panel">
         <DiceTray
+          onChange={() => setNote(null)}
           {...(maxDice !== undefined ? { maxDice } : {})}
           onRoll={(formula, pool, modifier) => {
             if (onRoll) {
