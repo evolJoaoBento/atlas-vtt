@@ -12,7 +12,7 @@
 - Reloading Atlas no longer leaves the previous 3D dice in graphics memory
 - Loading a scene with explored areas no longer keeps a copy of them in graphics memory
 - The laser pointer is let go when Obsidian loses focus in the middle of a stroke, instead of staying drawn until the next click
-- A replaced map image is released from memory once the new one shows
+- When a map image is replaced, the old image is released only after its sprite has left the map, so it is never freed while still showing
 - Fog that did not change is no longer redrawn when other fog changes
 - The automatic grid colour no longer fails on a map whose texture is not an image
 - Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
