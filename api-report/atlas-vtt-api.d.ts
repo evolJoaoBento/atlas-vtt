@@ -38,6 +38,7 @@ export declare interface AtlasExtension {
     readonly id: string;
     readonly views: ViewsApi;
     readonly presentation: PresentationApi;
+    readonly dice: DiceApi;
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
@@ -216,7 +217,25 @@ declare type DiagonalRule = 'equidistant' | 'alternating' | 'euclidean';
 /** The dice of Atlas's dice tray, in tray order. */
 declare const DICE_TYPES: readonly ["d4", "d6", "d8", "d10", "d12", "d20", "d100"];
 
+export declare interface DiceApi {
+    /** Rolls and logs the roll; returns a frozen copy of the result. */
+    roll(request: DiceRollRequest): DiceRollResult;
+    /** Every roll Atlas logs: the dice tray, statblocks, `roll`, `publish`. Listeners receive frozen copies and run guarded. */
+    onRolled(listener: (result: DiceRollResult) => void): Disposer;
+    /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
+    publish(result: DiceRollResult): void;
+}
+
 declare type DiceCrit = 'high' | 'low' | null;
+
+export declare interface DiceRollRequest {
+    /** e.g. "2d6+1d20-1"; the tray's selection is turned into this with `diceFormula` from @atlas-vtt/shared/rules. A formula without dice, such as "+3", is added to the rules' default roll. */
+    formula: string;
+    /** Rolls by the rules of this map's collection (exploding dice, critical rule); Atlas's defaults otherwise. */
+    mapPath?: string | null;
+    /** Someone other than the GM: shown in the log and toasts, shown as a result card rather than thrown on the GM's map, never saved in the map file. */
+    rolledBy?: string;
+}
 
 export declare interface DiceRollResult {
     id: string;
@@ -560,7 +579,7 @@ export declare interface PresentationListener {
     presented?(scene: PresentedSceneInfo, resumed: boolean): void;
     /** The GM switched the presented view to another tab; players keep the last scene they saw. */
     held?(scene: PresentedSceneInfo): void;
-    /** Nothing is presented: stopped, the view closed, or its tab was closed. */
+    /** Nothing is presented: stopped, the view closed, or its tab was closed. `previous.held` is true when the scene was held as it was cleared. */
     cleared?(previous: PresentedSceneInfo): void;
 }
 

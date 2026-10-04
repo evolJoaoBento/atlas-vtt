@@ -7,7 +7,7 @@ export interface PresentationListener {
   presented?(scene: PresentedSceneInfo, resumed: boolean): void;
   /** The GM switched the presented view to another tab; players keep the last scene they saw. */
   held?(scene: PresentedSceneInfo): void;
-  /** Nothing is presented: stopped, the view closed, or its tab was closed. */
+  /** Nothing is presented: stopped, the view closed, or its tab was closed. `previous.held` is true when the scene was held as it was cleared. */
   cleared?(previous: PresentedSceneInfo): void;
 }
 

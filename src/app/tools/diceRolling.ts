@@ -4,7 +4,7 @@
  * and the dice rules they read, `gameSystems/diceRules`), so it needs no PIXI or UI code.
  */
 import { getDiceCrit, type DiceCrit } from './diceCrit';
-import { rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';
+import { hasDiceTerm, rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';
 import type { DiceRules } from '../types/diceRulesTypes';
 
 /** The dice of Atlas's dice tray, in tray order. */
@@ -98,4 +98,15 @@ export function rollerName(result: DiceRollResult): string | null {
   if (result.rolledBy) return result.rolledBy;
   const source = result.source;
   return source?.type === 'statblock' && source.tokenName ? source.tokenName : null;
+}
+
+/** `+3` with `1d20` gives `1d20+3`; a bare number counts as a bonus. */
+function withDefaultRoll(modifier: string, defaultRoll: string): string {
+  const bonus = modifier.replace(/\s+/g, '');
+  return bonus === '' || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
+}
+
+/** Rolls `formula` by a collection's `rules`; one without dice (`+3`) is added to the rules' default roll. */
+export function rollByRules(formula: string, rules: DiceRules, random: () => number = Math.random, now: number = Date.now()): DiceRollResult {
+  return rollFormula(hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll), random, now, rules);
 }

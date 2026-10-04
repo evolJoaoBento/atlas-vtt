@@ -1,8 +1,7 @@
 import { EventEmitter } from 'events';
 import { DEFAULT_DICE_RULES } from '../gameSystems/diceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
-import { hasDiceTerm } from './diceFormula';
-import { DICE_ROLLED_EVENT, DICE_TYPES, rollFormula, type DiceRollResult } from './diceRolling';
+import { DICE_ROLLED_EVENT, DICE_TYPES, rollByRules, type DiceRollResult } from './diceRolling';
 
 export type { DiceRollResult } from './diceRolling';
 
@@ -55,9 +54,7 @@ export class DiceTool {
 
   /** Rolls the formula; one without dice (`+3`) is added to the collection's default roll. */
   private parseAndRoll(formula: string): DiceRollResult {
-    const rules = this.getDiceRules();
-    const complete = hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll);
-    return rollFormula(complete, Math.random, Date.now(), rules);
+    return rollByRules(formula, this.getDiceRules());
   }
 
   public clearHistory(): void {
@@ -88,10 +85,4 @@ export class DiceTool {
   public getState(): DiceToolState {
     return { ...this.state };
   }
-}
-
-/** `+3` with `1d20` gives `1d20+3`; a bare number counts as a bonus. */
-function withDefaultRoll(modifier: string, defaultRoll: string): string {
-  const bonus = modifier.replace(/\s+/g, '');
-  return bonus === '' || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
 }
