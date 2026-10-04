@@ -4,17 +4,20 @@ import { mapResources } from '../app/resources/collectionResources';
 import { AssetService } from '../app/services/AssetService';
 import { mapDiceRules } from '../app/services/mapDiceRules';
 import { mapInitiativeRules } from '../app/services/mapInitiativeRules';
-import { mapConeAngle } from '../app/services/mapMeasurementSettings';
+import { collectionSettingsFor, mapConeAngle } from '../app/services/mapMeasurementSettings';
+import { SettingsService } from '../app/services/SettingsService';
 import type { ApiEvents } from './events';
+import { frozenCopy } from './frozen';
 import type { MapRules, RulesApi } from './types/rules';
 
+/** A deep-frozen copy: nothing in it is Atlas's own state. */
 export function mapRules(app: App, mapPath: string | null): MapRules {
   const assets = AssetService.getInstance(app);
-  const collectionId = mapPath ? assets.getCollectionForMap(mapPath) : null;
-  const settings = collectionId ? assets.getCollectionSettings(collectionId) : null;
-  return Object.freeze({
-    collectionId,
-    gridDefaults: settings?.gridDefaults ?? null,
+  const settings = collectionSettingsFor(assets, mapPath);
+  const gridDefaults = settings?.gridDefaults ?? null;
+  return frozenCopy<MapRules>({
+    collectionId: mapPath ? assets.getCollectionForMap(mapPath) : null,
+    gridDefaults,
     measurement: { ...resolveMeasurementSettings(settings?.gridDefaults, null), coneAngle: mapConeAngle(assets, mapPath) },
     resources: mapResources(assets, mapPath),
     conditions: settings?.conditions ?? [],
@@ -27,18 +30,36 @@ export function rulesApi(app: App): RulesApi {
   return Object.freeze({ forMap: (mapPath: string | null): MapRules => mapRules(app, mapPath) });
 }
 
-/** `rules-changed` for collection settings saves and once the asset index has loaded; returns the stop. */
-export function watchRules(app: App, events: ApiEvents): () => void {
+/**
+ * `rules-changed` for collection settings saves (with the collection id) and for edits of the user's system
+ * presets (null: any collection may differ). Returns the stop.
+ *
+ * With `indexSettled` false it also reports (null) once the asset index has loaded, and logs a failed load;
+ * the publisher passes true, having awaited the index itself, so nothing retries a failed load.
+ */
+export function watchRules(app: App, events: ApiEvents, indexSettled = false): () => void {
   let live = true;
   const ref = app.workspace.on('atlas-vtt:collection-settings-changed', (collectionId: string) => {
     if (live) events.emit('rules-changed', collectionId ?? null);
   });
-  AssetService.getInstance(app).initialize().then(
-    () => { if (live) events.emit('rules-changed', null); },
-    () => undefined,
-  );
+  const settings = SettingsService.forApp(app);
+  const presets = (): string => JSON.stringify(settings?.getSetting('systemPresets') ?? []);
+  let previous = presets();
+  const stopSettings = settings?.onChange(() => {
+    const next = presets();
+    if (next === previous) return;
+    previous = next;
+    if (live) events.emit('rules-changed', null);
+  });
+  if (!indexSettled) {
+    AssetService.getInstance(app).initialize().then(
+      () => { if (live) events.emit('rules-changed', null); },
+      (error: unknown) => { console.error('[Atlas API] The asset index failed to load:', error); },
+    );
+  }
   return (): void => {
     live = false;
     app.workspace.offref(ref);
+    stopSettings?.();
   };
 }

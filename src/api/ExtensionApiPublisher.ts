@@ -40,7 +40,7 @@ export class ExtensionApiPublisher {
     views.start();
     this.plugin.api = host.api;
     host.publish();
-    this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents), watchSettings(this.plugin.settingsService, host.apiEvents));
+    this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents, true), watchSettings(this.plugin.settingsService, host.apiEvents));
   }
 
   stop(): void {

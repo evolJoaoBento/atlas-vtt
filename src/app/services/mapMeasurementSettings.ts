@@ -5,7 +5,7 @@ import type { CollectionGridDefaults, CollectionSettings } from '../types/collec
 import type { AssetService } from './AssetService';
 
 /** The settings of the collection holding the map at `mapPath`; null for a map outside a collection. */
-function collectionSettingsFor(assetService: AssetService, mapPath: string | null): CollectionSettings | null {
+export function collectionSettingsFor(assetService: AssetService, mapPath: string | null): CollectionSettings | null {
   const collectionId = mapPath ? assetService.getCollectionForMap(mapPath) : null;
   return collectionId ? assetService.getCollectionSettings(collectionId) : null;
 }

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiEvents } from '../../src/api/events';
 import { rulesApi, watchRules } from '../../src/api/rules';
 import { DEFAULT_CONE_ANGLE } from '../../src/app/grid/measurementFormat';
+import { SettingsService } from '../../src/app/services/SettingsService';
 import { AssetService } from '../../src/app/services/AssetService';
 import { mapDiceRules } from '../../src/app/services/mapDiceRules';
 import { mapConeAngle } from '../../src/app/services/mapMeasurementSettings';
@@ -61,6 +62,31 @@ describe('rules', () => {
     expect(Object.isFrozen(inside)).toBe(true);
   });
 
+  it('C-rules-4: the result is a deep-frozen copy; mutating it throws and leaves the collection settings alone', () => {
+    const { app } = appWithBus();
+    const assets = seedCollection();
+    const inside = rulesApi(app).forMap(MAP);
+    expect(() => (inside.conditions as unknown[]).push({})).toThrow(TypeError);
+    expect(() => { (inside.gridDefaults as { coneAngle: number }).coneAngle = 1; }).toThrow(TypeError);
+    expect(() => { (inside.dice as { defaultRoll: string }).defaultRoll = 'x'; }).toThrow(TypeError);
+    expect(() => { (inside.measurement as { coneAngle: number }).coneAngle = 1; }).toThrow(TypeError);
+    const stored = assets.getCollectionSettings('c1');
+    expect(stored.conditions).toHaveLength(1);
+    expect(Object.isFrozen(stored.conditions)).toBe(false);
+    expect(stored.gridDefaults?.coneAngle).toBe(60);
+  });
+
+  it('C-rules-5: a collection without grid defaults gives null defaults and the default cone', () => {
+    const { app } = appWithBus();
+    vi.spyOn(AssetService, 'getInstance').mockReturnValue({
+      getCollectionForMap: () => 'bare', getCollectionSettings: () => ({ conditions: [] }),
+    } as unknown as AssetService);
+    const rules = rulesApi(app).forMap(MAP);
+    expect(rules.collectionId).toBe('bare');
+    expect(rules.gridDefaults).toBeNull();
+    expect(rules.measurement.coneAngle).toBe(DEFAULT_CONE_ANGLE);
+  });
+
   it('C-rules-2: rules-changed fires with the collection id when its settings are saved', () => {
     const { app, trigger } = appWithBus();
     seedCollection(() => new Promise<void>(() => undefined));
@@ -73,6 +99,37 @@ describe('rules', () => {
     stop();
     trigger('atlas-vtt:collection-settings-changed', 'c1');
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('C-rules-6: rules-changed fires with null when a user system preset is edited, not for other settings', async () => {
+    const { app } = appWithBus();
+    seedCollection();
+    const settings = new SettingsService(app, Promise.resolve());
+    await settings.initialize();
+    const events = new ApiEvents();
+    const listener = vi.fn();
+    events.on('rules-changed', listener);
+    const stop = watchRules(app, events, true);
+    settings.setDiceDisplay('card');
+    expect(listener).not.toHaveBeenCalled();
+    settings.setSetting('systemPresets', [{ id: 'mine', name: 'Mine' }]);
+    expect(listener.mock.calls).toEqual([[null]]);
+    stop();
+    settings.setSetting('systemPresets', []);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('C-rules-7: a settled index is not loaded again; an unsettled one that fails is logged', async () => {
+    const { app } = appWithBus();
+    const initialize = vi.fn(() => Promise.reject(new Error('unreadable')));
+    seedCollection(initialize);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    watchRules(app, new ApiEvents(), true)();
+    expect(initialize).not.toHaveBeenCalled();
+    watchRules(app, new ApiEvents())();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(logged).toHaveBeenCalledTimes(1);
   });
 
   it('C-rules-3: rules-changed fires with null once the asset index has loaded, and the watch leaves no handler after stop', async () => {
