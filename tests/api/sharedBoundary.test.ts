@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ENTRIES = ['grid', 'draw', 'rules', 'dice3d'] as const;
-const FORBIDDEN = /^(obsidian|pixi\.js|pixi-viewport|pixi-filters|react|react-dom|zustand|zundo|howler|@codemirror\/.*)$/;
+/** The only packages an entry may import: dice3d renders with three; the rest import relative modules only. */
+const ALLOWED_PACKAGES: Record<(typeof ENTRIES)[number], readonly string[]> = { grid: [], draw: [], rules: [], dice3d: ['three'] };
 const IMPORT = /(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\sfrom\s+)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts'];
 
@@ -42,10 +43,9 @@ function reach(entry: string): { files: Set<string>; packages: Set<string> } {
 
 describe('shared modules package', () => {
   for (const entry of ENTRIES) {
-    it(`${entry} imports nothing from Obsidian, PIXI or React`, () => {
+    it(`${entry} imports only relative modules and its allowed packages`, () => {
       const { packages } = reach(entry);
-      expect([...packages].filter((name) => FORBIDDEN.test(name))).toEqual([]);
-      if (entry !== 'dice3d') expect(packages.has('three')).toBe(false);
+      expect([...packages].filter((name) => !ALLOWED_PACKAGES[entry].includes(name))).toEqual([]);
     });
   }
 

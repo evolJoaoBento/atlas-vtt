@@ -5,6 +5,10 @@ vi.mock('../../src/app/services/AssetService', () => ({
   AssetService: { getInstance: (): { initialize: () => Promise<void> } => ({ initialize }) },
 }));
 
+vi.mock('../../src/api/atlasViewHooks', () => ({
+  ATLAS_VIEW_HOOKS: { viewType: 'atlas-vtt', isMapView: (): boolean => false, activeView: (): null => null },
+}));
+
 import type AtlasVTTPlugin from '../../main';
 import { ExtensionApiPublisher } from '../../src/api/ExtensionApiPublisher';
 import { fakeApp, fakePlugin } from './apiFakes';
