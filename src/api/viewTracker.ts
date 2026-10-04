@@ -1,4 +1,5 @@
 import type { App } from 'obsidian';
+import type { LaserHub } from '../app/pixi/laser/LaserHub';
 import type { CameraViewport } from '../app/services/presentedCamera';
 import type { ViewAtlasStore } from '../app/storeFactory';
 import type { TabMetaStore } from '../app/stores/tabMetaStore';
@@ -13,6 +14,7 @@ export interface TrackedMapView {
   readonly renderer: {
     getBackgroundSprite(): { width: number; height: number; destroyed: boolean } | null;
     getViewportInstance?(): CameraViewport | null;
+    getLaserHub?(): LaserHub;
   } | null;
   readonly isClosed: boolean;
   register(callback: () => void): void;

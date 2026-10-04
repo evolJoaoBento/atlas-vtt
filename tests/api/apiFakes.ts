@@ -5,6 +5,7 @@ import { ApiEvents } from '../../src/api/events';
 import type { ConnectingPlugin } from '../../src/api/types/api';
 import { ViewTracker, type TrackedMapView } from '../../src/api/viewTracker';
 import type { SettingsService } from '../../src/app/services/SettingsService';
+import type { LaserHub } from '../../src/app/pixi/laser/LaserHub';
 import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
@@ -46,8 +47,15 @@ export function fakeServices(app: App): ApiServices {
 
 export interface FakeView extends TrackedMapView { close(): void }
 
-/** A map view with a real store and tab meta, a 1000 x 500 background and no viewport; `close()` runs what `register` was given; `switchToTab` activates the tab and loads its map. */
-export function fakeView(viewId: string, viewport: CameraViewport | null = null): FakeView {
+export interface FakeViewOptions {
+  viewport?: CameraViewport | null;
+  /** The view's lasers; without one the renderer has none. */
+  laserHub?: LaserHub;
+}
+
+/** A map view with a real store and tab meta, a 1000 x 500 background and no viewport unless `options` gives one; `close()` runs what `register` was given; `switchToTab` activates the tab and loads its map. */
+export function fakeView(viewId: string, options: FakeViewOptions = {}): FakeView {
+  const { viewport = null, laserHub } = options;
   const { app } = createInMemoryApp();
   const closers: Array<() => void> = [];
   let closed = false;
@@ -56,7 +64,7 @@ export function fakeView(viewId: string, viewport: CameraViewport | null = null)
   tabs.getState().setActiveTab(tabId);
   const view: FakeView = {
     viewId, atlasStore: createViewAtlasStore(app, viewId), tabMetaStore: tabs,
-    renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport },
+    renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport, ...(laserHub ? { getLaserHub: () => laserHub } : {}) },
     get isClosed(): boolean { return closed; },
     register: (callback: () => void): void => { closers.push(callback); },
     switchToTab: (tabId: string): Promise<void> => {

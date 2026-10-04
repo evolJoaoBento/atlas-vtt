@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.3.0";
+export declare const API_VERSION = "1.4.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -39,6 +39,7 @@ export declare interface AtlasExtension {
     readonly views: ViewsApi;
     readonly presentation: PresentationApi;
     readonly dice: DiceApi;
+    readonly lasers: LasersApi;
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
@@ -474,6 +475,22 @@ export declare type Json = null | boolean | number | string | Json[] | {
     [key: string]: Json;
 };
 
+export declare interface LasersApi {
+    /**
+     * Hears the GM's own laser in a view: each point of it as it is drawn (world units), and when it is let go.
+     * Listeners receive frozen events and run guarded; they end when the view closes. An unknown view, or one
+     * without a laser, gives a disposer that does nothing.
+     */
+    onLocal(viewId: ViewId, listener: (event: LocalLaserEvent) => void): Disposer;
+    /**
+     * Draws someone else's laser in a view, fading like Atlas's own. Send the newest points as they come:
+     * a laser that is not heard from for a second is let go, and lasers are never saved. A message counts
+     * its newest 64 points, a gap in time at most 2 seconds, and 32 lasers show at once; the rest is ignored.
+     * Does nothing for an unknown view; throws when `laser` is malformed.
+     */
+    show(viewId: ViewId, laser: RemoteLaser): void;
+}
+
 declare type LightAnimation = 'none' | 'torch' | 'candle' | 'pulse' | 'magic';
 
 /** What a light gives off. Distances are game units (feet, metres…), converted at render time. */
@@ -527,6 +544,20 @@ declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness'
  * there outranks (`lightLevelAt`): no ambient light and no such light counts in it.
  */
 export declare type LightLevel = 'bright' | 'dim' | 'dark' | 'magical-dark';
+
+/**
+ * One Atlas view's lasers for online play: the GM's own as it is drawn (`LaserPointerRenderer`
+ * emits, `LaserRelay` listens), and other people's to show (`LaserRelay` shows,
+ * `RemoteLaserRenderer` draws). PIXI-free.
+ */
+/** The GM's laser reached a point (world units), or was let go. */
+export declare type LocalLaserEvent = {
+    kind: 'point';
+    x: number;
+    y: number;
+} | {
+    kind: 'lift';
+};
 
 export declare interface MapRules {
     /** The collection holding the map; null outside a collection. */
@@ -602,6 +633,19 @@ export declare interface PresentedSceneInfo {
 declare interface RangeBand {
     name: string;
     maxSquares: number;
+}
+
+/** New points of someone else's laser, in their colour. */
+export declare interface RemoteLaser {
+    from: string;
+    color: string;
+    points: ReadonlyArray<{
+        x: number;
+        y: number;
+    }>;
+    lifted: boolean;
+    /** Milliseconds from each point to the one before it in the stroke, when the sender timed them. */
+    dt?: ReadonlyArray<number>;
 }
 
 export declare interface ResourceDefinition {

@@ -25,6 +25,11 @@ import { SelectionManager } from "./pixi/SelectionManager"; // Import SelectionM
 import { FogOfWarRenderer } from "./pixi/fog/FogOfWarRenderer";
 import { MeasureRenderer } from "./pixi/MeasureRenderer"; // Import MeasureRenderer
 import { LaserPointerRenderer } from "./pixi/LaserPointerRenderer"; // Import LaserPointerRenderer
+import { CanvasLaserBeam } from "./pixi/laser/CanvasLaserBeam";
+import { LaserBeam } from "./pixi/laser/LaserBeam";
+import { LaserHub } from "./pixi/laser/LaserHub";
+import { RemoteLaserRenderer } from "./pixi/laser/RemoteLaserRenderer";
+import { usesCanvasRenderer } from "./pixi/utils/rendererType";
 import { DrawingRenderer } from "./pixi/DrawingRenderer"; // Import DrawingRenderer
 import { DrawingInteraction } from "./pixi/DrawingInteraction";
 import { TextRenderer } from "./pixi/TextRenderer"; // Import TextRenderer
@@ -57,6 +62,9 @@ export class PixiRendererOrchestrator { // Renamed class
   private fogRenderer?: FogOfWarRenderer; // Add FogRenderer instance
   private measureRenderer?: MeasureRenderer; // Add MeasureRenderer instance
   private laserPointerRenderer?: LaserPointerRenderer; // Add LaserPointerRenderer instance
+  /** This view's lasers; one hub for the view's lifetime, so the presented scene and the extension API keep reaching it. */
+  private readonly laserHub = new LaserHub();
+  private remoteLaserRenderer?: RemoteLaserRenderer; // Other people's lasers, shown through the hub
   private drawingRenderer?: DrawingRenderer; // Add DrawingRenderer instance
   private drawingInteraction?: DrawingInteraction;
   private textRenderer?: TextRenderer; // Add TextRenderer instance
@@ -415,10 +423,20 @@ export class PixiRendererOrchestrator { // Renamed class
       this.pixiAppManager.getCanvasElement(),
       // Looked up on every draw: a plugin reload replaces the settings service.
       () => SettingsService.forApp(this.obsApp)?.getLaserPointerSettings() ?? DEFAULT_LASER_POINTER_SETTINGS,
+      this.laserHub,
     );
     const laserPointerContainer = this.laserPointerRenderer.getContainer();
     viewport.addChild(laserPointerContainer);
     laserPointerContainer.zIndex = 2000;
+
+    // Other people's lasers, above the map like the GM's own.
+    this.remoteLaserRenderer?.destroy();
+    this.remoteLaserRenderer = new RemoteLaserRenderer({
+      ticker: this.app.ticker, zoom: () => viewport.scale.x, hub: this.laserHub,
+      createBeam: () => (usesCanvasRenderer(this.app.renderer) ? new CanvasLaserBeam() : new LaserBeam()),
+    });
+    viewport.addChild(this.remoteLaserRenderer.container);
+    this.remoteLaserRenderer.container.zIndex = 2000;
 
     // Initialize DrawingRenderer (ink strokes; self-manages activation via store subscription)
     this.drawingRenderer = new DrawingRenderer(viewport, this.eventBus, this.store);
@@ -774,6 +792,7 @@ export class PixiRendererOrchestrator { // Renamed class
   getCanvasElement(): HTMLCanvasElement { return this.pixiAppManager.getCanvasElement(); }
   getGridSystem(): GridSystem | null { return this.gridSystem || null; }
   getBackgroundSprite(): Sprite | null { return this.backgroundSprite; }
+  getLaserHub(): LaserHub { return this.laserHub; }
   getTokenRenderer(): TokenRenderer | null { return this.tokenRenderer || null; }
 
   /**
@@ -1026,6 +1045,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.fogRenderer?.destroy(); // Destroy FogRenderer
     this.measureRenderer?.destroy(); // Destroy MeasureRenderer
     this.laserPointerRenderer?.destroy(); // Destroy LaserPointerRenderer
+    this.remoteLaserRenderer?.destroy();
     this.drawingRenderer?.destroy(); // Destroy DrawingRenderer
     this.drawingInteraction?.destroy();
     this.textRenderer?.destroy(); // Destroy TextRenderer

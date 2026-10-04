@@ -8,6 +8,7 @@ export * from '../app/pixi/textBoxLayout';
 export * from '../app/pixi/mapIcons';
 export * from '../app/pixi/laser/laserBeamGeometry';
 export * from '../app/pixi/laser/laserTrail';
+export * from '../app/pixi/laser/remoteLasers';
 export * from '../app/pixi/token-renderer/tokenUiLayout';
 export * from '../app/pixi/token-renderer/conditionBadgeLayout';
 export * from '../app/pixi/token-renderer/downedLook';

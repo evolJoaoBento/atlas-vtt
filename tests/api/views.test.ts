@@ -103,7 +103,7 @@ describe('views', () => {
 
   it('C-views-6: closing a view disposes its subscribe and watchCamera registrations; nothing fires after', () => {
     const viewport = new FakeViewport();
-    const view = fakeView('v1', viewport);
+    const view = fakeView('v1', { viewport });
     const { api, disposers } = setup([view]);
     loadMap(view);
     const snapshots = vi.fn();
@@ -142,7 +142,7 @@ describe('views', () => {
 
   it('C-views-7: a throwing listener is logged and stops neither the store nor later subscribers', () => {
     const viewport = new FakeViewport();
-    const view = fakeView('v1', viewport);
+    const view = fakeView('v1', { viewport });
     const { api } = setup([view]);
     loadMap(view);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
