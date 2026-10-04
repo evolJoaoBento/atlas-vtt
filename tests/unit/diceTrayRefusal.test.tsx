@@ -65,9 +65,10 @@ describe("the dice tray's roll may be refused", () => {
 
   it('keeps the tray limit when maxDice is not a number', () => {
     openTray({ maxDice: Number.NaN });
-    pickD20();
-    pickD20();
-    expect((screen.getByLabelText(/^Add a d20/) as HTMLButtonElement).disabled).toBe(false);
+    for (const sides of [20, 12, 10, 8, 6]) {
+      for (let i = 0; i < 20; i++) fireEvent.click(screen.getByLabelText(new RegExp(`^Add a d${sides}(,|$)`)));
+    }
+    expect((screen.getByLabelText('Add a d4') as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('holds no more dice than maxDice', () => {
