@@ -14,6 +14,7 @@ vi.mock('../../src/app/plugin/cleanupMissingAssets', () => ({ cleanupMissingAsse
 import { AtlasView } from '../../src/app/atlas-view';
 import { registerCommands, type CommandDependencies } from '../../src/app/plugin/registerCommands';
 import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
+import { addPresentationTarget } from '../../src/app/services/presentationTargets';
 import { presentedScene } from '../../src/app/services/PresentedScene';
 import { presentActiveTabToPlayers, presentViewToPlayers, stopPresenting } from '../../src/app/services/presentToPlayers';
 
@@ -67,6 +68,17 @@ describe('Present to players', () => {
     expect(presenter.presentTabInPlayerWindow).toHaveBeenCalledWith((view as { app: object }).app, view, tabId);
     expect(presentedScene.current()).toBeNull();
     expect(Notice).not.toHaveBeenCalledWith('Players see Tavern');
+  });
+
+  it('presents without the player window while a target is active, and says players see it', async () => {
+    playerWindowStore.setState({ isOpen: false });
+    const stop = addPresentationTarget({ id: 't', label: 'online players', isActive: () => true });
+    const { view, tabId } = fakeView();
+    await presentViewToPlayers(view);
+    stop();
+    expect(presenter.presentTabInPlayerWindow).not.toHaveBeenCalled();
+    expect(presentedScene.current()?.tabId).toBe(tabId);
+    expect(Notice).toHaveBeenCalledWith('Players see Tavern');
   });
 
   it('waits for the scene to finish loading', async () => {

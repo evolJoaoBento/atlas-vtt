@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
-import { ChevronDown, Eye, Plus, X } from 'lucide-react';
+import React, { useState, useSyncExternalStore } from 'react';
+import { ChevronDown, Eye, EyeOff, Plus, X } from 'lucide-react';
 import { useStore } from 'zustand';
 import { cn } from '../../../utils/cn';
 import { useSceneTabStore } from '../hooks/useSceneTabStore';
 import { useTabStripOverflow } from '../hooks/useTabStripOverflow';
-import { playerWindowStore } from '../../stores/playerWindowStore';
+import { usePresentedTabId } from '../hooks/usePresentedTabId';
+import { activePresentationTarget, subscribePresentationTargets } from '../../services/presentationTargets';
+import { stopPresenting } from '../../services/presentToPlayers';
 import type { SceneTab } from '../../types/sceneTabTypes';
 import { LabelTooltip, TooltipProvider } from '../../packages/components/primitives/tooltip';
 import './scene-tab-bar.scss';
+
+type MenuPosition = { x: number; y: number };
 
 interface SceneTabBarProps {
   onSwitchTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
   onAddTab: () => void;
   onPresentTab: (tabId: string) => void;
+  /** The eye's context menu; returns false when it offers none, so the right-click is left alone. */
+  onPresentTabMenu?: ((tabId: string, position: MenuPosition) => boolean) | undefined;
   /** Lists every open map; offered while the tabs do not fit the bar. */
   onShowAllTabs: () => void;
 }
@@ -24,10 +30,12 @@ interface TabActionButtonProps {
   /** When defined the button is a toggle and stays visible while active. */
   isActive?: boolean;
   onClick: () => void;
+  /** Returns true when it opened a menu of its own. */
+  onContextMenu?: ((position: MenuPosition) => boolean) | undefined;
 }
 
 /** Icon button inside a tab; keeps its events from activating or closing the tab. */
-function TabActionButton({ icon: Icon, label, isActive, onClick }: TabActionButtonProps): React.ReactElement {
+function TabActionButton({ icon: Icon, label, isActive, onClick, onContextMenu }: TabActionButtonProps): React.ReactElement {
   return (
     <LabelTooltip side="bottom" label={label}>
       <button
@@ -36,6 +44,11 @@ function TabActionButton({ icon: Icon, label, isActive, onClick }: TabActionButt
         onClick={(e) => {
           e.stopPropagation();
           onClick();
+        }}
+        onContextMenu={(e) => {
+          if (!onContextMenu?.({ x: e.clientX, y: e.clientY })) return;
+          e.preventDefault();
+          e.stopPropagation();
         }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
@@ -47,17 +60,22 @@ function TabActionButton({ icon: Icon, label, isActive, onClick }: TabActionButt
   );
 }
 
-export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, onShowAllTabs }: SceneTabBarProps): React.ReactElement | null {
+export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, onPresentTabMenu, onShowAllTabs }: SceneTabBarProps): React.ReactElement | null {
   const store = useSceneTabStore();
 
   const tabs = useStore(store, (s) => s.tabs);
   const activeTabId = useStore(store, (s) => s.activeTabId);
-  const presentedTabId = useStore(playerWindowStore, (s) => s.presentedTabId);
-  const isPlayerWindowOpen = useStore(playerWindowStore, (s) => s.isOpen);
+  const presentedTabId = usePresentedTabId(store);
+  const target = useSyncExternalStore(subscribePresentationTargets, activePresentationTarget);
   const [strip, setStrip] = useState<HTMLDivElement | null>(null);
   const { overflows, hiddenBefore, hiddenAfter } = useTabStripOverflow(strip, activeTabId);
 
   if (tabs.length === 0) return null;
+
+  const presentLabel = (tab: SceneTab, isPresented: boolean): string => {
+    if (isPresented) return target ? `Stop presenting ${tab.displayName}` : `${tab.displayName} is shown to players`;
+    return target ? `Present ${tab.displayName} to ${target.label}` : `Show ${tab.displayName} on the player view`;
+  };
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -74,7 +92,7 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
         >
           {tabs.map((tab: SceneTab) => {
             const isActive = tab.id === activeTabId;
-            const isPresented = isPlayerWindowOpen && tab.id === presentedTabId;
+            const isPresented = tab.id === presentedTabId;
             const stateClass = isActive
               ? 'atlas-scene-tab--active'
               : tab.isLoaded
@@ -104,10 +122,12 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
               >
                 {/* Show and close sit at opposite ends, so one is never clicked for the other */}
                 <TabActionButton
-                  icon={Eye}
-                  label={isPresented ? `${tab.displayName} is shown on the player view` : `Show ${tab.displayName} on the player view`}
+                  icon={isPresented && target ? EyeOff : Eye}
+                  label={presentLabel(tab, isPresented)}
                   isActive={isPresented}
-                  onClick={() => onPresentTab(tab.id)}
+                  // With a target active, the presented scene's eye hides it again.
+                  onClick={() => (isPresented && target ? stopPresenting() : onPresentTab(tab.id))}
+                  onContextMenu={onPresentTabMenu && ((position) => onPresentTabMenu(tab.id, position))}
                 />
                 <LabelTooltip side="bottom" label={tab.filePath}>
                   <span className="atlas-scene-tab__name">{tab.displayName}</span>
