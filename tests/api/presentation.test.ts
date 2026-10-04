@@ -1,0 +1,89 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class AtlasView {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
+vi.mock('../../src/app/dashboard-view', () => ({ DASHBOARD_VIEW_TYPE: 'dashboard' }));
+vi.mock('../../src/app/services/PlayerWindowPresenter', () => ({ presentActiveTabInPlayerWindow: vi.fn(), presentTabInPlayerWindow: vi.fn() }));
+vi.mock('obsidian', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), Notice: vi.fn() }));
+
+import { AtlasView } from '../../src/app/atlas-view';
+import { DisposerSet } from '../../src/api/disposers';
+import { presentationApi } from '../../src/api/presentation';
+import { presentedScene } from '../../src/app/services/PresentedScene';
+import { activePresentationTarget } from '../../src/app/services/presentationTargets';
+import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
+import { fakeView, loadMap as load, trackerWith, type FakeView } from './apiFakes';
+
+function setupWith(view: FakeView): { presentation: ReturnType<typeof presentationApi>; disposers: DisposerSet } {
+  // The present path recognises Atlas's views by class.
+  Object.setPrototypeOf(view, AtlasView.prototype);
+  load(view);
+  const disposers = new DisposerSet();
+  return { presentation: presentationApi(trackerWith([view]).tracker, disposers), disposers };
+}
+
+describe('presentation', () => {
+  beforeEach(() => {
+    presentedScene.clear();
+    playerWindowStore.setState({ isOpen: true });
+  });
+  afterEach(() => { presentedScene.clear(); });
+
+  it('C-pres-1: present returns false for a closed view; held on tab switch; resumed only after the tab loaded; cleared when the tab closes', async () => {
+    const view = fakeView('v1');
+    const { presentation } = setupWith(view);
+    const seen: string[] = [];
+    presentation.subscribe({
+      presented: (scene, resumed) => seen.push(`presented:${scene.tabId}:${resumed}`),
+      held: (scene) => seen.push(`held:${scene.tabId}`),
+      cleared: () => seen.push('cleared'),
+    });
+    const tabId = view.tabMetaStore.getState().activeTabId!;
+    expect(await presentation.present('v1', tabId)).toBe(true);
+    expect(presentation.current()).toMatchObject({ viewId: 'v1', tabId, mapPath: 'maps/a.atlasmap', held: false });
+    expect(Object.isFrozen(presentation.current())).toBe(true);
+    const other = view.tabMetaStore.getState().addTab('maps/b.atlasmap', 'B');
+    expect(seen.at(-1)).toBe(`held:${tabId}`);
+    view.atlasStore.setState({ isMapLoading: true });
+    view.tabMetaStore.getState().setActiveTab(tabId);
+    await Promise.resolve();
+    expect(seen.at(-1)).toBe(`held:${tabId}`);           // still loading: no resume
+    load(view);
+    await Promise.resolve();
+    expect(seen.at(-1)).toBe(`presented:${tabId}:true`);
+    view.tabMetaStore.getState().removeTab(tabId);
+    expect(seen.at(-1)).toBe('cleared');
+    view.close();
+    expect(await presentation.present('v1')).toBe(false);
+    void other;
+  });
+
+  it('C-pres-2: addTarget makes a target active for the eye; its disposer removes it', () => {
+    const { presentation } = setupWith(fakeView('v1'));
+    const stop = presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
+    expect(activePresentationTarget()?.label).toBe('online players');
+    stop();
+    stop();
+    expect(activePresentationTarget()).toBeNull();
+  });
+
+  it('present resolves false when the scene stays held (its map did not load), and stop clears the scene', async () => {
+    const view = fakeView('v1');
+    const { presentation } = setupWith(view);
+    view.atlasStore.setState({ mapLoaded: false });
+    view.switchToTab = (): Promise<void> => Promise.resolve();
+    expect(await presentation.present('v1')).toBe(false);
+    load(view);
+    expect(await presentation.present('v1')).toBe(true);
+    presentation.stop();
+    expect(presentation.current()).toBeNull();
+  });
+
+  it('removes its listener and target when the extension is disposed', () => {
+    const { presentation, disposers } = setupWith(fakeView('v1'));
+    const listener = vi.fn();
+    presentation.subscribe({ cleared: listener });
+    presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
+    disposers.disposeAll();
+    expect(activePresentationTarget()).toBeNull();
+  });
+});

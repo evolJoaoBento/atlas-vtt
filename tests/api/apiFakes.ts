@@ -46,7 +46,7 @@ export function fakeServices(app: App): ApiServices {
 
 export interface FakeView extends TrackedMapView { close(): void }
 
-/** A map view with a real store and tab meta, a 1000 x 500 background and no viewport; `close()` runs what `register` was given. */
+/** A map view with a real store and tab meta, a 1000 x 500 background and no viewport; `close()` runs what `register` was given; `switchToTab` activates the tab and loads its map. */
 export function fakeView(viewId: string, viewport: CameraViewport | null = null): FakeView {
   const { app } = createInMemoryApp();
   const closers: Array<() => void> = [];
@@ -54,13 +54,19 @@ export function fakeView(viewId: string, viewport: CameraViewport | null = null)
   const tabs = createTabMetaStore();
   const tabId = tabs.getState().addTab('maps/a.atlasmap', 'A');
   tabs.getState().setActiveTab(tabId);
-  return {
+  const view: FakeView = {
     viewId, atlasStore: createViewAtlasStore(app, viewId), tabMetaStore: tabs,
     renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport },
     get isClosed(): boolean { return closed; },
     register: (callback: () => void): void => { closers.push(callback); },
+    switchToTab: (tabId: string): Promise<void> => {
+      tabs.getState().setActiveTab(tabId);
+      loadMap(view);
+      return Promise.resolve();
+    },
     close: (): void => { closed = true; for (const callback of closers.splice(0)) callback(); },
   };
+  return view;
 }
 
 /** An app whose workspace holds `views` (open ones only) and reports `active()` as the active view; `layoutChanged()` fires `layout-change`. */

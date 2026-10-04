@@ -16,6 +16,7 @@ export interface TrackedMapView {
   } | null;
   readonly isClosed: boolean;
   register(callback: () => void): void;
+  switchToTab(tabId: string): Promise<void>;
 }
 
 /** How the tracker recognises Atlas map views; injected so it never loads the view's code itself (`atlasViewHooks.ts` holds the real ones). */

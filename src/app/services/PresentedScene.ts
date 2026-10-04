@@ -12,6 +12,8 @@ interface BackgroundSprite {
 
 /** What `PresentedScene` needs of an Atlas view; `AtlasView` provides it. */
 export interface PresentedView {
+  /** Identifies the view to the extension API; never reused. */
+  readonly viewId: string;
   readonly tabMetaStore: TabMetaStore;
   readonly atlasStore: StoreApi<ViewAtlasState>;
   register(callback: () => void): void;

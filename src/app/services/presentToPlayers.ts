@@ -2,7 +2,7 @@ import { Notice, type App } from 'obsidian';
 import { AtlasView } from '../atlas-view';
 import { playerWindowStore } from '../stores/playerWindowStore';
 import { presentTabInPlayerWindow } from './PlayerWindowPresenter';
-import { presentedScene, whenMapLoaded } from './PresentedScene';
+import { presentedScene, whenMapLoaded, type PresentedView } from './PresentedScene';
 import { activePresentationTarget } from './presentationTargets';
 
 /**
@@ -37,7 +37,7 @@ export function presentActiveTabToPlayers(app: App): Promise<void> {
  * Switch `view` to the scene tab `tabId`, then present it to players without
  * opening the player window.
  */
-export async function presentTabToPlayers(view: AtlasView, tabId: string): Promise<void> {
+export async function presentTabToPlayers(view: PresentedView & { switchToTab(tabId: string): Promise<void> }, tabId: string): Promise<void> {
   await view.switchToTab(tabId);
   if (view.isClosed || view.tabMetaStore.getState().activeTabId !== tabId) return;
   await presentViewToPlayers(view);
