@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { cellCenterAt } from '../../src/app/grid/gridDistance';
 import { axialToPixel, createHexLayout, hexCircumradius } from '../../src/app/grid/hexGeometry';
 import {
-  CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
+  arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../src/app/pixi/measureGeometry';
 import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
 
@@ -49,6 +49,10 @@ describe('measure geometry', () => {
     expect(cone.left.x).toBeCloseTo(70.71);
     expect(cone.left.y).toBeCloseTo(-70.71);
     expect(cone.right.y).toBeCloseTo(70.71);
+    const arc = arcPoints({ x: 0, y: 0 }, 100, cone.startAngle, cone.endAngle, 4);
+    expect(arc).toHaveLength(5);
+    expect(arc[0]!.x).toBeCloseTo(cone.left.x);
+    expect(arc[2]).toEqual({ x: 100, y: expect.closeTo(0) });
   });
 
   it('opens a cone by the given angle, 60 degrees here', () => {

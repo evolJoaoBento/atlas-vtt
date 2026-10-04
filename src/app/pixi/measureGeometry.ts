@@ -104,3 +104,15 @@ export function coneGeometry(start: Point, end: Point, opening: number = CONE_AN
   const at = (angle: number): Point => ({ x: start.x + radius * Math.cos(angle), y: start.y + radius * Math.sin(angle) });
   return { radius, startAngle, endAngle, left: at(startAngle), right: at(endAngle) };
 }
+
+/**
+ * `segments + 1` points along an arc, for surfaces that draw arcs as polylines.
+ * Part of the shared drawing contract (`@atlas-vtt/shared/draw`); Atlas's own renderer draws arcs natively.
+ */
+export function arcPoints(center: Point, radius: number, startAngle: number, endAngle: number, segments: number): Point[] {
+  const steps = Math.max(1, Math.round(segments));
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const angle = startAngle + ((endAngle - startAngle) * i) / steps;
+    return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) };
+  });
+}

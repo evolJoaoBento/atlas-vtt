@@ -6,6 +6,8 @@
  * and `height` are not used for drawing.
  */
 export const DEFAULT_TEXT_PADDING = 8;
+/** Line spacing in font sizes, for surfaces that cannot measure the font; part of the shared drawing contract (`@atlas-vtt/shared/draw`). */
+export const TEXT_LINE_SPACING = 1.2;
 
 export interface TextBoxSource {
   backgroundColor?: string | null | undefined;
