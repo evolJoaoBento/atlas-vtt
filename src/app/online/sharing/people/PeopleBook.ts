@@ -173,6 +173,11 @@ export class PeopleBook {
     return placeholder ? placeholderKey(placeholder.id) : null;
   }
 
+  /** Whether a stored key names a placeholder that is not linked to anyone yet. */
+  unlinkedKey(key: string): boolean {
+    return !this.byKey(key) && placeholderOfKey(this.placeholderList, key) !== null;
+  }
+
   /** Adds someone not met yet. Returns what is wrong with the name (it is never renamed silently), or null. */
   addPlaceholder(name: string): string | null {
     const cleaned = normalizePlayerName(name);

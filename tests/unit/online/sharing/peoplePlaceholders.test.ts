@@ -11,6 +11,7 @@ import { IdentityDesk } from '../../../../src/app/online/sharing/people/Identity
 import { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { parsePeopleData, personKey } from '../../../../src/app/online/sharing/people/peopleTypes';
 import { parsePlaceholders, placeholderKey, type Placeholder } from '../../../../src/app/online/sharing/people/placeholderTypes';
+import { unlinkedMapWarnings } from '../../../../src/app/online/sharing/ui/unlinkedWarnings';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { noteCatalogue, nodeIdentityCrypto as crypto, testPeople, testPerson, testTable } from './sharingFixtures';
 
@@ -154,7 +155,7 @@ describe('a placeholder grants nothing', () => {
     const key = placeholderKey(named(real, 'Dave').id);
     const eve = real.admit(T, 'Eve', D1);
     expect(mapShareReaches(share(key, 'people'), { tableId: T, personId: eve.personId }, real)).toBe(false);
-    expect(mapShareReaches(share(key, 'except'), { tableId: T, personId: eve.personId }, real)).toBe(true);
+    expect(mapShareReaches(share(key, 'except'), { tableId: T, personId: eve.personId }, real)).toBe(false);
     const linked = real.admitAsPlaceholder(T, named(real, 'Dave').id, D2)!;
     const recipientOf = { tableId: T, personId: linked.personId };
     expect(mapShareReaches(share(key, 'people'), recipientOf, real)).toBe(true);
@@ -319,5 +320,29 @@ describe('stored map-share keys follow people', () => {
     // A person linked by an older version keeps the name key as an alias.
     const linked = again.admitAsPlaceholder(T, id, D1)!;
     expect(again.currentKey('placeholder:dave')).toBe(personKey(T, linked.personId));
+  });
+});
+
+describe('a map shared with everyone except an unlinked placeholder', () => {
+  const share = (except: string[]): MapShare => ({ item: 'i'.repeat(22), everyone: true, people: [], except, mode: 'full', notes: [] });
+
+  it('reaches nobody until Dave is linked; then everyone but the real Dave', async () => {
+    const people = book();
+    await people.ready();
+    people.addPlaceholder('Dave');
+    const key = placeholderKey(named(people, 'Dave').id);
+    const eve = people.seen(T, 'eve', 'Eve');
+    const arrived = people.seen(T, 'dave2', 'Dave');
+    expect(arrived.name).toBe('Dave (2)');
+    const asDave2 = { tableId: T, personId: 'dave2' };
+    const asEve = { tableId: eve.tableId, personId: 'eve' };
+    expect(mapShareReaches(share([key]), asDave2, people)).toBe(false);
+    expect(mapShareReaches(share([key]), asEve, people)).toBe(false);
+    expect(unlinkedMapWarnings([key], people)).toEqual(['Dave isn’t linked yet; this map is kept back from everyone until you link Dave.']);
+    people.linkPlaceholder(personKey(T, 'dave2'), named(people, 'Dave').id);
+    expect(mapShareReaches(share([key]), asDave2, people)).toBe(false);
+    expect(mapShareReaches(share([key]), asEve, people)).toBe(true);
+    expect(unlinkedMapWarnings([key], people)).toEqual([]);
+    expect(unlinkedMapWarnings([personKey(T, 'gone')], people)).toEqual([]);
   });
 });

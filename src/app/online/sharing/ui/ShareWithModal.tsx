@@ -22,6 +22,7 @@ import { formatShareRule, parseShareRule, SHARE_PROPERTY, unknownRuleNames } fro
 import { writeNoteShare } from '../model/shareWriting';
 import { trustedSections, type SectionTrust } from '../model/sectionTrust';
 import { partError, partWarnings } from './partWarnings';
+import { unlinkedExceptWarning, unlinkedMapWarnings } from './unlinkedWarnings';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
 
 export const SHARE_DIALOG_TITLE = 'Share with';
@@ -31,7 +32,6 @@ const FULL_CONFIRM = {
   confirmLabel: 'Share full map',
 };
 export const REMOVED_PERSON_LABEL = 'Removed or unknown person';
-export const unlinkedExceptWarning = (name: string): string => `${name} isn’t linked yet; this part is kept back from everyone until you link ${name}.`;
 export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
 
 export interface ShareWithDeps {
@@ -85,7 +85,7 @@ class ShareWithModal extends Modal {
     const warnings = [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
-      ...unlinkedExceptNames(text, this.deps.people).map(unlinkedExceptWarning),
+      ...unlinkedExceptNames(text, this.deps.people).map((name) => unlinkedExceptWarning(name)),
       ...partWarnings(problems),
     ];
     return { warnings, error: partError(problems) };
@@ -156,7 +156,7 @@ class ShareWithModal extends Modal {
         initial={{ everyone: share?.everyone ?? false, people: current(share?.people ?? []), except: current(share?.except ?? []) }}
         map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [], ...(source.lit && { playerSafeRefused: LIT_MAP_NOT_PLAYER_SAFE }) }}
         preview={null}
-        warnings={[]}
+        warnings={unlinkedMapWarnings(share?.except ?? [], people)}
         onCancel={() => this.close()}
         onSave={(result) => { void this.saveMap(scene, share, result, source.lit); }}
       />,

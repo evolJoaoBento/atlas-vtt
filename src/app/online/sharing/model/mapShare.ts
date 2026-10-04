@@ -42,7 +42,12 @@ function keyReaches(key: string, recipient: Recipient, people: Pick<PeopleBook, 
   return person ? isPerson(person, recipient) : key === personKey(recipient.tableId, recipient.personId);
 }
 
-export function mapShareReaches(share: MapShare, recipient: Recipient, people: Pick<PeopleBook, 'byKey'>): boolean {
+/**
+ * Who a map share reaches. An `except` naming a placeholder that is not linked yet (`unlinkedKey`) reaches nobody, like a
+ * name nobody can resolve: whoever turns up as "Dave (2)" must not get what was kept back from Dave.
+ */
+export function mapShareReaches(share: MapShare, recipient: Recipient, people: Pick<PeopleBook, 'byKey'> & Partial<Pick<PeopleBook, 'unlinkedKey'>>): boolean {
+  if (share.except.some((key) => people.unlinkedKey?.(key))) return false;
   if (share.except.some((key) => keyReaches(key, recipient, people))) return false;
   return share.everyone || share.people.some((key) => keyReaches(key, recipient, people));
 }
