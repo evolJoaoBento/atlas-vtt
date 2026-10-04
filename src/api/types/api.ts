@@ -1,5 +1,6 @@
 import type { Plugin } from 'obsidian';
 import type { AtlasCapability, Disposer, ViewId } from './common';
+import type { RulesApi } from './rules';
 import type { ViewInfo, ViewsApi } from './views';
 
 /** What `connect` needs of the calling plugin: its id, and where to register its own teardown. */
@@ -21,11 +22,14 @@ export interface AtlasEvents {
   'map-loaded': (view: ViewInfo) => void;
   /** The view closed; its id is never reused. */
   'map-closed': (viewId: ViewId) => void;
+  /** A collection's rules changed (its id), or the asset index finished loading (null: any may have). Read `rules.forMap` again. */
+  'rules-changed': (collectionId: string | null) => void;
 }
 
 export interface AtlasExtension {
   /** The calling plugin's manifest id. */
   readonly id: string;
   readonly views: ViewsApi;
+  readonly rules: RulesApi;
   on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }

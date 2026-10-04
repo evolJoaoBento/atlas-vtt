@@ -3,3 +3,4 @@ export type * from './types/common';
 export type * from './types/api';
 export type * from './types/records';
 export type * from './types/views';
+export type * from './types/rules';

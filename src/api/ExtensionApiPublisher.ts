@@ -4,6 +4,7 @@ import { AtlasApiHost } from './AtlasApiHost';
 import { ATLAS_VIEW_HOOKS } from './atlasViewHooks';
 import { LANDED_CAPABILITIES } from './capabilities';
 import { buildExtension } from './extension';
+import { watchRules } from './rules';
 import type { ApiServices } from './services';
 import { ViewTracker } from './viewTracker';
 
@@ -11,6 +12,7 @@ import { ViewTracker } from './viewTracker';
 export class ExtensionApiPublisher {
   private host: AtlasApiHost | null = null;
   private views: ViewTracker | null = null;
+  private stopWatches: Array<() => void> = [];
   private stopped = false;
 
   constructor(private readonly plugin: AtlasVTTPlugin) {}
@@ -37,10 +39,12 @@ export class ExtensionApiPublisher {
     views.start();
     this.plugin.api = host.api;
     host.publish();
+    this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents));
   }
 
   stop(): void {
     this.stopped = true;
+    for (const stopWatch of this.stopWatches.splice(0)) stopWatch();
     this.host?.dispose();
     this.host = null;
     this.views?.stop();

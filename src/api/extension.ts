@@ -1,6 +1,7 @@
 import type { DisposerSet } from './disposers';
 import type { ApiEvents } from './events';
 import type { ApiServices } from './services';
+import { rulesApi } from './rules';
 import { viewsApi } from './views';
 import type { AtlasEvents, AtlasExtension } from './types/api';
 import type { Disposer } from './types/common';
@@ -16,5 +17,5 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
   function on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer {
     return scope.disposers.add(scope.events.on(event, listener));
   }
-  return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers) });
+  return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers), rules: rulesApi(services.app) });
 }

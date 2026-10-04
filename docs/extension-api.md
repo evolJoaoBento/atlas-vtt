@@ -17,7 +17,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | API version | Status | Capabilities added | Added to `AtlasExtension` | Events added |
 |---|---|---|---|---|
 | 1.0.0 | released | none | `id`, `on` | `unload` |
-| 1.1.0 | planned for 1.1.0 | `views`, `rules`, `settings`, `storage` | `views`, `rules`, `settings`, `storage` | `map-loaded`, `map-closed`, `rules-changed`, `settings-changed` |
+| 1.1.0 | shipped in 1.1.0: `views`, `rules`; `settings` and `storage` follow | `views`, `rules`, `settings`, `storage` | `views`, `rules`, `settings`, `storage` | `map-loaded`, `map-closed`, `rules-changed`, `settings-changed` |
 | 1.2.0 | planned for 1.2.0 | `presentation` | `presentation` | none |
 | 1.3.0 | planned for 1.3.0 | `dice` | `dice` | none |
 | 1.4.0 | planned for 1.4.0 | `lasers` | `lasers` | none |

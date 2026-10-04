@@ -27,12 +27,15 @@ export declare interface AtlasEvents {
     'map-loaded': (view: ViewInfo) => void;
     /** The view closed; its id is never reused. */
     'map-closed': (viewId: ViewId) => void;
+    /** A collection's rules changed (its id), or the asset index finished loading (null: any may have). Read `rules.forMap` again. */
+    'rules-changed': (collectionId: string | null) => void;
 }
 
 export declare interface AtlasExtension {
     /** The calling plugin's manifest id. */
     readonly id: string;
     readonly views: ViewsApi;
+    readonly rules: RulesApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -475,6 +478,22 @@ declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness'
  */
 export declare type LightLevel = 'bright' | 'dim' | 'dark' | 'magical-dark';
 
+export declare interface MapRules {
+    /** The collection holding the map; null outside a collection. */
+    readonly collectionId: string | null;
+    readonly gridDefaults: CollectionGridDefaults | null;
+    /**
+     * The measure tool's settings, with the cone angle the GM measures with (`mapConeAngle`).
+     * Outside a collection these are the defaults; the map's own grid units then decide.
+     * Combine with `resolveMeasurementSettings(null, snapshot.grid)` from `@atlas-vtt/shared/grid` and this `coneAngle`.
+     */
+    readonly measurement: MeasurementSettings;
+    readonly resources: readonly ResourceDefinition[];
+    readonly conditions: readonly ConditionDefinition[];
+    readonly initiative: InitiativeRules;
+    readonly dice: DiceRules;
+}
+
 declare type MeasurementMode = 'metric' | 'abstract';
 
 export declare interface MeasurementSettings {
@@ -549,6 +568,11 @@ declare interface RolledDie {
     negative?: true;
     /** The die was rolled because the die before it exploded. */
     exploded?: true;
+}
+
+export declare interface RulesApi {
+    /** The rules of the collection holding `mapPath`; Atlas's defaults outside a collection. Changes: 'rules-changed'. */
+    forMap(mapPath: string | null): MapRules;
 }
 
 /** Dynamic lighting of one scene. Saved in the map file, never undo-tracked. */
