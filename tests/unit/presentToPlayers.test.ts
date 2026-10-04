@@ -50,6 +50,15 @@ describe('Present to players', () => {
     expect(Notice).toHaveBeenCalledWith('Players see Tavern');
   });
 
+  it('does not claim players see a scene whose map did not load', async () => {
+    const { view, store } = fakeView();
+    store.setState({ mapLoaded: false });
+    await presentViewToPlayers(view);
+    expect(presentedScene.isHeld()).toBe(true);
+    expect(Notice).toHaveBeenCalledWith('Players see Tavern once it loads');
+    expect(Notice).not.toHaveBeenCalledWith('Players see Tavern');
+  });
+
   it('opens the player window when nothing shows the scene, and never claims players see it', async () => {
     playerWindowStore.setState({ isOpen: false });
     const { view, tabId } = fakeView();

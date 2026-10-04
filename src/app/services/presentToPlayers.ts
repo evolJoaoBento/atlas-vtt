@@ -23,7 +23,9 @@ export async function presentViewToPlayers(view: unknown): Promise<void> {
   }
   presentedScene.present(view, tabId);
   const name = view.tabMetaStore.getState().tabs.find((tab) => tab.id === tabId)?.displayName;
-  new Notice(`Players see ${name ?? 'this scene'}`);
+  const label = name ?? 'this scene';
+  // A held scene (its map did not load) is not on screen yet: players still have the previous frame.
+  new Notice(presentedScene.isHeld() ? `Players see ${label} once it loads` : `Players see ${label}`);
 }
 
 export function presentActiveTabToPlayers(app: App): Promise<void> {
