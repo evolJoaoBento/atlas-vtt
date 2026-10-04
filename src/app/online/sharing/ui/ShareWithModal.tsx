@@ -16,7 +16,7 @@ import { placeholderKey } from '../people/placeholderTypes';
 import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMap } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
-import { partProblemsInNote, unknownNamesIn } from '../model/noteFilter';
+import { partProblemsInNote, unknownNamesIn, unlinkedExceptNames } from '../model/noteFilter';
 import type { SenderCatalogue } from '../model/SenderCatalogue';
 import { formatShareRule, parseShareRule, SHARE_PROPERTY, unknownRuleNames } from '../model/shareRule';
 import { writeNoteShare } from '../model/shareWriting';
@@ -30,6 +30,8 @@ const FULL_CONFIRM = {
   message: ['A full share sends everything on this map, as a co-GM would see it: hidden tokens, GM-only pins, walls and lights.'],
   confirmLabel: 'Share full map',
 };
+export const REMOVED_PERSON_LABEL = 'Removed or unknown person';
+export const unlinkedExceptWarning = (name: string): string => `${name} isn’t linked yet; this part is kept back from everyone until you link ${name}.`;
 export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
 
 export interface ShareWithDeps {
@@ -69,7 +71,7 @@ class ShareWithModal extends Modal {
     const { people } = this.deps;
     const known: ShareRow[] = [
       ...people.list().map((person) => ({ key: keyOf(person), name: person.name, known: true })),
-      ...people.placeholders().map((placeholder) => ({ key: placeholderKey(placeholder.name), name: placeholder.name, known: true, placeholder: true })),
+      ...people.placeholders().map((placeholder) => ({ key: placeholderKey(placeholder.id), name: placeholder.name, known: true, placeholder: true })),
     ];
     if (this.file.extension === 'md') await this.renderNote(known);
     else await this.renderMap(known);
@@ -83,6 +85,7 @@ class ShareWithModal extends Modal {
     const warnings = [
       ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
       ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
+      ...unlinkedExceptNames(text, this.deps.people).map(unlinkedExceptWarning),
       ...partWarnings(problems),
     ];
     return { warnings, error: partError(problems) };
@@ -94,7 +97,7 @@ class ShareWithModal extends Modal {
     const keyFor = (name: string): string => {
       const person = people.byName(name);
       const placeholder = person ? null : people.placeholderByName(name);
-      return person ? keyOf(person) : placeholder ? placeholderKey(placeholder.name) : nameKey(name);
+      return person ? keyOf(person) : placeholder ? placeholderKey(placeholder.id) : nameKey(name);
     };
     const unknown = unknownRuleNames(rule, people);
     const rows: ShareRow[] = [...known, ...unknown.map((name) => ({ key: nameKey(name), name, known: false }))];
@@ -142,10 +145,15 @@ class ShareWithModal extends Modal {
       const property: unknown = file instanceof TFile ? this.app.metadataCache.getFileCache(file)?.frontmatter?.[SHARE_PROPERTY] : undefined;
       return { path: note.path, label: note.label, private: parseShareRule(property).private, hidden: note.hidden };
     });
+    // Stored keys follow their person or placeholder (a rename, a link, a merge); one that resolves to nobody stays a row to untick.
+    const { people } = this.deps;
+    const current = (keys: readonly string[]): string[] => [...new Set(keys.map((key) => people.currentKey(key) ?? key))];
+    const stale = [...new Set([...(share?.people ?? []), ...(share?.except ?? [])].filter((key) => people.currentKey(key) === null))];
+    const rows: ShareRow[] = [...known, ...stale.map((key) => ({ key, name: REMOVED_PERSON_LABEL, known: false }))];
     this.root?.render(
       <ShareWithForm
-        rows={known}
-        initial={{ everyone: share?.everyone ?? false, people: share?.people ?? [], except: share?.except ?? [] }}
+        rows={rows}
+        initial={{ everyone: share?.everyone ?? false, people: current(share?.people ?? []), except: current(share?.except ?? []) }}
         map={{ mode: share?.mode ?? 'player-safe', notes, ticked: share?.notes ?? [], ...(source.lit && { playerSafeRefused: LIT_MAP_NOT_PLAYER_SAFE }) }}
         preview={null}
         warnings={[]}

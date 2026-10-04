@@ -27,7 +27,7 @@ export function AddPersonForm({ people }: { people: Pick<PeopleBook, 'addPlaceho
         />
         <Button variant="default" onClick={add} disabled={!name.trim()}>Add</Button>
       </div>
-      <span className="atlas-people__seen">{ADD_PERSON_HINT}</span>
+      <span className="atlas-people__hint">{ADD_PERSON_HINT}</span>
       {problem && <span className="atlas-people__problem" role="alert">{problem}</span>}
     </div>
   );

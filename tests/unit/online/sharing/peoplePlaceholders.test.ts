@@ -5,12 +5,12 @@ import { hostedTable } from '../../../../src/app/online/sharing/identity/reissue
 import { makeDeviceProof } from '../../../../src/app/online/sharing/identity/proofs';
 import { isPerson, partAllows, ruleReaches } from '../../../../src/app/online/sharing/model/audience';
 import { mapShareReaches, type MapShare } from '../../../../src/app/online/sharing/model/mapShare';
-import { unknownNamesIn } from '../../../../src/app/online/sharing/model/noteFilter';
+import { unknownNamesIn, unlinkedExceptNames } from '../../../../src/app/online/sharing/model/noteFilter';
 import { parseShareRule, unknownRuleNames } from '../../../../src/app/online/sharing/model/shareRule';
 import { IdentityDesk } from '../../../../src/app/online/sharing/people/IdentityDesk';
 import { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import { parsePeopleData, personKey } from '../../../../src/app/online/sharing/people/peopleTypes';
-import { placeholderKey, parsePlaceholders } from '../../../../src/app/online/sharing/people/placeholderTypes';
+import { parsePlaceholders, placeholderKey, type Placeholder } from '../../../../src/app/online/sharing/people/placeholderTypes';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 import { noteCatalogue, nodeIdentityCrypto as crypto, testPeople, testPerson, testTable } from './sharingFixtures';
 
@@ -19,7 +19,8 @@ const U = 'U'.repeat(43);
 const D1 = 'a'.repeat(43);
 const D2 = 'b'.repeat(43);
 const FILE = `${SHARING_DATA_DIR}/people.json`;
-const dave = { name: 'Dave', formerNames: [] };
+const dave = { id: 'd'.repeat(22), name: 'Dave', formerNames: [] };
+const named = (people: PeopleBook, name: string): Placeholder => people.placeholderByName(name)!;
 
 function book(app = createInMemoryApp().app): PeopleBook {
   return new PeopleBook(new JsonDataFile(app.vault.adapter, FILE, parsePeopleData), () => 1000);
@@ -31,14 +32,14 @@ describe('people added by name', () => {
     const people = book(app);
     await people.ready();
     expect(people.addPlaceholder('  Dave ')).toBeNull();
-    expect(people.placeholders()).toEqual([dave]);
+    expect(people.placeholders()).toEqual([{ id: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/), name: 'Dave', formerNames: [] }]);
     expect(people.list()).toEqual([]);
     expect(people.byName('Dave')).toBeNull();
     expect(people.isPlaceholder('DAVE')).toBe(true);
     await vi.waitFor(async () => expect(await app.vault.adapter.read(FILE)).toContain('placeholders'));
     const again = book(app);
     await again.ready();
-    expect(again.placeholders()).toEqual([dave]);
+    expect(again.placeholders()).toEqual(people.placeholders());
   });
 
   it('refuses a name that is taken, now or formerly, by a person, a placeholder or someone removed, and never suffixes it', async () => {
@@ -63,7 +64,7 @@ describe('people added by name', () => {
     people.addPlaceholder('Dave');
     expect(people.admit(T, 'dave', D1).name).toBe('dave (2)');
     expect(people.seen(U, 'p1', 'Dave').name).toBe('Dave (3)');
-    expect(people.placeholders()).toEqual([dave]);
+    expect(people.placeholders().map((placeholder) => placeholder.name)).toEqual(['Dave']);
   });
 
   it('renames (the old name stays) and removes (the names stay taken)', async () => {
@@ -86,8 +87,8 @@ describe('people added by name', () => {
     expect(parsePeopleData({ version: 1, people: [], placeholders: 'x' }).placeholders).toEqual([]);
     expect(parsePeopleData(null).placeholders).toEqual([]);
     expect(parsePlaceholders([
-      { name: 'Dave', formerNames: ['Davey', 3, ''] }, { name: 'dave' }, { name: '' }, { name: 5 }, null, 'x', { formerNames: [] }, { name: 'Eve' },
-    ])).toEqual([{ name: 'Dave', formerNames: ['Davey'] }, { name: 'Eve', formerNames: [] }]);
+      { id: dave.id, name: 'Dave', formerNames: ['Davey', 3, ''] }, { name: 'dave' }, { name: '' }, { name: 5 }, null, 'x', { formerNames: [] }, { name: 'Eve' },
+    ])).toEqual([{ id: dave.id, name: 'Dave', formerNames: ['Davey'] }, { id: expect.any(String), name: 'Eve', formerNames: [] }]);
   });
 });
 
@@ -105,14 +106,39 @@ describe('a placeholder grants nothing', () => {
     expect(unknownNamesIn('---\natlas-share: [Dave]\n---\n%%[!only|Dave, Zed]%%x%%[!end]%%', people)).toEqual(['Zed']);
   });
 
-  it('except|Dave excludes nobody real, where an unknown name hides the part from everyone', () => {
-    expect(partAllows({ kind: 'except', names: ['Dave'] }, recipient, people)).toBe(true);
+  it('except|Dave, with Dave not linked yet, hides the part from everyone, like an unknown name', () => {
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, recipient, people)).toBe(false);
     expect(partAllows({ kind: 'except', names: ['Zed'] }, recipient, people)).toBe(false);
-    expect(ruleReaches(ruleOf(['public', 'except Dave']), recipient, people)).toBe(true);
+    expect(ruleReaches(ruleOf(['public', 'except Dave']), recipient, people)).toBe(false);
     expect(ruleReaches(ruleOf(['public', 'except Zed']), recipient, people)).toBe(false);
   });
 
-  it('a resolver that cannot tell placeholders treats the name as unknown, which is the stricter outcome', () => {
+  it('the real Dave arriving as "Dave (2)" does not see what was kept back from Dave', async () => {
+    const real = book();
+    await real.ready();
+    real.addPlaceholder('Dave');
+    const arrived = real.seen(T, 'dave2', 'Dave');
+    expect(arrived.name).toBe('Dave (2)');
+    const them = { tableId: T, personId: 'dave2' };
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, them, real)).toBe(false);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, them, real)).toBe(false);
+    expect(ruleReaches(ruleOf(['public', 'except Dave']), them, real)).toBe(false);
+    expect(ruleReaches(ruleOf(['Dave']), them, real)).toBe(false);
+    // Once linked, except|Dave hides it from Dave and shows it to others; only|Dave reaches Dave.
+    real.linkPlaceholder(personKey(T, 'dave2'), named(real, 'Dave').id);
+    const eve = real.seen(T, 'eve', 'Eve');
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, them, real)).toBe(false);
+    expect(partAllows({ kind: 'except', names: ['Dave'] }, { tableId: eve.tableId, personId: 'eve' }, real)).toBe(true);
+    expect(partAllows({ kind: 'only', names: ['Dave'] }, them, real)).toBe(true);
+  });
+
+  it('names the unlinked placeholders an except uses, for the sender’s warning', () => {
+    const text = '---\natlas-share: [public, except Dave]\n---\n%%[!except|Dave, Ana, Zed]%%x%%[!end]%%%%[!only|Dave]%%y%%[!end]%%';
+    expect(unlinkedExceptNames(text, people)).toEqual(['Dave']);
+    expect(unlinkedExceptNames('%%[!only|Dave]%%y%%[!end]%%', people)).toEqual([]);
+  });
+
+  it('a resolver that cannot tell placeholders treats the name as unknown', () => {
     const plain = { byName: people.byName, allByName: people.allByName };
     expect(partAllows({ kind: 'except', names: ['Dave'] }, recipient, plain)).toBe(false);
     expect(partAllows({ kind: 'only', names: ['Dave'] }, recipient, plain)).toBe(false);
@@ -122,14 +148,14 @@ describe('a placeholder grants nothing', () => {
     const share = (key: string, field: 'people' | 'except'): MapShare => ({
       item: 'i'.repeat(22), everyone: field === 'except', people: field === 'people' ? [key] : [], except: field === 'except' ? [key] : [], mode: 'full', notes: [],
     });
-    const key = placeholderKey('Dave');
     const real = book();
     await real.ready();
     real.addPlaceholder('Dave');
+    const key = placeholderKey(named(real, 'Dave').id);
     const eve = real.admit(T, 'Eve', D1);
     expect(mapShareReaches(share(key, 'people'), { tableId: T, personId: eve.personId }, real)).toBe(false);
     expect(mapShareReaches(share(key, 'except'), { tableId: T, personId: eve.personId }, real)).toBe(true);
-    const linked = real.admitAsPlaceholder(T, 'Dave', D2)!;
+    const linked = real.admitAsPlaceholder(T, named(real, 'Dave').id, D2)!;
     const recipientOf = { tableId: T, personId: linked.personId };
     expect(mapShareReaches(share(key, 'people'), recipientOf, real)).toBe(true);
     expect(mapShareReaches(share(key, 'except'), recipientOf, real)).toBe(false);
@@ -156,13 +182,14 @@ describe('meeting a placeholder', () => {
     await people.ready();
     people.addPlaceholder('Dave');
     const phone = await device();
+    const id = named(people, 'Dave').id;
     expect(await desk.identify(player('p1', 'dave'), await phone.proof('nonce-aaaaaaaaaaaaaaaa')))
-      .toEqual({ kind: 'new', sameName: { personId: null, name: 'Dave' } });
-    const result = await desk.admission('p1', { placeholder: 'Dave' });
+      .toEqual({ kind: 'new', sameName: { personId: null, name: 'Dave', placeholder: id } });
+    const result = await desk.admission('p1', { placeholder: id });
     if ('refused' in result) throw new Error('refused');
     const person = people.get(table.id, result.admission.personId)!;
     expect(person).toMatchObject({ name: 'Dave', devices: [phone.deviceId] });
-    expect(person.aliases).toContain(placeholderKey('Dave'));
+    expect(person.aliases).toContain(placeholderKey(id));
     expect(people.placeholders()).toEqual([]);
     expect(people.byName('Dave')?.personId).toBe(person.personId);
     // Their device knows them next time.
@@ -177,7 +204,7 @@ describe('meeting a placeholder', () => {
     const result = await desk.admission('p1');
     if ('refused' in result) throw new Error('refused');
     expect(people.get(people.list()[0]!.tableId, result.admission.personId)?.name).toBe('Dave (2)');
-    expect(people.placeholders()).toEqual([dave]);
+    expect(people.placeholders().map((placeholder) => placeholder.name)).toEqual(['Dave']);
     expect(ruleReaches(parseShareRule(['Dave']), { tableId: people.list()[0]!.tableId, personId: result.admission.personId }, people)).toBe(false);
   });
 
@@ -187,13 +214,27 @@ describe('meeting a placeholder', () => {
     people.addPlaceholder('Dave');
     const phone = await device();
     await desk.identify(player('p1', 'Dave'), await phone.proof('nonce-aaaaaaaaaaaaaaaa'));
+    const id = named(people, 'Dave').id;
     people.removePlaceholder('Dave');
-    expect(await desk.admission('p1', { placeholder: 'Dave' })).toEqual({ refused: 'person' });
+    expect(await desk.admission('p1', { placeholder: id })).toEqual({ refused: 'person' });
     expect(people.list()).toEqual([]);
     people.addPlaceholder('Eve');
     await desk.admission('p1');
-    expect(await desk.admission('p1', { placeholder: 'Eve' })).toEqual({ refused: 'person' });
-    expect(people.placeholders()).toEqual([{ name: 'Eve', formerNames: [] }]);
+    expect(await desk.admission('p1', { placeholder: named(people, 'Eve').id })).toEqual({ refused: 'person' });
+    expect(people.placeholders().map((placeholder) => placeholder.name)).toEqual(['Eve']);
+  });
+
+  it('answering a link twice (a re-sign) gives the same person, not a refusal', async () => {
+    const { people, desk, device } = await setup();
+    await people.ready();
+    people.addPlaceholder('Dave');
+    const id = named(people, 'Dave').id;
+    await desk.identify(player('p1', 'Dave'), await (await device()).proof('nonce-aaaaaaaaaaaaaaaa'));
+    const first = await desk.admission('p1', { placeholder: id });
+    const second = await desk.admission('p1', { placeholder: id });
+    if ('refused' in first || 'refused' in second) throw new Error('refused');
+    expect(second.admission.personId).toBe(first.admission.personId);
+    expect(people.list()).toHaveLength(1);
   });
 
   it('a person met in a session is never linked on their own; linking in People merges them and keeps every name', async () => {
@@ -204,14 +245,14 @@ describe('meeting a placeholder', () => {
     const met = people.seen(U, 'dave1', 'Dave');
     expect(met.name).toBe('Dave (2)');
     expect(people.placeholders()).toHaveLength(1);
-    expect(people.linkPlaceholder(personKey(U, 'dave1'), 'David')).toBeNull();
+    expect(people.linkPlaceholder(personKey(U, 'dave1'), named(people, 'David').id)).toBeNull();
     const linked = people.get(U, 'dave1')!;
     expect(linked).toMatchObject({ name: 'David', devices: [] });
     expect(linked.formerNames).toEqual(expect.arrayContaining(['Dave', 'Dave (2)']));
     expect(people.placeholders()).toEqual([]);
     for (const name of ['David', 'Dave', 'Dave (2)']) expect(people.byName(name)?.personId).toBe('dave1');
     expect(isPerson(linked, { tableId: U, personId: 'dave1' })).toBe(true);
-    expect(people.linkPlaceholder(personKey(U, 'dave1'), 'Nobody')).toBe('Pick another person.');
+    expect(people.linkPlaceholder(personKey(U, 'dave1'), 'x'.repeat(22))).toBe('Pick another person.');
   });
 });
 
@@ -226,9 +267,9 @@ describe('preview as a placeholder', () => {
     expect(got).toContain('Dave’s secret.');
     expect(got).not.toContain('Not for Dave.');
     expect(got).not.toContain('Ana’s.');
-    // The real recipients, and the people list, are unchanged.
+    // A real recipient is unaffected: Dave is not linked, so what is kept back from him is kept back from everyone.
     const asAna = await catalogue.previewNote({ tableId: ana.tableId, personId: 'ana' }, 'N.md');
-    expect(asAna).toContain('Not for Dave.');
+    expect(asAna).not.toContain('Not for Dave.');
     expect(asAna).not.toContain('Dave’s secret.');
     expect(await catalogue.list({ tableId: ana.tableId, personId: 'ana' })).toEqual([]);
     expect(await catalogue.previewNoteAsPlaceholder('Nobody', 'N.md')).toBeNull();
@@ -237,5 +278,46 @@ describe('preview as a placeholder', () => {
   it('never shows the placeholder a note it does not share, as a real stand-in would not be listed either', async () => {
     const catalogue = noteCatalogue({ 'N.md': { text: 'Hi', share: ['Ana'] } }, [testPerson('ana', 'Ana')], [dave]);
     expect(await catalogue.list({ tableId: 'preview', personId: 'placeholder' })).toEqual([]);
+  });
+});
+
+describe('stored map-share keys follow people', () => {
+  it('a rename, a link and a reload all keep resolving the stored key, and a stale key resolves to nobody', async () => {
+    const { app } = createInMemoryApp();
+    const people = book(app);
+    await people.ready();
+    people.addPlaceholder('Dave');
+    const { id } = named(people, 'Dave');
+    const key = placeholderKey(id);
+    expect(people.currentKey(key)).toBe(key);
+    people.renamePlaceholder('Dave', 'David');
+    expect(people.currentKey(key)).toBe(key);
+    expect(named(people, 'David').id).toBe(id);
+    const linked = people.admitAsPlaceholder(T, id, D1)!;
+    expect(people.currentKey(key)).toBe(personKey(T, linked.personId));
+    await vi.waitFor(async () => expect(await app.vault.adapter.read(FILE)).toContain(linked.personId));
+    const again = book(app);
+    await again.ready();
+    expect(again.currentKey(key)).toBe(personKey(T, linked.personId));
+    expect(again.currentKey(personKey(T, 'gone'))).toBeNull();
+    expect(again.currentKey(placeholderKey('z'.repeat(22)))).toBeNull();
+  });
+
+  it('keys older versions wrote by name still resolve, and ids given to an older file are saved so they hold', async () => {
+    const { app } = createInMemoryApp();
+    await app.vault.adapter.mkdir(SHARING_DATA_DIR);
+    await app.vault.adapter.write(FILE, JSON.stringify({ version: 1, people: [], placeholders: [{ name: 'Dave', formerNames: ['Davey'] }] }));
+    const people = book(app);
+    await people.ready();
+    const { id } = named(people, 'Dave');
+    expect(people.currentKey('placeholder:dave')).toBe(placeholderKey(id));
+    expect(people.currentKey('placeholder:davey')).toBe(placeholderKey(id));
+    await vi.waitFor(async () => expect(await app.vault.adapter.read(FILE)).toContain(id));
+    const again = book(app);
+    await again.ready();
+    expect(named(again, 'Dave').id).toBe(id);
+    // A person linked by an older version keeps the name key as an alias.
+    const linked = again.admitAsPlaceholder(T, id, D1)!;
+    expect(again.currentKey('placeholder:dave')).toBe(personKey(T, linked.personId));
   });
 });

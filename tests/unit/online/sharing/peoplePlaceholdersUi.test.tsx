@@ -35,7 +35,7 @@ describe('People dialog: add people by name', () => {
     fireEvent.change(field, { target: { value: 'Dave' } });
     expect(screen.queryByRole('alert')).toBeNull();
     fireEvent.keyDown(field, { key: 'Enter' });
-    expect(people.placeholders()).toEqual([{ name: 'Dave', formerNames: [] }]);
+    expect(people.placeholders().map((placeholder) => placeholder.name)).toEqual(['Dave']);
     expect(field.value).toBe('');
     const section = screen.getByRole('region', { name: 'Not met yet' });
     expect((within(section).getByLabelText('Name of Dave') as HTMLInputElement).value).toBe('Dave');
@@ -64,7 +64,7 @@ describe('People dialog: add people by name', () => {
     const met = people.seen(T, 'dave1', 'Dave');
     expect(met.name).toBe('Dave (2)');
     render(<PeopleList people={people} ownTableId={T} confirmRemove={async () => true} />);
-    fireEvent.change(screen.getByLabelText('Link Dave (2) to'), { target: { value: 'placeholder:Dave' } });
+    fireEvent.change(screen.getByLabelText('Link Dave (2) to'), { target: { value: `placeholder:${people.placeholderByName('Dave')!.id}` } });
     expect(people.placeholders()).toEqual([]);
     expect(people.get(T, 'dave1')?.name).toBe('Dave');
     expect(people.byKey(personKey(T, 'dave1'))?.formerNames).toContain('Dave (2)');
@@ -74,7 +74,7 @@ describe('People dialog: add people by name', () => {
 describe('pickers list people not met yet', () => {
   it('Share part: placeholders come after the session people, can be ticked, and are marked', () => {
     const ana = testPerson('ana', 'Ana');
-    const book = testPeople([ana], [{ name: 'Dave', formerNames: [] }, { name: 'Odd, one', formerNames: [] }]);
+    const book = testPeople([ana], [{ id: 'd'.repeat(22), name: 'Dave', formerNames: [] }, { id: 'o'.repeat(22), name: 'Odd, one', formerNames: [] }]);
     const inSession = partPeopleFrom({ session: { tableId: ana.tableId } as never, people: [{ personId: 'ana', name: 'Ana' }] }, book);
     expect(inSession.people.map((person) => person.name)).toEqual(['Ana', 'Dave', 'Odd, one']);
     expect(inSession.people[1]).toEqual({ name: 'Dave', notMet: true });
@@ -93,14 +93,14 @@ describe('pickers list people not met yet', () => {
     const preview = vi.fn(async () => 'as Dave');
     render(
       <ShareWithForm
-        rows={[{ key: 'T/ana', name: 'Ana', known: true }, { key: 'placeholder:dave', name: 'Dave', known: true, placeholder: true }]}
+        rows={[{ key: 'T/ana', name: 'Ana', known: true }, { key: `placeholder:${'d'.repeat(22)}`, name: 'Dave', known: true, placeholder: true }]}
         initial={{ everyone: false, people: [], except: [] }}
         map={null} preview={preview} warnings={[]} onSave={() => undefined} onCancel={() => undefined}
       />,
     );
     expect(screen.getByText('Not met yet')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Preview as'), { target: { value: 'placeholder:dave' } });
-    expect(preview).toHaveBeenCalledWith('placeholder:dave');
+    fireEvent.change(screen.getByLabelText('Preview as'), { target: { value: `placeholder:${'d'.repeat(22)}` } });
+    expect(preview).toHaveBeenCalledWith(`placeholder:${'d'.repeat(22)}`);
     expect(await screen.findByText('as Dave')).toBeTruthy();
   });
 });
@@ -110,12 +110,12 @@ describe('join requests with a placeholder’s name', () => {
     const service = { allow: vi.fn(), deny: vi.fn(), kick: vi.fn(), link: vi.fn(), linkPlaceholder: vi.fn() };
     render(<OnlinePlayerList
       players={[{ playerId: 'p1', name: 'Dave', status: 'pending', client: 'obsidian' }]}
-      requests={{ p1: { kind: 'new', sameName: { personId: null, name: 'Dave' } } }}
+      requests={{ p1: { kind: 'new', sameName: { personId: null, name: 'Dave', placeholder: 'd'.repeat(22) } } }}
       control={null}
       service={service}
     />);
     fireEvent.click(screen.getByRole('button', { name: 'Link to Dave' }));
-    expect(service.linkPlaceholder).toHaveBeenCalledWith('p1', 'Dave');
+    expect(service.linkPlaceholder).toHaveBeenCalledWith('p1', 'd'.repeat(22));
     expect(service.link).not.toHaveBeenCalled();
   });
 });

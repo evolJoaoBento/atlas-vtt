@@ -9,13 +9,14 @@ import type { DeviceProof } from '../../protocol';
 import type { HostedTable } from '../identity/reissue';
 import type { PeopleBook } from './PeopleBook';
 import type { Person } from './peopleTypes';
+import { placeholderKey } from './placeholderTypes';
 
 export type JoinIdentity =
   | { kind: 'known'; personId: string; name: string }
-  /** `sameName.personId` is null when the name is a placeholder's (someone added by name, not met yet). */
-  | { kind: 'new'; sameName: { personId: string | null; name: string } | null };
+  /** `sameName.personId` is null and `placeholder` the placeholder's id when the name is a placeholder's (someone added by name, not met yet). */
+  | { kind: 'new'; sameName: { personId: string | null; name: string; placeholder?: string } | null };
 
-/** Who a new device is linked to: a known person (by id), a placeholder (by name), or nobody (a new person). */
+/** Who a new device is linked to: a known person (by id), a placeholder (by its id), or nobody (a new person). */
 export type LinkTarget = string | { placeholder: string } | null;
 
 /** Why a request could not be admitted: `proof` the player's current device proof fails (deny), `person` the person to link to is gone or the device belongs to another (ask again), `unknown` the desk holds no such request. */
@@ -50,7 +51,7 @@ export class IdentityDesk {
     const known = people.byDevice(table.id, deviceId);
     const named = known ? null : people.byName(player.name, table.id);
     const placeholder = known || named ? null : people.placeholderByName(player.name);
-    const sameName = named ? { personId: named.personId, name: named.name } : placeholder ? { personId: null, name: placeholder.name } : null;
+    const sameName = named ? { personId: named.personId, name: named.name } : placeholder ? { personId: null, name: placeholder.name, placeholder: placeholder.id } : null;
     const identity: JoinIdentity = known ? { kind: 'known', personId: known.personId, name: known.name } : { kind: 'new', sameName };
     this.pending.set(player.playerId, { deviceId, nonce: device.nonce, name: player.name, identity });
     return identity;
@@ -78,7 +79,9 @@ export class IdentityDesk {
       // A device belongs to one person: linking it to another would leave two owners.
       const owner = people.byDevice(table.id, held.deviceId);
       if (typeof linkTo === 'string') person = owner && owner.personId !== linkTo ? null : people.linkDevice(table.id, linkTo, held.deviceId);
-      else person = owner ? null : people.admitAsPlaceholder(table.id, linkTo.placeholder, held.deviceId);
+      // A repeated answer (a re-sign) finds the device already linked to this placeholder: that is the same person.
+      else if (owner) person = owner.aliases.includes(placeholderKey(linkTo.placeholder)) ? owner : null;
+      else person = people.admitAsPlaceholder(table.id, linkTo.placeholder, held.deviceId);
     } else {
       // The device decides, not what `identify` saw: the person may have been removed or added since.
       const owner = people.byDevice(table.id, held.deviceId);

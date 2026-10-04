@@ -71,7 +71,7 @@ function PersonRow({ person, others, notMet, people, confirmRemove }: {
           {others.map((other) => <option key={keyOf(other)} value={keyOf(other)}>{other.name}</option>)}
           {notMet.length > 0 && (
             <optgroup label={NOT_MET_TEXT}>
-              {notMet.map((placeholder) => <option key={placeholder.name} value={`${PLACEHOLDER_PREFIX}${placeholder.name}`}>{placeholder.name}</option>)}
+              {notMet.map((placeholder) => <option key={placeholder.id} value={`${PLACEHOLDER_PREFIX}${placeholder.id}`}>{placeholder.name}</option>)}
             </optgroup>
           )}
         </select>
@@ -105,7 +105,7 @@ export function PeopleList({ people, ownTableId, confirmRemove }: PeopleListProp
         <section className="atlas-people__table" aria-label={NOT_MET_TEXT}>
           <h3 className="atlas-people__heading">{NOT_MET_TEXT}</h3>
           <ul className="atlas-people__list">
-            {notMet.map((placeholder) => <PlaceholderRow key={placeholder.name} placeholder={placeholder} people={people} confirmRemove={confirmRemove} />)}
+            {notMet.map((placeholder) => <PlaceholderRow key={placeholder.id} placeholder={placeholder} people={people} confirmRemove={confirmRemove} />)}
           </ul>
         </section>
       )}

@@ -144,7 +144,7 @@ export function partProblemsIn(body: string, blocks: BlockContext): PartProblems
   };
 }
 
-/** The names `only` and `except` tags use, in order of appearance. */
-export function partNamesIn(body: string): string[] {
-  return scanMarkup(body, 'inline-only').tags.flatMap((tag) => (tag.kind === 'open' && 'names' in tag.rule ? tag.rule.names : []));
+/** The names `only` and `except` tags use (only `kind`'s when given), in order of appearance. */
+export function partNamesIn(body: string, kind?: 'only' | 'except'): string[] {
+  return scanMarkup(body, 'inline-only').tags.flatMap((tag) => (tag.kind === 'open' && 'names' in tag.rule && (!kind || tag.rule.kind === kind) ? tag.rule.names : []));
 }

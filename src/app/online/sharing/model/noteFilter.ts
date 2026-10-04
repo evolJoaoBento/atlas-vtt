@@ -73,6 +73,15 @@ export function unknownNamesIn(source: string, people: NameResolver): string[] {
   return [...names].sort();
 }
 
+/** The placeholders (people added by name, not linked yet) an `except` in the note's tags or `atlas-share` names: each hides its part from everyone until linked. */
+export function unlinkedExceptNames(source: string, people: NameResolver): string[] {
+  const { frontmatter, body } = splitFrontmatter(lf(source));
+  const names = new Set(partNamesIn(body, 'except'));
+  const property = frontmatter?.find((line) => line.startsWith(`${SHARE_PROPERTY}:`));
+  if (property) parseShareRule(property.slice(SHARE_PROPERTY.length + 1).trim().replace(/^\[|\]$/g, '')).except.forEach((name) => names.add(name));
+  return [...names].filter((name) => !people.byName(name) && people.isPlaceholder?.(name)).sort();
+}
+
 /** Malformed, stray and unclosed tags, and tag text outside tags, for the sender's warnings; lines count from the note's first line. */
 export function partProblemsInNote(source: string, sections: readonly NoteSection[] | null | undefined): PartProblems {
   const { body, firstLine, blocks } = noteBody(source, sections);

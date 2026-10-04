@@ -10,7 +10,7 @@ import { Button } from '../../../packages/components/primitives/button';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { LabelledCheck } from '../ui/LabelledCheck';
-import { NOT_MET_TEXT } from '../people/ui/peopleCopy';
+import { NOT_MET_EXCEPT_TEXT, NOT_MET_TEXT } from '../people/ui/peopleCopy';
 import type { PartPeopleChoice } from './partPeople';
 
 export type PartPeopleKind = 'only' | 'except';
@@ -22,11 +22,12 @@ const TITLES: Record<PartPeopleKind, string> = {
 
 interface PartPeopleFormProps {
   choice: PartPeopleChoice;
+  kind?: PartPeopleKind;
   onApply: (names: string[]) => void;
   onCancel: () => void;
 }
 
-export function PartPeopleForm({ choice, onApply, onCancel }: PartPeopleFormProps): React.ReactElement {
+export function PartPeopleForm({ choice, kind, onApply, onCancel }: PartPeopleFormProps): React.ReactElement {
   const [ticked, setTicked] = useState<string[]>([]);
   const toggle = (name: string): void => setTicked(ticked.includes(name) ? ticked.filter((other) => other !== name) : [...ticked, name]);
   return (
@@ -41,7 +42,7 @@ export function PartPeopleForm({ choice, onApply, onCancel }: PartPeopleFormProp
                 ? (
                   <span className="atlas-share__person">
                     <LabelledCheck label={name} checked={ticked.includes(name)} onChange={() => toggle(name)} />
-                    {notMet && <span className="atlas-share__not-met">{NOT_MET_TEXT}</span>}
+                    {notMet && <span className="atlas-share__not-met">{kind === 'except' ? NOT_MET_EXCEPT_TEXT : NOT_MET_TEXT}</span>}
                   </span>
                 )
                 : (
@@ -73,7 +74,7 @@ class PartPeopleModal extends Modal {
     this.setTitle(TITLES[this.kind]);
     this.root = createRoot(this.contentEl);
     this.root.render(
-      <PartPeopleForm choice={this.choice} onCancel={() => this.close()} onApply={(names) => { this.close(); this.onApply(names); }} />,
+      <PartPeopleForm choice={this.choice} kind={this.kind} onCancel={() => this.close()} onApply={(names) => { this.close(); this.onApply(names); }} />,
     );
   }
 

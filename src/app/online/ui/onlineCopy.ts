@@ -12,6 +12,9 @@ export const SHARED_WITH_ME_BUTTON = 'Shared with me…';
 export const OBSIDIAN_PLAYER_LABEL = 'Joined from Obsidian';
 export const KNOWN_PERSON_MARK = '(known)';
 export const NEW_PERSON_MARK = '(new)';
-export const sameNameWarning = (name: string): string => `Someone named ${name} is already in your people list`;
+/** `notMet`: the name is of someone you added by name, who has never joined (Link hands over what you prepared for them). */
+export const sameNameWarning = (name: string, notMet = false): string => (notMet
+  ? `${name} was added by name and has not joined yet`
+  : `Someone named ${name} is already in your people list`);
 export const linkToLabel = (name: string): string => `Link to ${name}`;
 export const PEOPLE_LABEL = 'People';

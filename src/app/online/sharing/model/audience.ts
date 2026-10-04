@@ -14,8 +14,9 @@ export interface NameResolver {
   /** Everyone a name matches, current or former; `except` excludes them all. Without it, `byName` alone. */
   allByName?(name: string): Person[];
   /**
-   * Whether a name is someone added before meeting them: known, but nobody to match. So `only` reaches nobody and
-   * `except` excludes nobody, where an unknown name in `except` hides from everyone. Without it a name is unknown.
+   * Whether a name is someone added before meeting them: known, but nobody to match. So `only` reaches nobody. In
+   * `except` it counts as unknown and hides from everyone until they are linked: whoever turns up under that name
+   * (as "Dave (2)", say) must not get what was held back from Dave. Without it a name is unknown.
    */
   isPlaceholder?(name: string): boolean;
 }
@@ -32,7 +33,7 @@ function resolve(names: readonly string[], people: NameResolver, every = false):
   for (const name of names) {
     const matches = every && people.allByName ? people.allByName(name) : [people.byName(name)].filter((person): person is Person => person !== null);
     if (matches.length > 0) known.push(...matches);
-    else if (!people.isPlaceholder?.(name)) unknown++;
+    else if (every || !people.isPlaceholder?.(name)) unknown++;
   }
   return { known, unknown };
 }

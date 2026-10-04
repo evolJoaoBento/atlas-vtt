@@ -27,7 +27,7 @@ export function showJoinRequestNotice(player: SessionPlayer, answer: (allow: boo
       line.appendText(`${player.name} wants to join your online session.`);
       if (identity) line.createSpan({ cls: 'atlas-online-request__mark', text: ` ${identity.kind === 'known' ? KNOWN_PERSON_MARK : NEW_PERSON_MARK}` });
     },
-    warning: sameName ? sameNameWarning(sameName.name) : null,
+    warning: sameName ? sameNameWarning(sameName.name, sameName.personId === null) : null,
     answers,
   });
 }

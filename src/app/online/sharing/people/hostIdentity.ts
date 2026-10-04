@@ -57,9 +57,9 @@ export class HostIdentity {
     this.admit(playerId, personId);
   }
 
-  /** Admits a new device as someone added by name before meeting them: only the GM links. */
-  linkPlaceholder(playerId: string, name: string): void {
-    this.admit(playerId, { placeholder: name });
+  /** Admits a new device as someone added by name before meeting them (by the placeholder's id): only the GM links. */
+  linkPlaceholder(playerId: string, placeholderId: string): void {
+    this.admit(playerId, { placeholder: placeholderId });
   }
 
   deny(playerId: string): void {
@@ -76,7 +76,7 @@ export class HostIdentity {
   private show(player: SessionPlayer, identity: JoinIdentity | null): void {
     const sameName = identity?.kind === 'new' ? identity.sameName : null;
     this.notices.get(player.playerId)?.hide();
-    const info: JoinRequestInfo = { identity, link: sameName ? () => (sameName.personId ? this.link(player.playerId, sameName.personId) : this.linkPlaceholder(player.playerId, sameName.name)) : null };
+    const info: JoinRequestInfo = { identity, link: sameName ? () => (sameName.personId ? this.link(player.playerId, sameName.personId) : sameName.placeholder ? this.linkPlaceholder(player.playerId, sameName.placeholder) : undefined) : null };
     this.notices.set(player.playerId, this.options.showRequest(player, (allow) => (allow ? this.allow(player.playerId) : this.deny(player.playerId)), info));
   }
 

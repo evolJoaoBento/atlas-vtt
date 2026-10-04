@@ -19,6 +19,14 @@ interface OnlinePlayerListProps {
   service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder'>;
 }
 
+type SameName = { personId: string | null; name: string; placeholder?: string };
+
+/** Links a waiting player to the known person or the placeholder their name matches. */
+function linkTo(service: OnlinePlayerListProps['service'], playerId: string, same: SameName): void {
+  if (same.personId) service.link(playerId, same.personId);
+  else if (same.placeholder) service.linkPlaceholder(playerId, same.placeholder);
+}
+
 /** Marks a player who joined from Atlas in Obsidian. */
 function ObsidianMark(): React.ReactElement {
   return (
@@ -35,12 +43,12 @@ function IdentityMark({ identity }: { identity: JoinIdentity | null }): React.Re
 }
 
 /** The warning for a new device using a known name, with Link to that person. */
-function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLink: (sameName: { personId: string | null; name: string }) => void }): React.ReactElement | null {
+function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLink: (sameName: SameName) => void }): React.ReactElement | null {
   const sameName = identity?.kind === 'new' ? identity.sameName : null;
   if (!sameName) return null;
   return (
     <div className="atlas-online-panel__player-row atlas-online-panel__same-name">
-      <span className="atlas-online-panel__warning" role="note">{sameNameWarning(sameName.name)}</span>
+      <span className="atlas-online-panel__warning" role="note">{sameNameWarning(sameName.name, sameName.personId === null)}</span>
       <Button variant="outline" size="sm" onClick={() => onLink(sameName)}>{linkToLabel(sameName.name)}</Button>
     </div>
   );
@@ -73,7 +81,7 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
                   <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
                   <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
                 </div>
-                <SameNameRow identity={requests[player.playerId] ?? null} onLink={(same) => (same.personId ? service.link(player.playerId, same.personId) : service.linkPlaceholder(player.playerId, same.name))} />
+                <SameNameRow identity={requests[player.playerId] ?? null} onLink={(same) => linkTo(service, player.playerId, same)} />
               </li>
             ))}
           </ul>
