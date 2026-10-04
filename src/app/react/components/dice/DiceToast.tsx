@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
-import type { DiceRollResult } from '../../../tools/DiceTool';
+import { rollerName, type DiceRollResult } from '../../../tools/diceRolling';
 import { TokenPortrait } from '../../../packages/components/shared/TokenPortrait';
 import { useDiceAvatar } from './useDiceAvatar';
 import { DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';
@@ -25,6 +25,7 @@ export function DiceToast({ result, phase, onDismiss }: DiceToastProps): React.R
   const sourceTokenName = source?.tokenName ?? 'Unknown';
   const avatar = useDiceAvatar(source);
   const hasSource = source?.type === 'statblock' && Boolean(source.tokenName);
+  const name = rollerName(result);
 
   const handleToggleDetails = (e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -69,7 +70,7 @@ export function DiceToast({ result, phase, onDismiss }: DiceToastProps): React.R
             </div>
           ))}
         <div className="atlas-dice-toast__content">
-          {hasSource && <span className="atlas-dice-toast__name">{sourceTokenName}</span>}
+          {name && <span className="atlas-dice-toast__name">{name}</span>}
           {source?.abilityName && (
             <span className="atlas-dice-toast__ability">{source.abilityName}</span>
           )}

@@ -26,7 +26,11 @@ export interface DiceRollResult {
   total: number;
   /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
   crit?: DiceCrit;
+  /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
+  unlistedDice?: number;
   player?: string;
+  /** Who rolled it when it was someone other than the GM: their name. */
+  rolledBy?: string;
   source?: {
     type: 'toolbar' | 'statblock';
     /** Let the roll follow its token's or statblock's current artwork. */
@@ -82,4 +86,16 @@ export function withoutHiddenToken(result: DiceRollResult, isTokenHidden: (token
   if (!source || !tokenId || !isTokenHidden(tokenId)) return result;
   const { type, abilityName } = source;
   return { ...result, source: abilityName ? { type, abilityName } : { type } };
+}
+
+/** The dice log as a map file keeps it: rolls by someone other than the GM stay in the live log only. */
+export function persistableDiceLog(log: readonly DiceRollResult[]): DiceRollResult[] {
+  return log.filter((entry) => !entry.rolledBy);
+}
+
+/** The name a roll shows: the person who rolled it, or a statblock roll's token; null for the GM's own. */
+export function rollerName(result: DiceRollResult): string | null {
+  if (result.rolledBy) return result.rolledBy;
+  const source = result.source;
+  return source?.type === 'statblock' && source.tokenName ? source.tokenName : null;
 }

@@ -32,6 +32,7 @@ import { createMapObjectsActions, type MapObjectsSlice } from './stores/mapObjec
 import { computeNextInstanceNumber } from './stores/tokenInstanceNumbers';
 import { raiseTokens } from './stores/tokenStacking';
 import type { DiceRollResult } from './tools/DiceTool';
+import { persistableDiceLog } from './tools/diceRolling';
 import { isAtlasToolAvailable } from './tools/toolAvailability';
 import { readExploredMask } from './lighting/exploredMaskCodec';
 import { clampLitThreshold, readSceneLighting } from './lighting/sceneLightingOptions';
@@ -1536,7 +1537,7 @@ export function createViewAtlasStore(app: App, viewId: string, plugin?: AtlasVTT
               tokenSettings: state.tokenSettings, // Token display settings
               initiative: state.initiative, // Initiative tracker state
               initiativeTrackerOpen: state.initiativeTrackerOpen, // Initiative tracker open/closed state
-              diceLog: state.diceLog, // Dice roll history (last 20 per map)
+              diceLog: persistableDiceLog(state.diceLog), // Dice roll history (last 20 per map); rolls by others stay in memory
               pinnedNotePreviews: state.pinnedNotePreviews, // Pinned note preview windows
               lootRoller: state.lootRoller, // Loot roller window, filters and history
               lighting: state.lighting,

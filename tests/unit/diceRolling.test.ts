@@ -1,8 +1,9 @@
 import { EventEmitter } from 'events';
 import { describe, expect, it } from 'vitest';
 import {
-  DICE_TYPES, diceFormula, diceTerms, rollFormula, withoutHiddenToken, type DiceRollResult,
+  DICE_TYPES, diceFormula, diceTerms, persistableDiceLog, rollerName, rollFormula, withoutHiddenToken, type DiceRollResult,
 } from '../../src/app/tools/diceRolling';
+import type { DiceRules } from '../../src/app/types/diceRulesTypes';
 import { DiceTool } from '../../src/app/tools/DiceTool';
 
 /** Returns `values` in turn, over and over, as `Math.random` would. */
@@ -57,6 +58,30 @@ describe('rollFormula', () => {
   });
 });
 
+describe('rolling by the dice rules of a collection', () => {
+  const d20Rules: DiceRules = { defaultRoll: '1d20', crit: 'natural' };
+  const exploding: DiceRules = { defaultRoll: '1d20', crit: 'natural', explode: { dice: 'all', repeats: false, highFaces: 1, lowFaces: 0 } };
+
+  it('decides the critical result by the critical rule', () => {
+    expect(rollFormula('1d20', sequence(0.99), 0, d20Rules).crit).toBe('high');
+    expect(rollFormula('1d20', sequence(0), 0, d20Rules).crit).toBe('low');
+    expect(rollFormula('1d20', sequence(0.5), 0, d20Rules).crit).toBeNull();
+    expect(rollFormula('1d20', sequence(0.99), 0, { ...d20Rules, crit: 'none' }).crit).toBeNull();
+    expect(rollFormula('1d20', sequence(0.99), 0).crit).toBeUndefined();
+  });
+
+  it('rolls a die again when it shows its highest face and adds the new die', () => {
+    // 0.99 is a 6, which explodes; 0.5 then rolls a 4.
+    const result = rollFormula('1d6', sequence(0.99, 0.5), 0, exploding);
+    expect(result.rolls).toEqual([
+      { die: 'd6', value: 6, max: 6 },
+      { die: 'd6', value: 4, max: 6, exploded: true },
+    ]);
+    expect(result.total).toBe(10);
+    expect(rollFormula('1d6', sequence(0.99, 0.5), 0).rolls).toHaveLength(1);
+  });
+});
+
 describe('what players see of a roll', () => {
   const statblock: DiceRollResult = {
     id: 'r', timestamp: 0, formula: 'd20', rolls: [], modifiers: 0, total: 1,
@@ -66,5 +91,20 @@ describe('what players see of a roll', () => {
   it('drops the token of a roll for a hidden token, and keeps the ability', () => {
     expect(withoutHiddenToken(statblock, () => true).source).toEqual({ type: 'statblock', abilityName: 'Scimitar' });
     expect(withoutHiddenToken(statblock, () => false)).toBe(statblock);
+  });
+
+  it('names who rolled it, else the statblock token, else nobody', () => {
+    expect(rollerName({ ...statblock, rolledBy: 'Anna' })).toBe('Anna');
+    expect(rollerName(statblock)).toBe('Goblin');
+    expect(rollerName(withoutHiddenToken(statblock, () => true))).toBeNull();
+    expect(rollerName({ ...statblock, source: { type: 'toolbar' } })).toBeNull();
+  });
+});
+
+describe('what the dice log saves', () => {
+  it("keeps the GM's rolls and leaves rolls by others in memory", () => {
+    const gm = rollFormula('d20');
+    const player = { ...rollFormula('d6'), rolledBy: 'Anna' };
+    expect(persistableDiceLog([player, gm])).toEqual([gm]);
   });
 });

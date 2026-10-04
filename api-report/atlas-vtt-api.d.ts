@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.2.0";
+export declare const API_VERSION = "1.3.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -227,7 +227,11 @@ export declare interface DiceRollResult {
     total: number;
     /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
     crit?: DiceCrit;
+    /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
+    unlistedDice?: number;
     player?: string;
+    /** Who rolled it when it was someone other than the GM: their name. */
+    rolledBy?: string;
     source?: {
         type: 'toolbar' | 'statblock';
         /** Let the roll follow its token's or statblock's current artwork. */
