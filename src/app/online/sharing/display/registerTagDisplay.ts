@@ -25,7 +25,9 @@ export function registerTagDisplay(plugin: Plugin): void {
     const info = ctx.getSectionInfo(el);
     if (!info) return;
     const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
-    decorateSection(el, info, () => blocksOf(app, file instanceof TFile ? file : null, info.text));
+    const note = file instanceof TFile ? file : null;
+    // Keyed by the cache's sections array: a new parse gives a new array, so the model is read again.
+    decorateSection(el, info, { key: note ? app.metadataCache.getFileCache(note)?.sections ?? 'no-sections' : 'inline-only', read: () => blocksOf(app, note, info.text) });
   });
   // Sections arrive after an edit: let open editors of the note read them again.
   plugin.registerEvent(app.metadataCache.on('changed', (file) => {

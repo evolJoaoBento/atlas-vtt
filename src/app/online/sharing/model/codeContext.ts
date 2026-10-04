@@ -24,6 +24,8 @@ const REFERENCE_DEFINITION = /^\[[^\]]*\]:/;
 const FENCE_HTML_OR_MATH = /^(?:`{3,}|~{3,}|<[A-Za-z!?/]|\$\$)/;
 const LIST_ITEM_START = /^[ \t]*(?:[-*+]|\d{1,9}[.)])(?=[ \t]|$)/;
 const QUOTE_MARKERS = /^(?:[ \t]*>)*[ \t]?/;
+/** After quote and list markers: an ATX heading, a thematic break, or a setext underline. */
+const INTERRUPTS_PARAGRAPH = /^(?:#{1,6}(?:\s|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|=+[ \t]*$|-+[ \t]*$)/;
 
 /** `text` with every backslash escape (`\` before ASCII punctuation) masked, so the escaped character never counts. */
 function withoutEscapes(text: string): string {
@@ -164,9 +166,17 @@ export function codeOrLinkTest(text: string, ranges: readonly TextRange[], block
       if (at < index && quoteDepth(line) !== quoteDepth(lines[at + 1] ?? '')) { cutFirst = at + 1; break; }
       if (LIST_ITEM_START.test(line.replace(QUOTE_MARKERS, ''))) { cutFirst = at; break; }
     }
+    // A heading, thematic break or setext underline inside a list, quote or callout ends a paragraph too: read
+    // from that line and from the next one as well (A-I1).
+    const readings = new Set([blankFirst, cutFirst]);
+    for (let at = blankFirst; at <= index; at++) {
+      if (!INTERRUPTS_PARAGRAPH.test(lenientQuote(lines[at] ?? '').content)) continue;
+      readings.add(at);
+      if (at + 1 <= index) readings.add(at + 1);
+    }
     const lineStart = starts[index] ?? 0;
     const line = lines[index]?.length ?? 0;
-    return [blankFirst, cutFirst].some((paragraphLine) => {
+    return [...readings].some((paragraphLine) => {
       const from = starts[paragraphLine] ?? 0;
       if (codeSpanOpen(tokensMasked.slice(from, range.start))) return true;
       return [tokensMasked, unescaped].some((reading) => inlineOpen(reading.slice(from, range.start), reading.slice(lineStart, range.start), reading.slice(lineStart, lineStart + line)));

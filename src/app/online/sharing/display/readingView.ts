@@ -28,8 +28,8 @@ interface LabelledPart {
 
 interface NoteModel {
   text: string;
-  /** The block context the note was read with. */
-  context: string;
+  /** The key of the block context the note was read with (`SectionBlocks.key`). */
+  context: unknown;
   display: TagDisplay;
   /** Tags and comments, sorted and apart: never rendered. */
   removed: Array<{ start: number; end: number }>;
@@ -65,16 +65,27 @@ function disjoint(ranges: ReadonlyArray<{ start: number; end: number }>): Array<
   return out;
 }
 
-/** The note's tags, read once per source text (every section of a render shares it). */
-function modelOf(text: string, blocksFor: () => BlockContext): NoteModel {
-  // Cached by the text and the block context it was read with: sections that fit later give a new model.
-  const blocks = blocksFor();
-  const context = blocks === null || blocks === 'inline-only' ? String(blocks) : JSON.stringify(blocks);
-  if (cached?.text === text && cached.context === context) return cached;
-  const { tags, comments } = scanMarkup(text, blocks);
+/**
+ * A note's block context for the reading view: `key` is cheap to compare (the cache's sections array, which
+ * Obsidian replaces when it parses the note again), `read` works the context out only when the model is built.
+ */
+export interface SectionBlocks {
+  key: unknown;
+  read(): BlockContext;
+}
+
+export const INLINE_ONLY: SectionBlocks = { key: 'inline-only', read: () => 'inline-only' };
+
+/** The note's tags, read once per source text and sections (every section of a render shares it). */
+function modelOf(text: string, blocks: SectionBlocks): NoteModel {
+  // The cache check comes first and costs nothing: working the context out is O(text), once per model.
+  if (cached?.text === text && cached.context === blocks.key) return cached;
+  const context = blocks.key;
+  const scanned = blocks.read();
+  const { tags, comments } = scanMarkup(text, scanned);
   const lineStarts = [0];
   for (let at = text.indexOf('\n'); at >= 0; at = text.indexOf('\n', at + 1)) lineStarts.push(at + 1);
-  const display = tagDisplayOf(text, blocks);
+  const display = tagDisplayOf(text, scanned);
   const highlightAt = new Map(display.highlights.map((highlight) => [highlight.from, highlight]));
   const parts = display.labels
     .map((label) => ({ label, highlight: highlightAt.get(label.to) }))
@@ -126,13 +137,13 @@ const firstTextElement = (el: HTMLElement): HTMLElement =>
 
 const PROCESSED = 'atlasShareTags';
 
-/** Applies the share tags of `source` to `el`, the rendered section. `blocksFor` gives the note's block context. */
-export function decorateSection(el: HTMLElement, source: SectionSource, blocksFor: () => BlockContext): void {
+/** Applies the share tags of `source` to `el`, the rendered section; `blocks` gives the note's block context. */
+export function decorateSection(el: HTMLElement, source: SectionSource, blocks: SectionBlocks): void {
   if (el.dataset[PROCESSED]) return;
   el.dataset[PROCESSED] = 'true';
   // Every tag is a `%%` comment: most notes have none, and cost nothing more.
   if (!source.text.includes('%%')) return;
-  const model = modelOf(source.text, blocksFor);
+  const model = modelOf(source.text, blocks);
   if (model.display.labels.length === 0) return;
   const sStart = model.lineStarts[source.lineStart] ?? model.text.length;
   const sEnd = (model.lineStarts[source.lineEnd + 1] ?? model.text.length + 1) - 1;

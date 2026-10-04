@@ -343,6 +343,14 @@ describe('inline leaks of fix round 5', () => {
     ['2. inside a paragraph', lines(P, '', 'a `b', '2. c ' + E + ' ` LEAK `d', '3. e ' + P + ' `', '', E), [['paragraph', 0, 0], ['paragraph', 2, 4], ['paragraph', 6, 6]]],
     ['  2. inside a list item', lines(P, '', '- a `b', '  2. c ' + E + ' ` LEAK `d', '  3. e ' + P + ' `', '', E), [['paragraph', 0, 0], ['list', 2, 4], ['paragraph', 6, 6]]],
     ['$ over a lazy quote line', lines(P, '> a $b', 'c ' + E + ' $ LEAK $d', 'e ' + P + ' $', E), [['paragraph', 0, 0], ['blockquote', 1, 3], ['paragraph', 4, 4]]],
+    // Fix round 7 (A-I1): a heading, thematic break or setext underline in a container ends the paragraph.
+    ...([['a heading in a list', '- a `x', '  # h', '  `', '  c ' + E + ' ` LEAK `', '  e ' + P + ' `', 'list'],
+      ['a heading in a quote', '> a `x', '> # h', '> `', '> c ' + E + ' ` LEAK `', '> e ' + P + ' `', 'blockquote'],
+      ['a *** break in a list', '- a `x', '  ***', '  `', '  c ' + E + ' ` LEAK `', '  e ' + P + ' `', 'list'],
+      ['a setext underline in a quote', '> a `x', '> ---', '> `', '> c ' + E + ' ` LEAK `', '> e ' + P + ' `', 'blockquote'],
+      ['$ across a heading in a list', '- a $x', '  # h', '  $', '  c ' + E + ' $ LEAK $', '  e ' + P + ' $', 'list'],
+    ] as const).map(([label, a, b, c, d, e, type]): [string, string, Array<[string, number, number]>] => [
+      label, lines(P, '', a, b, c, d, e, '', E), [['paragraph', 0, 0], [type, 2, 6], ['paragraph', 8, 8]]]),
     // M4: an HTML attribute over lines.
     ['a multi-line HTML attribute', lines(P, 'a <span title="', E + '"> LEAK <span title="', P + '">', E), [['paragraph', 0, 4]]],
   ];
