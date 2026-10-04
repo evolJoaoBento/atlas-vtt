@@ -3,7 +3,7 @@ import { cn } from '../../../../utils/cn';
 import { throwStyle } from '../../../dice3d/diceDisplay';
 import { diceSceneToShow } from '../../../dice3d/rollPresentation';
 import { warmDiceSounds } from '../../../dice3d/audio/diceSamples';
-import { warmStages } from '../../../dice3d/stagePool';
+import { canShowDice, warmStages } from '../../../dice3d/stagePool';
 import { canRunMapHotkeys } from '../../../keyboard/mapHotkeys';
 import { DiceRollStack } from '../dice3d/DiceRollStack';
 import { closeAllRolls, closeRoll, dismissRoll, pushRoll, type StackedRoll } from '../dice3d/rollStackState';
@@ -20,7 +20,8 @@ import { useAtlasStore } from '../../ViewStoreContext';
  * GM's, thrown with the player's own dice settings (display, look) or as a result card. Other
  * people's rolls go only to the dice log. Fed by `remoteScene.ownRoll`, never by Atlas's document
  * dice event: the player's other maps listen to that one and would record the shared log. A roll
- * whose dice the log does not all list shows as a card, since its throw would be missing dice.
+ * whose dice the log does not all list shows as a card, since its throw would be missing dice, and
+ * so does every roll where the document cannot show 3D dice (no WebGL, a lost context).
  */
 export function OnlineOwnRolls(): React.ReactElement | null {
   const { app, view } = useAtlasUI();
@@ -31,22 +32,25 @@ export function OnlineOwnRolls(): React.ReactElement | null {
   const [rolls, setRolls] = useState<readonly StackedRoll[]>([]);
   // Mounting with a roll already in the store (a view rebuilt) throws nothing: that roll was shown.
   const shown = useRef<string | null>(ownRoll?.id ?? null);
+  /** Where the dice stages live: a canvas and its context belong to one document. */
+  const stageDoc = view?.containerEl.doc ?? document;
 
   useEffect(() => {
     if (!ownRoll || ownRoll.id === shown.current) return;
     shown.current = ownRoll.id;
     const scene = ownRoll.unlistedDice ? null : diceSceneToShow(ownRoll, display);
-    if (!scene) {
+    // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card, as on the GM's map.
+    if (!scene || !canShowDice(stageDoc)) {
       addToast(ownRoll);
       return;
     }
     warmDiceSounds();
     setRolls((prev) => pushRoll(prev, { result: ownRoll, scene, style: throwStyle(display) }));
-  }, [ownRoll, display, addToast]);
+  }, [ownRoll, display, addToast, stageDoc]);
 
   useEffect(() => {
-    if (display !== 'card') warmStages(view?.containerEl.doc ?? document);
-  }, [display, view]);
+    if (display !== 'card') warmStages(stageDoc);
+  }, [display, stageDoc]);
 
   // Escape dismisses the rolls on screen, as on the GM's map.
   const showing = rolls.some((roll) => !roll.leaving) || toasts.some((toast) => toast.phase !== 'exiting');

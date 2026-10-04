@@ -98,6 +98,25 @@ describe('live lighting of a presentation', () => {
     expect(live.frame({ exploredMask: null, lighting: { ...LIT, enabled: false } }, MAP)).toBeNull();
   });
 
+  // A view that lights its scenes now reads the settings before it makes its renderer (upstream #239),
+  // and a view rebuilt in place (a restored context, a reload) has none for a moment either.
+  it('stays closed while the view has no renderer yet, opens once its lighting is there, and closes again when it goes', () => {
+    const source = lightingSource(undefined);
+    const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
+    const at = (now: number) => live.frame({ exploredMask: null, lighting: LIT }, MAP, now)!;
+    expect(at(0).seen('hero')).toBe(false);
+    expect(at(0).darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    source.current = playerLightingOf(walled(), MAP);
+    const open = at(10);
+    expect(open.seen('hero')).toBe(true);
+    expect(open.seen('goblin')).toBe(false);
+    expect(open.darkness.covered).not.toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    source.current = undefined;
+    expect(at(20).seen('hero')).toBe(false);
+    expect(at(20).darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    live.dispose();
+  });
+
   it('watches the view once it can be watched, though it had no renderer at first', () => {
     const source = lightingSource(playerLightingOf(walled(), MAP));
     let watchable = false;

@@ -5,7 +5,7 @@ import { diceThrows } from '../../../online-client/dice3d/diceThrows.mts';
 import { LEAVE_MS, LINGER_MS, ThrowPanel, TICK_DELAY_MS, type PageThrow } from '../../../online-client/dice3d/throwPanel.mts';
 import { throwStyle } from '../../../src/app/dice3d/diceDisplay';
 import { sceneFromRolls } from '../../../src/app/dice3d/diceScene';
-import { resetStagePool } from '../../../src/app/dice3d/stagePool';
+import { borrowStage, releaseStagePools } from '../../../src/app/dice3d/stagePool';
 import type { DiceRollResult } from '../../../src/app/tools/diceRolling';
 
 const result: DiceRollResult = {
@@ -17,7 +17,7 @@ describe("the join page's thrown roll", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-    resetStagePool();
+    releaseStagePools();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -69,7 +69,8 @@ describe("the join page's thrown roll", () => {
     const renderer = {
       stage: vi.fn(() => [4, 3] as const), setView: vi.fn(), setPlan: vi.fn(), render: vi.fn(), isStill: vi.fn(() => true), reset: vi.fn(),
     };
-    const lease = { canvas: document.createElement('canvas'), renderer: renderer as never };
+    // A stage of the page's pool, with a stand-in renderer: jsdom has no WebGL.
+    const lease = { ...borrowStage(document), renderer: renderer as never };
     const panel = new ThrowPanel(document.body, lease, roll(true), () => {});
     expect(renderer.setPlan).toHaveBeenCalledWith([20]);
     expect(renderer.setView).toHaveBeenCalled();
