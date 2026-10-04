@@ -66,6 +66,8 @@ export class LiveLighting {
   private stopWatching: (() => void) | null = null;
   private built: Built | null = null;
   private timer: number | null = null;
+  /** The store's count of hand edits of the memory the last frame was made at. */
+  private edits: number | undefined;
 
   constructor(private readonly scene: PresentedSceneInfo, private readonly onDue: () => void, decode?: ExploredDecoder) {
     this.explored = new ExploredImages(onDue, decode);
@@ -77,8 +79,14 @@ export class LiveLighting {
    * without lighting. Where the view cannot tell (no renderer, no lighting state) and the scene is
    * saved lit, nothing is seen (`closedFrame`).
    */
-  frame(state: Pick<ViewAtlasState, 'exploredMask' | 'lighting'>, map: MapSize, now = Date.now()): LightingFrame | null {
+  frame(state: Pick<ViewAtlasState, 'exploredMask' | 'lighting'> & Partial<Pick<ViewAtlasState, 'exploredEdits'>>, map: MapSize, now = Date.now()): LightingFrame | null {
     this.watch();
+    // The memory was edited by hand (or undone): no memory decoded before stands in, and the darkness is not held back,
+    // so players see less while the new mask decodes, never what was forgotten.
+    if (state.exploredEdits !== this.edits) {
+      if (this.edits !== undefined) this.restart();
+      this.edits = state.exploredEdits;
+    }
     const lighting = this.scene.lighting?.();
     if (!lighting) {
       this.built = null;

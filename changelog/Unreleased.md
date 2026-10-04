@@ -50,6 +50,7 @@
 - Reloading Atlas no longer leaves the previous 3D dice in graphics memory
 - Loading a scene with explored areas no longer keeps a copy of them in graphics memory
 - With dynamic lighting on, online players no longer receive texts and drawings that sit in the dark across the map's edge. The darkness stops at the map, so a text or drawing that reached past it was sent; anything not wholly inside the map is now left out while lighting is on.
+- With dynamic lighting on, online players no longer keep seeing explored areas you have forgotten. Forgetting explored areas, and undoing or redoing an edit of them, now reaches players at once instead of after a couple of seconds, and until the new memory has been read they see less, never the area you forgot.
 
 ## Important changes
 
