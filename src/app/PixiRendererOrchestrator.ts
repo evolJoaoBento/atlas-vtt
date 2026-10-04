@@ -35,6 +35,7 @@ import { DrawingInteraction } from "./pixi/DrawingInteraction";
 import { TextRenderer } from "./pixi/TextRenderer"; // Import TextRenderer
 import { TextTool } from "./tools/TextTool"; // Import TextTool
 import type { LightingController } from './pixi/lighting/LightingController';
+import type { PlayerLighting } from './pixi/lighting/playerLightingLayers';
 import { LightingFeature } from './pixi/lighting/LightingFeature';
 import type { SceneFrame } from './pixi/lighting/engine/types';
 import { captureSceneFrame } from './pixi/sceneFrameCapture';
@@ -74,6 +75,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private get lighting(): LightingController | undefined {
     return this.lightingFeature?.controller;
   }
+  /** Who is told when what the players see by the lighting may have changed (`watchPlayerLighting`). */
+  private readonly playerLightingListeners = new Set<() => void>();
   private audioRenderer?: AudioRenderer;
   private audioTool?: AudioTool;
   private soundRegistry?: SoundRegistry;
@@ -392,6 +395,7 @@ export class PixiRendererOrchestrator { // Renamed class
         viewId: this.viewId,
         bounds: () => this.getMapRect(),
         albedo: () => (this.backgroundSprite && !this.backgroundSprite.destroyed ? this.backgroundSprite.texture : null),
+        onPlayerSightChange: () => { for (const listener of [...this.playerLightingListeners]) listener(); },
       });
     }
 
@@ -793,6 +797,20 @@ export class PixiRendererOrchestrator { // Renamed class
   getGridSystem(): GridSystem | null { return this.gridSystem || null; }
   getBackgroundSprite(): Sprite | null { return this.backgroundSprite; }
   getLaserHub(): LaserHub { return this.laserHub; }
+  /**
+   * What the players' window decides what they see by, for players outside the player window. Null while it hides
+   * nothing by lighting (the scene unlit, dynamic lighting off); undefined before the view's renderers exist.
+   */
+  getPlayerLighting(): PlayerLighting | null | undefined {
+    if (!this.lightingFeature) return undefined;
+    return this.lighting?.playerLighting() ?? null;
+  }
+
+  /** Calls `listener` whenever what `getPlayerLighting` describes may have changed outside the store; returns the unsubscribe. */
+  watchPlayerLighting(listener: () => void): () => void {
+    this.playerLightingListeners.add(listener);
+    return () => { this.playerLightingListeners.delete(listener); };
+  }
   getTokenRenderer(): TokenRenderer | null { return this.tokenRenderer || null; }
 
   /**

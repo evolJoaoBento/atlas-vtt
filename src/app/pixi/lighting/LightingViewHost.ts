@@ -1,5 +1,6 @@
 import type { ViewAtlasStore } from '../../storeFactory';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
+import type { SeenSpot } from '../../vision/perception';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import type { HideableLayer } from '../playerSafeFrame';
 import type { SceneFrame } from './engine/types';
@@ -78,6 +79,9 @@ export class LightingViewHost implements SceneLightingView {
   currentSight(): Sight { return this.view.currentSight(); }
   lightReaches(): LightReach[] { return this.view.lightReaches(); }
   ambientLight(): AmbientLight { return this.view.ambientLight(); }
+  seenSpots(): readonly SeenSpot[] { return this.view.seenSpots(); }
+  showsExplored(): boolean { return this.view.showsExplored(); }
+  sightReady(): boolean { return this.view.sightReady(); }
   refreshBounds(): void { this.view.refreshBounds(); }
   resetExplored(): void { this.view.resetExplored(); }
   editExplored(edit: ExploredEdit): boolean { return this.view.editExplored(edit); }

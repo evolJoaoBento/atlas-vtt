@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
 import type { LaserHub } from '../app/pixi/laser/LaserHub';
+import type { PlayerLighting } from '../app/pixi/lighting/playerLightingLayers';
 import type { CameraViewport } from '../app/services/presentedCamera';
 import type { ViewAtlasStore } from '../app/storeFactory';
 import type { TabMetaStore } from '../app/stores/tabMetaStore';
@@ -15,6 +16,10 @@ export interface TrackedMapView {
     getBackgroundSprite(): { width: number; height: number; destroyed: boolean } | null;
     getViewportInstance?(): CameraViewport | null;
     getLaserHub?(): LaserHub;
+    /** What the players' window decides what they see by: null while lighting hides nothing, undefined when it cannot tell. */
+    getPlayerLighting?(): PlayerLighting | null | undefined;
+    /** Calls `listener` when what `getPlayerLighting` describes may have changed outside the store; returns the unsubscribe. */
+    watchPlayerLighting?(listener: () => void): () => void;
   } | null;
   readonly isClosed: boolean;
   register(callback: () => void): void;

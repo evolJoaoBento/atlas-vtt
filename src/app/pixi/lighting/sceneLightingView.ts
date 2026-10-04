@@ -1,5 +1,6 @@
 import type { Texture } from 'pixi.js';
 import type { ExploredEdit } from '../../lighting/exploredEdits';
+import type { SeenSpot } from '../../vision/perception';
 import type { AmbientLight, LightReach, Sight } from '../../vision/sight';
 import type { HideableLayer } from '../playerSafeFrame';
 import type { SceneFrame } from './engine/types';
@@ -27,6 +28,16 @@ export interface SceneLightingView {
   lightReaches(): LightReach[];
   /** The ambient light the CPU checks tokens against. */
   ambientLight(): AmbientLight;
+  /** The tokens the players' view shows within their footprint where the picture is dark (`seenSpots`). */
+  seenSpots(): readonly SeenSpot[];
+  /** Whether the players' view shows the explored memory (the scene's `exploredMask`) where no token sees. */
+  showsExplored(): boolean;
+  /**
+   * Whether the sight, light and spots above were worked out for the scene the store holds now.
+   * False while a map loads, before its bounds are known and while the graphics device is lost:
+   * they may still be another scene's then.
+   */
+  sightReady(): boolean;
   refreshBounds(): void;
   /** Forgets all the scene remembers: an undo step where the memory can be edited. */
   resetExplored(): void;
