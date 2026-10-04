@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initialize = vi.hoisted(() => vi.fn<() => Promise<void>>());
 vi.mock('../../src/app/services/AssetService', () => ({
@@ -15,6 +15,10 @@ function atlas(): { plugin: AtlasVTTPlugin; triggered: ReturnType<typeof fakeApp
 }
 
 describe('ExtensionApiPublisher', () => {
+  beforeEach(() => {
+    initialize.mockReset();
+  });
+
   it('sets plugin.api only once the asset index is ready, then announces it', async () => {
     let finish: () => void = () => undefined;
     initialize.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
