@@ -1,6 +1,6 @@
-import React, { useEffect, useReducer, useRef } from 'react';
+import React, { useEffect, useReducer } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { setIcon } from 'obsidian';
+import { ObsidianIcon } from '../ObsidianIcon';
 import { runInBackground } from '../../../utils/backgroundTask';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import './atlas-context-menu.scss';
@@ -56,19 +56,8 @@ function runEntryAction(entry: ContextMenuItemEntry): void {
 
 // ── Icon helper ─────────────────────────────────────────────────────────────
 
-function ObsidianIcon({ name }: { name: string }): React.ReactElement {
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      while (ref.current.firstChild) {
-        ref.current.removeChild(ref.current.firstChild);
-      }
-      setIcon(ref.current, name);
-    }
-  }, [name]);
-
-  return <span ref={ref} className="atlas-ctx-icon" />;
+function CtxIcon({ name }: { name: string }): React.ReactElement {
+  return <ObsidianIcon name={name} className="atlas-ctx-icon" />;
 }
 
 /** A submenu's entries, rebuilt whenever the submenu reports that they changed. */
@@ -93,13 +82,13 @@ function Stepper({ stepper }: { stepper: MenuStepper }): React.ReactElement {
     <span className="atlas-ctx-stepper">
       <LabelTooltip label={`Lower ${stepper.label}`}>
         <button type="button" tabIndex={-1} className="atlas-ctx-stepper__button" disabled={!stepper.canDecrement} onClick={stepperClick(stepper.onDecrement)}>
-          <ObsidianIcon name="minus" />
+          <CtxIcon name="minus" />
         </button>
       </LabelTooltip>
       <span className="atlas-ctx-stepper__value">{stepper.value}</span>
       <LabelTooltip label={`Raise ${stepper.label}`}>
         <button type="button" tabIndex={-1} className="atlas-ctx-stepper__button" onClick={stepperClick(stepper.onIncrement)}>
-          <ObsidianIcon name="plus" />
+          <CtxIcon name="plus" />
         </button>
       </LabelTooltip>
     </span>
@@ -131,7 +120,7 @@ function ItemContent({ entry }: { entry: ContextMenuItemEntry }): React.ReactEle
           {entry.stepper && <Stepper stepper={entry.stepper} />}
           {entry.checked !== undefined && (
             <DropdownMenu.ItemIndicator forceMount className="atlas-ctx-item__check">
-              <ObsidianIcon name="check" />
+              <CtxIcon name="check" />
             </DropdownMenu.ItemIndicator>
           )}
         </span>
@@ -162,11 +151,11 @@ export function renderEntries(
               className={`atlas-ctx-item atlas-ctx-submenu-trigger`}
             >
               <span className="atlas-ctx-item__leading">
-                {entry.icon ? <ObsidianIcon name={entry.icon} /> : <span className="atlas-ctx-icon-spacer" />}
+                {entry.icon ? <CtxIcon name={entry.icon} /> : <span className="atlas-ctx-icon-spacer" />}
                 <span className="atlas-ctx-item__label">{entry.label}</span>
               </span>
               <span className="atlas-ctx-item__trailing">
-                <ObsidianIcon name="chevron-right" />
+                <CtxIcon name="chevron-right" />
               </span>
             </DropdownMenu.SubTrigger>
             <DropdownMenu.Portal>

@@ -15,6 +15,7 @@ import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
 import { AMBIENT_AUDIO_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
 import { useExperimentalFeature } from "../../react/hooks/useExperimentalFeature"
+import { useExtensionToolbarItems } from "../../extensions/extensionToolbarItems"
 import { ResponsiveToolbar } from "./toolbar/ResponsiveToolbar"
 import { MoveToolGroup } from "./toolbar/MoveToolGroup"
 import { FogToolGroup } from "./toolbar/FogToolGroup"
@@ -170,6 +171,8 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
     buttonItem(id, { icon, label, shortcut, isActive: activeTool === tool, onClick: () => handleToolClick(tool) }, activeTool === tool)
 
   const dm = !isActualPlayerView
+  // Items other plugins registered: they sit with Atlas's own by priority and fall into "More tools" like them.
+  const extensionItems = useExtensionToolbarItems(viewId ?? view?.viewId, store, isActualPlayerView)
 
   const items: ResponsiveToolbarItem[] = [
     toolGroupItem('move', moveToolFace(activeTool), hotkeyLabel('move'), <MoveToolGroup {...groupControls('move')} />),
@@ -201,6 +204,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
       ),
       menuEntry: { icon: Dices, label: "Roll Dice", shortcut: hotkeyLabel('diceTray'), isActive: isDiceTrayOpen, onSelect: toggleDiceTray },
     },
+    ...extensionItems,
     ...(dm ? [
       buttonItem('loot', { icon: CoinIcon, label: "Loot Roller", shortcut: hotkeyLabel('lootRoller'), isActive: lootRollerOpen, onClick: () => setLootRollerOpen(!lootRollerOpen) }, false),
       buttonItem('assets', { icon: ImageIcon, label: "Asset Manager", shortcut: hotkeyLabel('assets'), isActive: isAssetManagerOpen, onClick: handleAssetManagerClick }, false),

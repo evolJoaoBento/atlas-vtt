@@ -48,6 +48,7 @@ import { DiceSettingsPanel } from './command-palette/DiceSettingsPanel';
 import { ExperimentalFeaturesPanel } from './command-palette/ExperimentalFeaturesPanel';
 import { SceneSnapshotsPanel } from './command-palette/SceneSnapshotsPanel';
 import { placePalette, type PalettePosition } from './command-palette/palettePlacement';
+import { useExtensionCommands } from './command-palette/useExtensionCommands';
 import { isSettingsPanelId, type CommandOption, type SettingsPanelId } from './command-palette/types';
 
 interface CommandPaletteProps {
@@ -102,6 +103,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
   const setInitiativeTrackerOpen = useAtlasStore(state => state.setInitiativeTrackerOpen);
   const setDiceLogOpen = useAtlasStore(state => state.setDiceLogOpen);
   const setLootRollerOpen = useAtlasStore(state => state.setLootRollerOpen);
+  const extensionCommands = useExtensionCommands(isOpen ? view?.viewId : undefined, store, onClose);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [focusedOptionIndex, setFocusedOptionIndex] = useState<number>(-1);
@@ -408,6 +410,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
         },
       ],
     },
+    ...extensionCommands.options,
   ];
 
   // Derive rows from current state so open-menu toggles stay in sync.
@@ -752,6 +755,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     { id: 'tools', title: 'Tools' },
     { id: 'mode', title: 'Mode' },
     { id: 'settings', title: 'Settings' },
+    ...extensionCommands.sections,
   ].map((section) => ({
     ...section,
     options: filteredOptions.filter((option) => option.section === section.id),
