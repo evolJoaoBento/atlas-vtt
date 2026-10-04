@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { cellCenterAt } from '../../src/app/grid/gridDistance';
 import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { axialToPixel, createHexLayout, hexCircumradius } from '../../src/app/grid/hexGeometry';
+import * as laserBeam from '../../src/app/pixi/laser/LaserBeam';
+import { beamWidth, laserPointSpacing } from '../../src/app/pixi/laser/laserBeamGeometry';
+import { LaserTrail } from '../../src/app/pixi/laser/laserTrail';
 import {
   arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../src/app/pixi/measureGeometry';
 import { DragRulerPath, dragRulerLabel, samePoint, WAYPOINT_KEY } from '../../src/app/pixi/token-renderer/dragRulerPath';
 import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
+import { LASER_FADE_TIME } from '../../src/app/tools/laserPointerSettings';
 
 /** Records the Graphics calls the measure drawing makes. */
 function recordingGraphics(): { graphics: Graphics; calls: unknown[][] } {
@@ -116,5 +120,35 @@ describe('cellCenterAt', () => {
       expect(snapped.x).toBeCloseTo(center.x);
       expect(snapped.y).toBeCloseTo(center.y);
     }
+  });
+});
+
+describe('the laser trail and beam width', () => {
+  it('keeps the beam width functions LaserBeam exported', () => {
+    expect(laserBeam.beamWidth).toBe(beamWidth);
+  });
+
+  it("spaces points like Atlas's laser: three screen pixels, or more for a wide beam", () => {
+    expect(laserPointSpacing(8, 1)).toBe(3);
+    expect(laserPointSpacing(16, 2)).toBeCloseTo((beamWidth(16, 2).halfWidth) * 0.15);
+  });
+
+  it('fades every point over the fade time and drops it then', () => {
+    const trail = new LaserTrail();
+    trail.add(0, 0, 0);
+    trail.add(10, 0, LASER_FADE_TIME / 2);
+    expect(trail.beamPoints(LASER_FADE_TIME / 2)).toEqual([{ x: 0, y: 0, life: 0.5 }, { x: 10, y: 0, life: 1 }]);
+    trail.prune(LASER_FADE_TIME);
+    expect(trail.length).toBe(1);
+    expect(trail.last()).toEqual({ x: 10, y: 0, timestamp: LASER_FADE_TIME / 2 });
+    trail.prune(LASER_FADE_TIME * 2);
+    expect(trail.length).toBe(0);
+  });
+
+  it('keeps at most the last hundred points', () => {
+    const trail = new LaserTrail();
+    for (let i = 0; i < 150; i++) trail.add(i, 0, 0);
+    expect(trail.length).toBe(100);
+    expect(trail.beamPoints(0)[0]!.x).toBe(50);
   });
 });

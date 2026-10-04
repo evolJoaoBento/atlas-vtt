@@ -1,29 +1,10 @@
 import { EventEmitter } from 'events';
 import { DEFAULT_DICE_RULES } from '../gameSystems/diceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
-import { getDiceCrit, type DiceCrit } from './diceCrit';
-import { hasDiceTerm, rollFormula, type RolledDie } from './diceFormula';
+import { hasDiceTerm } from './diceFormula';
+import { DICE_ROLLED_EVENT, DICE_TYPES, rollFormula, type DiceRollResult } from './diceRolling';
 
-export interface DiceRollResult {
-  id: string;
-  timestamp: number;
-  formula: string;
-  rolls: RolledDie[];
-  modifiers: number;
-  total: number;
-  /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
-  crit?: DiceCrit;
-  player?: string;
-  source?: {
-    type: 'toolbar' | 'statblock';
-    /** Let the roll follow its token's or statblock's current artwork. */
-    tokenId?: string;
-    statblockPath?: string;
-    tokenName?: string;
-    tokenImagePath?: string;
-    abilityName?: string;
-  };
-}
+export type { DiceRollResult } from './diceRolling';
 
 export interface DiceToolState {
   isTrayOpen: boolean;
@@ -44,7 +25,7 @@ export class DiceTool {
       isTrayOpen: false,
       rollHistory: [],
       activeFormula: '',
-      quickDice: ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']
+      quickDice: [...DICE_TYPES],
     };
   }
 
@@ -67,7 +48,7 @@ export class DiceTool {
       this.state.rollHistory = this.state.rollHistory.slice(0, 50);
     }
     
-    document.dispatchEvent(new CustomEvent('atlas-dice-rolled', { detail: result }));
+    document.dispatchEvent(new CustomEvent(DICE_ROLLED_EVENT, { detail: result }));
 
     return result;
   }
@@ -76,18 +57,7 @@ export class DiceTool {
   private parseAndRoll(formula: string): DiceRollResult {
     const rules = this.getDiceRules();
     const complete = hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll);
-    const { rolls, modifiers, total } = rollFormula(complete, Math.random, rules);
-
-    return {
-      id: `roll_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
-      timestamp: Date.now(),
-      formula: complete,
-      rolls,
-      modifiers,
-      total,
-      crit: getDiceCrit(rolls, rules),
-      player: 'Player' // TODO: Get actual player name from session
-    };
+    return rollFormula(complete, Math.random, Date.now(), rules);
   }
 
   public clearHistory(): void {

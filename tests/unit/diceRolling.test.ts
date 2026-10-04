@@ -1,0 +1,70 @@
+import { EventEmitter } from 'events';
+import { describe, expect, it } from 'vitest';
+import {
+  DICE_TYPES, diceFormula, diceTerms, rollFormula, withoutHiddenToken, type DiceRollResult,
+} from '../../src/app/tools/diceRolling';
+import { DiceTool } from '../../src/app/tools/DiceTool';
+
+/** Returns `values` in turn, over and over, as `Math.random` would. */
+function sequence(...values: number[]): () => number {
+  let index = 0;
+  return () => values[index++ % values.length]!;
+}
+
+describe('dice formulas', () => {
+  it('lists the dice of the tray in tray order', () => {
+    expect(DICE_TYPES).toEqual(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
+  });
+
+  it('writes a selection in the order it was picked, as the dice tray does', () => {
+    expect(diceTerms({ d20: 1, d6: 2 })).toEqual(['d20', '2d6']);
+    expect(diceTerms({ d4: 0, d8: 1 })).toEqual(['d8']);
+    expect(diceFormula({ d6: 2, d20: 1 })).toBe('2d6+d20');
+    expect(diceFormula({ d8: 3 }, 4)).toBe('3d8+4');
+    expect(diceFormula({ d8: 3 }, -2)).toBe('3d8-2');
+    expect(diceFormula({}, 5)).toBe('');
+  });
+});
+
+describe('rollFormula', () => {
+  it('rolls each die and adds the modifier', () => {
+    // floor(0.5 × 20) + 1 = 11.
+    const result = rollFormula('1d20+5', sequence(0.5), 1000);
+    expect(result.rolls).toEqual([{ die: 'd20', value: 11, max: 20 }]);
+    expect(result).toMatchObject({ formula: '1d20+5', modifiers: 5, total: 16, timestamp: 1000 });
+  });
+
+  it('reads a count before a second die as dice, not as a modifier', () => {
+    const result = rollFormula('2d6+3d8+1', sequence(0), 0);
+    expect(result.rolls.map((roll) => roll.die)).toEqual(['d6', 'd6', 'd8', 'd8', 'd8']);
+    expect(result.modifiers).toBe(1);
+    expect(result.total).toBe(6);
+  });
+
+  it('reads spaced and negative modifiers, and dice without a count', () => {
+    const result = rollFormula('d20 + 2 - 5', sequence(0), 0);
+    expect(result.rolls).toEqual([{ die: 'd20', value: 1, max: 20 }]);
+    expect(result.modifiers).toBe(-3);
+    expect(result.total).toBe(-2);
+  });
+
+  it('is what DiceTool rolls', () => {
+    const tool = new DiceTool(new EventEmitter());
+    const result = tool.rollDice('2d6+3d8');
+    expect(result.rolls).toHaveLength(5);
+    expect(result.modifiers).toBe(0);
+    expect(tool.getQuickDice()).toEqual([...DICE_TYPES]);
+  });
+});
+
+describe('what players see of a roll', () => {
+  const statblock: DiceRollResult = {
+    id: 'r', timestamp: 0, formula: 'd20', rolls: [], modifiers: 0, total: 1,
+    source: { type: 'statblock', tokenId: 'gob', tokenName: 'Goblin', abilityName: 'Scimitar' },
+  };
+
+  it('drops the token of a roll for a hidden token, and keeps the ability', () => {
+    expect(withoutHiddenToken(statblock, () => true).source).toEqual({ type: 'statblock', abilityName: 'Scimitar' });
+    expect(withoutHiddenToken(statblock, () => false)).toBe(statblock);
+  });
+});
