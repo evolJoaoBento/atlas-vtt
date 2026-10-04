@@ -86,4 +86,15 @@ describe('lasers', () => {
     expect(() => lasers.show('v1', { ...LASER, dt: [Number.POSITIVE_INFINITY] })).toThrow(/dt/);
     expect(() => lasers.show('v1', null as unknown as RemoteLaser)).toThrow(/from/);
   });
+
+  it('show counts only the newest points, so a huge call stays cheap', () => {
+    const { hub, lasers } = setup();
+    const shown: RemoteLaser[] = [];
+    hub.onRemote((laser) => shown.push(laser));
+    const points = Array.from({ length: 200_000 }, (_, index) => ({ x: index, y: 0 }));
+    lasers.show('v1', { ...LASER, points, dt: points.map(() => 1) });
+    expect(shown[0]!.points).toHaveLength(64);
+    expect(shown[0]!.dt).toHaveLength(64);
+    expect(shown[0]!.points.at(-1)).toEqual({ x: 199_999, y: 0 });
+  });
 });

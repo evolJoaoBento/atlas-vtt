@@ -1,4 +1,5 @@
 import type { LaserHub, LocalLaserEvent, RemoteLaser } from '../app/pixi/laser/LaserHub';
+import { REMOTE_LASER_LIMITS } from '../app/pixi/laser/remoteLasers';
 import { isHexColor } from '../app/utils/hexColor';
 import type { DisposerSet } from './disposers';
 import type { ViewTracker } from './viewTracker';
@@ -13,9 +14,19 @@ function isPoint(value: unknown): value is Point {
   return typeof value === 'object' && value !== null && isFiniteNumber((value as Point).x) && isFiniteNumber((value as Point).y);
 }
 
+/** Only the newest points count (`REMOTE_LASER_LIMITS`), so the cost of a call does not grow with what is sent; `dt` keeps matching. */
+function newest(points: unknown, dt: unknown): { points: unknown; dt: unknown } {
+  const max = REMOTE_LASER_LIMITS.points;
+  if (!Array.isArray(points)) return { points, dt };
+  const skip = Math.max(0, points.length - max);
+  const gaps = Array.isArray(dt) ? (dt.length === points.length ? dt.slice(skip) : dt.slice(-max)) : dt;
+  return { points: skip > 0 ? points.slice(skip) : points, dt: gaps };
+}
+
 /** A copy Atlas's drawing can trust: the caller keeps no reference into it. Throws, saying what is wrong. */
 function checkedLaser(laser: RemoteLaser): RemoteLaser {
-  const { from, color, points, lifted, dt } = (laser ?? {}) as { [K in keyof RemoteLaser]?: unknown };
+  const { from, color, lifted, ...sent } = (laser ?? {}) as { [K in keyof RemoteLaser]?: unknown };
+  const { points, dt } = newest(sent.points, sent.dt);
   if (typeof from !== 'string' || from === '') throw new Error('lasers.show: "from" must name whose laser it is.');
   if (!isHexColor(color)) throw new Error('lasers.show: "color" must be a #rrggbb colour.');
   if (typeof lifted !== 'boolean') throw new Error('lasers.show: "lifted" must be true or false.');

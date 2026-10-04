@@ -122,7 +122,7 @@ export class LaserPointerRenderer {
       this.lastPointerScreen = null;
       this.pointer = null;
       // Online players must not see a laser held where nobody points any more.
-      this.liftLaser();
+      if (this.isPointing) this.liftLaser();
       this.redraw();
     };
     this.canvasEl.addEventListener('mouseleave', this.onCanvasLeave);

@@ -44,4 +44,29 @@ describe('RemoteLaserRenderer', () => {
     expect(ticker.count).toBe(0);
     renderer.destroy();
   });
+
+  it('leaves nothing behind when destroyed while lasers are on screen', () => {
+    const { ticker, advance } = manualTicker();
+    let now = 0;
+    const beams: FakeBeam[] = [];
+    const hub = new LaserHub();
+    const renderer = new RemoteLaserRenderer({
+      ticker, zoom: () => 1, hub, now: () => now,
+      createBeam: () => { const beam = new FakeBeam(); beams.push(beam); return beam; },
+    });
+    for (const from of ['p1', 'p2']) hub.showRemote({ from, color: '#ff9f2e', points: [{ x: 1, y: 1 }], lifted: false });
+    now = LASER_PLAYBACK_DELAY_MS;
+    advance(16);
+    expect(beams).toHaveLength(2);
+    expect(ticker.count).toBe(1);
+    renderer.destroy();
+    expect(ticker.count).toBe(0);
+    expect(beams.every((beam) => beam.destroyed && beam.view.destroyed)).toBe(true);
+    expect(renderer.container.destroyed).toBe(true);
+    // The hub no longer reaches it, and showing again starts nothing.
+    hub.showRemote({ from: 'p1', color: '#ff9f2e', points: [{ x: 1, y: 1 }], lifted: false });
+    advance(16);
+    expect(ticker.count).toBe(0);
+    expect(beams).toHaveLength(2);
+  });
 });

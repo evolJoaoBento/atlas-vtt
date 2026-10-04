@@ -18,9 +18,10 @@ export const LASER_STALE_MS = 1000;
 export const LASER_PLAYBACK_DELAY_MS = 90;
 /**
  * What one `receive` may bring in, so a flood of messages cannot cost the frame more than a few lasers' worth:
- * the newest `points` of a message count, a gap in time is at most `maxGapMs`, and `senders` lasers at a time.
+ * the newest `points` of a message count, a gap in time is at most `maxGapMs`, points are never queued further than
+ * `maxAheadMs` past the playback time, and `senders` lasers at a time.
  */
-export const REMOTE_LASER_LIMITS = { points: 64, maxGapMs: 2000, senders: 32 } as const;
+export const REMOTE_LASER_LIMITS = { points: 64, maxGapMs: 2000, maxAheadMs: 3000, senders: 32 } as const;
 /** Points waiting to be played; a laser further behind than this skips ahead. */
 const MAX_PENDING = 256;
 /** The time one message spans when the sender did not say. */
@@ -155,6 +156,9 @@ export class RemoteLasers {
       previous = Math.max(previous, (times[index] ?? 0) + offset);
       entry.pending.push({ x: point.x, y: point.y, at: previous });
     });
+    // However the gaps add up, a laser never holds more than a few seconds of future, so a lost lift cannot leave one hanging.
+    const horizon = now + LASER_PLAYBACK_DELAY_MS + REMOTE_LASER_LIMITS.maxAheadMs;
+    while (entry.pending.length > 0 && entry.pending[entry.pending.length - 1]!.at > horizon) entry.pending.pop();
     if (entry.pending.length > MAX_PENDING) entry.pending.splice(0, entry.pending.length - MAX_PENDING);
   }
 

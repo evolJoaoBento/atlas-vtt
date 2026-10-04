@@ -138,5 +138,17 @@ describe('RemoteLasers', () => {
       for (let index = 0; index < REMOTE_LASER_LIMITS.senders + 10; index++) lasers.receive(`p${index}`, ORANGE, [{ x: 0, y: 0 }], false, 0);
       expect(lasers.frame(LASER_PLAYBACK_DELAY_MS + 1)).toHaveLength(REMOTE_LASER_LIMITS.senders);
     });
+
+    it('never queues points further ahead than the limit, however the gaps add up', () => {
+      const lasers = new RemoteLasers();
+      const points = Array.from({ length: REMOTE_LASER_LIMITS.points }, (_, index) => ({ x: index, y: 0 }));
+      lasers.receive('p1', ORANGE, points, false, 0, { dt: points.map(() => REMOTE_LASER_LIMITS.maxGapMs) });
+      const horizon = LASER_PLAYBACK_DELAY_MS + REMOTE_LASER_LIMITS.maxAheadMs;
+      // Heard from nothing else, the laser is let go and has played all it kept, soon after the horizon.
+      lasers.frame(horizon + LASER_STALE_MS);
+      expect(lasers.frame(horizon + LASER_STALE_MS + LASER_FADE_TIME)).toEqual([]);
+      expect(lasers.isActive).toBe(false);
+    });
   });
+
 });
