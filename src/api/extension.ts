@@ -8,6 +8,7 @@ import { presentationApi } from './presentation';
 import { rulesApi } from './rules';
 import { settingsApi } from './settings';
 import { storageApi } from './storage';
+import { tokensApi } from './tokens';
 import { viewsApi } from './views';
 import type { AtlasEvents, AtlasExtension } from './types/api';
 import type { Disposer } from './types/common';
@@ -26,6 +27,6 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
   return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers),
     presentation: presentationApi(services.views, scope.disposers), dice: diceApi(services.app, scope.disposers),
     lasers: lasersApi(services.views, scope.disposers), lighting: lightingApi(services.views, services.sightFrames, scope.disposers),
-    rules: rulesApi(services.app),
+    tokens: tokensApi(services.views), rules: rulesApi(services.app),
     settings: settingsApi(services.settings), storage: storageApi(services.app, scope.id) });
 }

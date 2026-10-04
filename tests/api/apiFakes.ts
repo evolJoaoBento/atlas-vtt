@@ -12,6 +12,7 @@ import { SightFramesByView } from '../../src/api/sightFramesByView';
 import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
+import type { TokenEntity } from '../../src/app/types';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 export interface FakePlugin extends ConnectingPlugin {
@@ -133,4 +134,9 @@ export function trackerWith(views: FakeView[], active: () => FakeView | null = (
 /** Marks `view`'s store as holding `maps/a.atlasmap`, loaded. */
 export function loadMap(view: FakeView): void {
   view.atlasStore.setState({ mapPath: 'maps/a.atlasmap', mapLoaded: true, isMapLoading: false });
+}
+
+/** A plain token at the origin, typed in full; tests spread their own fields over it. */
+export function makeToken(id: string): TokenEntity {
+  return { kind: 'token', id, x: 0, y: 0, imagePath: `tokens/${id}.png` };
 }
