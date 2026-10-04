@@ -26,7 +26,7 @@ export interface ViewHooks {
   activeView(app: App): unknown;
 }
 
-interface Entry { view: TrackedMapView; unsubscribe: () => void; loadedPath: string | null }
+interface Entry { view: TrackedMapView; unsubscribe: () => void; loadedPath: string | null; closeHooks: Set<() => void> }
 
 /** Follows the open map views for the API: which there are, and when one loads a map or closes. */
 export class ViewTracker {
@@ -68,6 +68,14 @@ export class ViewTracker {
     return this.view(active.viewId) === active ? active : null;
   }
 
+  /** Calls `callback` once when the view closes (before `map-closed`); the returned function cancels it. A view not open runs nothing. */
+  onClose(viewId: string, callback: () => void): () => void {
+    const entry = this.entries.get(viewId);
+    if (!entry || entry.view.isClosed) return () => undefined;
+    entry.closeHooks.add(callback);
+    return () => { entry.closeHooks.delete(callback); };
+  }
+
   private scan(): void {
     for (const leaf of this.app.workspace.getLeavesOfType(this.hooks.viewType)) {
       const view: unknown = leaf.view;
@@ -76,7 +84,7 @@ export class ViewTracker {
   }
 
   private track(view: TrackedMapView): void {
-    const entry: Entry = { view, unsubscribe: () => undefined, loadedPath: null };
+    const entry: Entry = { view, unsubscribe: () => undefined, loadedPath: null, closeHooks: new Set() };
     const check = (): void => {
       const state = view.atlasStore.getState();
       const path = isLoaded(state) ? state.mapPath : null;
@@ -91,6 +99,8 @@ export class ViewTracker {
       if (closed) return;
       closed = true;
       entry.unsubscribe();
+      for (const hook of [...entry.closeHooks]) hook();
+      entry.closeHooks.clear();
       if (this.entries.get(view.viewId) !== entry) return;
       this.entries.delete(view.viewId);
       this.events.emit('map-closed', view.viewId);

@@ -4,6 +4,7 @@ import type { ApiServices } from '../../src/api/services';
 import { ApiEvents } from '../../src/api/events';
 import type { ConnectingPlugin } from '../../src/api/types/api';
 import { ViewTracker, type TrackedMapView } from '../../src/api/viewTracker';
+import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
@@ -45,7 +46,7 @@ export function fakeServices(app: App): ApiServices {
 export interface FakeView extends TrackedMapView { close(): void }
 
 /** A map view with a real store and tab meta, a 1000 x 500 background and no viewport; `close()` runs what `register` was given. */
-export function fakeView(viewId: string): FakeView {
+export function fakeView(viewId: string, viewport: CameraViewport | null = null): FakeView {
   const { app } = createInMemoryApp();
   const closers: Array<() => void> = [];
   let closed = false;
@@ -54,7 +55,7 @@ export function fakeView(viewId: string): FakeView {
   tabs.getState().setActiveTab(tabId);
   return {
     viewId, atlasStore: createViewAtlasStore(app, viewId), tabMetaStore: tabs,
-    renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => null },
+    renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport },
     get isClosed(): boolean { return closed; },
     register: (callback: () => void): void => { closers.push(callback); },
     close: (): void => { closed = true; for (const callback of closers.splice(0)) callback(); },

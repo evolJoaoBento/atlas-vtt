@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DisposerSet } from '../../src/api/disposers';
 import { viewsApi } from '../../src/api/views';
+import { FakeViewport } from './fakeViewport';
 import { fakeView, loadMap, trackerWith, type FakeView } from './apiFakes';
 
-function setup(views: FakeView[], active: () => FakeView | null = () => null): ReturnType<typeof trackerWith> & { api: ReturnType<typeof viewsApi> } {
+function setup(views: FakeView[], active: () => FakeView | null = () => null): ReturnType<typeof trackerWith> & { api: ReturnType<typeof viewsApi>; disposers: DisposerSet } {
   const tracked = trackerWith(views, active);
-  return { ...tracked, api: viewsApi(tracked.tracker, new DisposerSet()) };
+  const disposers = new DisposerSet();
+  return { ...tracked, disposers, api: viewsApi(tracked.tracker, disposers) };
 }
 
 describe('views', () => {
@@ -97,5 +99,65 @@ describe('views', () => {
     const stop = api.watchCamera('v1', () => undefined);
     stop();
     stop();
+  });
+
+  it('C-views-6: closing a view disposes its subscribe and watchCamera registrations; nothing fires after', () => {
+    const viewport = new FakeViewport();
+    const view = fakeView('v1', viewport);
+    const { api, disposers } = setup([view]);
+    loadMap(view);
+    const snapshots = vi.fn();
+    const cameras = vi.fn();
+    api.subscribe('v1', snapshots);
+    api.watchCamera('v1', cameras);
+    expect(disposers.size).toBe(2);
+    expect(viewport.listenerCount).toBe(1);
+    view.close();
+    expect(disposers.size).toBe(0);
+    expect(viewport.listenerCount).toBe(0);
+    view.atlasStore.setState((state) => ({ objects: { ...state.objects, tokens: { ...state.objects.tokens } } }));
+    viewport.frame();
+    expect(snapshots).not.toHaveBeenCalled();
+    expect(cameras).not.toHaveBeenCalled();
+  });
+
+  it('C-views-6: a store write after isClosed flips, before the close callbacks run, reaches no listener', () => {
+    const view = fakeView('v1');
+    const { api } = setup([view]);
+    loadMap(view);
+    const listener = vi.fn();
+    api.subscribe('v1', listener);
+    Object.defineProperty(view, 'isClosed', { get: () => true });
+    view.atlasStore.setState((state) => ({ objects: { ...state.objects, tokens: { ...state.objects.tokens } } }));
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('C-views-6: a disposed subscription is not disposed again by the close', () => {
+    const view = fakeView('v1');
+    const { api, disposers } = setup([view]);
+    api.subscribe('v1', vi.fn())();
+    expect(disposers.size).toBe(0);
+    expect(() => view.close()).not.toThrow();
+  });
+
+  it('C-views-7: a throwing listener is logged and stops neither the store nor later subscribers', () => {
+    const viewport = new FakeViewport();
+    const view = fakeView('v1', viewport);
+    const { api } = setup([view]);
+    loadMap(view);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const later = vi.fn();
+    const frames = vi.fn();
+    api.subscribe('v1', () => { throw new Error('boom'); });
+    view.atlasStore.subscribe(later);
+    api.watchCamera('v1', () => { throw new Error('boom'); });
+    viewport.on('frame-end', frames);
+    const change = (): void => view.atlasStore.setState((state) => ({ objects: { ...state.objects, tokens: { ...state.objects.tokens } } }));
+    expect(change).not.toThrow();
+    expect(later).toHaveBeenCalledTimes(1);
+    expect(() => viewport.frame()).not.toThrow();
+    expect(frames).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(2);
+    error.mockRestore();
   });
 });

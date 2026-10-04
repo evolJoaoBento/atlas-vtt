@@ -1,12 +1,30 @@
 import { viewCamera, watchViewCamera } from '../app/services/presentedCamera';
 import type { DisposerSet } from './disposers';
 import { sceneSnapshot, snapshotSlice, viewInfo } from './viewInfo';
-import type { ViewTracker } from './viewTracker';
+import type { TrackedMapView, ViewTracker } from './viewTracker';
 import type { SceneSnapshot, ViewCamera, ViewInfo, ViewsApi } from './types/views';
 import type { Disposer, ViewId } from './types/common';
 
 function sameSlice(a: readonly unknown[], b: readonly unknown[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** An extension's callback must never throw into Atlas's store or frame loop. */
+function callGuarded<T>(listener: (value: T) => void, value: T): void {
+  try {
+    listener(value);
+  } catch (error) {
+    console.error('[Atlas API] A view listener failed:', error);
+  }
+}
+
+/** Registers `start`'s teardown with the extension and ends it when `view` closes, so a closed view is never retained. */
+function ownedByView(tracker: ViewTracker, disposers: DisposerSet, view: TrackedMapView, start: () => () => void): Disposer {
+  let cancelClose: () => void = () => undefined;
+  const stop = start();
+  const dispose = disposers.add(() => { cancelClose(); stop(); });
+  cancelClose = tracker.onClose(view.viewId, dispose);
+  return dispose;
 }
 
 export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi {
@@ -24,11 +42,12 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
       const view = tracker.view(viewId);
       if (!view) return disposers.add(() => undefined);
       let slice = snapshotSlice(view.atlasStore.getState());
-      return disposers.add(view.atlasStore.subscribe((state) => {
+      return ownedByView(tracker, disposers, view, () => view.atlasStore.subscribe((state) => {
+        if (view.isClosed) return;
         const next = snapshotSlice(state);
         if (sameSlice(slice, next)) return;
         slice = next;
-        listener(sceneSnapshot(view));
+        callGuarded(listener, sceneSnapshot(view));
       }));
     },
     camera: (viewId: ViewId): ViewCamera | null => {
@@ -38,9 +57,10 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
     watchCamera: (viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer => {
       const view = tracker.view(viewId);
       if (!view) return disposers.add(() => undefined);
-      return disposers.add(watchViewCamera(view, () => {
+      return ownedByView(tracker, disposers, view, () => watchViewCamera(view, () => {
+        if (view.isClosed) return;
         const camera = viewCamera(view);
-        if (camera) listener(camera);
+        if (camera) callGuarded(listener, camera);
       }));
     },
   });
