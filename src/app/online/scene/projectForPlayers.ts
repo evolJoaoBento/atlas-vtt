@@ -18,7 +18,7 @@ import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
-import type { FogCoverage } from './FogCoverage';
+import type { FogCoverage, WorldBounds } from './FogCoverage';
 import type { LightingFrame } from './LiveLighting';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -85,6 +85,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
   const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules);
   const tokens = withCombatantSides(seen, initiative, objects?.tokens);
   const fog = projectFog(objects?.fog, context.memo);
+  const hidden = hiddenFrom(context, lighting !== null);
   return {
     sceneId: context.sceneId,
     map: projectMap(state.background, cellSize, context),
@@ -92,12 +93,25 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
     tokens,
     // The darkness goes last, over the GM's fog: what the GM erased stays dark where the lighting hides it.
     fog: lighting ? { ...fog, ...lighting.darkness.fog } : fog,
-    texts: projectTexts(objects?.texts, context.darkCoverage ?? context.coverage),
-    drawings: projectDrawings(objects?.drawings, context.darkCoverage ?? context.coverage, context.memo),
+    texts: projectTexts(objects?.texts, hidden),
+    drawings: projectDrawings(objects?.drawings, hidden, context.memo),
     widgets: projectWidgets(state, context.rules),
     initiative,
     measurement: projectMeasurement(context.collectionGrid ?? null, state.grid, context.coneAngle),
   };
+}
+
+/**
+ * What texts and drawings are checked against. Under lighting the darkness is clipped to the map and a
+ * coverage grid answers false outside it, so anything not wholly inside the map (or on a map of unknown
+ * size) counts as hidden: the dark beyond the edge would otherwise leak what sits in it.
+ */
+function hiddenFrom(context: ProjectionContext, lit: boolean): Pick<FogCoverage, 'isCovered'> {
+  const base = context.darkCoverage ?? context.coverage;
+  if (!lit) return base;
+  const { width: w, height: h } = context.mapSize;
+  const inMap = (b: WorldBounds): boolean => w > 0 && h > 0 && b.x >= 0 && b.y >= 0 && b.x + b.width <= w && b.y + b.height <= h;
+  return { isCovered: (b) => !inMap(b) || base.isCovered(b) };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {

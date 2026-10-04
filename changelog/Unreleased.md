@@ -49,6 +49,7 @@
 - The selection outline around a token follows it when the token is resized, from the resize handles or the size menu. Before, it kept the old size until the token was selected again
 - Reloading Atlas no longer leaves the previous 3D dice in graphics memory
 - Loading a scene with explored areas no longer keeps a copy of them in graphics memory
+- With dynamic lighting on, online players no longer receive texts and drawings that sit in the dark across the map's edge. The darkness stops at the map, so a text or drawing that reached past it was sent; anything not wholly inside the map is now left out while lighting is on.
 
 ## Important changes
 

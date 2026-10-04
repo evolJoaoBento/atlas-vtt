@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { plainBuilders, playerSceneToAtlasState } from '../../../src/app/online/obsidian/playerSceneToAtlasState';
 import { DARKNESS_FOG_ID, DARKNESS_ORDER } from '../../../src/app/online/scene/darknessFog';
-import { lightingFrame } from '../../../src/app/online/scene/LiveLighting';
+import { closedFrame, lightingFrame } from '../../../src/app/online/scene/LiveLighting';
 import { diffScenes } from '../../../src/app/online/scene/sceneDiff';
 import { patchMessage, snapshotMessages } from '../../../src/app/online/scene/sceneMessages';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
@@ -58,6 +58,22 @@ describe('dynamic lighting for online players', () => {
     }));
     expect(Object.keys(projected.texts)).toEqual(['seen']);
     expect(Object.keys(projected.drawings)).toEqual(['seen']);
+  });
+
+  it('leaves out texts and drawings that cross the map edge, where the darkness is clipped and covers nothing', () => {
+    const objects = {
+      texts: { lit: text('lit', 200, 200), edge: text('edge', 990, 200) },
+      drawings: { lit: drawing('lit', 200, 600), edge: { ...drawing('edge', 995, 600), points: [{ x: 995, y: 600 }, { x: 1010, y: 600 }] } },
+    };
+    const state = scene({ ambient: 1 }, { ...objects, tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) } });
+    const projected = projectLit(state);
+    expect(Object.keys(projected.texts)).toEqual(['lit']);
+    expect(Object.keys(projected.drawings)).toEqual(['lit']);
+    const closed = project(state, closedFrame(MAP));
+    expect(closed.texts).toEqual({});
+    expect(closed.drawings).toEqual({});
+    // Without lighting nothing is darkened, so the edge is no reason to hide them.
+    expect(Object.keys(project(state, null).texts).sort()).toEqual(['edge', 'lit']);
   });
 
   it('covers what no light reaches at night, shows what the torch lights and the hero standing in the dark', () => {
