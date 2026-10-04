@@ -29,6 +29,8 @@ export declare interface AtlasEvents {
     'map-closed': (viewId: ViewId) => void;
     /** A collection's rules changed (its id), or the asset index finished loading (null: any may have). Read `rules.forMap` again. */
     'rules-changed': (collectionId: string | null) => void;
+    /** A setting's value changed; read it again with `settings.get`. */
+    'settings-changed': (key: AtlasSettingKey) => void;
 }
 
 export declare interface AtlasExtension {
@@ -36,7 +38,31 @@ export declare interface AtlasExtension {
     readonly id: string;
     readonly views: ViewsApi;
     readonly rules: RulesApi;
+    readonly settings: SettingsApi;
+    readonly storage: StorageApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
+}
+
+export declare type AtlasSettingKey = 'laserPointer' | 'diceLook' | 'diceDisplay' | 'playerView';
+
+export declare interface AtlasSettingsView {
+    laserPointer: {
+        color: string;
+        size: number;
+    };
+    diceLook: {
+        colour: string;
+        font: string;
+    };
+    /** Atlas's own `DiceDisplay`. */
+    diceDisplay: 'card' | 'fast' | 'full';
+    /** The four `localPlayerView` rules online players follow, as the player window does (`PLAYER_VIEW_RULE_KEYS`). */
+    playerView: {
+        showGrid: boolean;
+        showTokenNameplates: boolean;
+        showWidgets: boolean;
+        showInitiative: boolean;
+    };
 }
 
 /** The vault path of the scene's background image; null without one. */
@@ -634,6 +660,19 @@ export declare interface SceneSnapshot {
     readonly initiativeTrackerOpen: boolean;
     /** Never sent to players by Atlas Online; read only to decide (with `lighting.playerVisibility`). */
     readonly lighting: SceneLighting;
+}
+
+export declare interface SettingsApi {
+    /** Read-only; changes arrive as 'settings-changed'. */
+    get<K extends AtlasSettingKey>(key: K): AtlasSettingsView[K];
+}
+
+export declare interface StorageApi {
+    /**
+     * `atlas-vtt/.atlas-data/extensions/<extension id>/`, created on first call; a dot folder Obsidian does not
+     * index, kept with Atlas's own data. Rejects for an extension id that is not kebab-case.
+     */
+    folder(): Promise<string>;
 }
 
 /**

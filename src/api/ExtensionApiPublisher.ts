@@ -5,6 +5,7 @@ import { ATLAS_VIEW_HOOKS } from './atlasViewHooks';
 import { LANDED_CAPABILITIES } from './capabilities';
 import { buildExtension } from './extension';
 import { watchRules } from './rules';
+import { watchSettings } from './settings';
 import type { ApiServices } from './services';
 import { ViewTracker } from './viewTracker';
 
@@ -33,13 +34,13 @@ export class ExtensionApiPublisher {
       build: (scope) => buildExtension(scope, services),
     });
     const views = new ViewTracker(this.plugin.app, host.apiEvents, ATLAS_VIEW_HOOKS);
-    services = { app: this.plugin.app, plugin: this.plugin, views };
+    services = { app: this.plugin.app, plugin: this.plugin, views, settings: this.plugin.settingsService };
     this.host = host;
     this.views = views;
     views.start();
     this.plugin.api = host.api;
     host.publish();
-    this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents));
+    this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents), watchSettings(this.plugin.settingsService, host.apiEvents));
   }
 
   stop(): void {

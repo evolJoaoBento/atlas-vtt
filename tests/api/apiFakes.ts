@@ -4,6 +4,7 @@ import type { ApiServices } from '../../src/api/services';
 import { ApiEvents } from '../../src/api/events';
 import type { ConnectingPlugin } from '../../src/api/types/api';
 import { ViewTracker, type TrackedMapView } from '../../src/api/viewTracker';
+import type { SettingsService } from '../../src/app/services/SettingsService';
 import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
@@ -40,7 +41,7 @@ export function fakeApp(): FakeWorkspaceApp {
 
 /** The services every facade is built with; later groups add their fields here as they land. */
 export function fakeServices(app: App): ApiServices {
-  return { app, plugin: {} as unknown as AtlasVTTPlugin, views: {} as unknown as ViewTracker };
+  return { app, plugin: {} as unknown as AtlasVTTPlugin, views: {} as unknown as ViewTracker, settings: {} as unknown as SettingsService };
 }
 
 export interface FakeView extends TrackedMapView { close(): void }

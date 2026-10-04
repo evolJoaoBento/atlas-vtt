@@ -1,5 +1,6 @@
 ## New
 
+- Extension API: read open map views and their scenes, the rules of a map's collection, the laser, dice and player view settings, and a data folder per extension
 - Extension API: other Obsidian plugins can connect to Atlas through `app.plugins.plugins['atlas-vtt'].api` (version 1.1.0), which announces itself with the `atlas-vtt:api-ready` workspace event and tidies up every extension's additions when Atlas unloads. See docs/extension-api.md
 
 ## Improved

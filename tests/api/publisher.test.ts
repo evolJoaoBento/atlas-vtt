@@ -15,7 +15,8 @@ import { fakeApp, fakePlugin } from './apiFakes';
 
 function atlas(): { plugin: AtlasVTTPlugin; triggered: ReturnType<typeof fakeApp>['triggered'] } {
   const { app, triggered } = fakeApp();
-  return { plugin: { app, api: undefined } as unknown as AtlasVTTPlugin, triggered };
+  const settingsService = { onChange: (): (() => void) => () => undefined, getLaserPointerSettings: () => ({ color: '#ff0059', size: 16 }), getDiceLook: () => ({ colour: 'card', font: 'default' }), getDiceDisplay: () => 'full', getLocalPlayerViewSettings: () => ({}) };
+  return { plugin: { app, api: undefined, settingsService } as unknown as AtlasVTTPlugin, triggered };
 }
 
 describe('ExtensionApiPublisher', () => {
