@@ -279,3 +279,11 @@ $tray-art: 32px;
 .atlas-dice-tray__roll {
   flex: 1;
 }
+
+// ── Note (why the tray's roll could not go) ──
+
+.atlas-dice-note {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  text-align: center;
+}

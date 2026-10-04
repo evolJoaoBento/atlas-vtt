@@ -10,8 +10,10 @@ import {
 } from './diceTrayPool';
 
 interface DiceTrayProps {
-  /** The finished formula goes up to whoever rolls it. */
-  onRoll: (formula: string) => void;
+  /** The finished formula, with the dice and modifier it was built from, goes up to whoever rolls it. False: it was not rolled, so the tray keeps its dice. */
+  onRoll: (formula: string, pool: TrayPool, modifier: number) => boolean;
+  /** The most dice the tray holds in all, when lower than its own limit. */
+  maxDice?: number;
 }
 
 /**
@@ -21,7 +23,7 @@ interface DiceTrayProps {
  * control on a touchpad. Mixed dice are thrown together, `2d6 + 1d20 + 3`, as
  * three kinds held in one hand.
  */
-export function DiceTray({ onRoll }: DiceTrayProps): React.ReactElement {
+export function DiceTray({ onRoll, maxDice = MAX_DICE }: DiceTrayProps): React.ReactElement {
   const [pool, setPool] = useState<TrayPool>({});
   const [modifier, setModifier] = useState(0);
 
@@ -38,8 +40,7 @@ export function DiceTray({ onRoll }: DiceTrayProps): React.ReactElement {
   // left standing is the mistake nobody sees, carried into the next roll.
   const throwDice = (): void => {
     if (formula === '') return;
-    onRoll(formula);
-    clear();
+    if (onRoll(formula, pool, modifier)) clear();
   };
 
   return (
@@ -54,7 +55,7 @@ export function DiceTray({ onRoll }: DiceTrayProps): React.ReactElement {
                   type="button"
                   className="atlas-dice-tray__face"
                   onClick={() => setPool((prev) => addDie(prev, sides))}
-                  disabled={count >= MAX_PER_DIE || total >= MAX_DICE}
+                  disabled={count >= MAX_PER_DIE || total >= Math.min(maxDice, MAX_DICE)}
                   aria-label={count === 0 ? `Add a d${sides}` : `Add a d${sides}, ${count} in the tray`}
                 >
                   <DieFace sides={sides} />
