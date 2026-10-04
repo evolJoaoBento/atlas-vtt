@@ -21,6 +21,27 @@ const footprint = (token: TokenEntity): number => (isFiniteNumber(token.size) &&
 
 const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
 
+/** `value` pulled at least `inset` away from both edges of `[0, max]` (to the middle when they would cross). */
+const inset = (value: number, margin: number, max: number): number => (2 * margin >= max ? max / 2 : Math.min(Math.max(value, margin), max - margin));
+
+/**
+ * Where `target` lands when the final position must lie on the map: where it snaps, or, when that is off the
+ * map, the nearest snapped position inside it (the target is pulled inward in half-cell steps until it snaps
+ * inside). The GM's own drag does not clamp; this is the API's extra. A map too small for any snapped position
+ * gets the target clamped, unsnapped.
+ */
+function landOnMap(snapAt: (point: Point) => Point, target: Point, map: { width: number; height: number }, pitch: number, reach: number): Point {
+  const onMap = (p: Point): boolean => p.x >= 0 && p.x <= map.width && p.y >= 0 && p.y <= map.height;
+  const direct = snapAt(target);
+  if (onMap(direct)) return direct;
+  const base = { x: clamp(target.x, map.width), y: clamp(target.y, map.height) };
+  for (let margin = 0; margin <= reach; margin += pitch / 2) {
+    const landed = snapAt({ x: inset(base.x, margin, map.width), y: inset(base.y, margin, map.height) });
+    if (onMap(landed)) return landed;
+  }
+  return base;
+}
+
 /** The options with every flag settled; throws on a malformed one. */
 function settled(options: unknown): Required<TokenMoveOptions> {
   if (options !== undefined && (typeof options !== 'object' || options === null || Array.isArray(options))) {
@@ -74,12 +95,14 @@ export function tokensApi(tracker: ViewTracker): TokensApi {
       const landings: Array<{ id: string; x: number; y: number }> = [];
       for (const { id, move, token } of entries) {
         if (!token || !isCoordinate(move.x) || !isCoordinate(move.y)) return { ok: false, reason: 'invalid-position' };
-        const target = bounded ? { x: clamp(move.x, map.width), y: clamp(move.y, map.height) } : { x: move.x, y: move.y };
-        const landed = snap ? snapDroppedToken(state.grid, target, footprint(token)) : target;
+        const target = { x: move.x, y: move.y };
+        const snapAt = (point: Point): Point => (snap ? snapDroppedToken(state.grid, point, footprint(token)) : point);
+        const pitch = state.grid && state.grid.size > 0 ? state.grid.size : 1;
+        const landed = bounded ? landOnMap(snapAt, target, map, pitch, pitch * (footprint(token) + 2)) : snapAt(target);
         if (!isCoordinate(landed.x) || !isCoordinate(landed.y)) return { ok: false, reason: 'invalid-position' };
         landings.push({ id, x: landed.x, y: landed.y });
       }
-      if (landings.length > 0) runHistoryTransaction(view.atlasStore, () => state.setTokenPositions(landings));
+      if (landings.length > 0) runHistoryTransaction(view.atlasStore, () => state.dropTokens(landings));
       const positions = Object.fromEntries(landings.map(({ id, x, y }) => [id, frozenPoint({ x, y })]));
       return { ok: true, positions: Object.freeze(positions) };
     },

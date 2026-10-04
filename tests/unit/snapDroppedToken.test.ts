@@ -11,7 +11,7 @@ import type { GridState } from '../../src/app/services/MapPersistence';
 const SIZE = 70;
 const OFFSET = { x: 13, y: 29 };
 const TYPES: readonly GridType[] = ['square', 'hex-vertical', 'hex-horizontal'];
-const TOKEN_SIZES = [1, 1.5, 2, 2.5] as const;
+const TOKEN_SIZES = [0.5, 1, 1.5, 2, 2.5, 3, 4] as const;
 const POINTS = [{ x: 300, y: 150 }, { x: 517.3, y: 402.9 }, { x: -40, y: 12 }, { x: 999, y: 1001 }];
 
 /** The GM's own drag: `GridSystem.snapTokenCenter` on a grid with these options, without a canvas. */

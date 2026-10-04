@@ -67,14 +67,55 @@ describe('tokens', () => {
     }
   });
 
-  it('clamps to the map before snapping unless told not to, and leaves a map without a size alone', () => {
+  it('keeps the final position on the map unless told not to, and leaves a map without a size alone', () => {
     const { tokens } = setup();
-    expect(tokens.move('v1', [{ tokenId: 'a', x: -500, y: 9999 }])).toEqual({ ok: true, positions: { a: { x: 35, y: 525 } } });
+    expect(tokens.move('v1', [{ tokenId: 'a', x: -500, y: 9999 }])).toEqual({ ok: true, positions: { a: { x: 35, y: 455 } } });
     expect(tokens.move('v1', [{ tokenId: 'a', x: -500, y: 9999 }], { clampToMap: false, snap: false })).toEqual({ ok: true, positions: { a: { x: -500, y: 9999 } } });
     const view = fakeView('v2');
     sceneWithTokens(view);
     (view.renderer as { getBackgroundSprite: () => null }).getBackgroundSprite = () => null;
     expect(tokensApi(trackerWith([view]).tracker).move('v2', [{ tokenId: 'a', x: -500, y: 9999 }], { snap: false })).toEqual({ ok: true, positions: { a: { x: -500, y: 9999 } } });
+  });
+
+  it('lands on the nearest snapped position inside the map on an offset grid, at both corners', () => {
+    const { tokens } = setup({ offsetX: 13, offsetY: 29 });
+    expect(tokens.move('v1', [{ tokenId: 'a', x: 0, y: 0 }])).toEqual({ ok: true, positions: { a: { x: 48, y: 64 } } });
+    expect(tokens.move('v1', [{ tokenId: 'a', x: 1000, y: 500 }])).toEqual({ ok: true, positions: { a: { x: 958, y: 484 } } });
+    expect(tokens.move('v1', [{ tokenId: 'a', x: 1000, y: 500 }], { clampToMap: false })).toEqual({ ok: true, positions: { a: { x: 1028, y: 484 } } });
+  });
+
+  it('keeps tokens of every size on the map, and on the grid, on hex grids too', () => {
+    for (const type of ['square', 'hex-vertical', 'hex-horizontal']) {
+      const { view, tokens } = setup({ type, offsetX: 13, offsetY: 29 });
+      view.atlasStore.setState((state) => ({
+        objects: { ...state.objects, tokens: { ...state.objects.tokens, huge: { ...makeToken('huge'), size: 3 }, large: { ...makeToken('large'), size: 1.5 } } },
+      }));
+      for (const id of ['a', 'large', 'huge']) {
+        const size = view.atlasStore.getState().objects.tokens[id]!.size ?? 1;
+        for (const corner of [{ x: 0, y: 0 }, { x: 1000, y: 500 }, { x: -50, y: 700 }, { x: 1300, y: -20 }]) {
+          const result = tokens.move('v1', [{ tokenId: id, ...corner }]);
+          if (!result.ok) throw new Error('expected a move');
+          const landed = result.positions[id]!;
+          expect(landed.x >= 0 && landed.x <= 1000 && landed.y >= 0 && landed.y <= 500).toBe(true);
+          const again = tokens.snapPoint('v1', landed, size);
+          expect(again.x).toBeCloseTo(landed.x, 6);
+          expect(again.y).toBeCloseTo(landed.y, 6);
+        }
+      }
+    }
+  });
+
+  it('puts the moved token on top and releases held tokens, as one undo step that restores the stack', () => {
+    const { view, tokens } = setup();
+    const layers = (): Record<string, number> => Object.fromEntries(Object.entries(view.atlasStore.getState().objects.tokens).map(([id, t]) => [id, t.layer ?? 0]));
+    const before = layers();
+    view.atlasStore.setState({ heldTokens: { a: true } } as never);
+    expect(tokens.move('v1', [{ tokenId: 'a', x: 150, y: 150 }]).ok).toBe(true);
+    const after = layers();
+    expect(Object.entries(after).filter(([id]) => id !== 'a').every(([, layer]) => after.a! > layer)).toBe(true);
+    expect(view.atlasStore.getState().heldTokens).toEqual({});
+    getHistoryStore(view.atlasStore)!.getState().undo();
+    expect(layers()).toEqual(before);
   });
 
   it('writes nothing, and leaves no undo step, when any move is refused', () => {

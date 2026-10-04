@@ -9,7 +9,11 @@ export interface TokenMove {
 export interface TokenMoveOptions {
   /** Snap each token the way `snapPoint` does. Default true. */
   snap?: boolean;
-  /** Keep each target on the map, `[0, width] x [0, height]`, before snapping. Default true; a map without a size is not clamped. */
+  /**
+   * Keep each token's final position on the map, `[0, width] x [0, height]`: when its snapped position is off the map,
+   * the nearest snapped position inside it is used. Default true; a map without a size is not clamped. The GM's own
+   * drag does not clamp, this is the API's extra.
+   */
   clampToMap?: boolean;
   /** Move hidden tokens too. Default false: a hidden token is refused. */
   allowHidden?: boolean;
@@ -28,7 +32,7 @@ export interface TokensApi {
    */
   snapPoint(viewId: ViewId, point: Point, tokenSize: number): Readonly<Point>;
   /**
-   * Moves tokens as one undo step, like a GM drag. Checked in this order, and nothing is written when any move
+   * Moves tokens as one undo step, like a GM drop: the moved tokens rise to the top of the stack and are no longer held. Checked in this order, and nothing is written when any move
    * fails: the map is loaded (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
    * `allowHidden` (`hidden`), every position is a number within 1e9 of the origin (`invalid-position`, also when snapping would
    * not give one). A token named twice moves to its last position. Throws when `moves` is not a list or `options` is malformed.
