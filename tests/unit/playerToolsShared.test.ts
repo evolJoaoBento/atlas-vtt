@@ -103,14 +103,14 @@ describe('cellCenterAt', () => {
   it('lands where a token dropped by a player lands, on square and hex grids', () => {
     const square = { enabled: true, visible: true, type: 'square' as const, size: 70, offsetX: 5, offsetY: 9, snapToGrid: true };
     for (const point of [{ x: 123, y: 99 }, { x: -40, y: 3 }, { x: 700, y: 701 }]) {
-      expect(cellCenterAt(square, point)).toEqual(snapDroppedToken(square as never, point));
+      expect(cellCenterAt(square, point)).toEqual(snapDroppedToken(square as never, point, 1));
     }
     for (const type of ['hex-vertical', 'hex-horizontal'] as const) {
       const grid = { enabled: true, visible: true, type, size: 70, offsetX: 10, offsetY: 20, snapToGrid: true };
       const center = axialToPixel(createHexLayout(type, 70, 10, 20), { q: 3, r: -2 });
       const near = { x: center.x + hexCircumradius(70) * 0.4, y: center.y - hexCircumradius(70) * 0.3 };
       const snapped = cellCenterAt(grid, near);
-      const dropped = snapDroppedToken(grid as never, near);
+      const dropped = snapDroppedToken(grid as never, near, 1);
       expect(snapped.x).toBeCloseTo(dropped.x);
       expect(snapped.y).toBeCloseTo(dropped.y);
       expect(snapped.x).toBeCloseTo(center.x);

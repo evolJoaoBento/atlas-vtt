@@ -78,12 +78,13 @@ export function placeMapObjects(
 }
 
 /**
- * Where a token dropped at `point` lands, as the GM's drag puts it (`InteractionController`): on its
- * cell's centre while snapping is on (the default), also on a grid that is switched off, since the
- * drag snaps to it too. Without grid state nothing snaps. Online players' moves land through here.
+ * Where a token of `tokenSize` dropped at `point` lands, as the GM's drag puts it
+ * (`InteractionController`): where it snaps while snapping is on (the default), a cell's centre or
+ * where cells meet for an even footprint, also on a grid that is switched off, since the drag snaps
+ * to it too. Without grid state nothing snaps. Online players' moves land through here.
  */
-export function snapDroppedToken(grid: GridState | null, point: Point): Point {
+export function snapDroppedToken(grid: GridState | null, point: Point, tokenSize: number): Point {
   if (!grid || !(grid.snapToGrid ?? true)) return point;
   const geometry = formationGridFromOptions({ ...grid, enabled: true });
-  return geometry ? snapToCellCenter(geometry, point) : point;
+  return geometry ? snapToken(geometry, point, tokenSize) : point;
 }

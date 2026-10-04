@@ -11,7 +11,7 @@ describe('DragRulerTool', () => {
   it('adds one waypoint per hold on a touch screen, however the finger jitters', () => {
     let changes = 0;
     const ruler = new DragRulerTool(() => { changes++; });
-    ruler.begin({ x: 100, y: 100 }, grid, 'touch');
+    ruler.begin({ x: 100, y: 100 }, grid, 'touch', 1);
     ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
     vi.advanceTimersByTime(WAYPOINT_HOLD_MS - 1);
     expect(ruler.overlay()?.points).toHaveLength(2);
@@ -29,7 +29,7 @@ describe('DragRulerTool', () => {
 
   it('never adds a waypoint by holding with a mouse; the key adds one instead', () => {
     const ruler = new DragRulerTool(() => {});
-    ruler.begin({ x: 100, y: 100 }, grid, 'mouse');
+    ruler.begin({ x: 100, y: 100 }, grid, 'mouse', 1);
     ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
     vi.advanceTimersByTime(WAYPOINT_HOLD_MS * 4);
     expect(ruler.overlay()?.points).toHaveLength(2);
@@ -40,7 +40,7 @@ describe('DragRulerTool', () => {
   it('stops holding and shows nothing once the drag ends', () => {
     let changes = 0;
     const ruler = new DragRulerTool(() => { changes++; });
-    ruler.begin({ x: 100, y: 100 }, grid, 'touch');
+    ruler.begin({ x: 100, y: 100 }, grid, 'touch', 1);
     ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
     ruler.end();
     vi.advanceTimersByTime(WAYPOINT_HOLD_MS * 2);
@@ -52,7 +52,7 @@ describe('DragRulerTool', () => {
     const scene = playerScene();
     const trace = (snapToGrid: boolean, hidden: boolean): ReturnType<DragRulerTool['overlay']> => {
       const ruler = new DragRulerTool(() => {});
-      ruler.begin({ x: 100, y: 100 }, toolGridOf({ ...scene, grid: hidden ? null : scene.grid, measurement: { ...scene.measurement, snapToGrid } }), 'mouse');
+      ruler.begin({ x: 100, y: 100 }, toolGridOf({ ...scene, grid: hidden ? null : scene.grid, measurement: { ...scene.measurement, snapToGrid } }), 'mouse', 1);
       ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
       return ruler.overlay();
     };
@@ -60,5 +60,12 @@ describe('DragRulerTool', () => {
     expect(trace(false, false)?.points).toEqual([{ x: 100, y: 100 }, { x: 240, y: 100 }]);
     expect(trace(true, true)?.points.length).toBe(2);
     expect(trace(false, true)?.points).toEqual([{ x: 100, y: 100 }, { x: 240, y: 100 }]);
+  });
+
+  it("ends a Large token's ruler where four cells meet, where the GM's drop puts it", () => {
+    const ruler = new DragRulerTool(() => {});
+    ruler.begin({ x: 140, y: 140 }, toolGridOf(playerScene()), 'mouse', 1.5);
+    ruler.update({ x: 240, y: 100 }, { x: 240, y: 100 });
+    expect(ruler.overlay()?.points).toEqual([{ x: 140, y: 140 }, { x: 210, y: 70 }]);
   });
 });

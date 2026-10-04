@@ -6,10 +6,10 @@ import { PlayerTools } from '../../../src/app/online/view/tools/PlayerTools';
 import { ViewInput, type PointerInput } from '../../../src/app/online/view/ViewInput';
 import { LASER_PLAYBACK_DELAY_MS } from '../../../src/app/pixi/laser/remoteLasers';
 import { LASER_COLOR_SWATCHES, LASER_FADE_TIME } from '../../../src/app/tools/laserPointerSettings';
-import { playerScene } from './sceneFixtures';
+import { playerScene, playerToken } from './sceneFixtures';
 
 /** Screen and world are the same here; t1 sits at (100, 100) on a 70 px square grid. */
-function setup(options: { grid?: boolean } = {}) {
+function setup(options: { grid?: boolean; tokenSize?: number } = {}) {
   const sent: Array<{ points: ScenePoint[]; lifted: boolean }> = [];
   const moved: Array<[string, number, number]> = [];
   const pans: Array<[number, number]> = [];
@@ -30,7 +30,10 @@ function setup(options: { grid?: boolean } = {}) {
     },
     onChange: () => {},
   });
-  const scene = playerScene(options.grid === false ? { grid: null } : {});
+  const scene = playerScene({
+    ...(options.grid === false ? { grid: null } : {}),
+    ...(options.tokenSize !== undefined ? { tokens: { t1: playerToken({ size: options.tokenSize }) } } : {}),
+  });
   moves.setScene(scene);
   moves.setControlled(['t1']);
   moves.setConnected(true);
@@ -171,6 +174,13 @@ describe('PlayerTools', () => {
     tools.drop({ x: 240, y: 240 });
     expect(tools.overlay().ruler).toBeNull();
     expect(moved).toEqual([['t1', 240, 240]]);
+  });
+
+  it("ends a Large token's ruler where four cells meet, where the GM's drop puts it", () => {
+    const { tools } = setup({ tokenSize: 1.5 });
+    expect(tools.grab({ x: 100, y: 100 }, 'mouse')).toBe(true);
+    tools.move({ x: 240, y: 100 });
+    expect(tools.overlay().ruler).toEqual({ points: [{ x: 70, y: 70 }, { x: 210, y: 70 }], label: '10ft' });
   });
 
   it("with Move, leaves a press off the player's tokens to pan the map", () => {
