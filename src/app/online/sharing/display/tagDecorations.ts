@@ -4,12 +4,13 @@
  * selection touches is shown as written so it can be edited (a click on a label puts the cursor there).
  *
  * A state field, not a view plugin: folding an end tag's line replaces a line break, which CodeMirror only
- * takes from a state field. The note is scanned once per edit (a part opened above the viewport colours what
- * is visible, so pairing needs the whole note, as the filter does); a selection change only rebuilds the
- * decorations, whose number follows the number of tags, not the length of the note.
+ * takes from a state field. The whole note is scanned (a part opened above the viewport colours what is
+ * visible, so pairing needs the whole note, as the filter does): at once after an edit of a note up to
+ * `LARGE_NOTE` long; in a longer one the ranges follow the edit and the scan waits until typing pauses.
+ * A selection change only rebuilds the decorations, whose number follows the number of tags.
  */
-import { StateEffect, StateField, type EditorState, type Extension, type Range, type Text } from '@codemirror/state';
-import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
+import { StateEffect, StateField, type ChangeDesc, type EditorState, type Extension, type Range, type Text } from '@codemirror/state';
+import { Decoration, EditorView, ViewPlugin, WidgetType, type DecorationSet, type PluginValue, type ViewUpdate } from '@codemirror/view';
 import type { BlockContext } from '../model/codeContext';
 import { revealedAt, tagDisplayOf, type DisplayRange, type TagDisplay, type TagTone } from './tagDisplay';
 import { highlightClass, tagLabelElement } from './tagElements';
@@ -35,7 +36,14 @@ class TagLabelWidget extends WidgetType {
   }
 }
 
-/** Hidden end tags as replacements: a line holding nothing else (and no cursor) folds away with its line break. */
+/** Notes longer than this are scanned once typing pauses (`RESCAN_DELAY` ms), not on every keystroke. */
+export const LARGE_NOTE = 100_000;
+const RESCAN_DELAY = 400;
+
+/**
+ * Hidden end tags as replacements: a line holding nothing else (and no cursor) folds away with the line break
+ * before it, so the next line keeps its start (where list, quote and heading styling sit).
+ */
 function hiddenRanges(doc: Text, all: readonly DisplayRange[], shown: readonly DisplayRange[], selections: readonly DisplayRange[]): Array<Range<Decoration>> {
   const out: Array<Range<Decoration>> = [];
   const byLine = new Map<number, DisplayRange[]>();
@@ -48,8 +56,8 @@ function hiddenRanges(doc: Text, all: readonly DisplayRange[], shown: readonly D
     let rest = line.text;
     for (const range of [...ranges].reverse()) rest = rest.slice(0, range.from - line.from) + rest.slice(range.to - line.from);
     const cursorOnLine = selections.some((selection) => selection.from <= line.to && selection.to >= line.from);
-    if (rest.trim() === '' && !cursorOnLine && number < doc.lines) {
-      out.push(Decoration.replace({}).range(line.from, line.to + 1));
+    if (rest.trim() === '' && !cursorOnLine && doc.lines > 1) {
+      out.push(number > 1 ? Decoration.replace({}).range(line.from - 1, line.to) : Decoration.replace({}).range(line.from, line.to + 1));
       continue;
     }
     for (const range of ranges) if (shown.includes(range)) out.push(Decoration.replace({}).range(range.from, range.to));
@@ -72,21 +80,61 @@ export function shareTagDecorations(state: EditorState, display: TagDisplay): De
 interface ShareTagState {
   display: TagDisplay;
   decorations: DecorationSet;
+  /** The display was moved through edits, not scanned: a scan is due. */
+  stale: boolean;
+}
+
+/** `display` moved through `changes`; ranges an edit removed are dropped. */
+export function mappedDisplay(display: TagDisplay, changes: ChangeDesc): TagDisplay {
+  const map = <T extends DisplayRange>(range: T): T => ({ ...range, from: changes.mapPos(range.from, 1), to: changes.mapPos(range.to, -1) });
+  return {
+    labels: display.labels.map(map).filter((range) => range.to > range.from),
+    highlights: display.highlights.map(map).filter((range) => range.to >= range.from),
+    hidden: display.hidden.map(map).filter((range) => range.to > range.from),
+  };
 }
 
 /** The editor extension; `blocksFor` gives the note's block context (Obsidian's sections, else inline only). */
 export function shareTagEditorExtension(blocksFor: (state: EditorState) => BlockContext): Extension {
   const compute = (state: EditorState): ShareTagState => {
-    const display = tagDisplayOf(state.doc.toString(), blocksFor(state));
-    return { display, decorations: shareTagDecorations(state, display) };
+    const text = state.doc.toString();
+    // The block context costs a pass over the note: only read it when there may be tags.
+    const display = tagDisplayOf(text, text.includes('%%') ? blocksFor(state) : 'inline-only');
+    return { display, decorations: shareTagDecorations(state, display), stale: false };
   };
-  return StateField.define<ShareTagState>({
+  const field = StateField.define<ShareTagState>({
     create: compute,
     update(value, tr) {
-      if (tr.docChanged || tr.effects.some((effect) => effect.is(refreshShareTags))) return compute(tr.state);
-      if (tr.selection) return { display: value.display, decorations: shareTagDecorations(tr.state, value.display) };
+      if (tr.effects.some((effect) => effect.is(refreshShareTags))) return compute(tr.state);
+      if (tr.docChanged && tr.state.doc.length <= LARGE_NOTE) return compute(tr.state);
+      if (tr.docChanged) {
+        const display = mappedDisplay(value.display, tr.changes);
+        return { display, decorations: shareTagDecorations(tr.state, display), stale: true };
+      }
+      if (tr.selection) return { ...value, decorations: shareTagDecorations(tr.state, value.display) };
       return value;
     },
-    provide: (field) => EditorView.decorations.from(field, (value) => value.decorations),
+    provide: (decorations) => EditorView.decorations.from(decorations, (value) => value.decorations),
   });
+  return [field, ViewPlugin.define((view) => new Rescan(view, field))];
+}
+
+/** Scans a long note again once its edits pause. */
+class Rescan implements PluginValue {
+  private timer: number | null = null;
+
+  constructor(private readonly view: EditorView, private readonly field: StateField<ShareTagState>) {}
+
+  update(update: ViewUpdate): void {
+    if (!update.docChanged || !update.state.field(this.field).stale) return;
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => {
+      this.timer = null;
+      if (this.view.state.field(this.field).stale) this.view.dispatch({ effects: refreshShareTags.of(null) });
+    }, RESCAN_DELAY);
+  }
+
+  destroy(): void {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+  }
 }

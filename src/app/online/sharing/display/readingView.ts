@@ -22,7 +22,6 @@ export interface SectionSource {
 }
 
 interface NoteModel {
-  key: string;
   text: string;
   display: TagDisplay;
   /** Tags and comments: never rendered. */
@@ -32,14 +31,16 @@ interface NoteModel {
 
 let cached: NoteModel | null = null;
 
-function modelOf(text: string, blocks: BlockContext): NoteModel {
-  const key = `${JSON.stringify(blocks)}\n${text}`;
-  if (cached?.key === key) return cached;
+/** The note's tags, read once per source text (every section of a render shares it). */
+function modelOf(text: string, blocksFor: () => BlockContext): NoteModel {
+  if (cached?.text === text) return cached;
+  const blocks = blocksFor();
   const { tags, comments } = scanMarkup(text, blocks);
   const lineStarts = [0];
   for (let at = text.indexOf('\n'); at >= 0; at = text.indexOf('\n', at + 1)) lineStarts.push(at + 1);
-  cached = { key, text, display: tagDisplayOf(text, blocks), removed: [...tags, ...comments].sort((a, b) => a.start - b.start), lineStarts };
-  return cached;
+  const model: NoteModel = { text, display: tagDisplayOf(text, blocks), removed: [...tags, ...comments].sort((a, b) => a.start - b.start), lineStarts };
+  cached = model;
+  return model;
 }
 
 /** `[from, to)` of the source without tags and comments. */
@@ -75,11 +76,13 @@ const firstTextElement = (el: HTMLElement): HTMLElement =>
 
 const PROCESSED = 'atlasShareTags';
 
-/** Applies the share tags of `source` to `el`, the rendered section. `blocks` is the note's block context. */
-export function decorateSection(el: HTMLElement, source: SectionSource, blocks: BlockContext): void {
+/** Applies the share tags of `source` to `el`, the rendered section. `blocksFor` gives the note's block context. */
+export function decorateSection(el: HTMLElement, source: SectionSource, blocksFor: () => BlockContext): void {
   if (el.dataset[PROCESSED]) return;
   el.dataset[PROCESSED] = 'true';
-  const model = modelOf(source.text, blocks);
+  // Every tag is a `%%` comment: most notes have none, and cost nothing more.
+  if (!source.text.includes('%%')) return;
+  const model = modelOf(source.text, blocksFor);
   if (model.display.labels.length === 0) return;
   const sStart = model.lineStarts[source.lineStart] ?? model.text.length;
   const sEnd = (model.lineStarts[source.lineEnd + 1] ?? model.text.length + 1) - 1;

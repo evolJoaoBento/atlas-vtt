@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import type { Decoration } from '@codemirror/view';
 import { revealedAt, tagDisplayOf, UNREADABLE_TAG_LABEL } from '../../../../../src/app/online/sharing/display/tagDisplay';
-import { shareTagDecorations } from '../../../../../src/app/online/sharing/display/tagDecorations';
+import { LARGE_NOTE, mappedDisplay, shareTagDecorations } from '../../../../../src/app/online/sharing/display/tagDecorations';
 
 const at = (text: string, part: string, from = 0): number => text.indexOf(part, from);
 
@@ -93,11 +93,20 @@ describe('editor decorations', () => {
     ]);
   });
 
-  it('a line holding only an end tag folds away with its line break, unless the cursor is on it', () => {
-    const doc = '%%[!private]%%\nSecret\n%%[!end]%%\nAfter';
+  it('a line holding only an end tag folds away with the line break before it, unless the cursor is on it', () => {
+    const doc = '%%[!private]%%\nSecret\n%%[!end]%%\n- After';
     const endLine = at(doc, '%%[!end');
-    expect(decorationsOf(doc, doc.length)).toContainEqual([endLine, endLine + 11, 'hidden']);
-    expect(decorationsOf(doc, endLine + 3).some(([from]) => from === endLine)).toBe(false);
+    // The next line keeps its start, where Obsidian puts list, quote and heading styling.
+    expect(decorationsOf(doc, doc.length)).toContainEqual([endLine - 1, endLine + 10, 'hidden']);
+    expect(decorationsOf(doc, endLine + 3).some(([, , kind]) => kind === 'hidden')).toBe(false);
+    expect(decorationsOf('%%[!end]%%\nNext', 15)).toContainEqual([0, 11, 'hidden']);
+  });
+
+  it('in a long note, the ranges follow an edit until the note is scanned again', () => {
+    const doc = `${'x'.repeat(LARGE_NOTE)}\nA %%[!private]%%secret%%[!end]%% B`;
+    const state = EditorState.create({ doc });
+    const edit = state.update({ changes: { from: 0, insert: 'typed ' } });
+    expect(mappedDisplay(tagDisplayOf(doc, 'inline-only'), edit.changes)).toEqual(tagDisplayOf(edit.state.doc.toString(), 'inline-only'));
   });
 
   it('the cursor inside a start tag shows it raw', () => {

@@ -54,6 +54,8 @@ function labelFor(part: OpenPart): Omit<TagLabel, 'from' | 'to'> {
 
 /** The labels, highlights and hidden end tags of `text`, in order of position. */
 export function tagDisplayOf(text: string, blocks: BlockContext): TagDisplay {
+  // Every tag is a `%%` comment: a note without one has nothing to show (the usual case, and the cheap one).
+  if (!text.includes('%%')) return { labels: [], highlights: [], hidden: [] };
   const { tags } = scanMarkup(text, blocks);
   const { parts, stray } = pairTags(tags);
   const labels: TagLabel[] = [];
