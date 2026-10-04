@@ -5,6 +5,8 @@ import { DASHBOARD_VIEW_TYPE } from '../dashboard-view';
 import type { GlobalAssetManagerService } from '../services/GlobalAssetManagerService';
 import type { ImageDisplayService } from '../services/ImageDisplayService';
 import { presentActiveTabInPlayerWindow } from '../services/PlayerWindowPresenter';
+import { presentedScene } from '../services/PresentedScene';
+import { presentActiveTabToPlayers, stopPresenting } from '../services/presentToPlayers';
 import { hasBestiaryFrontmatter } from '../services/statblockNoteSource';
 import { TokenStatblockLinkService } from '../services/TokenStatblockLinkService';
 import { cleanupMissingAssets } from './cleanupMissingAssets';
@@ -59,6 +61,22 @@ function registerPlayerViewCommands(plugin: Plugin, imageDisplay: ImageDisplaySe
     id: 'send-map-to-player-view',
     name: 'Send current map to player view',
     callback: () => void presentActiveTabInPlayerWindow(plugin.app),
+  });
+
+  plugin.addCommand({
+    id: 'present-to-players',
+    name: 'Present to players',
+    callback: () => void presentActiveTabToPlayers(plugin.app),
+  });
+
+  plugin.addCommand({
+    id: 'stop-presenting',
+    name: 'Stop presenting',
+    checkCallback: (checking) => {
+      if (!presentedScene.current()) return false;
+      if (!checking) stopPresenting();
+      return true;
+    },
   });
 
   plugin.addRibbonIcon('monitor', 'Display image on player view', () => {
