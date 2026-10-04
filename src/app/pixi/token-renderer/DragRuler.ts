@@ -7,18 +7,16 @@
 
 import type { StoreApi } from 'zustand';
 import type { GridSystem } from '../../grid/GridSystem';
-import { pathLengthInCells } from '../../grid/gridDistance';
 import type { Point } from '../../grid/hexGeometry';
-import { formatDistance, type MeasurementSettings } from '../../grid/measurementFormat';
+import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { LayerVisibility } from '../playerSafeFrame';
+import { DragRulerPath, dragRulerLabel, WAYPOINT_KEY } from './dragRulerPath';
 import type { DragRulerView } from './DragRulerView';
 
 export class DragRuler {
   private tokenId: string | null = null;
-  /** The snapped start followed by every waypoint. */
-  private waypoints: Point[] = [];
-  private landing: Point | null = null;
+  private readonly path = new DragRulerPath((point) => this.snap(point));
   private keyWindow: Window | null = null;
 
   constructor(
@@ -32,7 +30,7 @@ export class DragRuler {
   begin(tokenId: string, origin: Point): void {
     this.end();
     this.tokenId = tokenId;
-    this.waypoints = [this.snap(origin)];
+    this.path.begin(origin);
     this.keyWindow = activeWindow;
     this.keyWindow.addEventListener('keydown', this.onKeyDown, true);
   }
@@ -40,7 +38,7 @@ export class DragRuler {
   /** Moves the ruler's end to the cell a token at `position` would snap to. */
   update(position: Point): void {
     if (!this.tokenId) return;
-    this.landing = this.snap(position);
+    this.path.update(position);
     this.redraw();
   }
 
@@ -48,8 +46,7 @@ export class DragRuler {
     this.keyWindow?.removeEventListener('keydown', this.onKeyDown, true);
     this.keyWindow = null;
     this.tokenId = null;
-    this.waypoints = [];
-    this.landing = null;
+    this.path.end();
     this.view.clear();
   }
 
@@ -67,27 +64,19 @@ export class DragRuler {
 
   /** Captures Space before the map hotkeys, which would open the command palette mid-drag. */
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== ' ') return;
+    if (event.key !== WAYPOINT_KEY) return;
     event.preventDefault();
     event.stopPropagation();
-    const last = this.waypoints[this.waypoints.length - 1];
-    if (event.repeat || !this.landing || (last && samePoint(last, this.landing))) return;
-    this.waypoints.push(this.landing);
-    this.redraw();
+    if (!event.repeat && this.path.addWaypoint()) this.redraw();
   };
 
   private redraw(): void {
-    const landing = this.landing;
-    if (!landing) return;
-    const points = [...this.waypoints, landing];
-    if (points.every(point => samePoint(point, landing))) {
+    const points = this.path.points();
+    if (!points) {
       this.view.clear();
       return;
     }
-    const grid = this.gridSystem.getOptions();
-    const settings = this.settingsProvider();
-    const distance = formatDistance(pathLengthInCells(grid, points, settings.diagonalRule), settings);
-    this.view.draw(points, distance);
+    this.view.draw(points, dragRulerLabel(this.gridSystem.getOptions(), points, this.settingsProvider()));
   }
 
   private snap(point: Point): Point {
@@ -96,8 +85,4 @@ export class DragRuler {
     const size = this.tokenId ? this.store.getState().objects.tokens[this.tokenId]?.size : undefined;
     return this.gridSystem.snapTokenCenter(point.x, point.y, size || 1);
   }
-}
-
-function samePoint(a: Point, b: Point): boolean {
-  return Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5;
 }

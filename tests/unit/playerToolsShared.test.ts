@@ -1,10 +1,12 @@
 import type { Graphics } from 'pixi.js';
 import { describe, expect, it } from 'vitest';
 import { cellCenterAt } from '../../src/app/grid/gridDistance';
+import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { axialToPixel, createHexLayout, hexCircumradius } from '../../src/app/grid/hexGeometry';
 import {
   arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../src/app/pixi/measureGeometry';
+import { DragRulerPath, dragRulerLabel, samePoint, WAYPOINT_KEY } from '../../src/app/pixi/token-renderer/dragRulerPath';
 import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
 
 /** Records the Graphics calls the measure drawing makes. */
@@ -68,6 +70,35 @@ describe('measure geometry', () => {
     expect(measureLabelFontSize(1)).toBe(16);
     expect(measureLabelFontSize(0.1)).toBe(32);
     expect(measureLabelBox(40, 10, { x: 100, y: 100 }, 1)).toEqual({ x: 72, y: 90, width: 56, height: 20, radius: 10, strokeWidth: 0.5 });
+  });
+});
+
+describe('DragRulerPath', () => {
+  const snap = (point: { x: number; y: number }): { x: number; y: number } => ({
+    x: Math.floor(point.x / 70) * 70 + 35, y: Math.floor(point.y / 70) * 70 + 35,
+  });
+  const feet: MeasurementSettings = { mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [] };
+
+  it('is empty until the token leaves its start, then runs through each waypoint once', () => {
+    const path = new DragRulerPath(snap);
+    path.begin({ x: 40, y: 40 });
+    path.update({ x: 50, y: 50 });
+    expect(path.points()).toBeNull();
+    path.update({ x: 180, y: 40 });
+    expect(path.points()).toEqual([{ x: 35, y: 35 }, { x: 175, y: 35 }]);
+    expect(path.addWaypoint()).toBe(true);
+    expect(path.addWaypoint()).toBe(false);
+    path.update({ x: 180, y: 180 });
+    expect(path.points()).toEqual([{ x: 35, y: 35 }, { x: 175, y: 35 }, { x: 175, y: 175 }]);
+    path.end();
+    expect(path.active).toBe(false);
+  });
+
+  it("labels the path with the measurement settings and uses Atlas's key", () => {
+    const grid = { type: 'square' as const, size: 70, offsetX: 0, offsetY: 0 };
+    expect(dragRulerLabel(grid, [{ x: 35, y: 35 }, { x: 175, y: 35 }, { x: 175, y: 175 }], feet)).toBe('20ft');
+    expect(WAYPOINT_KEY).toBe(' ');
+    expect(samePoint({ x: 1, y: 1 }, { x: 1.4, y: 0.6 })).toBe(true);
   });
 });
 
