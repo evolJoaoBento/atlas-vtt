@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { cellNumberAnchor, numberCells } from '../../../src/app/grid/cellNumbering';
+import { squareLattice } from '../../../src/app/grid/squareLattice';
 import { gridLines } from '../../../src/app/online/preview/previewShapes';
 import type { PlayerGrid } from '../../../src/app/online/scene/sceneTypes';
 import { createDrawingsLayer } from '../../../src/app/online/view/layers/drawingsLayer';
@@ -91,6 +93,33 @@ describe('grid layer', () => {
     surface.clear();
     layer.draw(surface, frame(playerScene({ grid: hexes }), { zoom: 0.5 }));
     expect(surface.ops('text')).toEqual([]);
+  });
+
+  it('numbers the cells of a square grid in any format, where GridSystem numbers them', () => {
+    const squares: PlayerGrid = { ...grid, offsetX: 10, offsetY: 20, cellNumbers: 'letter-number', cellNumberOpacity: 0.5 };
+    const surface = new RecordingSurface();
+    createGridLayer().draw(surface, frame(playerScene({ grid: squares })));
+    const labels = surface.ops('text');
+    const expected = numberCells(squareLattice(70, 10, 20), { x: 0, y: 0, width: 1000, height: 800 }, 'letter-number')
+      .map((cell) => ({ ...cellNumberAnchor(70, cell.center), text: cell.label }));
+    expect(labels.map(({ text: label, x, y }) => ({ text: label, x, y })).sort((a, b) => a.text.localeCompare(b.text)))
+      .toEqual(expected.map(({ text: label, x, y }) => ({ text: label, x, y })).sort((a, b) => a.text.localeCompare(b.text)));
+    expect(labels.map((label) => label.text)).toContain('A1');
+    expect(labels[0]?.style).toMatchObject({ alpha: 0.5 });
+  });
+
+  it('reads the older hex numbers of a GM before Atlas 0.5.1 on hex grids only, and the cell numbers over them', () => {
+    const draw = (patch: Partial<PlayerGrid>): string[] => {
+      const surface = new RecordingSurface();
+      createGridLayer().draw(surface, frame(playerScene({ grid: { ...grid, ...patch } })));
+      return surface.ops('text').map((label) => label.text);
+    };
+    // An older GM sent `hexNumbers` on square grids too, where its Atlas drew none.
+    expect(draw({ hexNumbers: 'column-row' })).toEqual([]);
+    expect(draw({ type: 'hex-vertical', hexNumbers: 'sequential' })).toContain('1');
+    // A newer GM's `cellNumbers` decides, also when it says none.
+    expect(draw({ type: 'hex-vertical', hexNumbers: 'sequential', cellNumbers: null })).toEqual([]);
+    expect(draw({ type: 'hex-vertical', hexNumbers: null, cellNumbers: 'letter-number' })).toContain('A1');
   });
 
   it('draws the hexes of a large map at the fitted zoom, past the preview cap', () => {

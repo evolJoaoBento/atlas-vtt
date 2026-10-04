@@ -112,6 +112,16 @@ describe('playerSceneToAtlasState', () => {
     expect(hidden).toMatchObject({ enabled: true, visible: false, size: 50 });
   });
 
+  it('numbers the cells as the GM sends them, on any grid, and reads the hex numbers of a GM before Atlas 0.5.1', () => {
+    const gridOf = (patch: Partial<NonNullable<PlayerScene['grid']>>) =>
+      playerSceneToAtlasState(playerScene({ grid: { ...playerScene().grid!, ...patch } }), images).state.grid;
+    expect(gridOf({ cellNumbers: 'letter-number', cellNumberOpacity: 0.3 })).toMatchObject({ type: 'square', cellNumbers: 'letter-number', cellNumberOpacity: 0.3 });
+    expect(gridOf({ type: 'hex-vertical', hexNumbers: 'sequential', hexNumberOpacity: 0.6 })).toMatchObject({ cellNumbers: 'sequential', cellNumberOpacity: 0.6 });
+    // An older GM's hex numbers on a square grid: its Atlas drew none there.
+    expect(gridOf({ hexNumbers: 'column-row' })).not.toHaveProperty('cellNumbers');
+    expect(gridOf({ type: 'hex-vertical', hexNumbers: 'sequential', cellNumbers: null })).not.toHaveProperty('cellNumbers');
+  });
+
   it("takes the GM's measurement for the ruler, snapping included", () => {
     const scene: PlayerScene = playerScene({
       measurement: {

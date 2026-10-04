@@ -27,8 +27,12 @@ export const PLAYER_GRID_TYPES = ['square', 'hex-horizontal', 'hex-vertical'] as
 export type PlayerGridType = typeof PLAYER_GRID_TYPES[number];
 export const PLAYER_GRID_LINES = ['solid', 'dashed', 'dotted'] as const;
 export type PlayerGridLine = typeof PLAYER_GRID_LINES[number];
+/** The formats a player before Atlas 0.5.1 reads, and only on hex grids (`PlayerGrid.hexNumbers`). */
 export const PLAYER_HEX_NUMBERS = ['column-row', 'sequential'] as const;
 export type PlayerHexNumbers = typeof PLAYER_HEX_NUMBERS[number];
+/** Every format Atlas numbers cells in, as `CellNumberFormat` (a parity test keeps them equal). */
+export const PLAYER_CELL_NUMBERS = ['column-row', 'sequential', 'letter-number'] as const;
+export type PlayerCellNumbers = typeof PLAYER_CELL_NUMBERS[number];
 
 export interface PlayerGrid {
   type: PlayerGridType;
@@ -39,8 +43,15 @@ export interface PlayerGrid {
   opacity: number;
   lineType: PlayerGridLine;
   lineWidth: number;
+  /**
+   * The cell numbers as a player before Atlas 0.5.1 reads them: on a hex grid in a format it
+   * knows, else null. Newer players read `cellNumbers`.
+   */
   hexNumbers: PlayerHexNumbers | null;
   hexNumberOpacity: number | null;
+  /** How the player window numbers the cells, on any grid; absent from a GM before Atlas 0.5.1, which sent `hexNumbers` only. */
+  cellNumbers?: PlayerCellNumbers | null;
+  cellNumberOpacity?: number | null;
 }
 
 /** The HP and stress bars of a GM before Atlas 0.5, still validated and never read: bars are `PlayerResource` now. */

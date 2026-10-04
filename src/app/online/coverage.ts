@@ -156,8 +156,9 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   opacity: SENT,
   lineType: SENT,
   lineWidth: SENT,
-  hexNumbers: SENT,
-  hexNumberOpacity: SENT,
+  // As `cellNumbers`, and as `hexNumbers` on hex grids for players before Atlas 0.5.1.
+  cellNumbers: SENT,
+  cellNumberOpacity: SENT,
   // Sent in the measurement, so the page's drag ruler snaps as the GM's tokens do.
   snapToGrid: SENT,
   scale: gmOnly('used while aligning the grid to the map'),

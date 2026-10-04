@@ -3,7 +3,7 @@
  * (`online/coverage.ts`) mark `sent`, rebuilt from what players receive. Pure. The online scene
  * view's `RemoteSceneApplier` writes the result into its store with builders that reuse records.
  */
-import { DEFAULT_HEX_NUMBER_OPACITY } from '../../grid/hexNumbering';
+import { playerCellNumbers } from '../scene/playerCellNumbers';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
@@ -85,6 +85,7 @@ export function atlasGrid(scene: PlayerScene): GridState {
   if (!grid) {
     return { enabled: true, visible: false, type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0, opacity: 0, ...units };
   }
+  const numbers = playerCellNumbers(grid);
   return {
     enabled: true,
     visible: true,
@@ -96,9 +97,7 @@ export function atlasGrid(scene: PlayerScene): GridState {
     opacity: grid.opacity,
     lineType: grid.lineType,
     lineWidth: grid.lineWidth,
-    ...(grid.hexNumbers !== null
-      ? { hexNumbers: grid.hexNumbers, hexNumberOpacity: grid.hexNumberOpacity ?? DEFAULT_HEX_NUMBER_OPACITY }
-      : {}),
+    ...(numbers ? { cellNumbers: numbers.format, cellNumberOpacity: numbers.opacity } : {}),
     ...units,
   };
 }

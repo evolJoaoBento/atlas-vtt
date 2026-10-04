@@ -1,23 +1,26 @@
 /**
  * Atlas's grid: square lines or hex outlines over the visible part of the map (Atlas
- * clips its grid to the map), dashed or dotted by line type, and hex numbers when the
- * GM shows them and they are large enough to read.
+ * clips its grid to the map), dashed or dotted by line type, and cell numbers when the
+ * GM shows them and they are large enough to read, numbered as `GridSystem` numbers them.
  */
 import { createHexLayout, isHexGridType } from '../../../grid/hexGeometry';
 import {
-  DEFAULT_HEX_NUMBER_OPACITY, hexNumberAnchor, hexNumberFontSize, MIN_HEX_NUMBER_SCREEN_SIZE, numberHexes, type NumberedHex,
-} from '../../../grid/hexNumbering';
+  cellNumberAnchor, cellNumberFontSize, MIN_CELL_NUMBER_SCREEN_SIZE, numberCells, type CellLattice, type CellNumberStyle, type NumberedCell,
+} from '../../../grid/cellNumbering';
+import { hexLattice } from '../../../grid/hexLattice';
+import { squareLattice } from '../../../grid/squareLattice';
 import { gridLines, type GridLimits, type GridLines } from '../../preview/previewShapes';
+import { playerCellNumbers } from '../../scene/playerCellNumbers';
 import type { PlayerGrid, PlayerMap } from '../../scene/sceneTypes';
 import { intersection, type WorldRect } from '../camera';
 import type { TextStyle, ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
 
 const DEFAULT_NUMBER_COLOR = '#ffffff';
-/** Beyond this many hexes on the map, numbering them costs more than they are worth. */
-export const MAX_NUMBERED_HEXES = 100_000;
+/** Beyond this many cells on the map, numbering them costs more than they are worth. */
+export const MAX_NUMBERED_CELLS = 100_000;
 /** The view only builds what is on screen, so its caps are far above the preview's. */
-const VIEW_LIMITS: GridLimits = { lines: 100_000, hexes: MAX_NUMBERED_HEXES };
+const VIEW_LIMITS: GridLimits = { lines: 100_000, hexes: MAX_NUMBERED_CELLS };
 
 interface Anchored {
   x: number;
@@ -29,6 +32,7 @@ interface Numbered {
   grid: PlayerGrid;
   width: number;
   height: number;
+  style: CellNumberStyle | null;
   /** Where each number sits, ordered by y so the visible rows are found by bisection. */
   anchors: Anchored[];
 }
@@ -55,14 +59,15 @@ function snapArea(visible: WorldRect, map: PlayerMap): WorldRect | null {
 }
 
 export function createGridLayer(): PlayerLayer {
-  // Numbering every hex of the map, and building lines, run once per grid, map size and tile, not per frame.
+  // Numbering every cell of the map, and building lines, run once per grid, map size and tile, not per frame.
   let numbered: Numbered | null = null;
   let cached: CachedLines | null = null;
-  const numbersOf = (grid: PlayerGrid, map: PlayerMap): Anchored[] => {
+  const numbersOf = (grid: PlayerGrid, map: PlayerMap): Numbered => {
     if (numbered === null || numbered.grid !== grid || numbered.width !== map.width || numbered.height !== map.height) {
-      numbered = { grid, width: map.width, height: map.height, anchors: anchorsOf(grid, map) };
+      const style = playerCellNumbers(grid);
+      numbered = { grid, width: map.width, height: map.height, style, anchors: style ? anchorsOf(grid, map, style) : [] };
     }
-    return numbered.anchors;
+    return numbered;
   };
   const linesOf = (grid: PlayerGrid, map: PlayerMap, area: WorldRect): GridLines | null => {
     if (
@@ -84,7 +89,7 @@ export function createGridLayer(): PlayerLayer {
       if (!area) return;
       const tile = snapArea(frame.visible, map);
       if (tile) drawLines(surface, frame, linesOf(grid, map, tile));
-      drawHexNumbers(surface, frame, grid, numbersOf(grid, map));
+      drawCellNumbers(surface, frame, grid, numbersOf(grid, map));
     },
   };
 }
@@ -102,31 +107,36 @@ function drawLines(surface: ViewSurface, frame: LayerFrame, lines: GridLines | n
   if (lines.hexes.length > 0) surface.paths(lines.hexes, true, style);
 }
 
-function anchorsOf(grid: PlayerGrid, map: PlayerMap): Anchored[] {
-  if (!isHexGridType(grid.type)) return [];
-  const layout = createHexLayout(grid.type, grid.size, grid.offsetX, grid.offsetY);
-  return hexNumbersOf(grid, map)
-    .map((hex) => ({ ...hexNumberAnchor(layout, hex.center), label: hex.label }))
+/** The lattice `GridSystem` numbers for this grid. */
+function latticeOf(grid: PlayerGrid): CellLattice {
+  return isHexGridType(grid.type)
+    ? hexLattice(createHexLayout(grid.type, grid.size, grid.offsetX, grid.offsetY))
+    : squareLattice(grid.size, grid.offsetX, grid.offsetY);
+}
+
+function anchorsOf(grid: PlayerGrid, map: PlayerMap, style: CellNumberStyle): Anchored[] {
+  const lattice = latticeOf(grid);
+  return cellNumbersOf(grid, map, lattice, style)
+    .map((cell) => ({ ...cellNumberAnchor(lattice.size, cell.center), label: cell.label }))
     .sort((a, b) => a.y - b.y);
 }
 
-function hexNumbersOf(grid: PlayerGrid, map: PlayerMap): NumberedHex[] {
-  if (!grid.hexNumbers || !isHexGridType(grid.type) || !(map.width > 0) || !(map.height > 0)) return [];
-  if ((map.width * map.height) / (grid.size * grid.size * 0.866) > MAX_NUMBERED_HEXES) return [];
-  const layout = createHexLayout(grid.type, grid.size, grid.offsetX, grid.offsetY);
-  return numberHexes(layout, { x: 0, y: 0, width: map.width, height: map.height }, grid.hexNumbers);
+function cellNumbersOf(grid: PlayerGrid, map: PlayerMap, lattice: CellLattice, style: CellNumberStyle): NumberedCell[] {
+  if (!(map.width > 0) || !(map.height > 0)) return [];
+  const cellArea = isHexGridType(grid.type) ? grid.size * grid.size * 0.866 : grid.size * grid.size;
+  if ((map.width * map.height) / cellArea > MAX_NUMBERED_CELLS) return [];
+  return numberCells(lattice, { x: 0, y: 0, width: map.width, height: map.height }, style.format);
 }
 
-function drawHexNumbers(surface: ViewSurface, frame: LayerFrame, grid: PlayerGrid, anchors: readonly Anchored[]): void {
-  if (anchors.length === 0 || !isHexGridType(grid.type)) return;
-  const layout = createHexLayout(grid.type, grid.size, grid.offsetX, grid.offsetY);
-  const size = hexNumberFontSize(layout);
-  if (size * frame.zoom < MIN_HEX_NUMBER_SCREEN_SIZE) return;
-  const style: TextStyle = {
+function drawCellNumbers(surface: ViewSurface, frame: LayerFrame, grid: PlayerGrid, { style, anchors }: Numbered): void {
+  if (!style || anchors.length === 0) return;
+  const size = cellNumberFontSize(grid.size);
+  if (size * frame.zoom < MIN_CELL_NUMBER_SCREEN_SIZE) return;
+  const textStyle: TextStyle = {
     font: `bold ${size}px Arial, sans-serif`,
     color: grid.color ?? DEFAULT_NUMBER_COLOR,
     align: 'center',
-    alpha: grid.hexNumberOpacity ?? DEFAULT_HEX_NUMBER_OPACITY,
+    alpha: style.opacity,
   };
   const { visible } = frame;
   const top = visible.y;
@@ -143,6 +153,6 @@ function drawHexNumbers(surface: ViewSurface, frame: LayerFrame, grid: PlayerGri
     const at = anchors[index]!;
     if (at.y > bottom) break;
     if (at.x < visible.x || at.x > visible.x + visible.width) continue;
-    surface.text(at.label, at.x, at.y, style);
+    surface.text(at.label, at.x, at.y, textStyle);
   }
 }

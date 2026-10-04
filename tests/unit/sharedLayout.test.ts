@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_HEX_NUMBER_SCREEN_SIZE } from '../../src/app/grid/hexNumbering';
+import { MIN_CELL_NUMBER_SCREEN_SIZE } from '../../src/app/grid/cellNumbering';
 import { SCENE_LAYER_ORDER, SCENE_LAYER_Z } from '../../src/app/pixi/sceneLayerOrder';
 import { DEFAULT_TEXT_PADDING, textBackground, textFontStyle, textFontWeight, textRotation, textScale } from '../../src/app/pixi/textBoxLayout';
 import { badgePositions, badgeSlots, CONDITION_BADGE, fitBadges } from '../../src/app/pixi/token-renderer/conditionBadgeLayout';
@@ -81,9 +81,9 @@ describe('text box layout', () => {
   });
 });
 
-describe('hex numbers', () => {
+describe('cell numbers', () => {
   it('hide below 7 CSS pixels on screen', () => {
-    expect(MIN_HEX_NUMBER_SCREEN_SIZE).toBe(7);
+    expect(MIN_CELL_NUMBER_SCREEN_SIZE).toBe(7);
   });
 });
 

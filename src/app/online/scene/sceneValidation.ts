@@ -5,7 +5,7 @@
  * patch can never reach an object's prototype.
  */
 import {
-  PLAYER_DIAGONAL_RULES, PLAYER_DRAWING_TYPES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
+  PLAYER_DIAGONAL_RULES, PLAYER_DRAWING_TYPES, PLAYER_CELL_NUMBERS, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS,
   PLAYER_MEASUREMENT_MODES, PLAYER_SIDES, PLAYER_TEXT_ALIGNS, PLAYER_UNIT_TYPES, PLAYER_WIDGET_TYPES,
   SCENE_FIELD_KEYS, SCENE_LIMITS, SCENE_RANGES, SCENE_RECORD_KEYS, type SceneFieldKey, type SceneRecordKey,
 } from './sceneTypes';
@@ -101,7 +101,8 @@ function isPlayerGrid(value: unknown): boolean {
   return isFields(value) && oneOf(PLAYER_GRID_TYPES)(value.type) && inRange(SCENE_RANGES.gridSize)(value.size)
     && isCoordinate(value.offsetX) && isCoordinate(value.offsetY) && nullable(isString)(value.color) && isOpacity(value.opacity)
     && oneOf(PLAYER_GRID_LINES)(value.lineType) && isStroke(value.lineWidth)
-    && nullable(oneOf(PLAYER_HEX_NUMBERS))(value.hexNumbers) && nullable(isOpacity)(value.hexNumberOpacity);
+    && nullable(oneOf(PLAYER_HEX_NUMBERS))(value.hexNumbers) && nullable(isOpacity)(value.hexNumberOpacity)
+    && optional(nullable(oneOf(PLAYER_CELL_NUMBERS)))(value.cellNumbers) && optional(nullable(isOpacity))(value.cellNumberOpacity);
 }
 
 function isPlayerToken(value: unknown): boolean {
