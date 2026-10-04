@@ -9,6 +9,7 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
 import { isHandled } from './utils/handledEvents';
 import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
+import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './measureGeometry';
 
 interface PersistentMeasurement {
   graphics: Graphics;
@@ -31,7 +32,7 @@ export class MeasureRenderer {
   private isDrawing: boolean = false;
   private startPoint: { x: number; y: number } | null = null;
   private endPoint: { x: number; y: number } | null = null;
-  private measureShape: 'line' | 'cone' | 'circle' | 'sphere' = 'line';
+  private measureShape: MeasureShape = 'line';
   private persistMeasurements: boolean = false;
   private persistentMeasurements: PersistentMeasurement[] = [];
   
@@ -42,7 +43,7 @@ export class MeasureRenderer {
   
   private _unsubscribeFromToolChanges?: () => void;
   private _viewportScaleHandler?: () => void;
-  private _measureShapeChangedHandler?: (shape: 'line' | 'cone' | 'circle' | 'sphere') => void;
+  private _measureShapeChangedHandler?: (shape: MeasureShape) => void;
   private _measurePersistenceChangedHandler?: (persist: boolean) => void;
 
   constructor(
@@ -103,7 +104,7 @@ export class MeasureRenderer {
     }
     
     // Listen for measure shape changes
-    this._measureShapeChangedHandler = (shape: 'line' | 'cone' | 'circle' | 'sphere') => {
+    this._measureShapeChangedHandler = (shape: MeasureShape) => {
       this.measureShape = shape;
       // Clear any existing measurement when shape changes
       this.clearMeasurement();
@@ -264,7 +265,7 @@ export class MeasureRenderer {
         this.drawCircle(accentHex, distance);
         break;
       case 'cone':
-        this.drawCone(accentHex, distance, dx, dy);
+        this.drawCone(accentHex);
         break;
     }
     
@@ -288,9 +289,9 @@ export class MeasureRenderer {
     drawMeasureCircle(this.measureGraphics, color, this.startPoint, radius);
   }
   
-  private drawCone(color: number, distance: number, dx: number, dy: number): void {
-    if (!this.startPoint) return;
-    this.drawConeOnGraphics(this.measureGraphics, color, distance, dx, dy, this.startPoint);
+  private drawCone(color: number): void {
+    if (!this.startPoint || !this.endPoint) return;
+    this.drawConeOnGraphics(this.measureGraphics, color, this.startPoint, this.endPoint);
   }
   
   private updatePillAndText(): void {
@@ -300,7 +301,7 @@ export class MeasureRenderer {
 
   /** Midpoint of the measurement, lifted a constant screen distance above the line. */
   private labelAnchor(start: { x: number; y: number }, end: { x: number; y: number }): { x: number; y: number } {
-    return { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 30 / this.viewport.scale.x };
+    return measureLabelAnchor(start, end, this.viewport.scale.x);
   }
 
   private measurementSettings(): MeasurementSettings {
@@ -352,7 +353,7 @@ export class MeasureRenderer {
         drawMeasureCircle(persistGraphics, accentHex, this.startPoint, distance);
         break;
       case 'cone':
-        this.drawConeOnGraphics(persistGraphics, accentHex, distance, dx, dy, this.startPoint);
+        this.drawConeOnGraphics(persistGraphics, accentHex, this.startPoint, this.endPoint);
         break;
     }
     
@@ -380,55 +381,28 @@ export class MeasureRenderer {
     drawMeasurePoint(graphics, color, end);
   }
   
-  private drawConeOnGraphics(graphics: Graphics, color: number, distance: number, dx: number, dy: number, start: { x: number; y: number }): void {
+  private drawConeOnGraphics(graphics: Graphics, color: number, start: { x: number; y: number }, end: { x: number; y: number }): void {
     // The collection's game system sets how wide the cone opens
-    const halfAngle = this.measurementSettings().coneAngle * Math.PI / 360;
-    
-    // Calculate the angle of the line
-    const baseAngle = Math.atan2(dy, dx);
-    
-    // Calculate the two edge points of the cone
-    const leftAngle = baseAngle - halfAngle;
-    const rightAngle = baseAngle + halfAngle;
-    
-    const leftX = start.x + distance * Math.cos(leftAngle);
-    const leftY = start.y + distance * Math.sin(leftAngle);
-    const rightX = start.x + distance * Math.cos(rightAngle);
-    const rightY = start.y + distance * Math.sin(rightAngle);
-    
-    // Draw the cone shape
+    const opening = this.measurementSettings().coneAngle * Math.PI / 180;
+    const { radius, startAngle, endAngle, left, right } = coneGeometry(start, end, opening);
+    const outline = { width: MEASURE_AREA.strokeWidth, color, alpha: MEASURE_AREA.strokeAlpha };
+
     graphics.moveTo(start.x, start.y);
-    graphics.lineTo(leftX, leftY);
-    graphics.arc(
-      start.x, 
-      start.y, 
-      distance, 
-      leftAngle, 
-      rightAngle, 
-      false
-    );
+    graphics.lineTo(left.x, left.y);
+    graphics.arc(start.x, start.y, radius, startAngle, endAngle, false);
     graphics.lineTo(start.x, start.y);
-    graphics.fill({ color: color, alpha: 0.1 });
-    
-    // Draw the outline
+    graphics.fill({ color, alpha: MEASURE_AREA.fillAlpha });
+
     graphics.moveTo(start.x, start.y);
-    graphics.lineTo(leftX, leftY);
-    graphics.stroke({ width: 3, color: color, alpha: 0.8 });
-    
+    graphics.lineTo(left.x, left.y);
+    graphics.stroke(outline);
+
     graphics.moveTo(start.x, start.y);
-    graphics.lineTo(rightX, rightY);
-    graphics.stroke({ width: 3, color: color, alpha: 0.8 });
-    
-    // Draw the arc
-    graphics.arc(
-      start.x, 
-      start.y, 
-      distance, 
-      leftAngle, 
-      rightAngle, 
-      false
-    );
-    graphics.stroke({ width: 3, color: color, alpha: 0.8 });
+    graphics.lineTo(right.x, right.y);
+    graphics.stroke(outline);
+
+    graphics.arc(start.x, start.y, radius, startAngle, endAngle, false);
+    graphics.stroke(outline);
   }
   
   private clearAllPersistentMeasurements(): void {

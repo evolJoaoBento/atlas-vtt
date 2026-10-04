@@ -4,7 +4,8 @@ import type { RenderLayer } from 'pixi.js';
 import { drawSquareGrid } from './squareGridDrawer';
 import { drawHexGrid } from './hexGridDrawer';
 import type { GridBounds, GridLineType } from './gridLineStyle';
-import { createHexLayout, hexCellExtent, isHexGridType, nearestHexCenter } from './hexGeometry';
+import { createHexLayout, hexCellExtent, isHexGridType } from './hexGeometry';
+import { cellCenterAt } from './gridDistance';
 import type { HexLayout } from './hexGeometry';
 import { contrastColorForSprite } from './gridContrastColor';
 import { snapTokenCenter } from './gridPlacement';
@@ -433,18 +434,7 @@ export class GridSystem {
 
   /** Snap to the centre of the containing grid cell */
   public snapToCellCenter(x: number, y: number): { x: number; y: number } {
-    const hexLayout = this.getHexLayout();
-    if (hexLayout) {
-      return nearestHexCenter(hexLayout, { x, y });
-    }
-
-    const { size, offsetX = 0, offsetY = 0 } = this.options;
-    const col = Math.floor((x - offsetX) / size);
-    const row = Math.floor((y - offsetY) / size);
-    return {
-      x: col * size + offsetX + size / 2,
-      y: row * size + offsetY + size / 2,
-    };
+    return cellCenterAt(this.options, { x, y });
   }
 
   /** Snap a token's centre: a cell centre, or where cells meet for an even footprint (`tokenCenterShift`) */
