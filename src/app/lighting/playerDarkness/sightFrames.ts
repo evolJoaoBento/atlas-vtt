@@ -18,6 +18,9 @@ import { ExploredImages, type ExploredDecoder } from './exploredImage';
  */
 export const DARKNESS_INTERVAL_MS = 200;
 
+/** Rasters kept at once, one per cell count asked for; callers rarely ask for more than one or two. */
+const KEPT_CELL_COUNTS = 4;
+
 interface Built {
   inputs: readonly unknown[];
   raster: DarknessRaster;
@@ -37,7 +40,8 @@ export interface SightFrame {
  */
 export class SightFrames {
   private readonly explored: ExploredImages;
-  private built: Built | null = null;
+  /** The last raster by the cell count it was asked for: callers asking for different ones do not undo each other. */
+  private readonly built = new Map<number, Built>();
   private timer: number | null = null;
 
   constructor(private readonly onDue: () => void, decode?: ExploredDecoder) {
@@ -56,13 +60,13 @@ export class SightFrames {
       // Not kept: the first raster once the memory is known comes at once.
       return { raster: darknessRaster({ ...lighting, ready: false }, null, map, maxCellsPerSide), exploredPending: true };
     }
-    const inputs = [lighting.ready, lighting.sight, lighting.ambient, lighting.reaches, lighting.spots, explored, map.width, map.height, maxCellsPerSide];
-    return { raster: this.memo(inputs, now, () => darknessRaster(lighting, explored, map, maxCellsPerSide)), exploredPending: false };
+    const inputs = [lighting.ready, lighting.sight, lighting.ambient, lighting.reaches, lighting.spots, explored, map.width, map.height];
+    return { raster: this.memo(maxCellsPerSide, inputs, now, () => darknessRaster(lighting, explored, map, maxCellsPerSide)), exploredPending: false };
   }
 
   /** The store holds a scene anew (a map loaded, or reloaded in place): nothing worked out or decoded before stands in. */
   restart(): void {
-    this.built = null;
+    this.built.clear();
     this.explored.reset();
   }
 
@@ -70,12 +74,12 @@ export class SightFrames {
     this.explored.dispose();
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
-    this.built = null;
+    this.built.clear();
   }
 
   /** The raster of `inputs`; while the last one is younger than the interval, it stays and the new one is due later. */
-  private memo(inputs: readonly unknown[], now: number, build: () => DarknessRaster): DarknessRaster {
-    const last = this.built;
+  private memo(cells: number, inputs: readonly unknown[], now: number, build: () => DarknessRaster): DarknessRaster {
+    const last = this.built.get(cells);
     if (last && inputs.length === last.inputs.length && inputs.every((input, i) => input === last.inputs[i])) return last.raster;
     // A first raster comes at once, and so does the raster of a view whose sight is not the scene's (yet, or any more).
     const wait = last && inputs[0] === true && last.inputs[0] === true ? last.at + DARKNESS_INTERVAL_MS - now : 0;
@@ -86,7 +90,10 @@ export class SightFrames {
       }, wait);
       return last.raster;
     }
-    this.built = { inputs, raster: build(), at: now };
-    return this.built.raster;
+    const built = { inputs, raster: build(), at: now };
+    this.built.delete(cells);
+    this.built.set(cells, built);
+    if (this.built.size > KEPT_CELL_COUNTS) this.built.delete(this.built.keys().next().value!);
+    return built.raster;
   }
 }

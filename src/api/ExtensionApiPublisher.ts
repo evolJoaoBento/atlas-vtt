@@ -7,12 +7,14 @@ import { buildExtension } from './extension';
 import { watchRules } from './rules';
 import { watchSettings } from './settings';
 import type { ApiServices } from './services';
+import { SightFramesByView } from './sightFramesByView';
 import { ViewTracker } from './viewTracker';
 
 /** Publishes `plugin.api` once storage and the asset index have settled (loaded or failed), and takes it down on unload. */
 export class ExtensionApiPublisher {
   private host: AtlasApiHost | null = null;
   private views: ViewTracker | null = null;
+  private sightFrames: SightFramesByView | null = null;
   private stopWatches: Array<() => void> = [];
   private stopped = false;
 
@@ -34,9 +36,12 @@ export class ExtensionApiPublisher {
       build: (scope) => buildExtension(scope, services),
     });
     const views = new ViewTracker(this.plugin.app, host.apiEvents, ATLAS_VIEW_HOOKS);
-    services = { app: this.plugin.app, plugin: this.plugin, views, settings: this.plugin.settingsService };
+    const sightFrames = new SightFramesByView();
+    services = { app: this.plugin.app, plugin: this.plugin, views, settings: this.plugin.settingsService, sightFrames };
     this.host = host;
     this.views = views;
+    this.sightFrames = sightFrames;
+    this.stopWatches.push(host.apiEvents.on('map-closed', (viewId) => sightFrames.close(viewId)));
     views.start();
     this.plugin.api = host.api;
     host.publish();
@@ -50,6 +55,8 @@ export class ExtensionApiPublisher {
     this.host = null;
     this.views?.stop();
     this.views = null;
+    this.sightFrames?.dispose();
+    this.sightFrames = null;
     this.plugin.api = undefined;
   }
 }

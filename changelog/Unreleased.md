@@ -5,6 +5,7 @@
 - Extension API: present a scene, follow which scene players see, and add an audience besides the player window
 - Extension API: roll dice by a map's collection rules on someone's behalf, hear every roll, and add rolls made elsewhere to the log
 - Extension API: follow the GM's laser in a view and draw other people's lasers there, fading like Atlas's own
+- Extension API: ask what the player window shows of a lit scene, token by token and cell by cell, failing closed while sight is not ready
 
 ## Improved
 

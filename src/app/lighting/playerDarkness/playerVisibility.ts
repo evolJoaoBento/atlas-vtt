@@ -1,0 +1,66 @@
+/**
+ * What the GM's player window shows of a view's lit scene, for players who are not at it, and
+ * nothing more: per token how the window perceives it, and the map cell by cell. Fails closed:
+ * whatever Atlas cannot tell yet is `pending`, which means show players nothing. Never walls,
+ * lights, polygons or sight: only what they decide.
+ */
+import type { Perception, PlayerVisibility } from '../../../api/types/lighting';
+import type { PlayerLighting } from '../../pixi/lighting/playerLightingLayers';
+import { loadedMapSize } from '../../services/viewMapSize';
+import type { ViewAtlasStore } from '../../storeFactory';
+import { MAX_DARKNESS_CELLS_PER_SIDE } from './darknessRaster';
+import type { SightFrames } from './sightFrames';
+
+/** The cells per side a caller may ask for, and what it gets when it asks for none (or for no number). */
+export const CELLS_PER_SIDE = { min: 16, max: 1024, default: MAX_DARKNESS_CELLS_PER_SIDE } as const;
+
+const UNLIT: PlayerVisibility = Object.freeze({ status: 'unlit' });
+const PENDING: PlayerVisibility = Object.freeze({ status: 'pending' });
+
+/** What `visibilityOf` reads of a map view. */
+export interface VisibilityView {
+  readonly atlasStore: ViewAtlasStore;
+  readonly renderer: {
+    getBackgroundSprite(): { width: number; height: number; destroyed: boolean } | null;
+    getPlayerLighting?(): PlayerLighting | null | undefined;
+  } | null;
+}
+
+export function cellsPerSide(asked: unknown): number {
+  if (typeof asked !== 'number' || !Number.isFinite(asked)) return CELLS_PER_SIDE.default;
+  return Math.min(CELLS_PER_SIDE.max, Math.max(CELLS_PER_SIDE.min, Math.round(asked)));
+}
+
+/** `{ status: 'pending' }`: what players get while Atlas cannot tell. */
+export function pendingVisibility(): PlayerVisibility {
+  return PENDING;
+}
+
+/**
+ * The view's player visibility. Unlit only where the view's lighting says it hides nothing, or where it cannot be
+ * read and the store's scene is unlit. Pending while the view cannot tell for a lit scene, while sight is not the
+ * scene's, while the map loads or has no size, and while the explored memory shown is still decoding.
+ */
+export function visibilityOf(view: VisibilityView, frames: SightFrames, options: { maxCellsPerSide: number }): PlayerVisibility {
+  const state = view.atlasStore.getState();
+  const lighting = view.renderer?.getPlayerLighting?.();
+  if (lighting === null) return UNLIT;
+  if (lighting === undefined) return state.lighting.enabled ? PENDING : UNLIT;
+  if (!state.mapLoaded || state.isMapLoading) return PENDING;
+  const map = loadedMapSize(view);
+  if (!(map.width > 0) || !(map.height > 0)) return PENDING;
+  const { raster, exploredPending } = frames.raster(lighting, state.exploredMask, map, options.maxCellsPerSide);
+  // A view whose sight is not the scene's is still asked: the raster after it then comes at once.
+  if (!lighting.ready || exploredPending) return PENDING;
+  const tokens: Record<string, Perception> = {};
+  for (const id of Object.keys(state.objects.tokens)) tokens[id] = lighting.perception(id);
+  // A fresh buffer on every call: the raster is kept between calls, and no caller may change it for another.
+  const shown = new Uint8Array(raster.dark.length);
+  for (let i = 0; i < shown.length; i++) shown[i] = raster.dark[i] ? 0 : 1;
+  return Object.freeze({
+    status: 'ready',
+    tokens: Object.freeze(tokens),
+    darkness: Object.freeze({ cellSize: raster.cellSize, cols: raster.cols, rows: raster.rows, shown }),
+    showsExplored: lighting.showsExplored,
+  });
+}

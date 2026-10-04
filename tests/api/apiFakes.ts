@@ -6,6 +6,9 @@ import type { ConnectingPlugin } from '../../src/api/types/api';
 import { ViewTracker, type TrackedMapView } from '../../src/api/viewTracker';
 import type { SettingsService } from '../../src/app/services/SettingsService';
 import type { LaserHub } from '../../src/app/pixi/laser/LaserHub';
+import type { PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
+import type { ExploredDecoder } from '../../src/app/lighting/playerDarkness/exploredImage';
+import { SightFramesByView } from '../../src/api/sightFramesByView';
 import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
@@ -42,10 +45,24 @@ export function fakeApp(): FakeWorkspaceApp {
 
 /** The services every facade is built with; later groups add their fields here as they land. */
 export function fakeServices(app: App): ApiServices {
-  return { app, plugin: {} as unknown as AtlasVTTPlugin, views: {} as unknown as ViewTracker, settings: {} as unknown as SettingsService };
+  return {
+    app, plugin: {} as unknown as AtlasVTTPlugin, views: {} as unknown as ViewTracker, settings: {} as unknown as SettingsService,
+    sightFrames: new SightFramesByView(),
+  };
 }
 
-export interface FakeView extends TrackedMapView { close(): void }
+/** Fresh sight frames for a test's views, decoding explored memory with `decode` when given. */
+export function framesFor(decode?: ExploredDecoder): SightFramesByView {
+  return new SightFramesByView(decode);
+}
+
+export interface FakeView extends TrackedMapView {
+  close(): void;
+  /** What the renderer's `getPlayerLighting` answers from now on (undefined until set). */
+  setPlayerLighting(value: PlayerLighting | null | undefined): void;
+  /** Tells the renderer's `watchPlayerLighting` listeners that sight was worked out anew. */
+  firePlayerLightingChange(): void;
+}
 
 export interface FakeViewOptions {
   viewport?: CameraViewport | null;
@@ -59,12 +76,19 @@ export function fakeView(viewId: string, options: FakeViewOptions = {}): FakeVie
   const { app } = createInMemoryApp();
   const closers: Array<() => void> = [];
   let closed = false;
+  let playerLighting: PlayerLighting | null | undefined;
+  const lightingListeners = new Set<() => void>();
   const tabs = createTabMetaStore();
   const tabId = tabs.getState().addTab('maps/a.atlasmap', 'A');
   tabs.getState().setActiveTab(tabId);
   const view: FakeView = {
     viewId, atlasStore: createViewAtlasStore(app, viewId), tabMetaStore: tabs,
-    renderer: { getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport, ...(laserHub ? { getLaserHub: () => laserHub } : {}) },
+    renderer: {
+      getBackgroundSprite: () => ({ width: 1000, height: 500, destroyed: false }), getViewportInstance: () => viewport,
+      ...(laserHub ? { getLaserHub: () => laserHub } : {}),
+      getPlayerLighting: () => playerLighting,
+      watchPlayerLighting: (listener: () => void) => { lightingListeners.add(listener); return () => { lightingListeners.delete(listener); }; },
+    },
     get isClosed(): boolean { return closed; },
     register: (callback: () => void): void => { closers.push(callback); },
     switchToTab: (tabId: string): Promise<void> => {
@@ -73,6 +97,8 @@ export function fakeView(viewId: string, options: FakeViewOptions = {}): FakeVie
       return Promise.resolve();
     },
     close: (): void => { closed = true; for (const callback of closers.splice(0)) callback(); },
+    setPlayerLighting: (value): void => { playerLighting = value; },
+    firePlayerLightingChange: (): void => { for (const listener of [...lightingListeners]) listener(); },
   };
   return view;
 }
