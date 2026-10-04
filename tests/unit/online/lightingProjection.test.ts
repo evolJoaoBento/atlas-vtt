@@ -60,20 +60,39 @@ describe('dynamic lighting for online players', () => {
     expect(Object.keys(projected.drawings)).toEqual(['seen']);
   });
 
-  it('leaves out texts and drawings that cross the map edge, where the darkness is clipped and covers nothing', () => {
+  it('sends a text or drawing at the edge of a lit map, though its size pokes past it', () => {
+    const state = scene({ ambient: 1 }, {
+      texts: { edge: text('edge', 990, 200) },
+      drawings: { edge: { ...drawing('edge', 995, 600), points: [{ x: 995, y: 600 }, { x: 1010, y: 600 }] } },
+    });
+    const projected = projectLit(state);
+    expect(Object.keys(projected.texts)).toEqual(['edge']);
+    expect(Object.keys(projected.drawings)).toEqual(['edge']);
+  });
+
+  it('leaves out a dark text or drawing crossing the map edge, and every one under a closed frame', () => {
     const objects = {
       texts: { lit: text('lit', 200, 200), edge: text('edge', 990, 200) },
       drawings: { lit: drawing('lit', 200, 600), edge: { ...drawing('edge', 995, 600), points: [{ x: 995, y: 600 }, { x: 1010, y: 600 }] } },
     };
-    const state = scene({ ambient: 1 }, { ...objects, tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) } });
-    const projected = projectLit(state);
+    const projected = projectLit(walled(objects));
     expect(Object.keys(projected.texts)).toEqual(['lit']);
     expect(Object.keys(projected.drawings)).toEqual(['lit']);
-    const closed = project(state, closedFrame(MAP));
+    const closed = project(walled(objects), closedFrame(MAP));
     expect(closed.texts).toEqual({});
     expect(closed.drawings).toEqual({});
     // Without lighting nothing is darkened, so the edge is no reason to hide them.
-    expect(Object.keys(project(state, null).texts).sort()).toEqual(['edge', 'lit']);
+    expect(Object.keys(project(walled(objects), null).texts).sort()).toEqual(['edge', 'lit']);
+  });
+
+  it('leaves out a text or drawing wholly outside the map', () => {
+    const state = scene({ ambient: 1 }, {
+      texts: { in: text('in', 200, 200), out: text('out', 1200, 200) },
+      drawings: { in: drawing('in', 200, 600), out: drawing('out', 1200, 600) },
+    });
+    const projected = projectLit(state);
+    expect(Object.keys(projected.texts)).toEqual(['in']);
+    expect(Object.keys(projected.drawings)).toEqual(['in']);
   });
 
   it('covers what no light reaches at night, shows what the torch lights and the hero standing in the dark', () => {
