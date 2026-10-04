@@ -16,7 +16,7 @@ import type { CollectionGridDefaults } from '../../types/collectionSettingsTypes
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
-import type { FogCoverage, WorldBounds } from './FogCoverage';
+import type { FogCoverage } from './FogCoverage';
 import type { LightingFrame } from './LiveLighting';
 import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
@@ -101,15 +101,25 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 
 /**
  * What texts and drawings are checked against. Under lighting the darkness is clipped to the map and a
- * coverage grid answers false outside it, so anything not wholly inside the map (or on a map of unknown
- * size) counts as hidden: the dark beyond the edge would otherwise leak what sits in it.
+ * coverage grid answers false outside it. So an item wholly outside the map (or on a map of unknown size)
+ * counts as hidden, and any other is checked by the part of it inside the map, the only part the darkness
+ * can cover: an item whose estimated size pokes past the edge of a lit map is still sent, a dark one is not.
  */
 function hiddenFrom(context: ProjectionContext, lit: boolean): Pick<FogCoverage, 'isCovered'> {
   const base = context.darkCoverage ?? context.coverage;
   if (!lit) return base;
   const { width: w, height: h } = context.mapSize;
-  const inMap = (b: WorldBounds): boolean => w > 0 && h > 0 && b.x >= 0 && b.y >= 0 && b.x + b.width <= w && b.y + b.height <= h;
-  return { isCovered: (b) => !inMap(b) || base.isCovered(b) };
+  return {
+    isCovered: (b) => {
+      const right = b.x + Math.max(0, b.width);
+      const bottom = b.y + Math.max(0, b.height);
+      if (!(w > 0 && h > 0 && [b.x, b.y, right, bottom].every(Number.isFinite))) return true;
+      if (right < 0 || bottom < 0 || b.x > w || b.y > h) return true;
+      const x = Math.max(b.x, 0);
+      const y = Math.max(b.y, 0);
+      return base.isCovered({ x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y });
+    },
+  };
 }
 
 function projectMap(background: string | null, cellSize: number, context: ProjectionContext): PlayerMap {
