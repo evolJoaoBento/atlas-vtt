@@ -29,6 +29,7 @@ const lightingView = vi.hoisted(() => (deps: SceneLightingDeps): SceneLightingVi
   ambientLight: () => ({ ambient: 1 }),
   seenSpots: () => [],
   showsExplored: () => false,
+  exploredSettling: () => false,
   sightReady: () => true,
   refreshBounds: vi.fn(),
   resetExplored: vi.fn(),

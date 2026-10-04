@@ -19,7 +19,7 @@ const torchlit = (goblinX = 420): Scene => scene({ ambient: 0 }, {
 function view(ready: boolean, showsExplored = false) {
   return {
     sightReady: () => ready, currentSight: () => SEES_ALL, ambientLight: () => ({ ambient: 1 }),
-    lightReaches: () => [], seenSpots: () => [], showsExplored: () => showsExplored,
+    lightReaches: () => [], seenSpots: () => [], showsExplored: () => showsExplored, exploredSettling: () => false,
   };
 }
 

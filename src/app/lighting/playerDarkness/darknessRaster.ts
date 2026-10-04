@@ -1,6 +1,8 @@
 /**
  * Where the players' window of a lit scene shows the map, on a coarse cell grid, by the
- * window's own rules: a cell shows when its centre does. The map shows
+ * window's own rules, sampled at the centres of cells of at least `DARKNESS_MIN_CELL`: a cell
+ * shows only when every sample within it does, so a coarse cell hides more, never shows more
+ * (`DARKNESS_SAMPLES_PER_SIDE`). The map shows
  * - where a precise sense of a vision token that shows the map perceives it, in the light
  *   there (`perceivingRegion`, `lightLevelAt`); with no vision token, or token vision off,
  *   wherever normal sight sees by the light (`perceive` of `SEES_ALL`);
@@ -27,6 +29,8 @@ import { insideSpans } from './spans';
 export const DARKNESS_MIN_CELL = 8;
 /** By default the map's long side holds at most this many cells; the cells double in size until it does. */
 export const MAX_DARKNESS_CELLS_PER_SIDE = 384;
+/** The window's rules are sampled on cells this many to the map's long side at most (8 px cells up to 4096 px maps). */
+export const DARKNESS_SAMPLES_PER_SIDE = 512;
 /** A texel of the explored memory counts as explored from this coverage (0–255) on: more than half. */
 export const EXPLORED_COVERAGE = 128;
 
@@ -60,10 +64,33 @@ export function darknessRaster(
   maxCellsPerSide = MAX_DARKNESS_CELLS_PER_SIDE,
 ): DarknessRaster {
   const cellSize = darknessCellSize(map, maxCellsPerSide);
+  const samples = sampledRaster(lighting, explored, map, Math.min(cellSize, darknessCellSize(map, DARKNESS_SAMPLES_PER_SIDE)));
+  return samples.cellSize === cellSize ? samples : coarsened(samples, cellSize);
+}
+
+function emptyRaster(map: MapSize, cellSize: number): DarknessRaster {
   const cols = Math.max(1, Math.ceil(map.width / cellSize));
   const rows = Math.max(1, Math.ceil(map.height / cellSize));
-  const grid = { cols, rows, cellSize, map, dark: new Uint8Array(cols * rows).fill(1) };
+  return { cols, rows, cellSize, map, dark: new Uint8Array(cols * rows).fill(1) };
+}
+
+/** Each cell shows when its centre does. */
+function sampledRaster(lighting: PlayerLighting, explored: ExploredImage | null, map: MapSize, cellSize: number): DarknessRaster {
+  const grid = emptyRaster(map, cellSize);
   if (lighting.ready) showMap(lighting, explored, grid);
+  return grid;
+}
+
+/** Cells `cellSize` square (a power of two times the samples' size): dark where any sample within is dark. */
+function coarsened(samples: DarknessRaster, cellSize: number): DarknessRaster {
+  const grid = emptyRaster(samples.map, cellSize);
+  grid.dark.fill(0);
+  const per = cellSize / samples.cellSize;
+  for (let row = 0; row < samples.rows; row++) {
+    for (let col = 0; col < samples.cols; col++) {
+      if (samples.dark[row * samples.cols + col]) grid.dark[Math.floor(row / per) * grid.cols + Math.floor(col / per)] = 1;
+    }
+  }
   return grid;
 }
 

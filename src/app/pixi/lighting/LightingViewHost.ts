@@ -81,6 +81,7 @@ export class LightingViewHost implements SceneLightingView {
   ambientLight(): AmbientLight { return this.view.ambientLight(); }
   seenSpots(): readonly SeenSpot[] { return this.view.seenSpots(); }
   showsExplored(): boolean { return this.view.showsExplored(); }
+  exploredSettling(): boolean { return this.view.exploredSettling(); }
   sightReady(): boolean { return this.view.sightReady(); }
   refreshBounds(): void { this.view.refreshBounds(); }
   resetExplored(): void { this.view.resetExplored(); }

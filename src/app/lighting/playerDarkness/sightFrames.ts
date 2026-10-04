@@ -11,15 +11,17 @@ import { ExploredImages, type ExploredDecoder } from './exploredImage';
 /**
  * The darkness is worked out anew at most this often: whoever sends it to players repaints a fog
  * with each new one, and a drag with live sight would otherwise change it twenty times a second.
- * Every change to it waits, also one that hides more (a light put out, a door closed, the explored
- * memory cleared or switched off): only a view whose sight stops or starts being the scene's
- * darkens or lights at once. A darkness that lags shows, for up to this long, map art the window
+ * Every change to sight and light waits, also one that hides more (a light put out, a door closed):
+ * only a view whose sight stops or starts being the scene's darkens or lights at once, and so does
+ * any change to the explored memory shown (saved, cleared or switched off), which comes rarely. A darkness that lags shows, for up to this long, map art the window
  * showed that long ago; never another scene's, since the view's owner restarts it on every load.
  */
 export const DARKNESS_INTERVAL_MS = 200;
 
 /** Rasters kept at once, one per cell count asked for; callers rarely ask for more than one or two. */
 const KEPT_CELL_COUNTS = 4;
+/** Where the decoded explored memory sits in a raster's inputs. */
+const EXPLORED_INPUT = 5;
 
 interface Built {
   inputs: readonly unknown[];
@@ -42,7 +44,8 @@ export class SightFrames {
   private readonly explored: ExploredImages;
   /** The last raster by the cell count it was asked for: callers asking for different ones do not undo each other. */
   private readonly built = new Map<number, Built>();
-  private timer: number | null = null;
+  /** The timer of each cell count whose raster is deferred. */
+  private readonly timers = new Map<number, number>();
 
   constructor(private readonly onDue: () => void, decode?: ExploredDecoder) {
     this.explored = new ExploredImages(onDue, decode);
@@ -70,10 +73,15 @@ export class SightFrames {
     this.explored.reset();
   }
 
+  /** The explored memory was edited and may have lost area: no mask decoded before stands in for the next one. */
+  forgetExplored(): void {
+    this.explored.reset();
+  }
+
   dispose(): void {
     this.explored.dispose();
-    if (this.timer !== null) window.clearTimeout(this.timer);
-    this.timer = null;
+    for (const timer of this.timers.values()) window.clearTimeout(timer);
+    this.timers.clear();
     this.built.clear();
   }
 
@@ -81,13 +89,17 @@ export class SightFrames {
   private memo(cells: number, inputs: readonly unknown[], now: number, build: () => DarknessRaster): DarknessRaster {
     const last = this.built.get(cells);
     if (last && inputs.length === last.inputs.length && inputs.every((input, i) => input === last.inputs[i])) return last.raster;
-    // A first raster comes at once, and so does the raster of a view whose sight is not the scene's (yet, or any more).
-    const wait = last && inputs[0] === true && last.inputs[0] === true ? last.at + DARKNESS_INTERVAL_MS - now : 0;
+    // A first raster comes at once, and so do the raster of a view whose sight is not the scene's (yet, or any more)
+    // and one whose explored memory changed (`EXPLORED_INPUT`).
+    const waits = last && inputs[0] === true && last.inputs[0] === true && inputs[EXPLORED_INPUT] === last.inputs[EXPLORED_INPUT];
+    const wait = last && waits ? last.at + DARKNESS_INTERVAL_MS - now : 0;
     if (last && wait > 0) {
-      this.timer ??= window.setTimeout(() => {
-        this.timer = null;
-        this.onDue();
-      }, wait);
+      if (!this.timers.has(cells)) {
+        this.timers.set(cells, window.setTimeout(() => {
+          this.timers.delete(cells);
+          this.onDue();
+        }, wait));
+      }
       return last.raster;
     }
     const built = { inputs, raster: build(), at: now };

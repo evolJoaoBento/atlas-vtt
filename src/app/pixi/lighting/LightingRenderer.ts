@@ -98,15 +98,14 @@ export class LightingRenderer implements SceneLightingView {
     this.engine = new LightingEngine(renderer);
     this.layer = this.engine.layer;
     this.memory = new ExploredMemory({
-      renderer,
-      store: deps.store,
+      renderer, store: deps.store,
       onTexture: (texture) => {
         if (texture) this.engine.setExplored(texture);
         deps.exploredWatcher?.setTexture(texture);
       },
       onTravel: (undone) => deps.exploredWatcher?.memoryTravelled(undone),
-      onChange: () => requestRender(deps.app),
-      guard: (work) => this.run(work),
+      onChange: () => requestRender(deps.app), guard: (work) => this.run(work),
+      onSettled: () => { this.sightChanged = true; }, // inside `run`, which tells whoever waits on the memory
     });
     renderer.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.layer.zIndex = LIGHTING_Z_INDEX;
@@ -124,7 +123,8 @@ export class LightingRenderer implements SceneLightingView {
   lightReaches(): LightReach[] { return this.reaches; }
   seenSpots(): readonly SeenSpot[] { return this.spotsNow; }
   showsExplored(): boolean { return exploredMemoryOn(this.deps.store.getState().lighting); }
-  sightReady(): boolean { return this.fresh && !this.stopped; }
+  sightReady(): boolean { return this.fresh && !this.stopped && !contextLost(this.deps.app.renderer); }
+  exploredSettling(): boolean { return this.memory.settling(); }
   /** The scene's lighting as the rules read it: with its zones when it has any, the same object while both stay. */
   ambientLight(): AmbientLight {
     const { lighting } = this.deps.store.getState();

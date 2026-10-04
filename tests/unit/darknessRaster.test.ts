@@ -95,6 +95,28 @@ describe('darkness raster', () => {
   });
 });
 
+describe('coarse darkness cells', () => {
+  it('shows a cell only when all of it is seen: a large cell a wall edge crosses is dark', () => {
+    const state = scene({ ambient: 1 }, { tokens: { hero: hero(140, 400) }, walls: { a: wall('a', { x: 503, y: -10 }, { x: 503, y: 810 }) } });
+    const lighting = lightingFromStore(state, MAP)!;
+    const coarse = darknessRaster(lighting, null, MAP, 16);
+    expect(coarse.cellSize).toBe(64);
+    const row = Math.floor(400 / 64);
+    // 448–512 straddles the wall at 503: its centre (480) is seen, its right edge is not.
+    expect(coarse.dark[row * coarse.cols + 7]).toBe(1);
+    expect(coarse.dark[row * coarse.cols + 6]).toBe(0);
+    // Every cell shown is shown by the rules at every 8 px sample within it.
+    for (let r = 0; r < coarse.rows; r++) {
+      for (let c = 0; c < coarse.cols; c++) {
+        if (coarse.dark[r * coarse.cols + c]) continue;
+        for (let y = r * 64 + 4; y < Math.min(MAP.height, (r + 1) * 64); y += 8) {
+          for (let x = c * 64 + 4; x < Math.min(MAP.width, (c + 1) * 64); x += 8) expect(shownByTheRules(lighting, null, x, y), `${x},${y}`).toBe(true);
+        }
+      }
+    }
+  });
+});
+
 describe('inside spans', () => {
   it('gives the ranges of a line inside a polygon by nonzero winding', () => {
     const square = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];

@@ -12,7 +12,8 @@ interface Entry {
 /**
  * One `SightFrames` per open view, shared by every extension. A view keeps its frames across the
  * maps its tabs load, so they restart whenever the store starts or ends a load or holds another
- * map: no darkness or explored memory worked out for one scene ever stands in for another.
+ * map: no darkness or explored memory worked out for one scene ever stands in for another. An
+ * edit of the explored memory drops the decoded mask too: one from before it may show forgotten areas.
  */
 export class SightFramesByView {
   private readonly entries = new Map<ViewId, Entry>();
@@ -51,6 +52,8 @@ export class SightFramesByView {
     const frames = new SightFrames(() => { for (const listener of [...listeners]) listener(); }, this.decode);
     const unsubscribe = view.atlasStore.subscribe((state, previous) => {
       if (state.isMapLoading !== previous.isMapLoading || state.mapPath !== previous.mapPath) frames.restart();
+      // An edit by hand, an undo or a redo may take area out of the memory: the mask before it never stands in again.
+      else if (state.exploredEdits !== previous.exploredEdits) frames.forgetExplored();
     });
     const entry = { frames, listeners, unsubscribe };
     this.entries.set(view.viewId, entry);

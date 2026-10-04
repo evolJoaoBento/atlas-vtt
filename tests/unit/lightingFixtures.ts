@@ -31,7 +31,7 @@ export function lightingFromStore(state: LitState, map: MapSize, rules?: SightRu
   });
   const view = {
     sightReady: () => true, currentSight: () => model.sight, ambientLight: () => model.ambient,
-    lightReaches: () => model.reaches, seenSpots: () => spots, showsExplored: () => exploredMemoryOn(state.lighting),
+    lightReaches: () => model.reaches, seenSpots: () => spots, showsExplored: () => exploredMemoryOn(state.lighting), exploredSettling: () => false,
   };
   return playerLightingOf(view, perception);
 }
@@ -39,7 +39,7 @@ export function lightingFromStore(state: LitState, map: MapSize, rules?: SightRu
 /** A lit scene's lighting with nothing in it: everyone sees all in daylight, no token is seen; `overrides` replace any part. */
 export function fixtureLighting(overrides: Partial<PlayerLighting> = {}): PlayerLighting {
   return {
-    ready: true, perception: () => 'unseen', sight: SEES_ALL, ambient: { ambient: 1 }, reaches: [], spots: [], showsExplored: false,
+    ready: true, perception: () => 'unseen', sight: SEES_ALL, ambient: { ambient: 1 }, reaches: [], spots: [], showsExplored: false, exploredSettling: false,
     ...overrides,
   };
 }

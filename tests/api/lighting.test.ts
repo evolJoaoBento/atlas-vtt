@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DisposerSet } from '../../src/api/disposers';
 import { lightingApi } from '../../src/api/lighting';
 import type { ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
-import { fixtureExploredImage, fixtureLighting, lightingFromStore, scene, wall, character } from '../unit/lightingFixtures';
+import { character, exploredImage, fixtureExploredImage, fixtureLighting, lightingFromStore, scene, wall } from '../unit/lightingFixtures';
 import { fakeView, framesFor, loadMap as load, trackerWith, type FakeView } from './apiFakes';
 
 const MAP = { width: 1000, height: 500 };
@@ -149,6 +149,82 @@ describe('lighting', () => {
     // The hero now stands right of the wall: the left half, shown on the last map, is dark at once.
     expect(shown[Math.floor(250 / cellSize) * cols + Math.floor(100 / cellSize)]).toBe(0);
     expect(decode).toHaveBeenCalledTimes(2);
+  });
+
+  it('C-light-1: a map load or tab switch on a lit scene is pending until the new map and its lighting are known, never unlit', () => {
+    const view = fakeView('v1');
+    load(view);
+    view.atlasStore.getState().setSceneLighting({ enabled: true });
+    view.setPlayerLighting(walled());
+    const { api } = setup(view);
+    expect(api.playerVisibility('v1').status).toBe('ready');
+    const answers: string[] = [];
+    const ask = (): void => { answers.push(api.playerVisibility('v1').status); };
+    // As `MapService.runLoad` writes the store; the renderer answers by the cleared lighting meanwhile.
+    view.atlasStore.subscribe(ask);
+    for (const lighting of [null, undefined] as const) {
+      view.atlasStore.getState().setMapLoaded(false);
+      view.atlasStore.getState().setMapPath('maps/b.atlasmap');
+      view.setPlayerLighting(lighting);
+      view.atlasStore.getState().clearMapState();
+      view.atlasStore.getState().setMapLoading(true, 20);
+      view.atlasStore.getState().setSceneLighting({ enabled: true });
+      view.setPlayerLighting(fixtureLighting({ ready: false }));
+      view.atlasStore.getState().setMapLoading(false);
+      view.setPlayerLighting(walled());
+      view.atlasStore.getState().setMapLoaded(true);
+    }
+    expect(answers).not.toContain('unlit');
+    expect(answers.at(-1)).toBe('ready');
+  });
+
+  it('C-light-1: players never see what the GM forgot, cleared or took back by undo, until the saved mask shows it gone', async () => {
+    vi.useFakeTimers();
+    const memories: Record<string, ExploredImage> = {
+      'data:all': exploredImage(MAP, () => true), 'data:less': exploredImage(MAP, (x) => x < 300),
+    };
+    const decode = vi.fn((mask: string): Promise<ExploredImage> => Promise.resolve(memories[mask]!));
+    const view = fakeView('v1');
+    load(view);
+    const lit = walled();
+    const { api } = setup(view, decode);
+    // Behind the wall (x 800) only the memory shows it.
+    const behindWall = (): number | string => {
+      const answer = api.playerVisibility('v1');
+      if (answer.status !== 'ready') return answer.status;
+      const { cellSize, cols, shown } = answer.darkness;
+      return shown[Math.floor(250 / cellSize) * cols + Math.floor(800 / cellSize)]!;
+    };
+    // 'unasked': nobody asks while the window settles; the edit alone must keep the old mask from standing in.
+    for (const edit of ['forget', 'clear', 'undo-reveal', 'unasked'] as const) {
+      view.setPlayerLighting(lit);
+      view.atlasStore.setState({ exploredMask: 'data:all' });
+      behindWall();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(behindWall()).toBe(1);
+      // The window forgets at once: the store only counts the edit, and the renderer says its memory holds less.
+      view.setPlayerLighting({ ...lit, exploredSettling: true });
+      const edits = view.atlasStore.getState().exploredEdits;
+      view.atlasStore.getState().setExploredEdits(edit === 'undo-reveal' ? edits - 1 : edits + 1);
+      if (edit !== 'unasked') expect(behindWall()).toBe('pending');
+      await vi.advanceTimersByTimeAsync(1000);
+      if (edit !== 'unasked') expect(behindWall()).toBe('pending');
+      // The save: the renderer is settled before the store has the smaller mask, whose decode is outstanding.
+      view.setPlayerLighting(lit);
+      view.atlasStore.setState({ exploredMask: edit === 'clear' ? null : 'data:less' });
+      if (edit !== 'clear') expect(behindWall()).toBe('pending');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(behindWall()).toBe(0);
+    }
+  });
+
+  it('C-light-2: watch fires when the map is marked loaded, which can come after the load ends', () => {
+    const view = fakeView('v1');
+    const { api } = setup(view);
+    const listener = vi.fn();
+    api.watch('v1', listener);
+    view.atlasStore.getState().setMapLoaded(true);
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('C-light-2: watch fires when sight is recomputed, and its disposer stops it', () => {

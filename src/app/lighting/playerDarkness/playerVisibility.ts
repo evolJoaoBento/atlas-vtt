@@ -37,18 +37,25 @@ export function pendingVisibility(): PlayerVisibility {
 }
 
 /**
- * The view's player visibility. Unlit only where the view's lighting says it hides nothing, or where it cannot be
- * read and the store's scene is unlit. Pending while the view cannot tell for a lit scene, while sight is not the
- * scene's, while the map loads or has no size, and while the explored memory shown is still decoding.
+ * The view's player visibility. Pending while the store holds no whole map (loading, a tab switch: a load clears the
+ * scene's lighting before the next map's comes, so nothing about lighting can be told then), while the view cannot
+ * tell for a lit scene, while sight is not the scene's, while the map has no size, while the explored memory shown
+ * is still decoding, and while it may hold less than its saved mask (an edit took area out). Unlit only where the
+ * view's lighting says it hides nothing, or where it cannot be read and the store's scene is unlit.
  */
 export function visibilityOf(view: VisibilityView, frames: SightFrames, options: { maxCellsPerSide: number }): PlayerVisibility {
   const state = view.atlasStore.getState();
+  if (!state.mapLoaded || state.isMapLoading) return PENDING;
   const lighting = view.renderer?.getPlayerLighting?.();
   if (lighting === null) return UNLIT;
   if (lighting === undefined) return state.lighting.enabled ? PENDING : UNLIT;
-  if (!state.mapLoaded || state.isMapLoading) return PENDING;
   const map = loadedMapSize(view);
   if (!(map.width > 0) || !(map.height > 0)) return PENDING;
+  if (lighting.showsExplored && lighting.exploredSettling) {
+    // The saved mask still holds what the window forgot: nothing decoded from it may stand in once the next one comes.
+    frames.forgetExplored();
+    return PENDING;
+  }
   const { raster, exploredPending } = frames.raster(lighting, state.exploredMask, map, options.maxCellsPerSide);
   // A view whose sight is not the scene's is still asked: the raster after it then comes at once.
   if (!lighting.ready || exploredPending) return PENDING;

@@ -25,6 +25,7 @@ vi.mock('../../src/app/pixi/lighting/createSceneLighting', () => ({
       ambientLight: () => ({ ambient: 1 }),
       seenSpots: () => [],
       showsExplored: () => false,
+      exploredSettling: () => false,
       sightReady: () => true,
       refreshBounds: vi.fn(),
       resetExplored: () => { memory.resets++; },

@@ -27,6 +27,9 @@ function rendererWatch(view: TrackedMapView, listener: () => void): { retry: () 
   return { retry, stop: () => { stop?.(); stop = null; } };
 }
 
+/** The store fields whose change may change the answer; the extension follows the rest (tokens, the map) itself. */
+const WATCHED = ['lighting', 'exploredMask', 'exploredEdits', 'isMapLoading', 'mapLoaded'] as const;
+
 export function lightingApi(tracker: ViewTracker, frames: SightFramesByView, disposers: DisposerSet): LightingApi {
   /** Renderer watches still waiting for their view's renderer, retried whenever the view is asked about. */
   const waiting = new Map<ViewId, Set<() => void>>();
@@ -56,7 +59,7 @@ export function lightingApi(tracker: ViewTracker, frames: SightFramesByView, dis
       const stopDue = frames.onDue(view, call);
       const unsubscribe = view.atlasStore.subscribe((state, previous) => {
         renderer.retry();
-        if (state.lighting !== previous.lighting || state.exploredMask !== previous.exploredMask || state.isMapLoading !== previous.isMapLoading) call();
+        if (WATCHED.some((key) => state[key] !== previous[key])) call();
       });
       let cancelClose: () => void = () => undefined;
       // The view going away ends the watch too, so a closed view is never retained.

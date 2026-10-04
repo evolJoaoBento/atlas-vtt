@@ -33,6 +33,11 @@ export interface SceneLightingView {
   /** Whether the players' view shows the explored memory (the scene's `exploredMask`) where no token sees. */
   showsExplored(): boolean;
   /**
+   * Whether the explored memory the view shows may hold less than the scene's saved mask: an edit
+   * or undo took area out since the last save, or the mask is still being drawn in.
+   */
+  exploredSettling(): boolean;
+  /**
    * Whether the sight, light and spots above were worked out for the scene the store holds now.
    * False while a map loads, before its bounds are known and while the graphics device is lost:
    * they may still be another scene's then.

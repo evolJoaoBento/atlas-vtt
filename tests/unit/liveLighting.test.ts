@@ -68,8 +68,8 @@ describe('the sight frames of a view', () => {
     expect(shown.exploredPending).toBe(false);
     expect(darkAt(shown.raster, 900, 400)).toBe(false);
     expect(decode).toHaveBeenCalledTimes(1);
-    // Forgetting the memory waits for the interval like every other change.
-    expect(darkAt(frames.raster(lighting, null, MAP, undefined, 2 * DARKNESS_INTERVAL_MS).raster, 900, 400)).toBe(true);
+    // Forgetting the memory takes effect at once, within the interval.
+    expect(darkAt(frames.raster(lighting, null, MAP, undefined, 2).raster, 900, 400)).toBe(true);
     frames.dispose();
   });
 
@@ -108,6 +108,21 @@ describe('the sight frames of a view', () => {
     frames.raster(lighting, 'data:broken', MAP, undefined, 0);
     await vi.advanceTimersByTimeAsync(0);
     const after = frames.raster(lighting, 'data:broken', MAP, undefined, 1);
+    expect(after.exploredPending).toBe(false);
+    expect(darkAt(after.raster, 900, 400)).toBe(true);
+    frames.dispose();
+  });
+
+  it('lets no memory stand in after an edit that may have forgotten areas', async () => {
+    const memories: Record<string, ExploredImage> = { 'data:a': exploredImage(MAP, (x) => x > 700), 'data:b': exploredImage(MAP, () => false) };
+    const frames = new SightFrames(() => {}, async (mask) => memories[mask]!);
+    const lighting = lightingFromStore(night(), MAP)!;
+    frames.raster(lighting, 'data:a', MAP, undefined, 0);
+    await vi.advanceTimersByTimeAsync(0);
+    frames.forgetExplored();
+    expect(frames.raster(lighting, 'data:b', MAP, undefined, 1).exploredPending).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    const after = frames.raster(lighting, 'data:b', MAP, undefined, 2);
     expect(after.exploredPending).toBe(false);
     expect(darkAt(after.raster, 900, 400)).toBe(true);
     frames.dispose();

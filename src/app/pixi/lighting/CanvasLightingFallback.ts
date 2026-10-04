@@ -83,6 +83,7 @@ export class CanvasLightingFallback implements SceneLightingView {
   seenSpots(): readonly SeenSpot[] { return this.spots; }
   /** The fallback keeps no explored memory. */
   showsExplored(): boolean { return false; }
+  exploredSettling(): boolean { return false; }
   sightReady(): boolean { return this.fresh; }
   refreshBounds(): void {
     this.inputs = [];

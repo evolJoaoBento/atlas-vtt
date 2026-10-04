@@ -150,16 +150,19 @@ export interface PlayerLighting {
   spots: readonly SeenSpot[];
   /** The view shows the scene's explored memory where no token sees. */
   showsExplored: boolean;
+  /** The memory the view shows may hold less than the saved mask (`SceneLightingView.exploredSettling`): the mask would show too much. */
+  exploredSettling: boolean;
 }
 
 /** The players' lighting of a lit scene, `perception` as `playerTokenSight` gave it; undefined while the scene is unlit. */
 export function playerLightingOf(
-  lighting: Pick<SceneLightingView, 'sightReady' | 'currentSight' | 'ambientLight' | 'lightReaches' | 'seenSpots' | 'showsExplored'>,
+  lighting: Pick<SceneLightingView, 'sightReady' | 'currentSight' | 'ambientLight' | 'lightReaches' | 'seenSpots' | 'showsExplored' | 'exploredSettling'>,
   perception: TokenPerception | undefined,
 ): PlayerLighting | undefined {
   if (!perception) return undefined;
   return {
     ready: lighting.sightReady(), perception, sight: lighting.currentSight(), ambient: lighting.ambientLight(),
     reaches: lighting.lightReaches(), spots: lighting.seenSpots(), showsExplored: lighting.showsExplored(),
+    exploredSettling: lighting.exploredSettling(),
   };
 }
