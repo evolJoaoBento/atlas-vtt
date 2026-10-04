@@ -44,6 +44,8 @@ export class SightFrames {
   private readonly explored: ExploredImages;
   /** The last raster by the cell count it was asked for: callers asking for different ones do not undo each other. */
   private readonly built = new Map<number, Built>();
+  /** The store's count of explored edits the decoded mask was taken under; null until a raster is asked for. */
+  private editsSeen: number | null = null;
   /** The timer of each cell count whose raster is deferred. */
   private readonly timers = new Map<number, number>();
 
@@ -71,6 +73,16 @@ export class SightFrames {
   restart(): void {
     this.built.clear();
     this.explored.reset();
+    this.editsSeen = null;
+  }
+
+  /**
+   * The store's count of explored edits, read by whoever asks before anything else: once it moved, no mask decoded
+   * before stands in again, whichever store subscriber (the memory's, the caller's) runs first.
+   */
+  followEdits(edits: number): void {
+    if (this.editsSeen !== null && edits !== this.editsSeen) this.forgetExplored();
+    this.editsSeen = edits;
   }
 
   /** The explored memory was edited and may have lost area: no mask decoded before stands in for the next one. */

@@ -46,6 +46,7 @@ export function pendingVisibility(): PlayerVisibility {
 export function visibilityOf(view: VisibilityView, frames: SightFrames, options: { maxCellsPerSide: number }): PlayerVisibility {
   const state = view.atlasStore.getState();
   if (!state.mapLoaded || state.isMapLoading) return PENDING;
+  frames.followEdits(state.exploredEdits);
   const lighting = view.renderer?.getPlayerLighting?.();
   if (lighting === null) return UNLIT;
   if (lighting === undefined) return state.lighting.enabled ? PENDING : UNLIT;

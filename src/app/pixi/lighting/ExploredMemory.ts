@@ -6,6 +6,7 @@ import type { ExploredShapes } from '../../vision/exploredShapes';
 import type { MapBounds } from '../../vision/visibility';
 import { saveExploredMask } from './exploredMaskSaving';
 import { ExploredSaveScheduler } from './ExploredSaveScheduler';
+import { ExploredSettling } from './ExploredSettling';
 import { ExploredSteps } from './ExploredSteps';
 import { ExploredTexture } from './ExploredTexture';
 
@@ -51,10 +52,7 @@ export class ExploredMemory {
   private loadGeneration = 0;
   private ready = true;
   private contextLost = false;
-  /** An edit or an undo took area out of the memory, or may have, since the mask was last saved (`settling`). */
-  private shrunk = false;
-  /** A mask is on its way into the texture: until it is drawn, the memory shows less than the mask. */
-  private loading = false;
+  private readonly settled: ExploredSettling;
   private readonly saver: ExploredSaveScheduler;
   private readonly steps: ExploredSteps;
   /** The store's count of edits the texture stands at. */
@@ -65,8 +63,13 @@ export class ExploredMemory {
     this.saver = new ExploredSaveScheduler(() => deps.store.getState().mapPath, () => deps.guard(() => this.save()), EXPLORED_SAVE_DELAY);
     this.steps = new ExploredSteps(deps.renderer);
     this.revision = deps.store.getState().exploredEdits;
+    this.settled = new ExploredSettling(() => this.revision !== deps.store.getState().exploredEdits, deps.onSettled);
     // Undo and redo move the count; an edit of this memory's own has moved `revision` along with it.
-    this.unsubscribe = deps.store.subscribe((state) => this.follow(state.exploredEdits, state.isMapLoading));
+    this.unsubscribe = deps.store.subscribe((state, previous) => {
+      // A rename moves the open map's save target (a switch unloads first, so its map is not loaded by then).
+      if (state.mapPath !== previous.mapPath && previous.mapLoaded && !previous.isMapLoading) this.saver.retarget(previous.mapPath, state.mapPath);
+      this.follow(state.exploredEdits, state.isMapLoading);
+    });
   }
 
   /** Sizes the memory to the map and loads the scene's saved mask unless the texture holds it. */
@@ -99,7 +102,7 @@ export class ExploredMemory {
       if (changed) this.deps.onChange();
     });
     if (!changed) return false;
-    if (edit.mode === 'forget') this.shrunk = true;
+    if (edit.mode === 'forget') this.settled.tookOut();
     this.revision++;
     this.deps.store.getState().setExploredEdits(this.revision);
     this.saver.schedule();
@@ -168,24 +171,26 @@ export class ExploredMemory {
    * taken back or made again on the texture. A load starts the count over too, which takes no
    * edit back; and where the texture cannot be written (a lost context, an engine that
    * stopped) or the steps are gone (the guard found a restored context, which forgets them),
-   * nothing is saved and no one is told.
+   * nothing is saved and nothing is undone; whoever asked meanwhile is told the count is followed.
    */
   private follow(count: number, loading: boolean): void {
     if (count === this.revision) return;
     const from = this.revision;
     this.revision = count;
     const texture = this.texture;
-    if (!texture || loading) return;
     let travelled = false;
-    this.deps.guard(() => {
-      if (!this.steps.leads(from, count)) return;
-      this.steps.travel(texture, from, count);
-      travelled = true;
-      this.deps.onChange();
-    });
-    if (!travelled) return;
+    if (texture && !loading) {
+      this.deps.guard(() => {
+        if (!this.steps.leads(from, count)) return;
+        this.steps.travel(texture, from, count);
+        travelled = true;
+        this.deps.onChange();
+      });
+    }
+    // Until followed, the new count read as settling: whoever waited on it is told it took nothing out.
+    if (!travelled) return this.settled.followed();
     // Undoing a reveal or redoing a forget takes area out: any step may.
-    this.shrunk = true;
+    this.settled.tookOut();
     this.saver.schedule();
     this.deps.onTravel(count < from);
   }
@@ -207,12 +212,9 @@ export class ExploredMemory {
     });
   }
 
-  /**
-   * The memory differs from the scene's saved mask in a way that may show less: an edit took
-   * area out since the last save, or the mask is still being drawn into the texture.
-   */
+  /** The memory may hold less than the scene's saved mask (`ExploredSettling`). */
   settling(): boolean {
-    return this.shrunk || this.loading;
+    return this.settled.active;
   }
 
   /** The texture holds the scene's memory: its mask is in, and no lost context took it. */
@@ -221,7 +223,7 @@ export class ExploredMemory {
   }
 
   private supersede(): void {
-    this.settle(false);
+    this.settled.settle();
     this.loadedMask = null;
     this.loadGeneration++;
     this.ready = true;
@@ -250,19 +252,19 @@ export class ExploredMemory {
     if (!mask) {
       texture.clear();
       this.ready = true;
-      this.settle(false);
+      this.settled.settle();
       this.deps.onChange();
       return;
     }
     this.ready = false;
-    this.loading = true;
+    this.settled.loadStarted();
     let image: Texture;
     try {
       image = await texture.decode(mask);
     } catch (error) {
       if (generation === this.loadGeneration) {
         this.loadedMask = undefined;
-        this.deps.guard(() => this.settle(false));
+        this.deps.guard(() => this.settled.settle());
       }
       console.error('Atlas: could not load the explored areas of this scene', error);
       return;
@@ -273,7 +275,7 @@ export class ExploredMemory {
         texture.draw(image);
         drawn = true;
         this.ready = true;
-        this.settle(false);
+        this.settled.settle();
         this.deps.onChange();
       });
     }
@@ -284,15 +286,7 @@ export class ExploredMemory {
     if (!this.texture || !this.ready || this.contextLost) return;
     this.loadedMask = saveExploredMask(this.texture.toCanvas());
     // Settled before the store has the mask: whoever reads it then reads the memory as it is.
-    this.settle(false);
+    this.settled.settle();
     this.deps.store.getState().setExploredMask(this.loadedMask);
-  }
-
-  /** The texture is the saved mask's again, or a mask is on its way in (`loading`); tells the owner once it settles. */
-  private settle(loading: boolean): void {
-    const was = this.settling();
-    this.shrunk = false;
-    this.loading = loading;
-    if (was && !this.settling()) this.deps.onSettled?.();
   }
 }
