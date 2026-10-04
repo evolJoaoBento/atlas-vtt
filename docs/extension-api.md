@@ -14,20 +14,20 @@ The API is announced with the workspace event `atlas-vtt:api-ready` and withdraw
 
 An extension requires its major version and checks `api.has(capability)` before using a feature. It never compares minor versions. `has()` is true only for capabilities that have landed in the running Atlas.
 
-| API version | Capabilities added | Added to `AtlasExtension` | Events added |
-|---|---|---|---|
-| 1.0.0 | none | `id`, `on` | `unload` |
-| 1.1.0 | `views`, `rules`, `settings`, `storage` | `views`, `rules`, `settings`, `storage` | `map-loaded`, `map-closed`, `rules-changed`, `settings-changed` |
-| 1.2.0 | `presentation` | `presentation` | none |
-| 1.3.0 | `dice` | `dice` | none |
-| 1.4.0 | `lasers` | `lasers` | none |
-| 1.5.0 | `lighting` | `lighting` | none |
-| 1.6.0 | `tokens` | `tokens` | none |
-| 1.7.0 | `ui` | `ui` | none |
-| 1.8.0 | `scenes`, `bundles` | `scenes`, `bundles` | `scenes-changed` |
-| 1.9.0 | `remote-view` | `remoteViews` (optional) | none |
+| API version | Status | Capabilities added | Added to `AtlasExtension` | Events added |
+|---|---|---|---|---|
+| 1.0.0 | released | none | `id`, `on` | `unload` |
+| 1.1.0 | planned for 1.1.0 | `views`, `rules`, `settings`, `storage` | `views`, `rules`, `settings`, `storage` | `map-loaded`, `map-closed`, `rules-changed`, `settings-changed` |
+| 1.2.0 | planned for 1.2.0 | `presentation` | `presentation` | none |
+| 1.3.0 | planned for 1.3.0 | `dice` | `dice` | none |
+| 1.4.0 | planned for 1.4.0 | `lasers` | `lasers` | none |
+| 1.5.0 | planned for 1.5.0 | `lighting` | `lighting` | none |
+| 1.6.0 | planned for 1.6.0 | `tokens` | `tokens` | none |
+| 1.7.0 | planned for 1.7.0 | `ui` | `ui` | none |
+| 1.8.0 | planned for 1.8.0 | `scenes`, `bundles` | `scenes`, `bundles` | `scenes-changed` |
+| 1.9.0 | planned for 1.9.0 | `remote-view` | `remoteViews` (optional) | none |
 
-Rows after 1.0.0 describe the planned rollout. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
+Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ## Semver rules
 
