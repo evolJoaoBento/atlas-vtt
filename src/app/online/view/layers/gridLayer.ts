@@ -5,7 +5,7 @@
  */
 import { createHexLayout, isHexGridType } from '../../../grid/hexGeometry';
 import {
-  cellNumberAnchor, cellNumberFontSize, MIN_CELL_NUMBER_SCREEN_SIZE, numberCells, type CellLattice, type CellNumberStyle, type NumberedCell,
+  cellNumberAnchor, cellNumberFontSize, numberCells, type CellLattice, type CellNumberStyle, type NumberedCell,
 } from '../../../grid/cellNumbering';
 import { hexLattice } from '../../../grid/hexLattice';
 import { squareLattice } from '../../../grid/squareLattice';
@@ -17,6 +17,11 @@ import type { TextStyle, ViewSurface } from '../ViewSurface';
 import type { LayerFrame, PlayerLayer } from './layerTypes';
 
 const DEFAULT_NUMBER_COLOR = '#ffffff';
+/**
+ * Numbers smaller than this on screen (CSS pixels) hide until zoomed in, as `CellNumberLabels` hides
+ * them; its own copy is private, so upstream's file stays as written (`sharedLayout.test.ts` checks both).
+ */
+export const MIN_CELL_NUMBER_SCREEN_SIZE = 7;
 /** Beyond this many cells on the map, numbering them costs more than they are worth. */
 export const MAX_NUMBERED_CELLS = 100_000;
 /** The view only builds what is on screen, so its caps are far above the preview's. */

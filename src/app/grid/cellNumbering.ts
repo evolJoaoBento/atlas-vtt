@@ -19,8 +19,6 @@ export interface CellNumberStyle {
 }
 
 export const DEFAULT_CELL_NUMBER_OPACITY = 0.8;
-/** Numbers smaller than this on screen (CSS pixels) are unreadable noise, so they hide until zoomed in. */
-export const MIN_CELL_NUMBER_SCREEN_SIZE = 7;
 
 /** The cell number style a grid's settings ask for, or undefined when numbers are off. */
 export function cellNumberStyleOfGrid(

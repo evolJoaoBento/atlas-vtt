@@ -1,5 +1,5 @@
 import { BitmapText, Cache, Container, DynamicBitmapFont, TextStyle } from 'pixi.js';
-import { cellNumberAnchor, cellNumberFontSize, MIN_CELL_NUMBER_SCREEN_SIZE } from './cellNumbering';
+import { cellNumberAnchor, cellNumberFontSize } from './cellNumbering';
 import type { NumberedCell } from './cellNumbering';
 import type { Point } from './hexGeometry';
 
@@ -10,6 +10,8 @@ import type { Point } from './hexGeometry';
  */
 const RASTER_SIZES = [16, 32, 64, 128, 256] as const;
 type RasterSize = (typeof RASTER_SIZES)[number];
+/** Numbers smaller than this on screen (CSS pixels) are unreadable noise, so they hide until zoomed in. */
+const MIN_SCREEN_FONT_SIZE = 7;
 
 function fontName(size: RasterSize): string {
   return `atlas-cell-numbers-${size}`;
@@ -90,7 +92,7 @@ export class CellNumberLabels {
   }
 
   private isReadable(zoom: number): boolean {
-    return this.fontSize * zoom >= MIN_CELL_NUMBER_SCREEN_SIZE;
+    return this.fontSize * zoom >= MIN_SCREEN_FONT_SIZE;
   }
 
   /** Picks the glyph atlas for the numbers' size on screen and hides them while too small to read. */
