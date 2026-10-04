@@ -122,6 +122,8 @@ export class PlayerWindowService {
     this.holdCurrentFrame();
     const heldFrame = this.heldFrame ?? createEl('canvas');
     this.streamSource = { canvas: heldFrame, withPlayerSafeFrame: (capture) => capture() };
+    // The window no longer shows a scene tab, so presenting one again must re-target it.
+    playerWindowStore.setState({ presentedTabId: null });
     this.followSource();
   }
 

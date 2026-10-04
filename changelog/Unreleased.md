@@ -15,3 +15,5 @@
 - A replaced map image is released from memory once the new one shows
 - Fog that did not change is no longer redrawn when other fog changes
 - The automatic grid colour no longer fails on a map whose texture is not an image
+- Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
+- An odd last tile on the dashboard takes the whole row instead of leaving half of it empty
