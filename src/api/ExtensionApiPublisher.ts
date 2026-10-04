@@ -5,7 +5,7 @@ import { LANDED_CAPABILITIES } from './capabilities';
 import { buildExtension } from './extension';
 import type { ApiServices } from './services';
 
-/** Publishes `plugin.api` once storage and the asset index are ready, and takes it down on unload. */
+/** Publishes `plugin.api` once storage and the asset index have settled (loaded or failed), and takes it down on unload. */
 export class ExtensionApiPublisher {
   private host: AtlasApiHost | null = null;
   private stopped = false;
@@ -13,7 +13,12 @@ export class ExtensionApiPublisher {
   constructor(private readonly plugin: AtlasVTTPlugin) {}
 
   async start(): Promise<void> {
-    await AssetService.getInstance(this.plugin.app).initialize();
+    try {
+      await AssetService.getInstance(this.plugin.app).initialize();
+    } catch (error) {
+      // Publish anyway: a failed index must not disable every extension; scene functions will reject.
+      console.error('[Atlas API] The asset index failed to load; publishing the API without it:', error);
+    }
     if (this.stopped) return;
     const services: ApiServices = { app: this.plugin.app, plugin: this.plugin };
     const host = new AtlasApiHost({

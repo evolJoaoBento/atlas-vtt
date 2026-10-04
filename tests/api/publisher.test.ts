@@ -54,4 +54,13 @@ describe('ExtensionApiPublisher', () => {
     expect(plugin.api).toBeUndefined();
     expect(triggered.at(-1)).toEqual({ name: 'atlas-vtt:api-unload', data: [] });
   });
+
+  it('publishes even when the asset index fails to load', async () => {
+    initialize.mockRejectedValue(new Error('index unreadable'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { plugin, triggered } = atlas();
+    await new ExtensionApiPublisher(plugin).start();
+    expect(plugin.api).toBeDefined();
+    expect(triggered).toEqual([{ name: 'atlas-vtt:api-ready', data: [plugin.api] }]);
+  });
 });

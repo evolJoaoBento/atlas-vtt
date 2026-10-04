@@ -16,7 +16,11 @@ export interface ApiHostOptions {
 export class AtlasApiHost {
   readonly api: AtlasApi;
   private readonly events = new ApiEvents();
-  private readonly connected = new Map<string, DisposerSet>();
+  private readonly connected = new Map<string, { plugin: ConnectingPlugin; disposers: DisposerSet }>();
+  /** Obsidian cannot unregister, so each plugin object gets one `register` callback per host. */
+  private readonly registered = new WeakSet<object>();
+  /** What those callbacks reach the host through; cleared on dispose so an old host is not retained. */
+  private readonly link: { host: AtlasApiHost | null } = { host: this };
   private disposed = false;
 
   constructor(private readonly options: ApiHostOptions) {
@@ -43,8 +47,9 @@ export class AtlasApiHost {
     if (this.disposed) return;
     this.disposed = true;
     this.events.emit('unload');
-    for (const disposers of this.connected.values()) disposers.disposeAll();
+    for (const { disposers } of this.connected.values()) disposers.disposeAll();
     this.connected.clear();
+    this.link.host = null;
     this.options.app.workspace.trigger('atlas-vtt:api-unload');
   }
 
@@ -54,14 +59,29 @@ export class AtlasApiHost {
 
   private connect(plugin: ConnectingPlugin): AtlasExtension {
     if (this.disposed) throw new Error('Atlas VTT has unloaded; wait for atlas-vtt:api-ready.');
-    const id = plugin.manifest.id;
-    this.connected.get(id)?.disposeAll();
+    const id = (plugin as Partial<ConnectingPlugin> | null | undefined)?.manifest?.id;
+    if (typeof id !== 'string' || id === '') {
+      throw new Error('Atlas VTT: connect(plugin) needs an Obsidian plugin with a manifest id.');
+    }
+    if (typeof plugin.register !== 'function') {
+      throw new Error('Atlas VTT: connect(plugin) needs an Obsidian plugin with a register function.');
+    }
+    this.connected.get(id)?.disposers.disposeAll();
     const disposers = new DisposerSet();
-    this.connected.set(id, disposers);
-    plugin.register(() => {
-      disposers.disposeAll();
-      if (this.connected.get(id) === disposers) this.connected.delete(id);
-    });
+    this.connected.set(id, { plugin, disposers });
+    if (!this.registered.has(plugin)) {
+      this.registered.add(plugin);
+      const link = this.link;
+      plugin.register(() => link.host?.release(id, plugin));
+    }
     return this.options.build({ id, disposers, events: this.events });
+  }
+
+  /** The extension plugin unloaded: dispose its current connection, unless a newer plugin object took the id. */
+  private release(id: string, plugin: ConnectingPlugin): void {
+    const entry = this.connected.get(id);
+    if (entry?.plugin !== plugin) return;
+    entry.disposers.disposeAll();
+    this.connected.delete(id);
   }
 }
