@@ -1,5 +1,6 @@
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { exploredMemoryOn } from '../../src/app/lighting/sceneLightingOptions';
+import type { ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
 import { heldForSight } from '../../src/app/lighting/sightOnDrop';
 import { playerLightingOf, tokenPerception, type PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
 import { SceneModelBuilder, SceneSpots } from '../../src/app/pixi/lighting/sceneModel';
@@ -53,6 +54,22 @@ export function light(id: string, x: number, y: number, dim = 10): LightSource {
 }
 
 export const MAP: MapSize = { width: 1000, height: 800 };
+
+/** Explored memory over the whole map, explored where `explored(x, y)` says (in map pixels), one texel per 10 px. */
+export function exploredImage(map: MapSize, explored: (x: number, y: number) => boolean): ExploredImage {
+  const width = Math.ceil(map.width / 10);
+  const height = Math.ceil(map.height / 10);
+  const coverage = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) coverage[y * width + x] = explored(x * 10 + 5, y * 10 + 5) ? 255 : 0;
+  }
+  return { width, height, coverage };
+}
+
+/** Explored memory of the right half of `MAP`. */
+export function fixtureExploredImage(): ExploredImage {
+  return exploredImage(MAP, (x) => x > MAP.width / 2);
+}
 const GRID: GridState = { enabled: true, visible: true, type: 'square', size: 70, offsetX: 0, offsetY: 0, opacity: 0.5 };
 
 export type Scene = LitState & { exploredMask: string | null };

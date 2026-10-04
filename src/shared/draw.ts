@@ -18,3 +18,4 @@ export * from '../app/pixi/token-renderer/tokenRingMetrics';
 export * from '../app/pixi/fog/fogRenderUtils';
 export * from '../app/styles/designTokens';
 export * from '../app/utils/hexColor';
+export { insideSpans } from '../app/lighting/playerDarkness/spans';
