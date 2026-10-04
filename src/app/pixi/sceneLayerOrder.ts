@@ -1,8 +1,7 @@
 /**
  * The order Atlas stacks a scene's layers in, bottom first. The map and the grid sit
  * at the bottom by child index (the map at 0, the grid just above it); the others by
- * `zIndex`. Shared with the online player view, which stacks its layers by the same
- * list, so the two cannot drift. No PIXI imports.
+ * `zIndex`. Pure, with no PIXI imports.
  */
 export const SCENE_LAYER_ORDER = ['map', 'grid', 'tokens', 'texts', 'drawings', 'fog'] as const;
 export type SceneLayer = typeof SCENE_LAYER_ORDER[number];

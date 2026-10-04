@@ -1,13 +1,11 @@
 /**
- * How Atlas lays out a map text, shared by `TextRenderer` and the online player view;
+ * How Atlas lays out a map text, read by `TextRenderer`; pure,
  * no PIXI imports. A text is centred on its position. A background, when set, is the
  * text's measured box grown by its padding (8 when unset or 0) and filled at the text's
  * opacity; the glyphs themselves stay opaque. Atlas sizes the box to the text: `width`
  * and `height` are not used for drawing.
  */
 export const DEFAULT_TEXT_PADDING = 8;
-/** Line spacing in font sizes for the player view; PIXI measures the font, which comes close to this for common fonts. */
-export const TEXT_LINE_SPACING = 1.2;
 
 export interface TextBoxSource {
   backgroundColor?: string | null | undefined;

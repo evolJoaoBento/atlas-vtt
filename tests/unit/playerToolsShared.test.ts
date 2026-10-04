@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { cellCenterAt } from '../../src/app/grid/gridDistance';
 import { axialToPixel, createHexLayout, hexCircumradius } from '../../src/app/grid/hexGeometry';
 import {
-  arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
+  CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../src/app/pixi/measureGeometry';
 import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
 
@@ -42,17 +42,21 @@ describe('measure geometry', () => {
     ]);
   });
 
-  it("opens the cone 90 degrees around the measured direction", () => {
+  it('opens the cone 90 degrees around the measured direction', () => {
     const cone = coneGeometry({ x: 0, y: 0 }, { x: 100, y: 0 });
     expect(cone.radius).toBe(100);
     expect(cone.endAngle - cone.startAngle).toBeCloseTo(CONE_ANGLE);
     expect(cone.left.x).toBeCloseTo(70.71);
     expect(cone.left.y).toBeCloseTo(-70.71);
     expect(cone.right.y).toBeCloseTo(70.71);
-    const arc = arcPoints({ x: 0, y: 0 }, 100, cone.startAngle, cone.endAngle, 4);
-    expect(arc).toHaveLength(5);
-    expect(arc[0]!.x).toBeCloseTo(cone.left.x);
-    expect(arc[2]).toEqual({ x: 100, y: expect.closeTo(0) });
+  });
+
+  it('opens a cone by the given angle, 60 degrees here', () => {
+    const cone = coneGeometry({ x: 0, y: 0 }, { x: 100, y: 0 }, Math.PI / 3);
+    expect(cone.endAngle - cone.startAngle).toBeCloseTo(Math.PI / 3);
+    expect(cone.left.x).toBeCloseTo(86.6);
+    expect(cone.left.y).toBeCloseTo(-50);
+    expect(cone.right.y).toBeCloseTo(50);
   });
 
   it('lifts the label a constant screen distance and sizes its pill for the zoom', () => {

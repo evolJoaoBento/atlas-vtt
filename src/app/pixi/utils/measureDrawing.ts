@@ -1,7 +1,7 @@
 /**
  * Drawing shared by the measure tool and the token drag ruler: the accent path, its point
  * markers and the distance label on a pill, with Graphics. The geometry and style come from
- * `measureGeometry.ts`, which the join page draws from too.
+ * the pure `measureGeometry.ts`.
  */
 
 import { Text, type Graphics } from 'pixi.js';
