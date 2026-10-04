@@ -148,6 +148,7 @@ export const FOG_FIELD_COVERAGE: CoverageTable<KeysOfUnion<FogOperation>> = {
 export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   enabled: SENT,
   visible: SENT,
+  // In the grid players see, and in `measurement.snapGrid` also while they see none: the GM's drop snaps to it.
   type: SENT,
   size: SENT,
   offsetX: SENT,

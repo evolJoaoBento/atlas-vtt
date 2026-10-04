@@ -5,6 +5,7 @@
  * GM's records, never spread, so anything this code does not name, including
  * fields a later Atlas adds, is left out.
  */
+import { formationGridFromOptions } from '../../encounters/encounterFormation';
 import { DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
 import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings } from '../../grid/measurementFormat';
 import { DEFAULT_CELL_NUMBER_OPACITY, isCellNumberFormat } from '../../grid/cellNumbering';
@@ -26,7 +27,7 @@ import { projectDrawings, projectFog, projectRecord, projectTexts, type Projecti
 import { isDowned, projectBars } from './projectResources';
 import {
   PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
-  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
+  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 
 export type ProjectedState = Pick<
@@ -145,10 +146,26 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
     snapToGrid: grid?.snapToGrid ?? true,
     coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,
+    snapGrid: projectSnapGrid(grid),
     rangeBands: bands.slice(0, SCENE_LIMITS.rangeBands).map((band) => {
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };
     }),
+  };
+}
+
+/**
+ * The grid a player's drop lands on (`snapDroppedToken`): the GM's grid, also hidden or switched off, as
+ * its geometry alone; null where the GM snaps nothing (no grid state, or no usable cell size).
+ */
+function projectSnapGrid(grid: GridState | null): PlayerSnapGrid | null {
+  const snapped = formationGridFromOptions(grid ? { ...grid, enabled: true } : null);
+  if (!snapped) return null;
+  return {
+    type: snapped.type,
+    size: positiveOr(snapped.size, DEFAULT_GRID_SIZE, SCENE_RANGES.gridSize),
+    offsetX: finiteOr(snapped.offsetX, 0, SCENE_RANGES.coordinate),
+    offsetY: finiteOr(snapped.offsetY, 0, SCENE_RANGES.coordinate),
   };
 }
 

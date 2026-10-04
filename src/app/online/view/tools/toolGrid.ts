@@ -1,13 +1,16 @@
 /**
- * The grid the player's measuring tools use. It is the grid players see, snapped to cell centres
- * like the GM's measure tool (`cellCenterAt`); a dragged token's ruler ends where the GM's drop
- * puts a token of its size (`snapTokenCenter`: where cells meet for Large and Gargantuan). Without one, it is a square grid of the map's cell size,
- * never snapped by the measure tool, since the grid's offset is not sent; the drag ruler snaps there when the GM's snap-to-grid is on. Distances are labelled with the GM's
- * measurement settings, as Atlas's ruler labels them, and cones open by the GM's cone angle. Shared with the web page.
+ * The grid the player's measuring tools use: the grid the GM's drop snaps to (`snapGridOf`), which is
+ * the grid players see when they see one. The measure tool snaps to its cell centres only while players
+ * see the grid, like the GM's measure tool (`cellCenterAt`). A dragged token's ruler ends where the GM's
+ * drop puts a token of its size (`snapTokenCenter`: where cells meet for Large and Gargantuan), also on a
+ * hidden grid, while the GM's snap-to-grid is on; on a map without a grid it does not snap. Without a
+ * grid, distances count squares of the map's cell size. Distances are labelled with the GM's measurement
+ * settings, as Atlas's ruler labels them, and cones open by the GM's cone angle. Shared with the web page.
  */
 import { cellCenterAt, type GridGeometry } from '../../../grid/gridDistance';
 import { snapTokenCenter } from '../../../grid/gridPlacement';
 import { dragRulerLabel } from '../../../pixi/token-renderer/dragRulerPath';
+import { snapGridOf } from '../../scene/snapGrid';
 import type { PlayerScene, ScenePoint } from '../../scene/sceneTypes';
 
 export interface ToolGrid {
@@ -24,14 +27,14 @@ export interface ToolGrid {
 
 export function toolGridOf(scene: PlayerScene): ToolGrid {
   const grid = scene.grid;
-  const geometry: GridGeometry = grid
-    ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY }
-    : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 };
+  const snapGrid = snapGridOf(scene);
+  const geometry: GridGeometry = snapGrid
+    ?? (grid ? { type: grid.type, size: grid.size, offsetX: grid.offsetX, offsetY: grid.offsetY } : { type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0 });
   return {
     geometry,
     snap: (point) => (grid ? cellCenterAt(geometry, point) : { x: point.x, y: point.y }),
-    snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid
-      ? snapTokenCenter(point, tokenSize, geometry.type, geometry.size, (cell) => cellCenterAt(geometry, cell))
+    snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
+      ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),
     label: (points) => dragRulerLabel(geometry, points, scene.measurement),
     coneOpening: (scene.measurement.coneAngle * Math.PI) / 180,

@@ -208,6 +208,14 @@ export interface PlayerRangeBand {
   maxSquares: number;
 }
 
+/** Where the GM's drop snaps tokens: the grid's geometry only, nothing it draws. */
+export interface PlayerSnapGrid {
+  type: PlayerGridType;
+  size: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 /** The GM's measurement settings (Atlas's `MeasurementSettings`), so the page labels distances as Atlas does. */
 export interface PlayerMeasurement {
   mode: typeof PLAYER_MEASUREMENT_MODES[number];
@@ -220,6 +228,12 @@ export interface PlayerMeasurement {
   snapToGrid: boolean;
   /** The full opening of a cone measurement in degrees, as the GM's measure tool opens it (the game system's). */
   coneAngle: number;
+  /**
+   * The grid the GM snaps a dropped token to, also while players see no grid (hidden, switched off, or
+   * kept from players), so drags snap where the GM's check puts them; null where the GM's map has no
+   * grid, so nothing snaps. Absent from a GM before Atlas 0.5.1-beta.5.
+   */
+  snapGrid?: PlayerSnapGrid | null;
 }
 
 /** Atlas's cone of a collection without a cone angle (`DEFAULT_CONE_ANGLE`; a test keeps them equal), here since this file imports nothing. */

@@ -219,8 +219,10 @@ describe('projectForPlayers', () => {
       'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
       'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
     ];
-    const keys = keysOf({ ...scene, grid: null, texts: {}, drawings: {} });
+    // The grid and the snap grid are geometry players are meant to have (an offset among it).
+    const keys = keysOf({ ...scene, grid: null, measurement: { ...scene.measurement, snapGrid: null }, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);
+    expect(Object.keys(scene.measurement.snapGrid!).sort()).toEqual(['offsetX', 'offsetY', 'size', 'type']);
     expect(scene.initiative?.entries[0]).not.toHaveProperty('stress');
     expect(keysOf(scene.widgets).has('color')).toBe(false);
   });
@@ -257,6 +259,7 @@ describe('projectForPlayers', () => {
     const grid = { ...gmState().grid!, unitType: 'meters' as const, unitDistance: 1.5, measurementType: 'units' as const };
     expect(projectForPlayers(gmState({ grid }), context()).measurement).toEqual({
       mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90,
+      snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
     });
     expect(projectForPlayers(gmState({ grid: { ...grid, snapToGrid: false } }), context()).measurement.snapToGrid).toBe(false);
     const collectionGrid = {
@@ -265,6 +268,7 @@ describe('projectForPlayers', () => {
     };
     expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement).toEqual({
       mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'alternating', snapToGrid: true, coneAngle: 90,
+      snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
       rangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(128), maxSquares: 1 }],
     });
   });
