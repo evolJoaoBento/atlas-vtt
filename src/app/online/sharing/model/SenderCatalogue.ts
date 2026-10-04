@@ -16,6 +16,7 @@ import { isPerson, partAllows, type Recipient } from './audience';
 import { fullPayload, hashMapImages, playerSafePayload, type MapImages } from './buildMapPayload';
 import { accessFor, type Access, type AccessSources, type MapAccess } from './catalogueAccess';
 import type { MapShareMode } from './mapShare';
+import { previewAsPlaceholder, type PreviewPeople } from './placeholderPreview';
 import { forwardedOpenTag, localizeForwardedTags, MAX_FORWARD_NAMES } from './forwardedParts';
 import { filterNoteFor, strayEndLineIn, strayEndProblem } from './noteFilter';
 import type { NoteSection } from './noteSections';
@@ -72,15 +73,15 @@ export class SenderCatalogue {
   constructor(
     private readonly sources: CatalogueSources,
     private readonly items: Pick<ShareItems, 'idFor' | 'pathOf' | 'ready'>,
-    private readonly people: Pick<PeopleBook, 'byName' | 'byKey' | 'ready' | 'list' | 'get'>,
+    private readonly people: Pick<PeopleBook, 'byName' | 'allByName' | 'byKey' | 'ready' | 'list' | 'get' | 'isPlaceholder' | 'placeholderByName'>,
     private readonly hash: Hasher = sha256Id,
     private readonly dimensions?: (bytes: ArrayBuffer) => Promise<MapSize | null>,
   ) {}
 
   /** The access of one recipient, once the stored ids and people are read. */
-  private async access(recipient: Recipient): Promise<Access> {
+  private async access(recipient: Recipient, people: PreviewPeople = this.people): Promise<Access> {
     await Promise.all([this.items.ready(), this.people.ready()]);
-    return accessFor(this.sources, recipient, this.people);
+    return accessFor(this.sources, recipient, people);
   }
 
   async list(recipient: Recipient, self?: string): Promise<CatalogueItem[]> {
@@ -128,13 +129,26 @@ export class SenderCatalogue {
     return localizeForwardedTags(text, recipient.tableId, (personId) => (personId === self ? 'you' : this.people.get(recipient.tableId, personId)?.name ?? null));
   }
 
+  /** The note as someone not met yet would get it once linked (the dialog's "Preview as"); null when `name` is no placeholder. */
+  async previewNoteAsPlaceholder(name: string, path: string): Promise<string | null> {
+    await this.people.ready();
+    const stand = previewAsPlaceholder(this.people, name);
+    if (!stand) return null;
+    const text = await this.noteText(path, stand.recipient, await this.access(stand.recipient, stand.people), undefined, stand.people);
+    if (text === null) {
+      const note = await this.sources.readNote(path);
+      return strayEndProblem(strayEndLineIn(note.text, note.sections) ?? 0);
+    }
+    return text;
+  }
+
   /** Restricted parts the recipient gets name the sender and everyone else at their table the part lets in. */
-  private marksFor(recipient: Recipient, self: string | undefined): PartMarks {
+  private marksFor(recipient: Recipient, self: string | undefined, people: PreviewPeople = this.people): PartMarks {
     return {
       openTag: (rule) => {
-        const others = this.people.list()
+        const others = people.list()
           .filter((person) => person.tableId === recipient.tableId && person.personId !== self && !isPerson(person, recipient))
-          .filter((person) => partAllows(rule, { tableId: person.tableId, personId: person.personId }, this.people))
+          .filter((person) => partAllows(rule, { tableId: person.tableId, personId: person.personId }, people))
           .map(keyOf);
         return forwardedOpenTag([...(self ? [personKey(recipient.tableId, self)] : []), ...others].slice(0, MAX_FORWARD_NAMES));
       },
@@ -142,11 +156,11 @@ export class SenderCatalogue {
   }
 
   /** Null for a note that is not shared at all: a stray end tag (`strayEndLineIn`). */
-  private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined): Promise<string | null> {
+  private async noteText(path: string, recipient: Recipient, access: Access, self: string | undefined, people: PreviewPeople = this.people): Promise<string | null> {
     const { text: source, sections } = await this.sources.readNote(path);
     if (strayEndLineIn(source, sections) !== null) return null;
     return filterNoteFor(source, {
-      recipient, people: this.people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self), sections,
+      recipient, people, shareable: this.sources.shareable(), marks: this.marksFor(recipient, self, people), sections,
       links: (linkpath) => {
         const target = this.sources.resolveLink(linkpath, path);
         return target ? access.notes.get(target)?.title ?? null : null;

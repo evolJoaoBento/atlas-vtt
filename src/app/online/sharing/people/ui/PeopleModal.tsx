@@ -24,9 +24,11 @@ export class PeopleModal extends Modal {
         <PeopleList
           people={this.people}
           ownTableId={this.ownTableId}
-          confirmRemove={(person) => confirmAction({
-            title: `Remove ${person.name}?`,
-            message: ['They join as new next time, and what you share with them by name stops reaching them.'],
+          confirmRemove={(who) => confirmAction({
+            title: `Remove ${who.name}?`,
+            message: [who.placeholder
+              ? 'Notes and shares that name them reach nobody, and nobody else can take the name.'
+              : 'They join as new next time, and what you share with them by name stops reaching them.'],
             confirmLabel: 'Remove', destructive: true,
           })}
         />,

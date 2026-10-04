@@ -12,6 +12,7 @@ import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { randomId } from '../../ids';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf } from '../people/peopleTypes';
+import { placeholderKey } from '../people/placeholderTypes';
 import { LIT_MAP_NOT_PLAYER_SAFE, readSharedMap } from '../model/buildMapPayload';
 import { offeredNotes } from '../model/linkedNotes';
 import { mapShareOf, writeMapShare, type MapShare } from '../model/mapShare';
@@ -33,7 +34,7 @@ export const PART_HINT = 'To keep part of this note back, select it and right-cl
 
 export interface ShareWithDeps {
   people: PeopleBook;
-  catalogue: Pick<SenderCatalogue, 'previewNote'>;
+  catalogue: Pick<SenderCatalogue, 'previewNote' | 'previewNoteAsPlaceholder'>;
   assets: Pick<AssetService, 'updateAsset' | 'getAssets'>;
   /** This Atlas's person id at a table (`gm` at its own), for the preview's tags; undefined when unknown. */
   selfAt: (tableId: string) => string | undefined;
@@ -65,7 +66,11 @@ class ShareWithModal extends Modal {
 
   private async render(): Promise<void> {
     await this.deps.people.ready();
-    const known: ShareRow[] = this.deps.people.list().map((person) => ({ key: keyOf(person), name: person.name, known: true }));
+    const { people } = this.deps;
+    const known: ShareRow[] = [
+      ...people.list().map((person) => ({ key: keyOf(person), name: person.name, known: true })),
+      ...people.placeholders().map((placeholder) => ({ key: placeholderKey(placeholder.name), name: placeholder.name, known: true, placeholder: true })),
+    ];
     if (this.file.extension === 'md') await this.renderNote(known);
     else await this.renderMap(known);
   }
@@ -86,9 +91,13 @@ class ShareWithModal extends Modal {
   private async renderNote(known: ShareRow[]): Promise<void> {
     const rule = parseShareRule(this.app.metadataCache.getFileCache(this.file)?.frontmatter?.[SHARE_PROPERTY]);
     const people = this.deps.people;
-    const keyFor = (name: string): string => { const person = people.byName(name); return person ? keyOf(person) : nameKey(name); };
+    const keyFor = (name: string): string => {
+      const person = people.byName(name);
+      const placeholder = person ? null : people.placeholderByName(name);
+      return person ? keyOf(person) : placeholder ? placeholderKey(placeholder.name) : nameKey(name);
+    };
     const unknown = unknownRuleNames(rule, people);
-    const rows = [...known, ...unknown.map((name) => ({ key: nameKey(name), name, known: false }))];
+    const rows: ShareRow[] = [...known, ...unknown.map((name) => ({ key: nameKey(name), name, known: false }))];
     const nameFor = (key: string): string => rows.find((row) => row.key === key)?.name ?? key.replace(/^name:/, '');
     const { warnings, error } = await this.noteWarnings(unknown, rule.unreadable === true);
     this.root?.render(
@@ -101,9 +110,9 @@ class ShareWithModal extends Modal {
         hint={PART_HINT}
         preview={(key) => {
           const person = people.byKey(key);
-          return person
-            ? this.deps.catalogue.previewNote({ tableId: person.tableId, personId: person.personId }, this.file.path, this.deps.selfAt(person.tableId))
-            : Promise.resolve('');
+          if (person) return this.deps.catalogue.previewNote({ tableId: person.tableId, personId: person.personId }, this.file.path, this.deps.selfAt(person.tableId));
+          const placeholder = rows.find((row) => row.key === key && row.placeholder);
+          return placeholder ? this.deps.catalogue.previewNoteAsPlaceholder(placeholder.name, this.file.path).then((text) => text ?? '') : Promise.resolve('');
         }}
         onCancel={() => this.close()}
         onSave={(result) => { void this.saveNote(result, nameFor); }}

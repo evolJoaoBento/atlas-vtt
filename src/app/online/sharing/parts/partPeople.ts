@@ -12,6 +12,8 @@ export interface PartPerson {
   name: string;
   /** Why they cannot be picked; absent when they can. */
   problem?: string;
+  /** Added by name, not met yet: a tag naming them reaches nobody until they are linked. */
+  notMet?: true;
 }
 
 export interface PartPeopleChoice {
@@ -28,15 +30,18 @@ function entry(name: string | null, shownAs: string): PartPerson {
   return writableName(name) ? { name } : { name, problem: UNWRITABLE_NAME_HINT };
 }
 
-/** The people in the session, named as the people list names them; the people list when there is no session. */
-export function partPeopleFrom(state: Pick<ShareSessionState, 'session' | 'people'>, people: Pick<PeopleBook, 'get' | 'byName' | 'list'>): PartPeopleChoice {
+/** The people in the session, named as the people list names them; the people list when there is no session. People added by name, not met yet, come last. */
+export function partPeopleFrom(
+  state: Pick<ShareSessionState, 'session' | 'people'>, people: Pick<PeopleBook, 'get' | 'byName' | 'list' | 'placeholders'>,
+): PartPeopleChoice {
   const { session } = state;
+  const notMet = people.placeholders().map((placeholder): PartPerson => ({ ...entry(placeholder.name, placeholder.name), notMet: true }));
   if (session) {
     const names = peopleListNames(people, session.tableId);
-    return { people: state.people.map((person) => entry(names(person.personId), person.name)), inSession: true };
+    return { people: [...state.people.map((person) => entry(names(person.personId), person.name)), ...notMet], inSession: true };
   }
   return {
-    people: people.list().map((person) => entry(peopleListNames(people, person.tableId)(person.personId), person.name)),
+    people: [...people.list().map((person) => entry(peopleListNames(people, person.tableId)(person.personId), person.name)), ...notMet],
     inSession: false,
   };
 }

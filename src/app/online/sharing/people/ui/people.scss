@@ -24,6 +24,10 @@
   list-style: none;
 }
 
+.atlas-people__add {
+  @include atlas-flex-col($spacing-xs);
+}
+
 .atlas-people__person {
   @include atlas-flex-col($spacing-xs);
 }

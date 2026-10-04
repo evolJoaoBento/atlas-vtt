@@ -31,9 +31,15 @@
   color: var(--text-muted);
 }
 
-.atlas-share__private {
+.atlas-share__private,
+.atlas-share__not-met {
   color: var(--text-muted);
   font-size: $font-ui-smaller;
+}
+
+.atlas-share__person {
+  @include atlas-flex-row($spacing-s);
+  align-items: center;
 }
 
 .atlas-share__hint {

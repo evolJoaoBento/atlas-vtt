@@ -64,7 +64,7 @@ export function filterNoteFor(source: string, context: NoteFilterContext): strin
 /** Names in the note's tags and `atlas-share` that are not in the people list: the sender's warning. */
 export function unknownNamesIn(source: string, people: NameResolver): string[] {
   const { frontmatter, body } = splitFrontmatter(lf(source));
-  const names = new Set(partNamesIn(body).filter((name) => !people.byName(name)));
+  const names = new Set(partNamesIn(body).filter((name) => !people.byName(name) && !people.isPlaceholder?.(name)));
   const property = frontmatter?.find((line) => line.startsWith(`${SHARE_PROPERTY}:`));
   if (property) {
     const value = property.slice(SHARE_PROPERTY.length + 1).trim().replace(/^\[|\]$/g, '');

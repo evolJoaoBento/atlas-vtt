@@ -6,7 +6,9 @@ import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sig
 import type { IdentityCrypto, KeyPairJwk } from '../../../../src/app/online/sharing/identity/identityCrypto';
 import { SenderCatalogue, type CatalogueSources } from '../../../../src/app/online/sharing/model/SenderCatalogue';
 import { parseShareRule } from '../../../../src/app/online/sharing/model/shareRule';
+import type { PeopleBook } from '../../../../src/app/online/sharing/people/PeopleBook';
 import type { Person } from '../../../../src/app/online/sharing/people/peopleTypes';
+import { isCalled, type Placeholder } from '../../../../src/app/online/sharing/people/placeholderTypes';
 import { memoryImageFiles, nodeHash } from '../assetFixtures';
 import { simpleSections } from './obsidianSections';
 
@@ -46,25 +48,25 @@ export function testPerson(personId: string, name: string, tableId = TABLE_ID): 
   return { tableId, personId, name, formerNames: [], devices: [], aliases: [], lastSeen: 0 };
 }
 
-/** `byName`/`byKey`/`get` over a fixed list, as the people book answers them. */
-export function testPeople(list: readonly Person[]): {
-  byName(name: string): Person | null;
-  byKey(key: string): Person | null;
-  get(tableId: string, personId: string): Person | null;
-  list(): readonly Person[];
-  ready(): Promise<void>;
-} {
+/** The people book's lookups over a fixed list (and fixed placeholders, people added by name), as the book answers them. */
+export function testPeople(list: readonly Person[], placeholders: readonly Placeholder[] = []): Pick<PeopleBook,
+  'byName' | 'allByName' | 'byKey' | 'get' | 'list' | 'ready' | 'placeholders' | 'placeholderByName' | 'isPlaceholder'> {
+  const placeholderByName = (name: string): Placeholder | null => placeholders.find((placeholder) => isCalled(placeholder, name)) ?? null;
   return {
     get: (tableId, personId) => list.find((person) => person.tableId === tableId && person.personId === personId) ?? null,
     byName: (name) => list.find((person) => person.name.toLowerCase() === name.toLowerCase()) ?? null,
+    allByName: (name) => list.filter((person) => [person.name, ...person.formerNames].some((own) => own.toLowerCase() === name.toLowerCase())),
     byKey: (key) => list.find((person) => `${person.tableId}/${person.personId}` === key || person.aliases.includes(key)) ?? null,
     list: () => list,
     ready: async () => {},
+    placeholders: () => placeholders,
+    placeholderByName,
+    isPlaceholder: (name) => placeholderByName(name) !== null,
   };
 }
 
 /** A catalogue of notes only: path → text, each with its `atlas-share` value. */
-export function noteCatalogue(notes: Record<string, { text: string; share: unknown }>, people: readonly Person[]): SenderCatalogue {
+export function noteCatalogue(notes: Record<string, { text: string; share: unknown }>, people: readonly Person[], placeholders: readonly Placeholder[] = []): SenderCatalogue {
   const ids = new Map<string, string>();
   const items = {
     idFor: (path: string): string => {
@@ -91,5 +93,5 @@ export function noteCatalogue(notes: Record<string, { text: string; share: unkno
     coneAngle: () => 90,
     initiativeRules: () => ({ mode: 'turn-order', roll: '1d20', firstSide: 'players' }),
   };
-  return new SenderCatalogue(sources, items, testPeople(people), nodeHash, async () => null);
+  return new SenderCatalogue(sources, items, testPeople(people, placeholders), nodeHash, async () => null);
 }

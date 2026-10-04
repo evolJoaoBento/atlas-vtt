@@ -8,7 +8,7 @@ import type { GmSession, SessionPlayer } from '../../GmSession';
 import { onlineSessionStore } from '../../onlineSessionStore';
 import type { DeviceProof } from '../../protocol';
 import type { JoinRequestInfo } from '../../ui/joinRequestNotice';
-import type { IdentityDesk, JoinIdentity } from './IdentityDesk';
+import type { IdentityDesk, JoinIdentity, LinkTarget } from './IdentityDesk';
 
 /** How often a table proof is signed again because a newer device proof arrived while it was being signed. */
 const MAX_RESIGNS = 3;
@@ -57,6 +57,11 @@ export class HostIdentity {
     this.admit(playerId, personId);
   }
 
+  /** Admits a new device as someone added by name before meeting them: only the GM links. */
+  linkPlaceholder(playerId: string, name: string): void {
+    this.admit(playerId, { placeholder: name });
+  }
+
   deny(playerId: string): void {
     this.options.session()?.deny(playerId);
   }
@@ -71,7 +76,7 @@ export class HostIdentity {
   private show(player: SessionPlayer, identity: JoinIdentity | null): void {
     const sameName = identity?.kind === 'new' ? identity.sameName : null;
     this.notices.get(player.playerId)?.hide();
-    const info: JoinRequestInfo = { identity, link: sameName ? () => this.link(player.playerId, sameName.personId) : null };
+    const info: JoinRequestInfo = { identity, link: sameName ? () => (sameName.personId ? this.link(player.playerId, sameName.personId) : this.linkPlaceholder(player.playerId, sameName.name)) : null };
     this.notices.set(player.playerId, this.options.showRequest(player, (allow) => (allow ? this.allow(player.playerId) : this.deny(player.playerId)), info));
   }
 
@@ -104,7 +109,7 @@ export class HostIdentity {
     this.show(player, identity);
   }
 
-  private admit(playerId: string, linkTo: string | null): void {
+  private admit(playerId: string, linkTo: LinkTarget): void {
     const session = this.options.session();
     const { desk } = this.options;
     if (!session || this.stopped || this.identifying.has(playerId) || this.admitting.has(playerId)) return;
@@ -135,7 +140,7 @@ export class HostIdentity {
   }
 
   /** Signs for the entry's current device proof: a takeover while waiting may have refreshed it. */
-  private async admitIdentified(session: GmSession, desk: IdentityDesk, playerId: string, linkTo: string | null): Promise<void> {
+  private async admitIdentified(session: GmSession, desk: IdentityDesk, playerId: string, linkTo: LinkTarget): Promise<void> {
     for (let attempt = 0; attempt < MAX_RESIGNS; attempt++) {
       const device = session.deviceOf(playerId);
       const result = await desk.admission(playerId, linkTo, device ?? undefined);

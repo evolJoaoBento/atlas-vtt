@@ -1,5 +1,6 @@
 /** The people list: who this Atlas knows from online sessions, by table and person id. */
 import { isKeyId, isPersonId } from '../../protocol';
+import { parsePlaceholders, type Placeholder } from './placeholderTypes';
 
 /** The GM's own person id at their table, in every player's list. */
 export const GM_PERSON_ID = 'gm';
@@ -27,6 +28,8 @@ export interface PeopleData {
    * person must not start reaching whoever is called that next.
    */
   retiredNames?: string[];
+  /** People added by name before meeting them; older files have none. */
+  placeholders?: Placeholder[];
 }
 
 export const personKey = (tableId: string, personId: string): string => `${tableId}/${personId}`;
@@ -53,9 +56,11 @@ function parsePerson(value: unknown): Person | null {
 export function parsePeopleData(value: unknown): PeopleData {
   const people = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).people : null;
   const retired = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).retiredNames : null;
+  const placeholders = typeof value === 'object' && value !== null ? (value as Record<string, unknown>).placeholders : null;
   return {
     version: 1,
     people: Array.isArray(people) ? people.flatMap((entry) => parsePerson(entry) ?? []) : [],
     retiredNames: Array.isArray(retired) ? retired.filter((name): name is string => typeof name === 'string' && name.length <= 80).slice(0, 1000) : [],
+    placeholders: parsePlaceholders(placeholders),
   };
 }

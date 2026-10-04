@@ -16,7 +16,7 @@ interface OnlinePlayerListProps {
   /** Who each waiting Obsidian player is, by player id. */
   requests: Readonly<Record<string, JoinIdentity>>;
   control: TokenControl | null;
-  service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick' | 'link'>;
+  service: Pick<OnlineSessionService, 'allow' | 'deny' | 'kick' | 'link' | 'linkPlaceholder'>;
 }
 
 /** Marks a player who joined from Atlas in Obsidian. */
@@ -35,13 +35,13 @@ function IdentityMark({ identity }: { identity: JoinIdentity | null }): React.Re
 }
 
 /** The warning for a new device using a known name, with Link to that person. */
-function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLink: (personId: string) => void }): React.ReactElement | null {
+function SameNameRow({ identity, onLink }: { identity: JoinIdentity | null; onLink: (sameName: { personId: string | null; name: string }) => void }): React.ReactElement | null {
   const sameName = identity?.kind === 'new' ? identity.sameName : null;
   if (!sameName) return null;
   return (
     <div className="atlas-online-panel__player-row atlas-online-panel__same-name">
       <span className="atlas-online-panel__warning" role="note">{sameNameWarning(sameName.name)}</span>
-      <Button variant="outline" size="sm" onClick={() => onLink(sameName.personId)}>{linkToLabel(sameName.name)}</Button>
+      <Button variant="outline" size="sm" onClick={() => onLink(sameName)}>{linkToLabel(sameName.name)}</Button>
     </div>
   );
 }
@@ -73,7 +73,7 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
                   <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
                   <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
                 </div>
-                <SameNameRow identity={requests[player.playerId] ?? null} onLink={(personId) => service.link(player.playerId, personId)} />
+                <SameNameRow identity={requests[player.playerId] ?? null} onLink={(same) => (same.personId ? service.link(player.playerId, same.personId) : service.linkPlaceholder(player.playerId, same.name))} />
               </li>
             ))}
           </ul>

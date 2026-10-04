@@ -10,6 +10,7 @@ import { Button } from '../../../packages/components/primitives/button';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { LabelledCheck } from '../ui/LabelledCheck';
+import { NOT_MET_TEXT } from '../people/ui/peopleCopy';
 import type { PartPeopleChoice } from './partPeople';
 
 export type PartPeopleKind = 'only' | 'except';
@@ -32,12 +33,17 @@ export function PartPeopleForm({ choice, onApply, onCancel }: PartPeopleFormProp
     <div className="atlas-share">
       <section className="atlas-share__section">
         <h3 className="atlas-share__heading">{choice.inSession ? 'People in this session' : 'Not in a session: your people list'}</h3>
-        {choice.people.length === 0 && <p className="atlas-share__hint">Nobody yet. People are added when you share a session with them.</p>}
+        {choice.people.length === 0 && <p className="atlas-share__hint">Nobody yet. Add people by name in People…, or they are added when you share a session with them.</p>}
         <ul className="atlas-share__people">
-          {choice.people.map(({ name, problem }) => (
+          {choice.people.map(({ name, problem, notMet }) => (
             <li key={name}>
               {problem === undefined
-                ? <LabelledCheck label={name} checked={ticked.includes(name)} onChange={() => toggle(name)} />
+                ? (
+                  <span className="atlas-share__person">
+                    <LabelledCheck label={name} checked={ticked.includes(name)} onChange={() => toggle(name)} />
+                    {notMet && <span className="atlas-share__not-met">{NOT_MET_TEXT}</span>}
+                  </span>
+                )
                 : (
                   <LabelTooltip label={problem} multiline>
                     <span><LabelledCheck label={name} checked={false} disabled onChange={() => undefined} /></span>

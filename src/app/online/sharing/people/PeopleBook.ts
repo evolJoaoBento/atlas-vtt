@@ -8,6 +8,7 @@ import { randomId } from '../../ids';
 import { normalizePlayerName } from '../../protocol';
 import { JsonDataFile, SHARING_DATA_DIR } from '../dataFile';
 import { nameKey, uniqueName } from './peopleNames';
+import { isCalled, MAX_PLACEHOLDERS, placeholderKeys, type Placeholder } from './placeholderTypes';
 import { keyOf, parsePeopleData, type PeopleData, type Person } from './peopleTypes';
 
 export const PEOPLE_FILE = `${SHARING_DATA_DIR}/people.json`;
@@ -30,6 +31,7 @@ export class PeopleBook {
 
   private people: Person[] = [];
   private retiredNames: string[] = [];
+  private placeholderList: Placeholder[] = [];
   private loading: Promise<void> | null = null;
   private readonly listeners = new Set<() => void>();
   private saveTimer: number | null = null;
@@ -43,6 +45,7 @@ export class PeopleBook {
     this.loading ??= this.file.load().then((data) => {
       this.people = data.people;
       this.retiredNames = data.retiredNames ?? [];
+      this.placeholderList = data.placeholders ?? [];
       this.loaded = true;
       this.listeners.forEach((listener) => listener());
     });
@@ -144,6 +147,84 @@ export class PeopleBook {
     return null;
   }
 
+  /** People added by name, not met yet. The same array until something changes. */
+  placeholders(): readonly Placeholder[] {
+    return this.placeholderList;
+  }
+
+  /** The placeholder called `name` now or before. */
+  placeholderByName(name: string): Placeholder | null {
+    return this.placeholderList.find((placeholder) => isCalled(placeholder, name)) ?? null;
+  }
+
+  isPlaceholder(name: string): boolean {
+    return this.placeholderByName(name) !== null;
+  }
+
+  /** Adds someone not met yet. Returns what is wrong with the name (it is never renamed silently), or null. */
+  addPlaceholder(name: string): string | null {
+    const cleaned = normalizePlayerName(name);
+    if (!cleaned) return NAME_PROBLEM;
+    if (this.nameTaken(nameKey(cleaned))) return `Someone in your people list is already called ${cleaned}.`;
+    if (this.placeholderList.length >= MAX_PLACEHOLDERS) return `You can add up to ${MAX_PLACEHOLDERS} people by name.`;
+    this.placeholderList = [...this.placeholderList, { name: cleaned, formerNames: [] }];
+    this.changed(true);
+    return null;
+  }
+
+  /** Renames a placeholder (found by its current name); the old name stays a former name. Returns what is wrong, or null. */
+  renamePlaceholder(name: string, newName: string): string | null {
+    const placeholder = this.placeholderNamed(name);
+    const cleaned = normalizePlayerName(newName);
+    if (!placeholder) return null;
+    if (!cleaned) return NAME_PROBLEM;
+    const same = nameKey(cleaned) === nameKey(placeholder.name);
+    if (!same && this.nameTaken(nameKey(cleaned), undefined, placeholder)) return `Someone in your people list is already called ${cleaned}.`;
+    const formerNames = same ? placeholder.formerNames : [...placeholder.formerNames.filter((former) => nameKey(former) !== nameKey(cleaned)), placeholder.name];
+    this.placeholderList = this.placeholderList.map((other) => (other === placeholder ? { name: cleaned, formerNames } : other));
+    this.changed(true);
+    return null;
+  }
+
+  /** Removes a placeholder; its names stay taken. */
+  removePlaceholder(name: string): void {
+    const placeholder = this.placeholderNamed(name);
+    if (!placeholder) return;
+    this.placeholderList = this.placeholderList.filter((other) => other !== placeholder);
+    this.retiredNames = [...new Set([...this.retiredNames, placeholder.name, ...placeholder.formerNames])];
+    this.changed(true);
+  }
+
+  /** The GM admits a new device as the person a placeholder stands for; null when the placeholder is gone. */
+  admitAsPlaceholder(tableId: string, placeholderName: string, deviceId: string): Person | null {
+    const placeholder = this.placeholderNamed(placeholderName);
+    if (!placeholder) return null;
+    const person: Person = {
+      tableId, personId: randomId(), name: placeholder.name, formerNames: placeholder.formerNames, devices: [deviceId],
+      aliases: placeholderKeys(placeholder), lastSeen: this.now(),
+    };
+    this.placeholderList = this.placeholderList.filter((other) => other !== placeholder);
+    this.people = [...this.people, person];
+    this.changed(true);
+    return person;
+  }
+
+  /**
+   * Links a person met in a session to a placeholder: the person takes the placeholder's name, and every name
+   * either had stays a former name, so notes naming any of them reach the person. Returns what is wrong, or null.
+   */
+  linkPlaceholder(key: string, placeholderName: string): string | null {
+    const person = this.byKey(key);
+    const placeholder = this.placeholderNamed(placeholderName);
+    if (!person || !placeholder) return 'Pick another person.';
+    const formerNames = [...new Set([...placeholder.formerNames, person.name, ...person.formerNames])].filter((name) => nameKey(name) !== nameKey(placeholder.name));
+    const linked: Person = { ...person, name: placeholder.name, formerNames, aliases: [...new Set([...person.aliases, ...placeholderKeys(placeholder)])] };
+    this.people = this.people.map((other) => (other === person ? linked : other));
+    this.placeholderList = this.placeholderList.filter((other) => other !== placeholder);
+    this.changed(true);
+    return null;
+  }
+
   /** Removes a person; their names stay taken (`PeopleData.retiredNames`). */
   remove(key: string): void {
     const person = this.byKey(key);
@@ -159,8 +240,16 @@ export class PeopleBook {
   }
 
   /** A current or former name of anyone (but `except`), or a removed person's: such a name is never given to someone else. */
-  private nameTaken(key: string, except?: Person): boolean {
-    return this.retiredNames.some((name) => nameKey(name) === key) || this.people.some((other) => other !== except && (nameKey(other.name) === key || other.formerNames.some((former) => nameKey(former) === key)));
+  private nameTaken(key: string, except?: Person, exceptPlaceholder?: Placeholder): boolean {
+    const held = (names: readonly string[]): boolean => names.some((name) => nameKey(name) === key);
+    return held(this.retiredNames)
+      || this.placeholderList.some((other) => other !== exceptPlaceholder && held([other.name, ...other.formerNames]))
+      || this.people.some((other) => other !== except && held([other.name, ...other.formerNames]));
+  }
+
+  /** The placeholder whose current name is `name`. */
+  private placeholderNamed(name: string): Placeholder | null {
+    return this.placeholderList.find((other) => nameKey(other.name) === nameKey(name)) ?? null;
   }
 
   private freeName(name: string): string {
@@ -191,6 +280,6 @@ export class PeopleBook {
   private save(): void {
     if (this.saveTimer !== null) window.clearTimeout(this.saveTimer);
     this.saveTimer = null;
-    if (this.loaded) void this.file.save({ version: 1, people: this.people, retiredNames: this.retiredNames });
+    if (this.loaded) void this.file.save({ version: 1, people: this.people, retiredNames: this.retiredNames, placeholders: this.placeholderList });
   }
 }

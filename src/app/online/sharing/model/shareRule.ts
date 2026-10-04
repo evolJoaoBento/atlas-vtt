@@ -85,5 +85,5 @@ export function formatShareRule(choice: ShareChoice): string | string[] | null {
 
 /** Names in the rule that are not in the people list, sorted. */
 export function unknownRuleNames(rule: ShareRule, people: NameResolver): string[] {
-  return [...new Set([...rule.only, ...rule.except].filter((name) => !people.byName(name)))].sort();
+  return [...new Set([...rule.only, ...rule.except].filter((name) => !people.byName(name) && !people.isPlaceholder?.(name)))].sort();
 }

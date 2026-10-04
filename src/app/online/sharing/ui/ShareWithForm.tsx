@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '../../../packages/components/primitives/button';
 import type { MapShareMode } from '../model/mapShare';
 import { TaggedText } from '../display/TaggedText';
+import { NOT_MET_TEXT } from '../people/ui/peopleCopy';
 import { LabelledCheck } from './LabelledCheck';
 
 /** A person to tick: a known person by key, or a name the note uses that the list does not know (`name:<name>`). */
@@ -9,6 +10,8 @@ export interface ShareRow {
   key: string;
   name: string;
   known: boolean;
+  /** Added by name, not met yet: it reaches nobody until linked. */
+  placeholder?: boolean;
 }
 
 export interface ShareFormResult {
@@ -66,10 +69,11 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
         <LabelledCheck label="Everyone in my sessions" checked={everyone} onChange={() => setEveryone(!everyone)} />
         <ul className="atlas-share__people">
           {(everyone ? rows.filter((row) => row.known || except.includes(row.key)) : rows).map((row) => (
-            <li key={row.key}>
+            <li key={row.key} className="atlas-share__person">
               {everyone
                 ? <LabelledCheck label={`Except ${row.name}`} checked={except.includes(row.key)} onChange={() => setExcept(toggled(except, row.key))} />
                 : <LabelledCheck label={row.name} checked={people.includes(row.key)} onChange={() => setPeople(toggled(people, row.key))} />}
+              {row.placeholder && <span className="atlas-share__not-met">{NOT_MET_TEXT}</span>}
             </li>
           ))}
         </ul>
@@ -102,7 +106,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
             <select className="dropdown" aria-label="Preview as" defaultValue=""
               onChange={(event) => { const key = event.target.value; if (key) void preview(key).then(setPreviewText); }}>
               <option value="" disabled>Pick a person</option>
-              {known.map((row) => <option key={row.key} value={row.key}>{row.name}</option>)}
+              {known.map((row) => <option key={row.key} value={row.key}>{row.placeholder ? `${row.name} (${NOT_MET_TEXT.toLowerCase()})` : row.name}</option>)}
             </select>
           </label>
           {previewText !== null && <pre className="atlas-share__preview"><TaggedText text={previewText} /></pre>}

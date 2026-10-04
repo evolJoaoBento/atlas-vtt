@@ -313,6 +313,8 @@ export class OnlineSessionService {
   allow(playerId: string): void { this.requests?.allow(playerId); }
   /** Admits a new device as a known person: only the GM links. */
   link(playerId: string, personId: string): void { this.requests?.link(playerId, personId); }
+  /** Admits a new device as someone added by name before meeting them: only the GM links. */
+  linkPlaceholder(playerId: string, name: string): void { this.requests?.linkPlaceholder(playerId, name); }
   deny(playerId: string): void { this.requests?.deny(playerId); }
   kick(playerId: string): void { this.current?.kick(playerId); }
 }
