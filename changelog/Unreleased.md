@@ -35,6 +35,7 @@
 - Settings → Online play: the own server's host, port and path sit on their own row under the setting's name, so its description no longer wraps one word per line, and other rows with wide fields move them below the text in a narrow window. The own server fields are shown disabled while **PeerJS cloud (free)** is chosen.
 - **Ask to pull…** on a note offers only the people the note is shared with, and says to share it first when it reaches nobody, instead of sending a request whose **Pull** could only fail with "Could not pull that item." A pull that fails now says why where Atlas knows (the item is no longer shared with you, it arrived damaged), and every failed pull writes its error to the developer console.
 - The Online scene tab no longer fails to open its grid ("Failed to open view") while the map image is still on its way: the automatic grid colour uses white lines while the map shows its placeholder instead of trying to read it.
+- With dynamic lighting on, online players no longer receive texts and drawings that sit in the dark across the map's edge. The darkness stops at the map, so a text or drawing that reached past it was sent; anything not wholly inside the map is now left out while lighting is on.
 
 ## Important changes
 

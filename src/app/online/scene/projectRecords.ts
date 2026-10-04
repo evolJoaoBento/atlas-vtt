@@ -14,6 +14,9 @@ import {
 import { isSceneId } from './sceneValidation';
 import { wirePoints } from './simplifyPoints';
 
+/** What a text or drawing is checked against: a fog coverage, or one with more hidden. */
+type Covers = Pick<FogCoverage, 'isCovered'>;
+
 /**
  * Projections by GM record. Immer keeps unchanged records, so their projections
  * are reused and their points are not simplified again on every change.
@@ -98,7 +101,7 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
 }
 
 /** A text players may see; null when it is completely under fog or has no position. */
-export function projectText(text: TextElement, coverage: FogCoverage): PlayerText | null {
+export function projectText(text: TextElement, coverage: Covers): PlayerText | null {
   const x = finiteOrNull(text.x, SCENE_RANGES.coordinate);
   const y = finiteOrNull(text.y, SCENE_RANGES.coordinate);
   if (x === null || y === null || coverage.isCovered(textBounds(text))) return null;
@@ -123,7 +126,7 @@ export function projectText(text: TextElement, coverage: FogCoverage): PlayerTex
   };
 }
 
-export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: FogCoverage): Record<string, PlayerText> {
+export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: Covers): Record<string, PlayerText> {
   return projectRecord(texts, (text) => projectText(text, coverage));
 }
 
@@ -145,7 +148,7 @@ export function projectDrawingShape(stroke: DrawingStroke): PlayerDrawing | null
 
 export function projectDrawings(
   drawings: Readonly<Record<string, DrawingStroke>> | undefined,
-  coverage: FogCoverage,
+  coverage: Covers,
   memo: ProjectionMemo,
 ): Record<string, PlayerDrawing> {
   return projectRecord(drawings, (stroke) => {
