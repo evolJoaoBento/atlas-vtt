@@ -132,6 +132,25 @@ describe('live lighting of a presentation', () => {
     expect(darkAt('data:b', 2 * DARKNESS_INTERVAL_MS)).toBe(true);
   });
 
+  it('shows less at once when the explored memory is edited by hand, never the memory it had', async () => {
+    const night = scene({ ambient: 0 }, { tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) } });
+    const decode = vi.fn(() => new Promise<ExploredImage>(() => {}));
+    const first = vi.fn(() => Promise.resolve(exploredImage(MAP, (x) => x > 700)));
+    decode.mockImplementationOnce(first);
+    const live = new LiveLighting(lightingSource(playerLightingOf(night, MAP)).info as PresentedSceneInfo, () => {}, decode);
+    const darkAt = (edits: number, now: number): boolean => {
+      const op = live.frame({ exploredMask: 'data:a', exploredEdits: edits, lighting: LIT }, MAP, now)?.darkness.fog[DARKNESS_FOG_ID];
+      return insideByNonzero(op?.type === 'lasso' ? op.points : [], { x: 900, y: 400 });
+    };
+    darkAt(0, 0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(darkAt(0, DARKNESS_INTERVAL_MS)).toBe(false);
+    // Within the interval and with the same edits the last darkness is held, with the memory in it.
+    expect(darkAt(0, DARKNESS_INTERVAL_MS + 10)).toBe(false);
+    // A forget (or an undo) moves the count: dark at once, though the new mask has not decoded and the interval has not passed.
+    expect(darkAt(1, DARKNESS_INTERVAL_MS + 20)).toBe(true);
+  });
+
   it('calls back when the view says what players see changed, until disposed', () => {
     const source = lightingSource(playerLightingOf(walled(), MAP));
     const due = vi.fn();

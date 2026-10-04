@@ -95,7 +95,9 @@ export class ExploredMemory {
     if (!changed) return false;
     this.revision++;
     this.deps.store.getState().setExploredEdits(this.revision);
-    this.saver.schedule();
+    // What is forgotten leaves the saved mask at once: players are shown the saved mask, not the texture.
+    if (edit.mode === 'forget') this.saveNow();
+    else this.saver.schedule();
     return true;
   }
 
@@ -177,7 +179,8 @@ export class ExploredMemory {
       this.deps.onChange();
     });
     if (!travelled) return;
-    this.saver.schedule();
+    // A step may take memory away (undo of a reveal, redo of a forget), which players must not keep seeing.
+    this.saveNow();
     this.deps.onTravel(count < from);
   }
 
@@ -254,6 +257,12 @@ export class ExploredMemory {
       });
     }
     if (!drawn) image.destroy(true);
+  }
+
+  /** Saves the texture into the scene now, with no wait for the debounce; the same guard as the timer's. */
+  private saveNow(): void {
+    this.saver.cancel();
+    this.deps.guard(() => this.save());
   }
 
   private save(): void {
