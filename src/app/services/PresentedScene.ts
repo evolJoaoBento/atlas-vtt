@@ -115,14 +115,19 @@ export class PresentedScene {
       watchCamera: (listener) => watchViewCamera(view, listener),
     };
     this.scene = scene;
-    this.held = view.tabMetaStore.getState().activeTabId !== tabId;
+    // A store that does not hold the tab's loaded map (a load that failed, or one still running) is held too, so the resume releases the frame once the map is there.
+    this.held = view.tabMetaStore.getState().activeTabId !== tabId || !showsTab(view, tabId);
     this.resumeToken++;
     this.clearOnClose(view);
     this.stopWatching = view.tabMetaStore.subscribe((state) => {
       this.tabsChanged(scene, state.activeTabId, state.tabs.some((tab) => tab.id === tabId));
     });
-    if (this.held) this.emit((listener) => listener.held?.(scene));
-    else this.emit((listener) => listener.presented?.(scene, false));
+    if (this.held) {
+      this.emit((listener) => listener.held?.(scene));
+      if (view.tabMetaStore.getState().activeTabId === tabId) this.resumeWhenLoaded(scene, this.resumeToken);
+    } else {
+      this.emit((listener) => listener.presented?.(scene, false));
+    }
   }
 
   clear(): void {

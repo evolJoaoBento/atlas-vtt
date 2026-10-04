@@ -154,8 +154,8 @@ export default class AtlasVTTPlugin extends Plugin {
     this.imageDisplayService?.destroy();
     PlayerLootDisplay.get().dispose();
     LootHistoryStore.flush(this.app);
-    presentedScene.clear();
     PlayerWindowService.getInstance()?.destroy(false);
+    presentedScene.clear();
     this.globalAssetManager?.close();
     CreatureIndex.release(this.app);
     disposeImageProcessing();

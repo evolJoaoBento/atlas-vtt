@@ -184,6 +184,19 @@ describe('PresentedScene', () => {
     expect(scene.current()?.view).toBe(second.view);
   });
 
+  it('starts held when the store does not hold the tab, and resumes once its map is loaded', async () => {
+    const scene = new PresentedScene();
+    const events = record(scene);
+    const { view, store, tavern } = fakeView();
+    store.setState({ mapLoaded: false });
+    scene.present(view, tavern);
+    expect(scene.isHeld()).toBe(true);
+    store.setState({ mapLoaded: true });
+    await flush();
+    expect(scene.isHeld()).toBe(false);
+    expect(events).toEqual([`held:${tavern}`, `resumed:${tavern}`]);
+  });
+
   it('keeps telling the other listeners when one throws', () => {
     const scene = new PresentedScene();
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);

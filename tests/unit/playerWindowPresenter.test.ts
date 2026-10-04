@@ -324,14 +324,15 @@ describe('PlayerWindowPresenter', () => {
     expect(serviceMock.holdCurrentFrame).not.toHaveBeenCalled();
   });
 
-  test('follows a scene presented to online players while the window is open', async () => {
-    const { view, canvas } = createFakeView();
+  test('follows a scene presented elsewhere while the window is open', async () => {
+    const { view, canvas, atlasStore } = createFakeView();
     const tavern = view.tabMetaStore.getState().addTab('maps/tavern.md', 'Tavern');
     const dungeon = view.tabMetaStore.getState().addTab('maps/dungeon.md', 'Dungeon');
     serviceMock.isWindowOpen.mockReturnValue(true);
 
     await presentTabInPlayerWindow({} as any, view, tavern);
     view.tabMetaStore.getState().setActiveTab(dungeon);
+    atlasStore.setState({ mapPath: 'maps/dungeon.md' });
     presentedScene.present(view, dungeon);
     await flush();
 
@@ -342,6 +343,7 @@ describe('PlayerWindowPresenter', () => {
   test('re-targets the window when the same tab is presented again after stopping', async () => {
     const { view, canvas, atlasStore } = createFakeView();
     const tavern = view.tabMetaStore.getState().addTab('maps/tavern.md', 'Tavern');
+    atlasStore.setState({ mapPath: 'maps/tavern.md' });
     serviceMock.isWindowOpen.mockReturnValue(true);
     await presentTabInPlayerWindow({} as any, view, tavern);
     serviceMock.presentCanvas.mockClear();
@@ -356,7 +358,8 @@ describe('PlayerWindowPresenter', () => {
   });
 
   test('re-targets after holding, stopping and coming back to the tab', async () => {
-    const { view, canvas } = createFakeView();
+    const { view, canvas, atlasStore } = createFakeView();
+    atlasStore.setState({ mapPath: 'maps/tavern.md' });
     const tavern = view.tabMetaStore.getState().addTab('maps/tavern.md', 'Tavern');
     const dungeon = view.tabMetaStore.getState().addTab('maps/dungeon.md', 'Dungeon');
     serviceMock.isWindowOpen.mockReturnValue(true);
@@ -430,5 +433,27 @@ describe('PlayerWindowPresenter', () => {
 
     expect(serviceMock.presentCanvas).not.toHaveBeenCalled();
     expect(serviceMock.releaseHeldFrame).not.toHaveBeenCalled();
+  });
+
+  test('releases the held frame once a failed load is retried after Present to players', async () => {
+    const { view, atlasStore } = createFakeView();
+    const tavern = view.tabMetaStore.getState().addTab('maps/tavern.md', 'Tavern');
+    const dungeon = view.tabMetaStore.getState().addTab('maps/dungeon.md', 'Dungeon');
+    atlasStore.setState({ mapPath: 'maps/tavern.md' });
+    serviceMock.isWindowOpen.mockReturnValue(true);
+    await presentTabInPlayerWindow({} as any, view, tavern);
+
+    view.tabMetaStore.getState().setActiveTab(dungeon);
+    expect(serviceMock.holdCurrentFrame).toHaveBeenCalledTimes(1);
+    view.tabMetaStore.getState().setActiveTab(tavern);
+    // Tavern's load fails, then the GM runs Present to players on it.
+    atlasStore.setState({ mapLoaded: false, isMapLoading: false, mapPath: null });
+    presentedScene.present(view, tavern);
+    await flush();
+    expect(serviceMock.releaseHeldFrame).not.toHaveBeenCalled();
+
+    atlasStore.setState({ mapLoaded: true, mapPath: 'maps/tavern.md' });
+    await flush();
+    expect(serviceMock.releaseHeldFrame).toHaveBeenCalledTimes(1);
   });
 });

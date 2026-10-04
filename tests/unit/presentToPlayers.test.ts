@@ -1,22 +1,27 @@
-import type { Command, Plugin } from 'obsidian';
+import { Notice, type Command, type Plugin } from 'obsidian';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createStore } from 'zustand/vanilla';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
 
 vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class AtlasView {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 vi.mock('../../src/app/dashboard-view', () => ({ DASHBOARD_VIEW_TYPE: 'dashboard' }));
-vi.mock('../../src/app/services/PlayerWindowPresenter', () => ({ presentActiveTabInPlayerWindow: vi.fn() }));
+const presenter = vi.hoisted(() => ({ presentTabInPlayerWindow: vi.fn() }));
+vi.mock('../../src/app/services/PlayerWindowPresenter', () => ({ presentActiveTabInPlayerWindow: vi.fn(), presentTabInPlayerWindow: presenter.presentTabInPlayerWindow }));
+vi.mock('obsidian', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), Notice: vi.fn() }));
 vi.mock('../../src/app/services/TokenStatblockLinkService', () => ({ TokenStatblockLinkService: {} }));
 vi.mock('../../src/app/plugin/cleanupMissingAssets', () => ({ cleanupMissingAssets: vi.fn() }));
 
 import { AtlasView } from '../../src/app/atlas-view';
 import { registerCommands, type CommandDependencies } from '../../src/app/plugin/registerCommands';
+import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
 import { presentedScene } from '../../src/app/services/PresentedScene';
 import { presentActiveTabToPlayers, presentViewToPlayers, stopPresenting } from '../../src/app/services/presentToPlayers';
 
-function fakeView(): { view: object; tabId: string; store: ReturnType<typeof createStore<{ isMapLoading: boolean }>> } {
+interface SceneState { isMapLoading: boolean; mapLoaded: boolean; mapPath: string | null }
+
+function fakeView(): { view: object; tabId: string; store: ReturnType<typeof createStore<SceneState>> } {
   const tabMetaStore = createTabMetaStore();
-  const store = createStore<{ isMapLoading: boolean }>(() => ({ isMapLoading: false }));
+  const store = createStore<SceneState>(() => ({ isMapLoading: false, mapLoaded: true, mapPath: 'maps/tavern.atlasmap' }));
   const view = { tabMetaStore, atlasStore: store, register: vi.fn() };
   Object.setPrototypeOf(view, AtlasView.prototype);
   const tabId = tabMetaStore.getState().addTab('maps/tavern.atlasmap', 'Tavern');
@@ -30,14 +35,29 @@ function fakeApp(view: object | null): { workspace: { getActiveViewOfType: () =>
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('Present to players', () => {
-  beforeEach(() => { presentedScene.clear(); });
+  beforeEach(() => {
+    presentedScene.clear();
+    presenter.presentTabInPlayerWindow.mockClear();
+    vi.mocked(Notice).mockClear();
+    playerWindowStore.setState({ isOpen: true });
+  });
 
-  it('presents the active scene without opening the player window', async () => {
+  it('presents the active scene to an open player window', async () => {
     const { view, tabId } = fakeView();
-    const app = fakeApp(view);
-    await presentActiveTabToPlayers(app as never);
+    await presentActiveTabToPlayers(fakeApp(view) as never);
     expect(presentedScene.current()).toMatchObject({ view, tabId });
-    expect(app.workspace.openPopoutLeaf).not.toHaveBeenCalled();
+    expect(presenter.presentTabInPlayerWindow).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenCalledWith('Players see Tavern');
+  });
+
+  it('opens the player window when nothing shows the scene, and never claims players see it', async () => {
+    playerWindowStore.setState({ isOpen: false });
+    const { view, tabId } = fakeView();
+    (view as { app?: object }).app = {};
+    await presentActiveTabToPlayers(fakeApp(view) as never);
+    expect(presenter.presentTabInPlayerWindow).toHaveBeenCalledWith((view as { app: object }).app, view, tabId);
+    expect(presentedScene.current()).toBeNull();
+    expect(Notice).not.toHaveBeenCalledWith('Players see Tavern');
   });
 
   it('waits for the scene to finish loading', async () => {
