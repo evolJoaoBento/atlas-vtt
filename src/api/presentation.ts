@@ -21,7 +21,12 @@ export function presentationApi(tracker: ViewTracker, disposers: DisposerSet): P
       const view = tracker.view(viewId);
       const target = tabId ?? view?.tabMetaStore.getState().activeTabId ?? null;
       if (!view || !target) return false;
-      await presentTabToPlayers(view, target);
+      try {
+        await presentTabToPlayers(view, target);
+      } catch (error) {
+        console.error('[Atlas API] Presenting a scene failed:', error);
+        return false;
+      }
       const scene = presentedScene.current();
       // A held scene is not on screen: its map did not load, or the GM moved on meanwhile.
       return Boolean(scene && scene.view === view && scene.tabId === target && !presentedScene.isHeld());
@@ -31,8 +36,13 @@ export function presentationApi(tracker: ViewTracker, disposers: DisposerSet): P
     subscribe: (listener: PresentationListener): Disposer => disposers.add(presentedScene.subscribe({
       presented: (scene, resumed) => listener.presented?.(info(scene, false), resumed),
       held: (scene) => listener.held?.(info(scene, true)),
-      cleared: (previous) => listener.cleared?.(info(previous, false)),
+      cleared: (previous, wasHeld) => listener.cleared?.(info(previous, wasHeld)),
     })),
-    addTarget: (target: PresentationTarget): Disposer => disposers.add(addPresentationTarget(target)),
+    addTarget: (target: PresentationTarget): Disposer => {
+      if (!target || typeof target.id !== 'string' || typeof target.label !== 'string' || typeof target.isActive !== 'function') {
+        throw new Error('[Atlas API] addTarget needs { id: string, label: string, isActive(): boolean }.');
+      }
+      return disposers.add(addPresentationTarget(target));
+    },
   });
 }

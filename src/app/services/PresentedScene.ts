@@ -44,7 +44,7 @@ export interface PresentedSceneListener {
   /** The GM switched the presented view to another tab; players keep the last scene they saw. */
   held?(scene: PresentedSceneInfo): void;
   /** Nothing is presented any more: stopped, the view closed, or its tab was closed. */
-  cleared?(previous: PresentedSceneInfo): void;
+  cleared?(previous: PresentedSceneInfo, wasHeld: boolean): void;
   /** A view that was presented has closed, whether or not it is still the presented one. */
   viewClosed?(view: PresentedView): void;
 }
@@ -135,13 +135,14 @@ export class PresentedScene {
   clear(): void {
     const previous = this.scene;
     if (!previous) return;
+    const wasHeld = this.held;
     this.stopWatching?.();
     this.stopWatching = null;
     this.stopResuming?.();
     this.scene = null;
     this.held = false;
     this.resumeToken++;
-    this.emit((listener) => listener.cleared?.(previous));
+    this.emit((listener) => listener.cleared?.(previous, wasHeld));
   }
 
   private tabsChanged(scene: PresentedSceneInfo, activeTabId: string | null, tabExists: boolean): void {

@@ -23,7 +23,7 @@ export function presentTab(app: App, view: AtlasView, tabId: string): void {
 export function openPresentMenu(app: App, view: AtlasView, tabId: string, position: { x: number; y: number }): boolean {
   if (!anyTargetActive()) return false;
   const entries: ContextMenuEntry[] = [
-    { type: 'item', label: OPEN_PLAYER_WINDOW_LABEL, icon: 'monitor-up', onClick: () => presentTabInPlayerWindow(app, view, tabId) },
+    { type: 'item', label: OPEN_PLAYER_WINDOW_LABEL, icon: 'monitor-up', onClick: () => { void presentTabInPlayerWindow(app, view, tabId).catch((error: unknown) => console.error('[Atlas] Opening the player window failed:', error)); } },
   ];
   openContextMenuGlobal(entries, position);
   return true;

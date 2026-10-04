@@ -6,7 +6,8 @@ import { useSceneTabStore } from '../hooks/useSceneTabStore';
 import { useTabStripOverflow } from '../hooks/useTabStripOverflow';
 import { usePresentedTabId } from '../hooks/usePresentedTabId';
 import { activePresentationTarget, subscribePresentationTargets } from '../../services/presentationTargets';
-import { stopPresenting } from '../../services/presentToPlayers';
+import { stopPresenting } from '../../services/stopPresenting';
+import { playerWindowStore } from '../../stores/playerWindowStore';
 import type { SceneTab } from '../../types/sceneTabTypes';
 import { LabelTooltip, TooltipProvider } from '../../packages/components/primitives/tooltip';
 import './scene-tab-bar.scss';
@@ -66,6 +67,7 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
   const tabs = useStore(store, (s) => s.tabs);
   const activeTabId = useStore(store, (s) => s.activeTabId);
   const presentedTabId = usePresentedTabId(store);
+  const isPlayerWindowOpen = useStore(playerWindowStore, (s) => s.isOpen);
   const target = useSyncExternalStore(subscribePresentationTargets, activePresentationTarget);
   const [strip, setStrip] = useState<HTMLDivElement | null>(null);
   const { overflows, hiddenBefore, hiddenAfter } = useTabStripOverflow(strip, activeTabId);
@@ -73,7 +75,9 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
   if (tabs.length === 0) return null;
 
   const presentLabel = (tab: SceneTab, isPresented: boolean): string => {
-    if (isPresented) return target ? `Stop presenting ${tab.displayName}` : `${tab.displayName} is shown to players`;
+    if (isPresented && target) return `Stop presenting ${tab.displayName}`;
+    // Only a player window or a target shows the scene; without either the eye offers to open the window.
+    if (isPresented && isPlayerWindowOpen) return `${tab.displayName} is shown on the player view`;
     return target ? `Present ${tab.displayName} to ${target.label}` : `Show ${tab.displayName} on the player view`;
   };
 

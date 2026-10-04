@@ -6,6 +6,7 @@ import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { SceneTabBar } from '../../src/app/react/components/SceneTabBar';
 import { presentedScene, type PresentedView } from '../../src/app/services/PresentedScene';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
+import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
 import { addPresentationTarget } from '../../src/app/services/presentationTargets';
 
 class StubResizeObserver {
@@ -82,7 +83,11 @@ it('keeps the plain eye on the presented tab without a target', () => {
   act(() => { presentedScene.present(view, tavern); });
 
   expect(queryByRole('button', { name: 'Stop presenting Tavern' })).toBeNull();
-  act(() => { getByRole('button', { name: 'Tavern is shown to players' }).click(); });
+  // The window is closed: nothing shows the scene, so the eye offers to show it.
+  act(() => { getByRole('button', { name: 'Show Tavern on the player view' }).click(); });
   expect(onPresentTab).toHaveBeenCalledWith(tavern);
   expect(presentedScene.current()).not.toBeNull();
+  act(() => { playerWindowStore.setState({ isOpen: true }); });
+  expect(getByRole('button', { name: 'Tavern is shown on the player view' })).toBeTruthy();
+  act(() => { playerWindowStore.setState({ isOpen: false }); });
 });
