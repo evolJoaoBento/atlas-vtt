@@ -6,6 +6,7 @@ import type { OnlineSessionService } from '../OnlineSessionService';
 import type { ShareItems } from './model/ShareItems';
 import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems } from './receive/PulledItems';
+import { registerSharePropertyDisplay } from './display/registerSharePropertyDisplay';
 import { registerTagDisplay } from './display/registerTagDisplay';
 import { sectionTrustFor } from './model/sectionTrust';
 import { registerPartCommands } from './parts/registerPartCommands';
@@ -30,6 +31,7 @@ export function registerSharing(plugin: Plugin, services: SharingServices): void
   const catalogue = registerShareCommands(plugin, { people, items, settings, sections });
   registerPartCommands(plugin, people);
   registerTagDisplay(plugin);
+  registerSharePropertyDisplay(plugin, people);
   registerAskToPull(plugin, items, people, sections);
   registerReceiving(plugin, pulled, people);
   registerSessionHooks(plugin, { joins, people, sessions, catalogue });
