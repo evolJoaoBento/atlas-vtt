@@ -11,3 +11,7 @@
 - The selection outline around a token follows it when the token is resized, from the resize handles or the size menu. Before, it kept the old size until the token was selected again
 - Reloading Atlas no longer leaves the previous 3D dice in graphics memory
 - Loading a scene with explored areas no longer keeps a copy of them in graphics memory
+- The laser pointer is let go when Obsidian loses focus in the middle of a stroke, instead of staying drawn until the next click
+- A replaced map image is released from memory once the new one shows
+- Fog that did not change is no longer redrawn when other fog changes
+- The automatic grid colour no longer fails on a map whose texture is not an image

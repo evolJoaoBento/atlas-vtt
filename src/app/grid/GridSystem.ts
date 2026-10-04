@@ -7,7 +7,7 @@ import type { GridBounds, GridLineType } from './gridLineStyle';
 import { createHexLayout, hexCellExtent, isHexGridType } from './hexGeometry';
 import { cellCenterAt } from './gridDistance';
 import type { HexLayout } from './hexGeometry';
-import { contrastColorForSprite } from './gridContrastColor';
+import { safeContrastColorForSprite } from './safeContrastColor';
 import { snapTokenCenter } from './gridPlacement';
 import { numberCells, type CellLattice, type CellNumberStyle } from './cellNumbering';
 import { hexLattice } from './hexLattice';
@@ -259,7 +259,7 @@ export class GridSystem {
 
   /** Black or white, whichever contrasts with the map image; cached because it reads the texture's pixels. */
   private getAutoColor(bgSprite: Sprite): number {
-    this.autoColor ??= contrastColorForSprite(bgSprite);
+    this.autoColor ??= safeContrastColorForSprite(bgSprite);
     return this.autoColor ?? 0xffffff;
   }
 
