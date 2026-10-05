@@ -24,7 +24,7 @@ function setup() {
   const dice = new RemoteViewDice(store);
   const view = { viewId: 'remote-log', serviceManager: {} } as never;
   const roller = vi.fn((): string | null => 'Not connected');
-  const stop = registerRemoteControls('remote-log', { fitMap: () => undefined, roll: roller });
+  const stop = registerRemoteControls('remote-log', { owner: 'ext', fitMap: () => undefined, roll: roller });
   const shown = render(
     <AtlasUIContext.Provider value={{ app, view, pixiApp: null, renderer: null }}>
       <ViewStoreProvider store={store as never}><DiceRollLog isOpen onClose={() => undefined} /></ViewStoreProvider>

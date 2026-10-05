@@ -1,13 +1,14 @@
 import React from 'react';
 import { ToolButton } from '../packages/components/primitives/ToolButton';
 import type { ResponsiveToolbarItem } from '../packages/components/toolbar/toolbarTypes';
-import type { ToolbarItem, ViewContext } from '../../api/types/ui';
+import type { ToolbarItem, ToolbarItemContext, ViewContext } from '../../api/types/ui';
 import { obsidianIconComponent } from '../react/components/ObsidianIcon';
 import { safely, type SlotEntry } from './SlotRegistry';
 import { toolbarSlot } from './slots';
 import { useSlot } from './useSlot';
 import { t } from '../i18n';
 import { viewContextOf, type ViewContextState } from './viewContext';
+import { remoteOwnerOf } from '../remote-view/remoteControls';
 
 /** An item's place among other extensions' items when it names none: higher sits further left. */
 export const DEFAULT_EXTENSION_PRIORITY = 50;
@@ -56,6 +57,24 @@ export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ct
   };
 }
 
+/** Items whose `isVisible` threw already: the failure is logged once, not on every render. */
+const failedVisibility = new WeakSet<ToolbarItem>();
+
+/** Whether `entry` shows in the view of `ctx`: only `isVisible` answering true hides nothing; a throw hides it. */
+function isVisibleIn({ owner, item }: SlotEntry<ToolbarItem>, ctx: ViewContext): boolean {
+  if (!item.isVisible) return true;
+  const visibility: ToolbarItemContext = Object.freeze({ ...ctx, ownRemote: ctx.kind === 'remote' && remoteOwnerOf(ctx.viewId) === owner });
+  try {
+    return item.isVisible(visibility) === true;
+  } catch (error) {
+    if (!failedVisibility.has(item)) {
+      failedVisibility.add(item);
+      console.error(`[Atlas API] ${owner}: toolbar item "${item.id}" isVisible failed:`, error);
+    }
+    return false;
+  }
+}
+
 function priorityOf({ item }: SlotEntry<ToolbarItem>): number {
   return Number.isFinite(item.priority) ? item.priority as number : DEFAULT_EXTENSION_PRIORITY;
 }
@@ -76,7 +95,10 @@ export function withExtensionToolbarItems(
   return [...atlasItems.slice(0, at), ...extensionItems, ...atlasItems.slice(at)];
 }
 
-/** The registered toolbar items that belong in this view, to be placed among Atlas's own. None in a player view, except a remote view's own. */
+/**
+ * The registered toolbar items that belong in this view and are visible there, to be placed among Atlas's own. None in a player
+ * view, except a remote view's own. A hidden item never reaches the bar, so it takes no room and is not in "More tools".
+ */
 export function useExtensionToolbarItems(
   viewId: string | undefined,
   store: { getState(): ViewContextState },
@@ -87,7 +109,7 @@ export function useExtensionToolbarItems(
   const ctx = viewContextOf({ viewId }, store);
   if (ctx.isPlayerView && ctx.kind !== 'remote') return [];
   return entries
-    .filter(({ item }) => (item.views ?? ['map']).includes(ctx.kind))
+    .filter((entry) => (entry.item.views ?? ['map']).includes(ctx.kind) && isVisibleIn(entry, ctx))
     .map((entry, index) => ({ entry, index, priority: priorityOf(entry) }))
     // Highest priority first; registration order breaks ties.
     .sort((a, b) => b.priority - a.priority || a.index - b.index)

@@ -1,10 +1,12 @@
 /**
- * What a remote view's own UI asks of its handle, by view id: Fit map (through the view's camera)
- * and a roll from the dice tray or the dice log (to the owner's `onRoll` listeners).
+ * What a remote view's own UI asks of its handle, by view id: who opened it, Fit map (through the
+ * view's camera) and a roll from the dice tray or the dice log (to the owner's `onRoll` listeners).
  */
 import { t } from '../i18n';
 
 export interface RemoteControls {
+  /** The id of the extension that opened the view. */
+  readonly owner: string;
   fitMap(): void;
   /** Null once the owner sent the roll, else why it could not (shown in the tray). */
   roll(dice: Readonly<Record<string, number>>, modifier: number): string | null;
@@ -21,6 +23,11 @@ export function registerRemoteControls(viewId: string, entry: RemoteControls): (
 /** The controls of the remote view `viewId`; null for any other view. */
 export function remoteControlsOf(viewId: string | undefined): RemoteControls | null {
   return viewId === undefined ? null : controls.get(viewId) ?? null;
+}
+
+/** The id of the extension that opened the remote view `viewId`; null for any other view. */
+export function remoteOwnerOf(viewId: string | undefined): string | null {
+  return remoteControlsOf(viewId)?.owner ?? null;
 }
 
 /** Fits the map of the remote view `viewId`; false for any other view, which fits as a map view does. */

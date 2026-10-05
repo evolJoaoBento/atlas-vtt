@@ -18,6 +18,7 @@
 - Extension API: reading a saved map without opening it also gives its note pins, walls, lights, light zones, camera, token settings and whether the initiative tracker was open, and adding a scene can write them
 - Extension API: an extension can replace the map of a scene it added itself with a newer version, keeping the scene; the GM's own scenes, and scenes open in a view, are never replaced
 - Extension API: follows Atlas 0.6. A scene's own distance per cell reaches extensions (`GridState.unitDistanceOverride`, `MeasurementSettings.ruleDistance`), extension toolbar buttons sit after the dice in the customizable toolbar, and Atlas's own texts around what extensions add follow Obsidian's language
+- Extension API: a toolbar button can choose per view whether it shows, for example only in the remote views its own extension opened; a hidden button takes no room and is not in More tools
 
 ## Improved
 

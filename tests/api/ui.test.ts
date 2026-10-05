@@ -108,6 +108,7 @@ describe('ui registration', () => {
     expect(() => ui.addToolbarItem({ id: 't', icon: 'x', label: 'T' } as never)).toThrow(/"onClick" must be a function/);
     expect(() => ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: () => undefined, views: ['sideways'] as never })).toThrow(/"views"/);
     expect(() => ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: () => undefined, priority: Number.NaN })).toThrow(/"priority" must be a number/);
+    expect(() => ui.addToolbarItem({ id: 't', icon: 'x', label: 'T', onClick: () => undefined, isVisible: true as never })).toThrow(/"isVisible" must be a function/);
     expect(() => ui.addPaletteSection({ id: 'p', title: 'P' } as never)).toThrow(/"commands" must be a function/);
     expect(() => ui.addDashboardTile({ id: 'd', icon: 'x', title: 'D', onClick: () => undefined } as never)).toThrow(/"description" must be a string/);
     expect(() => ui.addViewMenuItems('x' as never)).toThrow(/needs a function/);

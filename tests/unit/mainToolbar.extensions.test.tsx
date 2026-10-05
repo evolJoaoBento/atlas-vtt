@@ -60,6 +60,7 @@ vi.mock('../../src/app/react/root/ContextMenuContext', async (importOriginal) =>
 
 import { MainToolbar } from '../../src/app/packages/components/MainToolbar';
 import { toolbarSlot } from '../../src/app/extensions/slots';
+import { registerRemoteControls } from '../../src/app/remote-view/remoteControls';
 import type { ToolbarItem } from '../../src/api/types/ui';
 
 const item = (overrides: Partial<ToolbarItem> = {}): ToolbarItem => ({
@@ -191,5 +192,72 @@ describe('MainToolbar with extension items', () => {
     expect(screen.getByRole('button', { name: 'Roll Dice' })).toBeTruthy();
     removeRemote();
     removeMap();
+  });
+
+  describe('isVisible', () => {
+    /** Makes `view-1` a remote view opened by `owner`; the returned function closes it again. */
+    function remoteOpenedBy(owner: string): () => void {
+      storeState.isPlayerView = true;
+      storeState.remoteView = {};
+      return registerRemoteControls('view-1', { owner, fitMap: () => undefined, roll: () => null });
+    }
+
+    it('shows an item only while its predicate answers true, re-read on invalidate, and leaves no More tools entry', () => {
+      let visible = false;
+      const { container } = render(<MainToolbar viewId="view-1" />);
+      const remove = add(item({ isVisible: () => visible }));
+      expect(button()).toBeNull();
+      expect(container.querySelector('[data-toolbar-item="ext:ext:x"]')).toBeNull();
+      visible = true;
+      act(() => { toolbarSlot.invalidate(); });
+      expect(button()).not.toBeNull();
+      visible = 'yes' as never;
+      act(() => { toolbarSlot.invalidate(); });
+      expect(button()).toBeNull();
+      remove();
+    });
+
+    it('hides an item that is active as well', () => {
+      render(<MainToolbar viewId="view-1" />);
+      const remove = add(item({ isVisible: () => false, isActive: () => true }));
+      expect(button()).toBeNull();
+      remove();
+    });
+
+    it('tells the predicate whether the extension opened the remote view', () => {
+      const isVisible = vi.fn(() => true);
+      render(<MainToolbar viewId="view-1" />);
+      const remove = add(item({ isVisible }));
+      expect(isVisible).toHaveBeenLastCalledWith({ viewId: 'view-1', kind: 'map', isPlayerView: false, ownRemote: false });
+      remove();
+      cleanup();
+
+      const closeOwn = remoteOpenedBy('ext');
+      render(<MainToolbar viewId="view-1" />);
+      const removeOwn = add(item({ views: ['remote'], isVisible: (ctx) => ctx.ownRemote }));
+      expect(button()).not.toBeNull();
+      removeOwn();
+      closeOwn();
+      cleanup();
+
+      const closeOther = remoteOpenedBy('someone-else');
+      render(<MainToolbar viewId="view-1" />);
+      const removeOther = add(item({ views: ['remote'], isVisible: (ctx) => ctx.ownRemote }));
+      expect(button()).toBeNull();
+      removeOther();
+      closeOther();
+    });
+
+    it('hides an item whose predicate throws, and logs the failure once', () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<MainToolbar viewId="view-1" />);
+      const remove = add(item({ isVisible: () => { throw new Error('boom'); } }));
+      act(() => { toolbarSlot.invalidate(); });
+      act(() => { toolbarSlot.invalidate(); });
+      expect(button()).toBeNull();
+      expect(screen.getByRole('button', { name: 'Roll Dice' })).toBeTruthy();
+      expect(error.mock.calls.filter(([message]) => String(message).includes('isVisible'))).toHaveLength(1);
+      remove();
+    });
   });
 });

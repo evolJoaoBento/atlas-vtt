@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.14.0";
+export declare const API_VERSION = "1.15.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -1396,11 +1396,23 @@ export declare interface ToolbarItem {
     priority?: number;
     /** Default ['map']. */
     views?: ReadonlyArray<'map' | 'remote'>;
+    /**
+     * Whether the item shows in this view, among the `views` it is for; left out, it always shows. Only `true` shows it: a hidden
+     * item takes no room in the bar and is not in "More tools". Read again after `ui.invalidate()`. A predicate that throws
+     * hides the item, and the failure is logged once.
+     */
+    isVisible?(ctx: ToolbarItemContext): boolean;
     /** Draws the button as the one in use, and keeps it in the bar rather than in "More tools". */
     isActive?(ctx: ViewContext): boolean;
     /** A dot (`true`) or a count on the button; `null` shows nothing. */
     badge?(ctx: ViewContext): string | number | true | null;
     onClick(ctx: ViewContext): void;
+}
+
+/** What `ToolbarItem.isVisible` is told: the view, and for a remote view whether the asking extension opened it. */
+export declare interface ToolbarItemContext extends ViewContext {
+    /** True in a remote view this extension opened (`remoteViews.open`); false in any other view. */
+    ownRemote: boolean;
 }
 
 export declare interface UiApi {
@@ -1413,7 +1425,7 @@ export declare interface UiApi {
     addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
     /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
     addPanel(panel: PanelSpec): PanelHandle;
-    /** Re-reads `isActive`, `badge`, palette commands and menu providers now. */
+    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands and menu providers now. */
     invalidate(): void;
 }
 

@@ -83,7 +83,7 @@ export function uiApi(scope: ExtensionScope, views: ViewTracker): UiApi {
   return Object.freeze({
     addToolbarItem: (item: ToolbarItem): Disposer => {
       check('ui.addToolbarItem', item, { id: 'text', icon: 'text', label: 'text', onClick: 'function' },
-        { shortcut: 'text', priority: 'number', isActive: 'function', badge: 'function' });
+        { shortcut: 'text', priority: 'number', isVisible: 'function', isActive: 'function', badge: 'function' });
       const kinds: unknown = item.views;
       if (kinds !== undefined && !(Array.isArray(kinds) && (kinds as unknown[]).every((kind) => typeof kind === 'string' && VIEW_KINDS.includes(kind)))) {
         throw new Error('[Atlas API] ui.addToolbarItem: "views" must list \'map\' and \'remote\'.');

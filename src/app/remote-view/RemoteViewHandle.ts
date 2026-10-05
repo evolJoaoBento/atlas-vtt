@@ -91,7 +91,9 @@ export class RemoteViewHandle implements RemoteViewOwner {
     const motion = this.motion;
     const dice = new RemoteViewDice(remote.atlasStore, this.maxDice);
     this.dice = dice;
-    this.stopControls = registerRemoteControls(remote.viewId, { fitMap: () => motion.fitMap(), roll: (picked, modifier) => dice.roll(picked, modifier) });
+    this.stopControls = registerRemoteControls(remote.viewId, {
+      owner: this.owner, fitMap: () => motion.fitMap(), roll: (picked, modifier) => dice.roll(picked, modifier),
+    });
   }
 
   closed(): void {
