@@ -255,14 +255,17 @@ export class SceneBroadcaster implements SessionHandler {
   /** The store, what the view's lighting hides now (null while unlit) and the coverage, worked out once per projection. */
   private prepare(live: LiveScene): Prepared {
     const state = live.scene.store.getState();
-    this.watchMapSize(live);
     const lighting = this.lighting?.frame(state, live.scene.mapSize()) ?? null;
     // Rebuilt only when the fog operations or the darkness change.
-    return { state, lighting, fog: this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness) };
+    const fog = this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness);
+    // Only painted fog and lighting need the map's size (a scene with neither sends what it has without one).
+    if (fog.coverage.hasPaintedFog || state.lighting?.enabled) this.watchMapSize(live);
+    return { state, lighting, fog };
   }
 
   /**
-   * Players are shown nothing while the map's size is unknown (the fog and the darkness say nothing outside the map), and the size
+   * Under painted fog or lighting players are shown nothing while the map's size is unknown (the fog and the darkness say nothing
+   * outside the map), and the size
    * is read from the background sprite, which can arrive without any change of the store. So while it is unknown, look again
    * every `MAP_SIZE_POLL_MS`, and project once it is known.
    */

@@ -5,7 +5,8 @@ import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRu
 import { projectForPlayers, type ProjectedState } from '../../../src/app/online/scene/projectForPlayers';
 import { createProjectionMemo, projectFog } from '../../../src/app/online/scene/projectRecords';
 import type { MapSize, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
-import type { Character, DrawingStroke, TextElement } from '../../../src/app/types';
+import type { Character, DrawingStroke, NotePin, TextElement } from '../../../src/app/types';
+import { pinFootprint } from '../../../src/app/online/sharing/model/buildMapPayload';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
 import { fakeAssetIds, insideByNonzero } from './sceneFixtures';
@@ -104,6 +105,16 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
     expect(Object.keys(projectOn(map, elsewhere, { tokens: { ...strip.tokens, off: hero('off', 760, 250) } }, 4).tokens)).toEqual(['strip', 'straddle']);
   });
 
+  it('checks a token by the size players draw, not only the raw one (a size of 1000 is sent as 100)', () => {
+    const wide = { width: 30000, height: 30000 };
+    const fogged = [rect('f', 1, false, 0, 0, 30000, 30000), rect('r', 2, true, 0, 0, 1000, 1000)];
+    // Raw, the token covers the whole map and so the revealed corner; as sent (size 100, a 13 930 px footprint around 20 000) it is wholly fogged.
+    const sent = projectOn(wide, fogged, { tokens: { big: { ...hero('big', 20000, 20000), size: 1000 } } });
+    expect(Object.keys(sent.tokens)).toEqual([]);
+    // A token of that size that does reach the revealed corner as sent is still sent.
+    expect(Object.keys(projectOn(wide, fogged, { tokens: { big: { ...hero('big', 5000, 5000), size: 1000 } } }).tokens)).toEqual(['big']);
+  });
+
   it('on a map of unknown size sends everything when no fog is painted, and nothing under painted fog', () => {
     const unknown = { width: 0, height: 0 };
     expect(keys(projectOn(unknown, [], edgeItems))).toHaveLength(3);
@@ -152,14 +163,18 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
       const tokens: Record<string, Character> = {};
       const texts: Record<string, TextElement> = {};
       const drawings: Record<string, DrawingStroke> = {};
+      // Tokens of 10 to 80 px (the grid), texts of 10 to 80 px, drawings up to 120 px long and 8 px wide, and pins.
+      const gridSize = between(10, 80);
+      const pins: NotePin[] = [];
       for (let i = 0; i < 20; i++) {
         tokens[`k${i}`] = hero(`k${i}`, between(-20, size.width + 20), between(-20, size.height + 20));
-        texts[`t${i}`] = note(`t${i}`, between(-10, size.width + 10), between(-10, size.height + 10));
+        texts[`t${i}`] = { ...note(`t${i}`, between(-10, size.width + 10), between(-10, size.height + 10)), width: between(10, 80), height: between(10, 80) } as TextElement;
         const x = between(-10, size.width + 10);
         const y = between(-10, size.height + 10);
-        drawings[`d${i}`] = { ...ink(`d${i}`, x, y), points: [{ x, y }, { x: x + between(-15, 15), y: y + between(-15, 15) }], width: between(0.5, 3) };
+        drawings[`d${i}`] = { ...ink(`d${i}`, x, y), points: [{ x, y }, { x: x + between(-60, 60), y: y + between(-60, 60) }], width: between(0.5, 8) };
+        pins.push({ id: `p${i}`, kind: 'pin', x: between(-10, size.width + 10), y: between(-10, size.height + 10), notePath: 'n.md' } as NotePin);
       }
-      const scene = projectOn(size, ops, { tokens, texts, drawings });
+      const scene = projectOn(size, ops, { tokens, texts, drawings }, gridSize);
       const allRevealed = (bounds: { x: number; y: number; width: number; height: number }): boolean => {
         const x0 = Math.floor(Math.max(bounds.x, 0));
         const x1 = Math.ceil(Math.min(bounds.x + bounds.width, size.width));
@@ -182,7 +197,15 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
         if (id in scene.tokens) {
           sent++;
           // A token needs some pixel of it revealed (the window draws it half under the fog), none at all would be a leak.
-          expect(anyRevealed(tokenBounds({ x: token.x, y: token.y, size: 1 }, 70)), `token ${id}, round ${round}`).toBe(true);
+          expect(anyRevealed(tokenBounds({ x: token.x, y: token.y, size: 1 }, gridSize)), `token ${id}, round ${round}`).toBe(true);
+        } else withheld++;
+      }
+      const reveal = FogCoverage.fromPlayerFog(projectFog(Object.fromEntries(ops.map((op) => [op.id, op])), createProjectionMemo())).reveal(size);
+      for (const pin of pins) {
+        const footprint = clipToMap(pinFootprint(pin, null), size);
+        if (footprint && reveal.revealed(footprint)) {
+          sent++;
+          expect(allRevealed(pinFootprint(pin, null)), `pin ${pin.id}, round ${round}`).toBe(true);
         } else withheld++;
       }
       for (const id of Object.keys(texts)) {
