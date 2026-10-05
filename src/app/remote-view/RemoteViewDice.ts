@@ -12,13 +12,14 @@ import { isDieType, type DiceRollResult } from '../tools/diceRolling';
 import { callGuarded, ListenerSet } from './listeners';
 import { ROLL_NOT_SENT } from './remoteControls';
 import { updateRemoteView } from './remoteViewState';
+import { t } from '../i18n';
 
 /** The most dice a remote view's tray may offer for one roll (`remoteViews.open({ maxDice })`, its default). */
 export const REMOTE_MAX_DICE = 100;
 /** The most entries of the shared log the dice log shows. */
 export const REMOTE_LOG_ENTRIES = 100;
 /** Why a pick of the wrong size is not sent. */
-export const rollDiceCount = (maxDice: number): string => `Roll 1 to ${maxDice} dice.`;
+export const rollDiceCount = (maxDice: number): string => t('remote.rollDiceCount', { max: maxDice });
 
 export type RollListener = (dice: Readonly<Record<string, number>>, modifier: number) => string | null;
 

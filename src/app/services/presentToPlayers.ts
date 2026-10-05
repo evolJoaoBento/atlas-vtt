@@ -4,6 +4,7 @@ import { playerWindowStore } from '../stores/playerWindowStore';
 import { presentTabInPlayerWindow } from './PlayerWindowPresenter';
 import { presentedScene, whenMapLoaded, type PresentedView } from './PresentedScene';
 import { activePresentationTarget } from './presentationTargets';
+import { t } from '../i18n';
 
 /**
  * Present the scene `view` shows to players. An open player window follows it
@@ -13,7 +14,7 @@ export async function presentViewToPlayers(view: unknown): Promise<void> {
   // A remote view shows a scene fed from outside, never one of this vault's maps.
   const tabId = view instanceof AtlasView && !view.isRemote ? view.tabMetaStore.getState().activeTabId : null;
   if (!(view instanceof AtlasView) || view.isRemote || !tabId) {
-    new Notice('Open a scene to present it to players');
+    new Notice(t('present.openSceneFirst'));
     return;
   }
   await whenMapLoaded(view.atlasStore);
@@ -25,9 +26,9 @@ export async function presentViewToPlayers(view: unknown): Promise<void> {
   }
   presentedScene.present(view, tabId);
   const name = view.tabMetaStore.getState().tabs.find((tab) => tab.id === tabId)?.displayName;
-  const label = name ?? 'this scene';
+  const label = name ?? t('present.thisScene');
   // A held scene (its map did not load) is not on screen yet: players still have the previous frame.
-  new Notice(presentedScene.isHeld() ? `Players see ${label} once it loads` : `Players see ${label}`);
+  new Notice(t(presentedScene.isHeld() ? 'present.playersSeeOnceLoaded' : 'present.playersSee', { name: label }));
 }
 
 export function presentActiveTabToPlayers(app: App): Promise<void> {

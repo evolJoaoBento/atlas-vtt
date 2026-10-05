@@ -9,8 +9,7 @@ import { presentTabInPlayerWindow } from '../services/PlayerWindowPresenter';
 import { activePresentationTarget } from '../services/presentationTargets';
 import { presentTabToPlayers } from '../services/presentToPlayers';
 import { openContextMenuGlobal, type ContextMenuEntry } from './root/ContextMenuContext';
-
-const OPEN_PLAYER_WINDOW_LABEL = 'Open player window';
+import { t } from '../i18n';
 
 const anyTargetActive = (): boolean => activePresentationTarget() !== null;
 
@@ -23,7 +22,7 @@ export function presentTab(app: App, view: AtlasView, tabId: string): void {
 export function openPresentMenu(app: App, view: AtlasView, tabId: string, position: { x: number; y: number }): boolean {
   if (!anyTargetActive()) return false;
   const entries: ContextMenuEntry[] = [
-    { type: 'item', label: OPEN_PLAYER_WINDOW_LABEL, icon: 'monitor-up', onClick: () => { void presentTabInPlayerWindow(app, view, tabId).catch((error: unknown) => console.error('[Atlas] Opening the player window failed:', error)); } },
+    { type: 'item', label: t('present.openPlayerWindow'), icon: 'monitor-up', onClick: () => { void presentTabInPlayerWindow(app, view, tabId).catch((error: unknown) => console.error('[Atlas] Opening the player window failed:', error)); } },
   ];
   openContextMenuGlobal(entries, position);
   return true;

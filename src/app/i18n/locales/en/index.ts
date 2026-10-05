@@ -58,6 +58,8 @@ import { pinMenu } from './pinMenu';
 import { resource } from './resource';
 import { token } from './token';
 import { image } from './image';
+import { extensions } from './extensions';
+import { remote } from './remote';
 import { link } from './link';
 import { mapPreview } from './mapPreview';
 import { names } from './names';
@@ -165,4 +167,6 @@ export const en = {
   ...wall,
   ...sceneLight,
   ...vision,
+  ...extensions,
+  ...remote,
 } as const;

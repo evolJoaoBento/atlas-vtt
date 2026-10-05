@@ -2,6 +2,8 @@
  * What a remote view's own UI asks of its handle, by view id: Fit map (through the view's camera)
  * and a roll from the dice tray or the dice log (to the owner's `onRoll` listeners).
  */
+import { t } from '../i18n';
+
 export interface RemoteControls {
   fitMap(): void;
   /** Null once the owner sent the roll, else why it could not (shown in the tray). */
@@ -30,7 +32,7 @@ export function fitRemoteMap(viewId: string | undefined): boolean {
 }
 
 /** Shown when a remote view's tray rolls with nothing to take the roll. */
-export const ROLL_NOT_SENT = 'The roll could not be sent.';
+export const ROLL_NOT_SENT = t('remote.rollNotSent');
 
 /** The dice tray's roll in the remote view `viewId`: to its owner, never rolled locally. */
 export function remoteTrayRoll(viewId: string | undefined): (dice: Readonly<Record<string, number>>, modifier: number) => string | null {

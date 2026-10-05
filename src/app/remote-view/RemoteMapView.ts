@@ -10,6 +10,7 @@ import type AtlasVTTPlugin from '../../../main';
 import { AtlasView } from '../atlas-view';
 import { takeRemoteOwner, type RemoteViewOwner } from './remoteOwners';
 import { REMOTE_VIEW_TYPE } from './remoteViewType';
+import { t } from '../i18n';
 
 export class RemoteMapView extends AtlasView {
   /** Null for a tab nothing opened: it closes once the layout is ready. */
@@ -27,7 +28,7 @@ export class RemoteMapView extends AtlasView {
   }
 
   getDisplayText(): string {
-    return this.owner?.title ?? 'Remote view';
+    return this.owner?.title ?? t('remote.defaultTitle');
   }
 
   getIcon(): string {

@@ -1,8 +1,9 @@
 import { normalizePath, type App, type TAbstractFile } from 'obsidian';
 import { ensureFolder } from '../app/plugin/vaultFolders';
 import type { AssetService, CollectionMetadata } from '../app/services/AssetService';
-import { collectionFolderName, collectionFolderPath, collectionNameProblem } from '../app/services/assetPaths';
+import { collectionFolderName, collectionFolderPath, collectionNameProblemKey } from '../app/services/assetPaths';
 import { mapStrings } from '../app/utils/mapStrings';
+import { en } from '../app/i18n/locales/en';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
 import { checkedSceneFields, isPlainRelative, setsSceneFields, type SceneFields } from './savedMapFields';
@@ -35,8 +36,9 @@ async function resolveCollection(assets: AssetService, ref: AddInput['collection
     if (!known.some((collection) => collection.id === ref.id)) throw new Error(`[Atlas API] There is no collection with the id "${String(ref.id)}".`);
     return { id: ref.id, created: false };
   }
-  const problem = typeof ref.name === 'string' ? collectionNameProblem(ref.name) : 'Enter a name';
-  if (problem) throw new Error(`[Atlas API] The collection name cannot be used: ${problem}`);
+  // In English whatever Atlas's language: the error is for the extension's author.
+  const problem = typeof ref.name === 'string' ? collectionNameProblemKey(ref.name) : 'names.enter';
+  if (problem) throw new Error(`[Atlas API] The collection name cannot be used: ${String(en[problem])}`);
   const key = ref.name.trim().toLowerCase();
   const match = known.find((collection: CollectionMetadata) => collection.id.toLowerCase() === key || collection.name.toLowerCase() === key);
   if (match) return { id: match.id, created: false };

@@ -4,6 +4,7 @@ import type { PanelSpec, ViewContext } from '../../api/types/ui';
 import { CloseButton } from '../packages/components/primitives/CloseButton';
 import { useDialogWindowVariants } from '../packages/components/primitives/dialogMotion';
 import { safely } from './SlotRegistry';
+import { t } from '../i18n';
 
 interface ExtensionPanelFrameProps {
   owner: string;
@@ -58,7 +59,7 @@ export function ExtensionPanelFrame({ owner, panel, ctx, onClose }: ExtensionPan
     >
       <header className="atlas-extension-panel__header">
         <h2 className="atlas-extension-panel__title">{panel.title}</h2>
-        <CloseButton onClick={onClose} aria-label={`Close ${panel.title}`} />
+        <CloseButton onClick={onClose} aria-label={t('extensions.closePanel', { name: panel.title })} />
       </header>
       <div ref={body} className="atlas-extension-panel__body" />
     </motion.section>

@@ -124,7 +124,7 @@ export function DiceRollEntry({ result, isNew, onRepeat }: DiceRollEntryProps): 
               </span>
             ))}
             {/* A log may list only some of a roll's dice; the total counts them all. */}
-            {result.unlistedDice ? <span className="dice-log-entry__badge">+{result.unlistedDice} more</span> : null}
+            {result.unlistedDice ? <span className="dice-log-entry__badge">{t('dice.moreDice', { count: result.unlistedDice })}</span> : null}
           </div>
         )}
       </div>
