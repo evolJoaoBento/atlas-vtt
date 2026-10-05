@@ -89,3 +89,32 @@ describe('texts and drawings are sent only where the darkness is proven shown', 
     }
   });
 });
+
+describe('the text box is checked as players draw it', () => {
+  const map = { width: 1000, height: 800 };
+  const words = (id: string, x: number, content: string, extra: Partial<TextElement>): TextElement => (
+    { id, kind: 'text', x, y: 400, text: content, fontSize: 16, fontFamily: 'serif', color: '#000000', ...extra } as TextElement
+  );
+  const sentWith = (frameDarkFrom: number, texts: Record<string, TextElement>): string[] => {
+    const grid = raster(map, (col) => col * grid8 >= frameDarkFrom);
+    return Object.keys(project(scene({ ambient: 1 }, { texts }), frameOf(grid), map).texts);
+  };
+  const grid8 = darknessCellSize(map);
+
+  it('uses the clamped font size and scale, not the raw ones (a font size of 0.01, a scale of 0.0001)', () => {
+    const twenty = 'WWWWWWWWWWWWWWWWWWWW';
+    expect(sentWith(16, { tiny: words('tiny', 12, twenty, { fontSize: 0.01 }) })).toEqual([]);
+    expect(sentWith(16, { squashed: words('squashed', 12, twenty, { fontSize: 1000, scale: 0.0001 }) })).toEqual([]);
+    // The same texts well clear of the dark are still sent.
+    expect(sentWith(900, { tiny: words('tiny', 12, twenty, { fontSize: 0.01 }) })).toEqual(['tiny']);
+  });
+
+  it('counts code points and gives wide ones two ems: ten CJK characters reach twice as far', () => {
+    const wide = '漢字漢字漢字漢字漢字';
+    // At 16 px each, ten characters are drawn up to 320 px wide: 100 +- 160 reaches the dark that starts at 224.
+    expect(sentWith(224, { cjk: words('cjk', 100, wide, {}) })).toEqual([]);
+    expect(sentWith(224, { latin: words('latin', 100, 'abcdefghij', {}) })).toEqual(['latin']);
+    // Astral characters are one code point each, not two units.
+    expect(sentWith(224, { emoji: words('emoji', 100, '😀😀😀😀😀', {}) })).toEqual(['emoji']);
+  });
+});

@@ -104,8 +104,9 @@ export function projectFog(fog: Readonly<Record<string, FogOperation>> | undefin
 export function projectText(text: TextElement, coverage: Covers): PlayerText | null {
   const x = finiteOrNull(text.x, SCENE_RANGES.coordinate);
   const y = finiteOrNull(text.y, SCENE_RANGES.coordinate);
-  if (x === null || y === null || coverage.isCovered(textBounds(text))) return null;
-  return {
+  if (x === null || y === null) return null;
+  // Checked as players draw it: the clamped font size, scale and padding, not the GM's raw values.
+  const projected: PlayerText = {
     x,
     y,
     text: textOr(text.text, '', SCENE_LIMITS.textLength),
@@ -124,6 +125,7 @@ export function projectText(text: TextElement, coverage: Covers): PlayerText | n
     rotation: finiteOr(text.rotation, 0),
     scale: positiveOr(text.scale, 1, SCENE_RANGES.textScale),
   };
+  return coverage.isCovered(textBounds(projected)) ? null : projected;
 }
 
 export function projectTexts(texts: Readonly<Record<string, TextElement>> | undefined, coverage: Covers): Record<string, PlayerText> {
