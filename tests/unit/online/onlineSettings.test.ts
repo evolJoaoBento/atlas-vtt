@@ -51,7 +51,6 @@ describe('online settings', () => {
       logEvents: false,
       playerName: '',
       keepImages: true,
-      table: null,
       shareableProperties: ['tags', 'aliases'],
     });
   });
@@ -63,7 +62,10 @@ describe('online settings', () => {
   });
 
   it("remembers the player's name and keeps images unless switched off", () => {
-    expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true, table: null });
+    expect(DEFAULT_ONLINE_SETTINGS).toMatchObject({ playerName: '', keepImages: true });
+    // The table key is no setting: it stays on the device (`tableKey.ts`), and one left in stored settings is not read.
+    expect(DEFAULT_ONLINE_SETTINGS).not.toHaveProperty('table');
+    expect(resolveOnlineSettings({ table: { id: 'A'.repeat(43), publicKey: 'k', privateKey: { kty: 'EC', crv: 'P-256', d: 'secret' } } })).not.toHaveProperty('table');
     expect(resolveOnlineSettings({ playerName: 'Anna', keepImages: false })).toMatchObject({ playerName: 'Anna', keepImages: false });
     expect(resolveOnlineSettings({ playerName: 4, keepImages: 'no' })).toMatchObject({ playerName: '', keepImages: true });
   });

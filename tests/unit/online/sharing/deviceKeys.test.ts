@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEVICE_KEYS_STORAGE, DeviceKeys, memoryKeyValueStore } from '../../../../src/app/online/sharing/identity/deviceKeys';
-import { ensureTableIdentity, moveTableKeyToDevice, ownOldTableKey, TABLE_KEY_STORAGE, tableKeyStore } from '../../../../src/app/online/sharing/identity/tableKey';
+import { ensureTableIdentity, moveTableKeyOnStart, moveTableKeyToDevice, ownOldTableKey, TABLE_KEY_STORAGE, tableKeyStore, withoutSyncedTableKey } from '../../../../src/app/online/sharing/identity/tableKey';
+import { memoryPluginData } from '../../../mocks/pluginData';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
-import { DEFAULT_ONLINE_SETTINGS, resolveOnlineSettings, type OnlineSettings, type StoredTable } from '../../../../src/app/online/onlineSettings';
+import type { StoredTable } from '../../../../src/app/online/onlineSettings';
 import { nodeIdentityCrypto as crypto } from './sharingFixtures';
 
 describe('device keys', () => {
@@ -30,15 +31,20 @@ describe('device keys', () => {
 });
 
 describe('table key', () => {
-  /** The synced settings as the table key's move sees them. */
-  function settings(table: StoredTable | null = null): { getOnlineSettings(): OnlineSettings; setOnlineSettings(partial: Partial<OnlineSettings>): void } {
-    let online = { ...DEFAULT_ONLINE_SETTINGS, table };
-    return { getOnlineSettings: () => online, setOnlineSettings: (partial) => { online = { ...online, ...partial }; } };
-  }
+  const OLD = 'atlas-vtt/.atlas-data/settings.json';
 
   async function tableOf(): Promise<StoredTable> {
     const keys = await crypto.generate();
     return { id: await crypto.keyId(keys.publicKey), publicKey: keys.publicKey, privateKey: keys.privateKey };
+  }
+
+  /** A device: its vault (with an old settings file holding `table`, if given), its synced plugin data and its local storage. */
+  function device(table: StoredTable | null, data: unknown = table ? { diceColour: 'dark', online: { playerName: 'Guy', table } } : null) {
+    const old = table ? JSON.stringify({ diceColour: 'dark', online: { playerName: 'Guy', keepImages: false, table } }) : null;
+    const vault = createInMemoryApp({ files: old ? { [OLD]: old } : {} });
+    const plugin = memoryPluginData(data);
+    const local = memoryKeyValueStore();
+    return { ...vault, plugin, local, keys: tableKeyStore(local) };
   }
 
   it('is made on first use, kept on the device and stable', async () => {
@@ -49,69 +55,82 @@ describe('table key', () => {
     expect(await ensureTableIdentity(tableKeyStore(local), crypto)).toEqual(first);
   });
 
-  it('replaces a broken stored key, and reads the synced settings of any shape', async () => {
+  it('replaces a broken stored key', async () => {
     const local = memoryKeyValueStore();
     local.set(TABLE_KEY_STORAGE, { id: 'short', publicKey: 'x', privateKey: {} });
     const made = await ensureTableIdentity(tableKeyStore(local), crypto);
     expect(tableKeyStore(local).get()?.id).toBe(made.id);
-    expect(resolveOnlineSettings({ table: { id: 'short', publicKey: made.keys.publicKey, privateKey: {} } }).table).toBeNull();
-    expect(resolveOnlineSettings({}).table).toBeNull();
   });
 
-  it('moves this device\'s key out of the synced settings into local storage, and strips it from them', async () => {
+  it('moves this device\'s key into local storage, then strips it from the old settings file and the plugin data, keeping every other setting', async () => {
     const own = await tableOf();
-    const synced = settings(own);
-    const local = memoryKeyValueStore();
-    moveTableKeyToDevice(synced, tableKeyStore(local), own);
-    expect(tableKeyStore(local).get()).toEqual(own);
-    expect(synced.getOnlineSettings().table).toBeNull();
+    const { app, files, plugin, keys } = device(own);
+    await moveTableKeyOnStart(app, keys, plugin);
+    expect(keys.get()).toEqual(own);
+    expect(JSON.parse(files.get(OLD)!)).toEqual({ diceColour: 'dark', online: { playerName: 'Guy', keepImages: false } });
+    expect(plugin.stored()).toEqual({ diceColour: 'dark', online: { playerName: 'Guy' } });
     // The same table hosts on: its id is unchanged.
-    expect((await ensureTableIdentity(tableKeyStore(local), crypto)).id).toBe(own.id);
+    expect((await ensureTableIdentity(keys, crypto)).id).toBe(own.id);
   });
 
   it('keeps the key this device holds already: the local one wins', async () => {
     const kept = await tableOf();
-    const synced = settings(await tableOf());
-    const local = memoryKeyValueStore();
-    tableKeyStore(local).set(kept);
-    moveTableKeyToDevice(synced, tableKeyStore(local), await tableOf());
-    expect(tableKeyStore(local).get()).toEqual(kept);
-    expect(synced.getOnlineSettings().table).toBeNull();
+    const { app, files, plugin, keys } = device(await tableOf());
+    keys.set(kept);
+    await moveTableKeyOnStart(app, keys, plugin);
+    expect(keys.get()).toEqual(kept);
+    expect(files.get(OLD)).not.toContain('privateKey');
   });
 
   it('lets a second device, with the synced settings but no key of its own, host a table of its own, as before 0.6', async () => {
     const first = await tableOf();
-    const synced = settings(first);
-    const local = memoryKeyValueStore();
-    moveTableKeyToDevice(synced, tableKeyStore(local), null);
-    expect(tableKeyStore(local).get()).toBeNull();
-    expect(synced.getOnlineSettings().table).toBeNull();
-    const own = await ensureTableIdentity(tableKeyStore(local), crypto);
+    const { app, plugin, keys } = device(null, { online: { table: first } });
+    await moveTableKeyOnStart(app, keys, plugin);
+    expect(keys.get()).toBeNull();
+    expect(JSON.stringify(plugin.stored())).not.toContain('privateKey');
+    const own = await ensureTableIdentity(keys, crypto);
     expect(own.id).not.toBe(first.id);
-    expect(synced.getOnlineSettings().table).toBeNull();
   });
 
-  it('loses nothing when the move is interrupted or the device cannot keep the key', async () => {
+  it('loses nothing when the device cannot keep the key: the files stay whole until a later start', async () => {
     const own = await tableOf();
-    // The local write does not hold (storage blocked, or the start ended before it read back).
+    const { app, files, plugin, local } = device(own);
+    const before = files.get(OLD);
     const broken = { get: (): unknown => null, set: (): void => {} };
-    const synced = settings(own);
-    moveTableKeyToDevice(synced, tableKeyStore(broken), own);
-    expect(synced.getOnlineSettings().table).toEqual(own);
-    // Interrupted after the local copy was written, before the synced one was cleared: the next start finishes.
-    const local = memoryKeyValueStore();
-    tableKeyStore(local).set(own);
-    moveTableKeyToDevice(synced, tableKeyStore(local), own);
+    expect(moveTableKeyToDevice(tableKeyStore(broken), own)).toBe(false);
+    await moveTableKeyOnStart(app, tableKeyStore(broken), plugin);
+    expect(files.get(OLD)).toBe(before);
+    // The next start, with working storage, moves it and only then strips the file.
+    await moveTableKeyOnStart(app, tableKeyStore(local), plugin);
     expect(tableKeyStore(local).get()).toEqual(own);
-    expect(synced.getOnlineSettings().table).toBeNull();
+    expect(files.get(OLD)).not.toContain('privateKey');
   });
 
-  it('reads this device\'s key from its old settings file, which it never changes', async () => {
+  it('only logs when an old file cannot be rewritten, the local copy being safe', async () => {
     const own = await tableOf();
-    const file = JSON.stringify({ diceColour: 'dark', online: { playerName: 'Guy', table: own } });
-    const { app, files } = createInMemoryApp({ files: { 'atlas-vtt/.atlas-data/settings.json': file } });
-    expect(await ownOldTableKey(app)).toEqual(own);
-    expect(files.get('atlas-vtt/.atlas-data/settings.json')).toBe(file);
+    const { app, plugin, keys } = device(own);
+    vi.spyOn(app.vault.adapter, 'write').mockRejectedValue(new Error('read-only'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(moveTableKeyOnStart(app, keys, plugin)).resolves.toBeUndefined();
+    expect(keys.get()).toEqual(own);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+  });
+
+  it('reads this device\'s key from its old settings file', async () => {
+    const own = await tableOf();
+    expect(await ownOldTableKey(device(own).app)).toEqual(own);
     expect(await ownOldTableKey(createInMemoryApp().app)).toBeNull();
+  });
+
+  it('keeps the plugin data free of the key: the migration\'s first save and every read', async () => {
+    const own = await tableOf();
+    const plugin = memoryPluginData({ online: { playerName: 'Guy', table: own } });
+    const data = withoutSyncedTableKey(plugin);
+    expect(JSON.stringify(await data.loadData())).not.toContain('privateKey');
+    await data.saveData({ diceColour: 'dark', online: { playerName: 'Guy', table: own } });
+    expect(plugin.saveData).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(vi.mocked(plugin.saveData).mock.calls[0]![0])).not.toContain('privateKey');
+    expect(plugin.stored()).toEqual({ diceColour: 'dark', online: { playerName: 'Guy' } });
   });
 });

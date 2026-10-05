@@ -3,11 +3,15 @@ import { OnlineSessionService } from '../../../../src/app/online/OnlineSessionSe
 import { onlineSessionStore, resetOnlineSessionStore } from '../../../../src/app/online/onlineSessionStore';
 import { DEFAULT_ONLINE_SETTINGS, type OnlineSettings, type StoredTable } from '../../../../src/app/online/onlineSettings';
 import { memoryKeyValueStore } from '../../../../src/app/online/sharing/identity/deviceKeys';
-import { renewTableIdentity, TABLE_KEY_STORAGE, tableKeyStore } from '../../../../src/app/online/sharing/identity/tableKey';
+import { moveTableKeyOnStart, renewTableIdentity, TABLE_KEY_STORAGE, tableKeyStore } from '../../../../src/app/online/sharing/identity/tableKey';
 import { MemoryNetwork } from '../../../../src/app/online/transport/MemoryTransport';
 import { confirmNewTableKey } from '../../../../src/app/online/ui/newTableKey';
 import { onlineSettingsSection } from '../../../../src/app/settings/onlineSettingsSection';
 import { nodeIdentityCrypto as crypto } from './sharingFixtures';
+import { createInMemoryApp } from '../../../mocks/inMemoryVault';
+import { memoryPluginData } from '../../../mocks/pluginData';
+
+const OLD = 'atlas-vtt/.atlas-data/settings.json';
 
 const app = { workspace: { on: () => ({}), offref: () => {} }, vault: { getName: () => 'My Vault', getAbstractFileByPath: () => null, on: () => ({}), offref: () => {} } } as never;
 
@@ -18,9 +22,9 @@ async function tableOf(): Promise<StoredTable> {
   return { id: await crypto.keyId(keys.publicKey), publicKey: keys.publicKey, privateKey: keys.privateKey };
 }
 
-/** Synced settings that still hold a leaked table key, as Atlas 0.6's settings migration left them. */
-function syncedSettings(table: StoredTable | null) {
-  let online: OnlineSettings = { ...DEFAULT_ONLINE_SETTINGS, table };
+/** The online settings as the session service reads them. */
+function syncedSettings() {
+  let online: OnlineSettings = { ...DEFAULT_ONLINE_SETTINGS };
   return {
     getOnlineSettings: () => online,
     setOnlineSettings: (partial: Partial<OnlineSettings>) => { online = { ...online, ...partial }; },
@@ -52,16 +56,22 @@ describe('New table key', () => {
     await expect(renewTableIdentity(stuck, crypto)).rejects.toThrow();
   });
 
-  it('stops hosting first, hosts the new table next time and leaves no key in the synced settings', async () => {
+  it('stops hosting first, hosts the new table next time and leaves the old key in no vault file', async () => {
     const leaked = await tableOf();
-    const settings = syncedSettings(leaked);
+    const settings = syncedSettings();
     const local = memoryKeyValueStore();
     const keys = tableKeyStore(local);
     keys.set(leaked);
+    // Copies of the old key that reached the vault: the old settings file and Atlas 0.6's synced plugin data.
+    const vault = createInMemoryApp({ files: { [OLD]: JSON.stringify({ diceColour: 'dark', online: { playerName: 'Guy', table: leaked } }) } });
+    const plugin = memoryPluginData({ online: { playerName: 'Guy', table: leaked } });
+    // What the session service reads of the app besides the vault's files.
+    Object.assign(vault.app.vault, { getName: () => 'My Vault' });
+    const svcApp = Object.assign(vault.app, { workspace: { ...vault.app.workspace, on: () => ({}), offref: () => {} } });
     const network = new MemoryNetwork();
     let hosts = 0;
-    const svc = new OnlineSessionService(app, settings as never, {
-      tableKeys: keys, identityCrypto: crypto, createHost: async () => network.host(`gm-${++hosts}`), showRequest: () => ({ hide: () => {} }),
+    const svc = new OnlineSessionService(svcApp, settings as never, {
+      tableKeys: keys, pluginData: plugin, identityCrypto: crypto, createHost: async () => network.host(`gm-${++hosts}`), showRequest: () => ({ hide: () => {} }),
     });
     await svc.start();
     expect(onlineSessionStore.getState().error).toBeNull();
@@ -72,7 +82,15 @@ describe('New table key', () => {
     expect(onlineSessionStore.getState().status).toBe('idle');
     expect(id).not.toBe(leaked.id);
     expect(keys.get()?.id).toBe(id);
-    expect(settings.getOnlineSettings().table).toBeNull();
+    expect(vault.files.get(OLD)).not.toContain(leaked.publicKey);
+    expect(JSON.parse(vault.files.get(OLD)!)).toEqual({ diceColour: 'dark', online: { playerName: 'Guy' } });
+    expect(JSON.stringify(plugin.stored())).not.toContain(leaked.publicKey);
+
+    // A device of the same vault whose local storage is empty (reinstalled, restored, a second device)
+    // does not get the old key back at its next start: it makes a table of its own.
+    const emptyDevice = tableKeyStore(memoryKeyValueStore());
+    await moveTableKeyOnStart(vault.app, emptyDevice, plugin);
+    expect(emptyDevice.get()).toBeNull();
 
     await svc.start();
     expect(svc.table?.id).toBe(id);
@@ -102,8 +120,8 @@ describe('New table key', () => {
     error.mockRestore();
 
     const newTableKey = vi.fn();
-    const rows = onlineSettingsSection(syncedSettings(null) as never, newTableKey).rows;
+    const rows = onlineSettingsSection(syncedSettings() as never, newTableKey).rows;
     expect(rows.some((row) => row.name === 'New table key')).toBe(true);
-    expect(onlineSettingsSection(syncedSettings(null) as never).rows.some((row) => row.name === 'New table key')).toBe(false);
+    expect(onlineSettingsSection(syncedSettings() as never).rows.some((row) => row.name === 'New table key')).toBe(false);
   });
 });

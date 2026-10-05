@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { migrateSettingsToPluginData } from '../../../src/app/plugin/settingsMigration';
 import { memoryKeyValueStore } from '../../../src/app/online/sharing/identity/deviceKeys';
-import { moveTableKeyToDevice, ownOldTableKey, tableKeyStore } from '../../../src/app/online/sharing/identity/tableKey';
+import { moveTableKeyOnStart, tableKeyStore, withoutSyncedTableKey } from '../../../src/app/online/sharing/identity/tableKey';
 import { SettingsService } from '../../../src/app/services/SettingsService';
 import { SystemPresetFiles } from '../../../src/app/services/systemPresets/SystemPresetFiles';
 import type { App } from 'obsidian';
@@ -35,41 +35,58 @@ afterEach(() => {
 });
 
 describe('online settings in the plugin data (upstream 0.6 moved the settings there)', () => {
-  it('carries the online settings over from the old settings file, and the table key to this device only', async () => {
+  it('carries the online settings over from the old settings file, and the table key to this device only, as main.ts wires it', async () => {
     vi.useFakeTimers();
     const vault = createInMemoryApp({ files: { [HIDDEN_SETTINGS]: JSON.stringify({ diceColour: 'dark', online: ONLINE }) } });
     opened.push(vault.app);
     const data = memoryPluginData(null);
-    await migrateSettingsToPluginData(vault.app, data, SystemPresetFiles.open(vault.app));
+    await migrateSettingsToPluginData(vault.app, withoutSyncedTableKey(data), SystemPresetFiles.open(vault.app));
+    // The migration's first save already holds no private key.
+    expect(data.saveData).toHaveBeenCalled();
+    expect(JSON.stringify(vi.mocked(data.saveData).mock.calls[0]![0])).not.toContain('secret');
 
-    // As the plugin starts: the settings load, then the table key leaves them.
-    const settings = new SettingsService(vault.app, undefined, data);
+    const settings = new SettingsService(vault.app, undefined, withoutSyncedTableKey(data));
     await settings.initialize();
     const local = memoryKeyValueStore();
-    moveTableKeyToDevice(settings, tableKeyStore(local), await ownOldTableKey(vault.app));
+    await moveTableKeyOnStart(vault.app, tableKeyStore(local), data);
     await vi.advanceTimersByTimeAsync(1000);
 
-    expect(settings.getOnlineSettings()).toEqual({ ...ONLINE, table: null });
+    const { table: _table, ...settingsWithoutKey } = ONLINE;
+    expect(settings.getOnlineSettings()).toEqual(settingsWithoutKey);
     expect(tableKeyStore(local).get()).toEqual(TABLE);
-    // No private key in the synced file.
     expect(JSON.stringify(data.stored())).not.toContain('secret');
+    expect(vault.files.get(HIDDEN_SETTINGS)).not.toContain('secret');
     expect((data.stored() as { online?: { playerName?: string } }).online?.playerName).toBe('Guy');
+  });
+
+  it('never takes in a table key another device left in the plugin data, on start or on a reload', async () => {
+    vi.useFakeTimers();
+    const vault = createInMemoryApp();
+    const data = memoryPluginData({ online: { playerName: 'Guy' } });
+    const settings = new SettingsService(vault.app, undefined, withoutSyncedTableKey(data));
+    await settings.initialize();
+    // A sync delivers plugin data with a key in it; the next save of this device must not carry it on.
+    data.set({ online: { playerName: 'Ana', table: TABLE } });
+    await settings.reload();
+    expect(settings.getOnlineSettings().playerName).toBe('Ana');
+    settings.setOnlineSettings({ keepImages: false });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(JSON.stringify(data.stored())).not.toContain('secret');
+    expect((data.stored() as { online?: unknown }).online).toMatchObject({ playerName: 'Ana', keepImages: false });
   });
 
   it('saves a change of the online settings into the plugin data and reads it back', async () => {
     vi.useFakeTimers();
     const vault = createInMemoryApp();
     const data = memoryPluginData({});
-    const settings = new SettingsService(vault.app, undefined, data);
+    const settings = new SettingsService(vault.app, undefined, withoutSyncedTableKey(data));
     await settings.initialize();
-    expect(settings.getOnlineSettings().table).toBeNull();
-
     settings.setOnlineSettings({ playerName: 'Guy' });
     await vi.advanceTimersByTimeAsync(1000);
-    expect((data.stored() as { online?: unknown }).online).toMatchObject({ table: null, playerName: 'Guy' });
+    expect((data.stored() as { online?: unknown }).online).toMatchObject({ playerName: 'Guy' });
 
-    const again = new SettingsService(vault.app, undefined, data);
+    const again = new SettingsService(vault.app, undefined, withoutSyncedTableKey(data));
     await again.initialize();
-    expect(again.getOnlineSettings()).toMatchObject({ table: null, playerName: 'Guy', keepImages: true });
+    expect(again.getOnlineSettings()).toMatchObject({ playerName: 'Guy', keepImages: true });
   });
 });

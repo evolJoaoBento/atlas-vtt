@@ -34,11 +34,6 @@ export interface OnlineSettings {
   playerName: string;
   /** Joining from Atlas: keep a session's images on this device (outside the vault) for the next one. */
   keepImages: boolean;
-  /**
-   * Only read, by `moveTableKeyToDevice`: the GM's table key as Atlas 0.6's settings migration carried it into the synced settings.
-   * The key lives in this device's local storage (`tableKey.ts`); nothing writes it here, and the move clears it.
-   */
-  table: StoredTable | null;
   /** Note properties that shared notes keep (all others are stripped; `atlas-share` always). */
   shareableProperties: string[];
 }
@@ -52,7 +47,6 @@ export const DEFAULT_ONLINE_SETTINGS: OnlineSettings = {
   logEvents: false,
   playerName: '',
   keepImages: true,
-  table: null,
   shareableProperties: ['tags', 'aliases'],
 };
 
@@ -114,7 +108,6 @@ export function resolveOnlineSettings(stored: unknown): OnlineSettings {
     logEvents: source.logEvents === true,
     playerName: typeof source.playerName === 'string' ? source.playerName.slice(0, 200) : defaults.playerName,
     keepImages: source.keepImages !== false,
-    table: validStoredTable(source.table),
     shareableProperties: Array.isArray(source.shareableProperties)
       ? source.shareableProperties.filter((key): key is string => typeof key === 'string' && key.trim().length > 0 && key.length <= 64)
         .map((key) => key.trim()).slice(0, 50)
