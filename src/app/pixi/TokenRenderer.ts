@@ -1,4 +1,5 @@
-import { mapResources } from '../resources/collectionResources';
+import { viewConditionDefinitions } from './token-renderer/viewConditionDefinitions';
+import { viewResourceDefinitions } from './token-renderer/viewResourceDefinitions';
 import type { ResourceDefinition, ResourceDefsProvider } from '../resources/resourceTypes';
 import { fillMissingResources, syncedResources } from '../resources/statblockResourceSync';
 import { runUntracked } from '../stores/history';
@@ -229,16 +230,10 @@ export class TokenRenderer {
     });
     
     // Wire condition definitions provider (shared by InteractionController + UIManager/TokenUIRenderers)
-    const conditionDefsProvider = (): ConditionDefinition[] => {
-      const mapPath = this.store.getState().mapPath;
-      if (!mapPath) return [];
-      const collectionId = this.assetService.getCollectionForMap(mapPath);
-      if (!collectionId) return [];
-      return this.assetService.getCollectionSettings(collectionId).conditions;
-    };
+    const conditionDefsProvider = (): ConditionDefinition[] => viewConditionDefinitions(this.store.getState(), this.assetService);
     this.interactionController.conditionDefsProvider = conditionDefsProvider;
     this.uiManager.conditionDefsProvider = conditionDefsProvider;
-    this.resourceDefsProvider = (): readonly ResourceDefinition[] => mapResources(this.assetService, this.store.getState().mapPath);
+    this.resourceDefsProvider = (tokenId?: string): readonly ResourceDefinition[] => viewResourceDefinitions(this.store.getState(), this.assetService, tokenId);
     this.interactionController.resourceDefsProvider = this.resourceDefsProvider;
     this.uiManager.resourceDefsProvider = this.resourceDefsProvider;
 
@@ -745,7 +740,7 @@ export class TokenRenderer {
 
   /** Greys out a token at 0 HP and marks it with a skull; killing and healing a loaded token animate. */
   private applyDownedState(token: TokenEntity, tokenGroup: TokenGroupContainer, prevToken?: TokenEntity): void {
-    const definitions = this.resourceDefsProvider();
+    const definitions = this.resourceDefsProvider(token.id);
     const downed = isTokenDowned(token, definitions);
     const canvas = this.pixiApp?.canvas;
     const animate = prevToken !== undefined && isTokenDowned(prevToken, definitions) !== downed && !!canvas && !prefersReducedMotion(canvas);

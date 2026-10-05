@@ -6,11 +6,10 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { InitiativeEntry } from '../types/initiativeTypes';
 import { createTokenPortrait } from '../packages/components/shared/tokenPortraitElement';
 import { SIDE_LABELS, listedBySides, sideOf, sidesInOrder } from '../initiative/sides';
-import type { InitiativeSide } from '../types/initiativeRulesTypes';
+import type { InitiativeRules, InitiativeSide } from '../types/initiativeRulesTypes';
 import { scrollWithin } from '../utils/scrollWithin';
 import { mapInitiativeRules } from './mapInitiativeRules';
-import { PlayerSceneOverlay, type PlayerSettings } from './PlayerSceneOverlay';
-import type { SettingsService } from './SettingsService';
+import { PlayerSceneOverlay, type PlayerSettings, type PlayerSettingsSource } from './PlayerSceneOverlay';
 import './player-initiative.scss';
 
 /** Separates token ids in `InitiativeScene.visibleTokenIds`. */
@@ -22,6 +21,10 @@ interface InitiativeScene {
   /** Initiative tokens players may see, joined into a key so edits to other tokens compare equal. */
   visibleTokenIds: string;
   mapPath: string | null;
+  /** The remote view's list is grouped by the rules its owner feeds (`remoteView.initiativeRules`), not by the player's own collection; null elsewhere. */
+  remoteRules: InitiativeRules | null;
+  /** The remote view's list: its owner decides which combatants show a bar (`remoteView.initiativeHealth`). */
+  remote: boolean;
   /** What the list shows of every initiative token (`EntryToken`), in entry order, as a key that changes when one of them does. */
   tokens: string;
 }
@@ -46,11 +49,11 @@ interface Combatant {
  * GM's combatants without those whose token is hidden, in turn order or by sides as the fight runs.
  */
 export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
-  constructor(private readonly app: App, settings: SettingsService) {
+  constructor(private readonly app: App, settings: PlayerSettingsSource) {
     super({ cls: 'atlas-player-initiative-container' }, settings);
   }
 
-  protected select({ initiative, initiativeTrackerOpen, objects, mapPath }: ViewAtlasState): InitiativeScene {
+  protected select({ initiative, initiativeTrackerOpen, objects, mapPath, remoteView }: ViewAtlasState): InitiativeScene {
     const tokens = objects?.tokens;
     const entries = initiative?.entries ?? [];
     const visibleTokenIds = entries
@@ -59,9 +62,10 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       .join(TOKEN_ID_SEPARATOR);
     const entryTokens = JSON.stringify(entries.map((entry): EntryToken => {
       const token = tokens?.[entry.tokenId];
-      return { hp: token?.resources?.hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
+      const hp = remoteView ? (Object.hasOwn(remoteView.initiativeHealth, entry.tokenId) ? remoteView.initiativeHealth[entry.tokenId] : undefined) : token?.resources?.hp;
+      return { hp: hp ?? null, showRing: token?.showRing !== false, ringColor: token?.ringColor, side: sideOf(token) };
     }));
-    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, tokens: entryTokens };
+    return { initiative, initiativeTrackerOpen, visibleTokenIds, mapPath: mapPath ?? null, remoteRules: remoteView?.initiativeRules ?? null, remote: remoteView != null, tokens: entryTokens };
   }
 
   protected render(container: HTMLElement, scene: InitiativeScene, settings: PlayerSettings): void {
@@ -70,7 +74,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
     const visibleTokenIds = new Set(scene.visibleTokenIds.split(TOKEN_ID_SEPARATOR));
     const tokenOf = JSON.parse(scene.tokens) as EntryToken[];
     // Players see HP where the map's collection shows it to them
-    const hpVisible = mapResources(AssetService.getInstance(this.app), scene.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
+    const hpVisible = scene.remote || mapResources(AssetService.getInstance(this.app), scene.mapPath).some((definition) => definition.key === 'hp' && definition.visibleToPlayers);
     const combatants = initiative.entries
       .map((entry, index): Combatant => {
         const token = tokenOf[index] ?? { hp: null, showRing: true, side: 'opponents' };
@@ -84,7 +88,7 @@ export class PlayerInitiativePanel extends PlayerSceneOverlay<InitiativeScene> {
       cls: 'atlas-player-initiative',
       attr: { role: 'region', 'aria-label': 'Initiative order' },
     });
-    const rules = mapInitiativeRules(this.app, scene.mapPath);
+    const rules = scene.remoteRules ?? mapInitiativeRules(this.app, scene.mapPath);
     if (listedBySides(initiative, rules)) {
       this.renderSides(panel, combatants, initiative, settings, initiative.sides?.first ?? rules.firstSide);
     } else {

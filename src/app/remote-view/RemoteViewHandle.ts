@@ -8,6 +8,7 @@ import type { RemoteView } from '../../api/types/remoteViews';
 import type { Disposer } from '../../api/types/common';
 import type { RemoteMapView } from './RemoteMapView';
 import type { RemoteViewOwner } from './remoteOwners';
+import { RemoteViewScene } from './RemoteViewScene';
 
 /** An extension's callback must never throw into Atlas's store, pointer handling or frame loop. */
 export function callGuarded<A extends unknown[], R>(what: string, listener: (...args: A) => R, ...args: A): R | undefined {
@@ -47,6 +48,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   private settle: (opened: boolean) => void = () => undefined;
   private readonly closeListeners = new ListenerSet<() => void>();
   private facade: RemoteView | null = null;
+  private scene: RemoteViewScene | null = null;
 
   constructor(readonly owner: string, readonly title: string, readonly icon: string, readonly leaf: WorkspaceLeaf) {
     this.ready = new Promise((resolve) => { this.settle = resolve; });
@@ -67,6 +69,8 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (!view) throw new Error('The remote view has not opened.');
     this.facade ??= Object.freeze({
       viewId: view.viewId,
+      setScene: (scene: unknown): void => { this.scene?.setScene(scene); },
+      setPlayer: (state: unknown): void => { this.scene?.setPlayer(state); },
       onClose: (listener: () => void): Disposer => this.closeListeners.add(listener),
       close: (): void => this.close(),
     });
@@ -75,7 +79,11 @@ export class RemoteViewHandle implements RemoteViewOwner {
 
   opened(view: unknown): void {
     if (this.done) return;
-    this.view = view as RemoteMapView;
+    const remote = view as RemoteMapView;
+    this.view = remote;
+    this.scene = new RemoteViewScene({
+      app: remote.app, viewId: remote.viewId, atlasStore: remote.atlasStore, containerEl: remote.containerEl, renderer: remote.renderer,
+    });
     this.settle(true);
   }
 
@@ -97,6 +105,8 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (this.done) return;
     this.done = true;
     this.settle(false);
+    this.scene?.dispose();
+    this.scene = null;
     const listeners = this.closeListeners.list();
     this.closeListeners.close();
     for (const listener of listeners) callGuarded('close', listener);

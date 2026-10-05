@@ -105,7 +105,8 @@ export class FogOfWarRenderer {
 
     // ── Preview compositor + texture (used during drawing only) ──────
     const bounds = this.calculateFogBounds();
-    this.compositor = new FogCanvasCompositor(bounds);
+    // Only the remote view (its fog, a lit scene's darkness, is fed from outside) keeps the prefix canvas; every other view allocates as before.
+    this.compositor = new FogCanvasCompositor(bounds, undefined, Boolean(this.store.getState().remoteView));
 
     this.previewTexture = PIXI.Texture.from(this.compositor.getCanvas());
     this.previewSprite = new PIXI.Sprite(this.previewTexture);

@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/app/atlas-view', async () => import('./fakeAtlasView'));
 
+import { tokensApi } from '../../src/api/tokens';
+import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
+import { mapMeasurementSettings } from '../../src/app/services/mapMeasurementSettings';
+import { createViewAtlasStore } from '../../src/app/storeFactory';
 import { getHistoryStore } from '../../src/app/stores/history';
+import { remoteScene, remoteToken } from '../unit/remoteSceneFixtures';
 import { fakePlugin } from './apiFakes';
 import { remoteHarness, remoteHostHarness, type RemoteHarness } from './remoteViewHarness';
 
@@ -99,5 +104,35 @@ describe('remoteViews', () => {
     expect(Object.isFrozen(view)).toBe(true);
     await expect(api.open({ title: '' })).rejects.toThrow(/title/);
     await expect(api.open({ title: 'A', icon: 3 as never })).rejects.toThrow(/icon/);
+  });
+
+  it('C-remote-3: setScene shows in the snapshot, loaded; null unloads; a GM view keeps its own measurement', async () => {
+    vi.useFakeTimers();
+    const harness = await remoteHarness();
+    const before = JSON.stringify([...harness.files].sort());
+    const view = await harness.api.open({ title: 'A' });
+    view.setScene(remoteScene({ objects: { tokens: { t1: remoteToken('t1'), t2: remoteToken('t2', { x: 300 }) }, texts: {}, drawings: {}, fog: {} } }));
+    const snapshot = harness.views.snapshot(view.viewId);
+    expect(snapshot?.loaded).toBe(true);
+    expect(snapshot?.mapPath).toBe(`remote:${view.viewId}`);
+    expect(Object.keys(snapshot?.objects.tokens ?? {})).toEqual(['t1', 't2']);
+    const measurement = { ...resolveMeasurementSettings(undefined, null), unitDistance: 10, coneAngle: 60 };
+    view.setPlayer({ movableTokenIds: ['t1'], measurement, tokenUi: { conditions: [], resources: {} }, initiative: { rules: null, health: {} } });
+    const store = storeOf(harness, view.viewId);
+    const assets = { getCollectionForMap: () => null } as never;
+    expect(mapMeasurementSettings(assets, store.getState())).toEqual(measurement);
+    const gm = createViewAtlasStore(harness.app, 'gm-view');
+    expect(mapMeasurementSettings(assets, gm.getState())).toEqual(resolveMeasurementSettings(undefined, gm.getState().grid));
+    // Read-only: tokens.move refuses it; nothing of it reaches the vault or the history.
+    expect(tokensApi(harness.tracker).move(view.viewId, [{ tokenId: 't1', x: 500, y: 500 }])).toEqual({ ok: false, reason: 'not-loaded' });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(JSON.stringify([...harness.files].sort())).toBe(before);
+    expect(getHistoryStore(store)?.getState().pastStates).toHaveLength(0);
+    view.setScene(null);
+    expect(harness.views.snapshot(view.viewId)?.loaded).toBe(false);
+    expect(harness.views.snapshot(view.viewId)?.objects.tokens).toEqual({});
+    expect(() => view.setScene({ nonsense: true } as never)).toThrow(/RemoteSceneInput/);
+    view.close();
+    expect(() => view.setScene(remoteScene())).not.toThrow();
   });
 });

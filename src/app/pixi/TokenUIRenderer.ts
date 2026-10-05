@@ -310,7 +310,7 @@ export class TokenUIRenderer {
     const tokenSettings = this.store?.getState().tokenSettings;
     // Players see the resources their definitions allow, whatever the DM hides on this map.
     const viewer: ResourceViewer = playerSettings ? 'player' : 'dm';
-    const definitions = this.resourceDefsProvider();
+    const definitions = this.resourceDefsProvider(token.id);
     // The map's own switches hide resources from the GM; the player view never reads them
     const hidden = playerSettings ? [] : tokenSettings?.hiddenResources ?? [];
     const shown = visibleResources(token, definitions, viewer).filter(({ definition }) => !hidden.includes(definition.key));
@@ -593,8 +593,13 @@ export class TokenUIRenderer {
     this.wheels.setAlpha(alpha);
   }
 
+  /** The remote view shows what the player window shows: bars, no numbers on hover or selection. */
+  private isRemote(): boolean {
+    return this.store?.getState().remoteView != null;
+  }
+
   private updateTextVisibility(): void {
-    const shouldShowText = this.isHovered || this.isSelected;
+    const shouldShowText = (this.isHovered || this.isSelected) && !this.isRemote();
     const targetAlpha = shouldShowText ? 1 : 0;
     
     // Cancel any existing animation

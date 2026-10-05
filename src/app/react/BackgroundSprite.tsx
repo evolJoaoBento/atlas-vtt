@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Texture, Sprite } from 'pixi.js';
 import { useAtlasUI } from './root/AtlasUIContext';
 import { useViewStoreHook } from './ViewStoreContext';
-import { toError } from '../utils/errors';
 import type { GridOptions } from '../grid/GridSystem';
 import { toGridOptions } from '../grid/gridStateOptions';
 import { backgroundTextureCache } from '../pixi/backgroundTextureCache';
@@ -21,8 +20,8 @@ const FALLBACK_GRID_OPTIONS: GridOptions = {
 
 interface LoadedBackground {
   texture: Texture;
-  /** The cache URL to release once the texture is no longer shown; null for a texture the cache does not hold. */
-  url: string | null;
+  /** The cache URL to release once the texture is no longer shown. */
+  url: string;
   size: { width: number; height: number };
 }
 
@@ -34,44 +33,31 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
   const { app, renderer } = useAtlasUI();
   const store = useViewStoreHook();
   // The texture and the cache URL it holds travel together: the URL is released only once the
-  // sprite showing the texture is out of the viewport.
+  // sprite showing the texture is out of the viewport (an object URL's texture is destroyed on release).
   const [loaded, setLoaded] = useState<LoadedBackground | null>(null);
 
   useEffect(() => {
     if (!imagePath) return;
     let isCancelled = false;
-    // Vault images are shared through the background cache; streamed maps arrive as blob URLs
-    let blobUrl: string | null = null;
 
     const loadTexture = async (): Promise<void> => {
       try {
-        let loadedTexture: Texture;
-        let cachedUrl: string | null = null;
-        if (imagePath.startsWith('blob:')) {
-          blobUrl = imagePath;
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = (err) => reject(toError(err, 'Failed to load blob image'));
-            img.src = imagePath;
-          });
-          loadedTexture = Texture.from(img);
-        } else {
+        // A remote view's maps arrive by URL (object URLs); vault images load by their resource URL.
+        let url = imagePath;
+        if (!imagePath.startsWith('blob:') && !store.getState().remoteView) {
           const imgFile = app.vault.getAbstractFileByPath(imagePath);
           if (!imgFile) {
             console.error(`[BackgroundSprite] Image file not found: ${imagePath}`);
             return;
           }
-          const url = app.vault.adapter.getResourcePath(imgFile.path);
-          cachedUrl = url;
-          loadedTexture = await backgroundTextureCache.acquire(url);
+          url = app.vault.adapter.getResourcePath(imgFile.path);
         }
-
+        const texture = await backgroundTextureCache.acquire(url);
         if (isCancelled) {
-          if (cachedUrl) backgroundTextureCache.release(cachedUrl);
+          backgroundTextureCache.release(url);
           return;
         }
-        setLoaded({ texture: loadedTexture, url: cachedUrl, size: { width: loadedTexture.width, height: loadedTexture.height } });
+        setLoaded({ texture, url, size: { width: texture.width, height: texture.height } });
       } catch (error) {
         console.error(`[BackgroundSprite] Failed to load texture: ${imagePath}`, error);
       }
@@ -81,13 +67,8 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
 
     return () => {
       isCancelled = true;
-      if (blobUrl) {
-        const urlToRevoke = blobUrl;
-        // Revoke after pending image operations complete
-        window.setTimeout(() => URL.revokeObjectURL(urlToRevoke), 100);
-      }
     };
-  }, [imagePath, app.vault]);
+  }, [imagePath, app.vault, store]);
 
   // Add/update the sprite in the viewport when texture is loaded
   useEffect(() => {
@@ -141,7 +122,7 @@ export const BackgroundSprite: React.FC<BackgroundSpriteProps> = ({ imagePath })
 
   // Declared after the sprite effect, so a replaced texture is released after its sprite left the viewport.
   useEffect(() => {
-    if (!loaded?.url) return;
+    if (!loaded) return;
     const { url } = loaded;
     return () => backgroundTextureCache.release(url);
   }, [loaded]);
