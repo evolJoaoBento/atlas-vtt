@@ -39,6 +39,11 @@ export class FogCoverage {
     private readonly fogShapes: readonly FogShape[],
   ) {}
 
+  /** Some operation paints fog. A scene with none (or only erasures) hides nothing by fog, wherever its items are. */
+  get hasPaintedFog(): boolean {
+    return this.fogShapes.some((shape) => !shape.erase);
+  }
+
   /**
    * What the fog surely leaves revealed on a map of `map` size (`FogReveal`): the check every text, drawing, token and pin
    * must pass to reach players. Closed for a map of unknown size. Worked out once for each map size.

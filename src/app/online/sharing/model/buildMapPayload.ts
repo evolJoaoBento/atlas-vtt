@@ -2,7 +2,10 @@
  * Builds a map's payload on the sender's machine, from the saved map file. Images are hashed
  * first (and the background's size read), so the payload never goes out without its art.
  */
+import { hexVertices, type HexLayout } from '../../../grid/hexGeometry';
+import { hexLayoutOfGrid, isShownAsHex, pinDisplayPoint } from '../../../grid/hexLinks';
 import { pinSize } from '../../../styles/designTokens';
+import type { NotePin } from '../../../types';
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { readSceneLighting } from '../../../lighting/sceneLightingOptions';
 import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
@@ -10,7 +13,7 @@ import type { CollectionGridDefaults } from '../../../types/collectionSettingsTy
 import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
-import { FogCoverage } from '../../scene/FogCoverage';
+import { FogCoverage, type WorldBounds } from '../../scene/FogCoverage';
 import { clipToMap } from '../../scene/objectBounds';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
 import { projectForPlayers, type ProjectedState } from '../../scene/projectForPlayers';
@@ -107,6 +110,28 @@ export async function hashMapImages(
   return { fingerprints, size };
 }
 
+/**
+ * What Atlas draws of a pin: the badge (`PinRenderer`, a circle of `pinSize.badgeRadius`) at its point, and for a pin linked to a hex
+ * on a hex grid the badge at the hex centre together with the whole hex, which is highlighted. Its bounding box, for the fog to cover.
+ */
+export function pinFootprint(pin: NotePin, layout: HexLayout | null): WorldBounds {
+  const radius = pinSize.badgeRadius;
+  const at = pinDisplayPoint(pin, layout);
+  let left = at.x - radius;
+  let top = at.y - radius;
+  let right = at.x + radius;
+  let bottom = at.y + radius;
+  if (layout && isShownAsHex(pin, layout)) {
+    for (const vertex of hexVertices(layout, at)) {
+      left = Math.min(left, vertex.x);
+      top = Math.min(top, vertex.y);
+      right = Math.max(right, vertex.x);
+      bottom = Math.max(bottom, vertex.y);
+    }
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
 /** Null for a lit map (`LIT_MAP_NOT_PLAYER_SAFE`): a player-safe share of it is refused. */
 export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload | null {
   if (source.lit) return null;
@@ -118,12 +143,14 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     collectionGrid: context.collectionGrid, coneAngle: context.coneAngle, initiativeRules: context.initiativeRules,
   });
   // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
+  const hexLayout = hexLayoutOfGrid(source.state.grid);
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
     if (pin.gmOnly) return [];
-    // A pin is shown only where the fog surely leaves the map revealed, inside the map, over the badge it is drawn as
-    // (PinRenderer: a circle of `pinSize.badgeRadius` about the pin; a pin linked to a hex is drawn at the hex centre, which is not known here).
-    const inMap = clipToMap({ x: pin.x - pinSize.badgeRadius, y: pin.y - pinSize.badgeRadius, width: 2 * pinSize.badgeRadius, height: 2 * pinSize.badgeRadius }, context.images.size);
-    if (!inMap || !coverage.reveal(context.images.size).revealed(inMap)) return [];
+    // Under painted fog a pin is shown only where the fog surely leaves the map revealed, inside the map, over what Atlas draws of it.
+    if (coverage.hasPaintedFog) {
+      const inMap = clipToMap(pinFootprint(pin, hexLayout), context.images.size);
+      if (!inMap || !coverage.reveal(context.images.size).revealed(inMap)) return [];
+    }
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
     return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];

@@ -230,19 +230,34 @@ describe('SceneBroadcaster', () => {
     expect(player.scene).toEqual(h.broadcaster.currentProjection());
   });
 
-  it('shows nothing while the map size is unknown, then projects again once it is known, with no change of the store', async () => {
-    const h = setup();
-    const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140) }));
-    let size = { width: 0, height: 0 };
-    (view as unknown as { renderer: unknown }).renderer = { getBackgroundSprite: () => (size.width > 0 ? { ...size, destroyed: false } : null) };
-    h.presented.present(view, tavern);
-    const player = await join(h);
-    expect(player.scene?.tokens).toEqual({});
-    // The background sprite arrives; nothing in the store changes.
-    size = { width: 2000, height: 1500 };
-    await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS + SCENE_TICK_MS);
-    expect(player.scene?.tokens.hero?.x).toBe(140);
-    expect(player.scene).toEqual(h.broadcaster.currentProjection());
+  describe('while the map size is unknown', () => {
+    const unsized = (state: SceneState) => {
+      const h = setup();
+      const { view, tavern } = fakeView(state);
+      const size = { width: 0, height: 0 };
+      (view as unknown as { renderer: unknown }).renderer = { getBackgroundSprite: () => (size.width > 0 ? { ...size, destroyed: false } : null) };
+      h.presented.present(view, tavern);
+      return { h, size };
+    };
+    const FOG: Record<string, FogOperation> = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 900, y: 900, width: 400, height: 400 } };
+
+    it('sends what there is when no fog is painted, as a scene without a background does', async () => {
+      const { h } = unsized(sceneState({ hero: character('hero', 140) }));
+      const player = await join(h);
+      expect(player.scene?.tokens.hero?.x).toBe(140);
+    });
+
+    it('shows nothing under painted fog, then projects again once the size is known, with no change of the store', async () => {
+      const { h, size } = unsized(sceneState({ hero: character('hero', 140) }, FOG));
+      const player = await join(h);
+      expect(player.scene?.tokens).toEqual({});
+      // The background sprite arrives; nothing in the store changes.
+      size.width = 2000;
+      size.height = 1500;
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS + SCENE_TICK_MS);
+      expect(player.scene?.tokens.hero?.x).toBe(140);
+      expect(player.scene).toEqual(h.broadcaster.currentProjection());
+    });
   });
 
   it('batches changes into one patch per tick and sends nothing for an empty diff', async () => {
