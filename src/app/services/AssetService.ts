@@ -22,6 +22,7 @@ import type { Json } from '../../api/types/common';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
 import { SceneChangeWatcher } from './sceneChanges';
+import type { SceneIndexData } from './sceneIndexData';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
 import { trashVaultItem } from '../utils/trashVaultItem';
@@ -1096,14 +1097,20 @@ export class AssetService {
   }
 
   /**
-   * Replaces a scene's data where only what the index alone keeps changed (`data.extensions`, `createdImages`):
-   * no edit of the scene, so its `modifiedAt` stays and its record file, which never holds that data, is not rewritten.
+   * Changes only what a scene keeps in the index alone (`sceneIndexData.ts`): each key `patch` names is set, or
+   * removed when it is `undefined`; the rest of the record is the one the index holds now, read and written in one
+   * step. No edit of the scene, so its `modifiedAt` stays and its record file, which never holds these, is not rewritten.
    */
-  async updateSceneIndexData(id: string, data: SceneAssetData): Promise<void> {
+  async updateSceneIndexData(id: string, patch: { [K in keyof SceneIndexData]?: SceneIndexData[K] | undefined }): Promise<void> {
     await this.ensureLoaded();
     const asset = this.metadata!.assets[id];
     if (asset?.type !== 'scene') return;
-    this.metadata!.assets[id] = { ...asset, data };
+    const data: Record<string, unknown> = { ...asset.data };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) Reflect.deleteProperty(data, key);
+      else data[key] = value;
+    }
+    this.metadata!.assets[id] = { ...asset, data: data as SceneAssetData };
     await this.saveMetadata();
   }
 

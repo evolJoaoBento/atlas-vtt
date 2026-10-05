@@ -137,11 +137,9 @@ export function replaceSceneMap(
     }
     const kept = await removeOldImages(app, assets, sceneId, scene.data.createdImages ?? [], newText);
     try {
-      // Read again: the record may have changed during the awaits (a rename, a move, setData); only the image list is ours to change.
-      const current = await assets.getAssetById(sceneId);
-      if (current?.type === 'scene') {
-        await assets.updateSceneIndexData(sceneId, { ...current.data, createdImages: [...new Set([...kept, ...written])] });
-      }
+      // Only the image list is ours to change; the method patches it onto the record as the index holds it now
+      // (a rename, a move or setData may have landed during the awaits).
+      await assets.updateSceneIndexData(sceneId, { createdImages: [...new Set([...kept, ...written])] });
     } catch (error) {
       console.error('[Atlas API] replaceMap could not note the images it wrote:', error);
     }

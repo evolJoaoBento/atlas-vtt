@@ -2,7 +2,7 @@ import type { Asset, TagMetadata } from '../AssetService';
 import { remapPaths } from '../collectionBundle/pathRemap';
 import { hasAssetTag, tagGroupOf, tagKey, type TagGroup } from '../tagGroups';
 import { baseName } from '../../utils/pathUtils';
-import { withoutSceneExtensions } from '../collectionBundle/bundleExtensionData';
+import { withoutSceneExtensions } from '../sceneIndexData';
 import type { TransferPlan } from './transferPlan';
 
 export interface RecordContext {

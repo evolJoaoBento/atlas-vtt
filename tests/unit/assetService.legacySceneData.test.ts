@@ -78,7 +78,7 @@ describe('record files of scenes', () => {
     await service.initialize();
     const before = vault.files.get(RECORD);
 
-    await service.updateSceneIndexData('moved', { mapPath: A, extensions: { ext: { item: 1 } } });
+    await service.updateSceneIndexData('moved', { extensions: { ext: { item: 1 } } });
     expect(vault.files.get(RECORD)).toBe(before);
     expect(await dataOf(service, 'moved')).toEqual({ mapPath: A, extensions: { ext: { item: 1 } } });
 

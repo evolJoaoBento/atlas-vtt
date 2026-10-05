@@ -53,14 +53,14 @@ export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>, views: Vi
     setData: async (sceneId: string, value: Json | null): Promise<void> => {
       const assets = await loadedAssets(app);
       const copy = value === null ? null : plainJson(value);
-      // Re-read right before writing and patch only this extension's key: never write back `mapPath` or anyone else's data.
+      // Re-read right before writing and patch only this extension's key: never anyone else's data, never the scene's own.
       await assets.runExclusive(async () => {
         const scene = await assets.getAssetById(sceneId);
         if (scene?.type !== 'scene') throw new Error(`[Atlas API] There is no scene with the id "${String(sceneId)}".`);
-        const { extensions: current, ...rest } = scene.data ?? {};
+        const current = scene.data?.extensions;
         const next = Object.fromEntries(Object.entries(current ?? {}).filter(([key]) => key !== scope.id));
         if (copy !== null) Object.defineProperty(next, scope.id, { value: copy, enumerable: true, writable: true, configurable: true });
-        await assets.updateSceneIndexData(sceneId, Object.keys(next).length > 0 ? { ...rest, extensions: next } : rest);
+        await assets.updateSceneIndexData(sceneId, { extensions: Object.keys(next).length > 0 ? next : undefined });
       });
     },
     readMap: async (mapPath: string) => {

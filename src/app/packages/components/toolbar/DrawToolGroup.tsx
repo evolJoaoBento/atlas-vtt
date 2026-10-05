@@ -32,6 +32,7 @@ const MAP_ICON_OPTIONS = [
 
 /** Pen, icon stamp and drawing eraser, with ink, icon and sizes. DM only. */
 export function DrawToolGroup({ activeTool, selectTool, menuOpen, toggleMenu, closeMenu }: ToolGroupControls): React.ReactElement {
+  const iconLabels = mapIconLabels()
   const hotkeyLabel = useHotkeyLabels()
   const setActiveTool = useAtlasStore(state => state.setActiveTool)
   const emit = useEmitViewEvent()
@@ -84,7 +85,7 @@ export function DrawToolGroup({ activeTool, selectTool, menuOpen, toggleMenu, cl
           <span className="atlas-dropdown-label">{t('toolbar.icons')}</span>
           <div className="atlas-icon-grid">
             {MAP_ICON_OPTIONS.map(({ key, icon: Icon }) => (
-              <LabelTooltip key={key} label={mapIconLabels()[key] ?? key}>
+              <LabelTooltip key={key} label={iconLabels[key] ?? key}>
                 <button
                   type="button"
                   aria-pressed={activeTool === "draw-icon" && drawIcon === key}

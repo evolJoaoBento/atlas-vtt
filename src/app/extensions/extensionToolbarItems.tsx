@@ -6,6 +6,7 @@ import { obsidianIconComponent } from '../react/components/ObsidianIcon';
 import { safely, type SlotEntry } from './SlotRegistry';
 import { toolbarSlot } from './slots';
 import { useSlot } from './useSlot';
+import { t } from '../i18n';
 import { viewContextOf, type ViewContextState } from './viewContext';
 
 /** An item's place among other extensions' items when it names none: higher sits further left. */
@@ -16,7 +17,7 @@ function ToolBadge({ badge, label }: { badge: string | number | true; label: str
   return (
     <span className="atlas-ext-tool__badge">
       <span aria-hidden="true">{badge}</span>
-      <span className="atlas-ext-tool__hidden-text">{`${label}: ${badge}`}</span>
+      <span className="atlas-ext-tool__hidden-text">{t('extensions.badge', { label, badge })}</span>
     </span>
   );
 }

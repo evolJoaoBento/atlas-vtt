@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCENE_LAYER_ORDER, SCENE_LAYER_Z } from '../../src/app/pixi/sceneLayerOrder';
+import { MAP_LAYER_Z } from '../../src/app/pixi/mapLayerOrder';
 import { DEFAULT_TEXT_PADDING, textBackground, textFontStyle, textFontWeight, textRotation, textScale } from '../../src/app/pixi/textBoxLayout';
 import { badgePositions, badgeSlots, CONDITION_BADGE, fitBadges } from '../../src/app/pixi/token-renderer/conditionBadgeLayout';
 import { getTokenRingCenterRadius } from '../../src/app/pixi/token-renderer/tokenRingMetrics';
@@ -18,6 +19,10 @@ describe('scene layer order', () => {
     expect(zLayers).toEqual(['tokens', 'texts', 'drawings', 'fog']);
     const z = zLayers.map((layer) => SCENE_LAYER_Z[layer]);
     expect(z).toEqual([...z].sort((a, b) => a - b));
+  });
+
+  it("places texts where Atlas's own map layers put them, so extensions draw them in the same order", () => {
+    expect(SCENE_LAYER_Z.texts).toBe(MAP_LAYER_Z.text);
   });
 });
 
