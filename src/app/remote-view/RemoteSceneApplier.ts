@@ -85,7 +85,15 @@ export class RemoteSceneApplier {
   private readonly emptyInitiative: InitiativeState;
   private scene: RemoteSceneInput | null = null;
 
-  constructor(private readonly store: RemoteStore, private readonly mapPath: string) {
+  /**
+   * `positionOf` places a token where this view shows it instead of the scene's position (the player's drag in
+   * progress, which a new scene must not pull from under the pointer); null for the scene's.
+   */
+  constructor(
+    private readonly store: RemoteStore,
+    private readonly mapPath: string,
+    private readonly positionOf: (tokenId: string) => { x: number; y: number } | null = () => null,
+  ) {
     // The fresh store's own empty records, shown while there is no scene.
     this.emptyInitiative = store.getState().initiative;
   }
@@ -120,6 +128,10 @@ export class RemoteSceneApplier {
   private stateOf(scene: RemoteSceneInput): Pick<ViewAtlasState, 'mapPath' | 'mapLoaded' | 'isMapLoading' | 'background' | 'grid' | 'widgetSettings' | 'widgetValues' | 'initiative' | 'initiativeTrackerOpen'> & { objects: Pick<ViewAtlasState['objects'], (typeof OBJECT_KINDS)[number]> } {
     const images = scene.tokenImages;
     const imageOf = (id: string): string => (Object.hasOwn(images, id) ? images[id] ?? '' : '');
+    const shownAt = (id: string): string => {
+      const point = this.positionOf(id);
+      return `${imageOf(id)}|${point ? `${point.x},${point.y}` : ''}`;
+    };
     const initiative = this.initiative.of(scene.initiative);
     return {
       mapPath: this.mapPath,
@@ -129,7 +141,7 @@ export class RemoteSceneApplier {
       grid: scene.grid ? this.grid.of(scene.grid) : NO_GRID,
       objects: {
         // A token without an image URL draws as Atlas's default token.
-        tokens: this.tokens.build(scene.objects.tokens, imageOf, (id, token) => frozenCopy({ ...token, imagePath: imageOf(id) })),
+        tokens: this.tokens.build(scene.objects.tokens, shownAt, (id, token) => frozenCopy({ ...token, imagePath: imageOf(id), ...this.positionOf(id) })),
         fog: this.fog.build(scene.objects.fog, () => '', copyRecord),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),

@@ -6,40 +6,15 @@
 import type { WorkspaceLeaf } from 'obsidian';
 import type { RemoteView } from '../../api/types/remoteViews';
 import type { Disposer } from '../../api/types/common';
+import { callGuarded, ListenerSet } from './listeners';
 import type { RemoteMapView } from './RemoteMapView';
 import type { RemoteViewOwner } from './remoteOwners';
+import { RemoteViewMotion } from './RemoteViewMotion';
 import { RemoteViewScene } from './RemoteViewScene';
+import type { TokenMove } from '../../api/types/tokens';
+import type { ViewCamera } from '../services/presentedCamera';
 
-/** An extension's callback must never throw into Atlas's store, pointer handling or frame loop. */
-export function callGuarded<A extends unknown[], R>(what: string, listener: (...args: A) => R, ...args: A): R | undefined {
-  try {
-    return listener(...args);
-  } catch (error) {
-    console.error(`[Atlas API] A remote view ${what} listener failed:`, error);
-    return undefined;
-  }
-}
-
-/** Listeners that are dropped all at once when the view closes. */
-export class ListenerSet<L> {
-  private readonly listeners = new Set<L>();
-  private closed = false;
-
-  add(listener: L): Disposer {
-    if (this.closed || typeof listener !== 'function') return () => undefined;
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
-  }
-
-  list(): L[] {
-    return [...this.listeners];
-  }
-
-  close(): void {
-    this.closed = true;
-    this.listeners.clear();
-  }
-}
+const noop: Disposer = () => undefined;
 
 export class RemoteViewHandle implements RemoteViewOwner {
   readonly ready: Promise<boolean>;
@@ -49,6 +24,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   private readonly closeListeners = new ListenerSet<() => void>();
   private facade: RemoteView | null = null;
   private scene: RemoteViewScene | null = null;
+  private motion: RemoteViewMotion | null = null;
 
   constructor(readonly owner: string, readonly title: string, readonly icon: string, readonly leaf: WorkspaceLeaf) {
     this.ready = new Promise((resolve) => { this.settle = resolve; });
@@ -69,8 +45,12 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (!view) throw new Error('The remote view has not opened.');
     this.facade ??= Object.freeze({
       viewId: view.viewId,
-      setScene: (scene: unknown): void => { this.scene?.setScene(scene); },
-      setPlayer: (state: unknown): void => { this.scene?.setPlayer(state); },
+      setScene: (scene: unknown): void => { this.scene?.setScene(scene); this.motion?.checkDrag(); },
+      setPlayer: (state: unknown): void => { this.scene?.setPlayer(state); this.motion?.checkDrag(); },
+      setCamera: (camera: ViewCamera, options?: { animate?: boolean }): void => { this.motion?.setCamera(camera, options); },
+      cancelDrag: (): void => { this.motion?.cancelDrag(); },
+      onTokenDrop: (listener: (move: TokenMove) => void): Disposer => this.motion?.drops.add(listener) ?? noop,
+      onCameraMoved: (listener: (byUser: boolean) => void): Disposer => this.motion?.cameraMoves.add(listener) ?? noop,
       onClose: (listener: () => void): Disposer => this.closeListeners.add(listener),
       close: (): void => this.close(),
     });
@@ -81,8 +61,14 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (this.done) return;
     const remote = view as RemoteMapView;
     this.view = remote;
-    this.scene = new RemoteViewScene({
+    const scene = new RemoteViewScene({
       app: remote.app, viewId: remote.viewId, atlasStore: remote.atlasStore, containerEl: remote.containerEl, renderer: remote.renderer,
+    });
+    this.scene = scene;
+    this.motion = new RemoteViewMotion({
+      viewId: remote.viewId, atlasStore: remote.atlasStore,
+      eventBus: remote.serviceManager.getEventBus(), viewport: remote.serviceManager.getRendererService().getViewport(),
+      mapSize: () => scene.mapSize(), refreshScene: () => scene.refresh(),
     });
     this.settle(true);
   }
@@ -92,7 +78,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   }
 
   resized(): void {
-    // Nothing follows the view's size yet.
+    this.motion?.resize();
   }
 
   close(): void {
@@ -105,6 +91,8 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (this.done) return;
     this.done = true;
     this.settle(false);
+    this.motion?.dispose();
+    this.motion = null;
     this.scene?.dispose();
     this.scene = null;
     const listeners = this.closeListeners.list();

@@ -29,7 +29,7 @@ export interface RemoteSceneHost {
   readonly viewId: string;
   readonly atlasStore: ViewAtlasStore;
   readonly containerEl: HTMLElement;
-  readonly renderer: BackdropRenderer | null;
+  readonly renderer: (BackdropRenderer & { getBackgroundSprite?(): { width: number; height: number; destroyed: boolean } | null }) | null;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -60,7 +60,7 @@ export class RemoteViewScene {
   private background: RemoteSceneInput['background'] | null = null;
 
   constructor(private readonly host: RemoteSceneHost) {
-    this.applier = new RemoteSceneApplier(host.atlasStore, `remote:${host.viewId}`);
+    this.applier = new RemoteSceneApplier(host.atlasStore, `remote:${host.viewId}`, (tokenId) => this.draggedTo(tokenId));
     this.backdrop = host.renderer ? new RemoteMapBackdrop(host.renderer) : null;
     this.initiative = new PlayerInitiativePanel(host.app, SHOW_WHAT_ARRIVES);
     this.initiative.mount(host.containerEl);
@@ -97,6 +97,14 @@ export class RemoteViewScene {
     this.hideNonBars(state);
   }
 
+  /** The map's size, for Fit map; null without a scene. */
+  mapSize(): { width: number; height: number } | null {
+    const background = this.background;
+    if (background && background.width > 0 && background.height > 0) return { width: background.width, height: background.height };
+    const sprite = this.host.renderer?.getBackgroundSprite?.() ?? null;
+    return background && sprite && !sprite.destroyed ? { width: sprite.width, height: sprite.height } : null;
+  }
+
   dispose(): void {
     this.backdrop?.dispose();
     this.initiative.destroy();
@@ -115,7 +123,15 @@ export class RemoteViewScene {
     store.setState({ tokenSettings: { ...tokenSettings, hiddenResources: next } });
   }
 
-  private showBackdrop(): void {
+  /** Where the player's drag in progress holds `tokenId`; null when it is not being dragged. */
+  private draggedTo(tokenId: string): { x: number; y: number } | null {
+    const state = this.host.atlasStore.getState();
+    if (!state.isDragging || !state.selectedIds.includes(tokenId)) return null;
+    const token = Object.hasOwn(state.objects.tokens, tokenId) ? state.objects.tokens[tokenId] : undefined;
+    return token ? { x: token.x, y: token.y } : null;
+  }
+
+    private showBackdrop(): void {
     this.backdrop?.show(this.background, this.host.atlasStore.getState().grid);
   }
 }

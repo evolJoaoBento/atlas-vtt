@@ -2,7 +2,8 @@ import type { Disposer, ViewId } from './common';
 import type {
   ConditionDefinition, GridState, InitiativeRules, InitiativeState, MeasurementSettings, ResourceDefinition,
 } from './records';
-import type { SceneSnapshot } from './views';
+import type { TokenMove } from './tokens';
+import type { SceneSnapshot, ViewCamera } from './views';
 
 export interface RemoteSceneInput {
   /** Records in Atlas's own types; images by URL (object URLs are released by the caller after replacing them). */
@@ -41,7 +42,7 @@ export interface RemoteViewsApi {
 
 /**
  * A remote view: read-only, never saved, with no undo history. Every method does nothing once the view closed, and every
- * listener runs guarded and is dropped when the view closes. `views.*` and `lasers.*` take its `viewId`;
+ * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*` and `tokens.snapPoint` take its `viewId`;
  * `views.active()` never returns it, and `tokens.move` and `presentation.present` refuse it.
  */
 export interface RemoteView {
@@ -52,6 +53,17 @@ export interface RemoteView {
    */
   setScene(scene: RemoteSceneInput | null): void;
   setPlayer(state: RemotePlayerState): void;
+  /**
+   * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
+   * resizes until the player moves the camera. Throws when `camera` is not finite numbers with a size above 0.
+   */
+  setCamera(camera: ViewCamera, options?: { animate?: boolean }): void;
+  /** Ends a drag in progress; the token goes back. */
+  cancelDrag(): void;
+  /** The player let go of a token they may move, at the snapped drop point. The token goes back until the scene moves it. */
+  onTokenDrop(listener: (move: TokenMove) => void): Disposer;
+  /** The player moved the camera (`byUser`), or Fit map ran; lets the extension stop following the GM. */
+  onCameraMoved(listener: (byUser: boolean) => void): Disposer;
   /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
   onClose(listener: () => void): Disposer;
   close(): void;

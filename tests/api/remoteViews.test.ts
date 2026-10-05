@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../src/app/atlas-view', async () => import('./fakeAtlasView'));
 
 import { tokensApi } from '../../src/api/tokens';
+import { REMOTE_DRAG_CANCEL, REMOTE_TOKEN_DROPPED } from '../../src/app/remote-view/remoteDrag';
+import { fitRemoteMap } from '../../src/app/remote-view/remoteFit';
+import type { AtlasView as FakeAtlasView } from './fakeAtlasView';
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { mapMeasurementSettings } from '../../src/app/services/mapMeasurementSettings';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
@@ -134,5 +137,61 @@ describe('remoteViews', () => {
     expect(() => view.setScene({ nonsense: true } as never)).toThrow(/RemoteSceneInput/);
     view.close();
     expect(() => view.setScene(remoteScene())).not.toThrow();
+  });
+
+  it('C-remote-4: onTokenDrop fires for movable ids only; lasers work in the remote view; onCameraMoved after a pan and Fit map', async () => {
+    const harness = await remoteHarness();
+    const view = await harness.api.open({ title: 'A' });
+    const fake = harness.tracker.view(view.viewId) as unknown as FakeAtlasView;
+    view.setScene(remoteScene({ objects: { tokens: { t1: remoteToken('t1'), t2: remoteToken('t2') }, texts: {}, drawings: {}, fog: {} } }));
+    view.setPlayer({ movableTokenIds: ['t1'], measurement: resolveMeasurementSettings(undefined, null), tokenUi: { conditions: [], resources: {} }, initiative: { rules: null, health: {} } });
+    const drops = vi.fn();
+    view.onTokenDrop(drops);
+    fake.eventBus.emit(REMOTE_TOKEN_DROPPED, { tokenId: 't2', x: 1, y: 2 });
+    fake.eventBus.emit(REMOTE_TOKEN_DROPPED, { tokenId: 't1', x: 175, y: 105 });
+    expect(drops.mock.calls).toEqual([[{ tokenId: 't1', x: 175, y: 105 }]]);
+    expect(Object.isFrozen(drops.mock.calls[0]![0])).toBe(true);
+
+    const local = vi.fn();
+    harness.lasers.onLocal(view.viewId, local);
+    fake.renderer.laserHub.emitLocal({ kind: 'point', x: 5, y: 6 });
+    expect(local).toHaveBeenCalledWith({ kind: 'point', x: 5, y: 6 });
+    const shown = vi.fn();
+    fake.renderer.laserHub.onRemote(shown);
+    harness.lasers.show(view.viewId, { from: 'p1', color: '#ff0000', points: [{ x: 1, y: 1 }], lifted: false });
+    expect(shown).toHaveBeenCalledOnce();
+
+    const moved = vi.fn();
+    view.onCameraMoved(moved);
+    view.setCamera({ centerX: 200, centerY: 100, width: 400, height: 300 });
+    expect(fake.viewport.center).toEqual({ x: 200, y: 100 });
+    expect(moved).not.toHaveBeenCalled();
+    fake.viewport.moved('drag');
+    expect(moved).toHaveBeenLastCalledWith(true);
+    expect(fitRemoteMap(view.viewId)).toBe(true);
+    expect(moved).toHaveBeenLastCalledWith(false);
+    expect(() => view.setCamera({ centerX: 0, centerY: 0, width: 0, height: 1 })).toThrow(/camera/);
+  });
+
+  it('a new scene leaves a dragged token under the pointer, and ends a drag whose token may no longer move', async () => {
+    const harness = await remoteHarness();
+    const view = await harness.api.open({ title: 'A' });
+    const fake = harness.tracker.view(view.viewId) as unknown as FakeAtlasView;
+    const store = storeOf(harness, view.viewId);
+    const player = { measurement: resolveMeasurementSettings(undefined, null), tokenUi: { conditions: [], resources: {} }, initiative: { rules: null, health: {} } };
+    view.setPlayer({ ...player, movableTokenIds: ['t1'] });
+    view.setScene(remoteScene());
+    store.setState({ isDragging: true, selectedIds: ['t1'] });
+    store.getState().setTokenPositions([{ id: 't1', x: 400, y: 400 }]);
+    view.setScene(remoteScene({ objects: { tokens: { t1: remoteToken('t1', { x: 120 }) }, texts: {}, drawings: {}, fog: {} } }));
+    expect(store.getState().objects.tokens.t1).toMatchObject({ x: 400, y: 400 });
+    const cancelled = vi.fn();
+    fake.eventBus.on(REMOTE_DRAG_CANCEL, cancelled);
+    view.setPlayer({ ...player, movableTokenIds: [] });
+    expect(cancelled).toHaveBeenCalledOnce();
+    store.setState({ isDragging: false });
+    view.cancelDrag();
+    expect(store.getState().objects.tokens.t1).toMatchObject({ x: 120, y: 100 });
+    expect(getHistoryStore(store)?.getState().pastStates).toHaveLength(0);
   });
 });
