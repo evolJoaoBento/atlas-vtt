@@ -43,7 +43,7 @@ describe('a darkness change costs the same however much fog the GM painted', () 
     const replays = vi.spyOn(FogCoverage, 'fromPlayerFog');
     const cache = new FogCoverageCache();
     const memo = createProjectionMemo();
-    const darkness = (x: number): Darkness => ({ fog: {}, covered: [{ x, y: 0, width: 100, height: 800 }] });
+    const darkness = (x: number): Darkness => ({ fog: {}, covered: [{ x, y: 0, width: 100, height: 800 }], shown: () => false });
     for (const x of [500, 600, 700]) cache.get(fog, memo, darkness(x));
     expect(replays).toHaveBeenCalledTimes(1);
     // The darkness painted over the cells covers what painting it after the operations covers.
