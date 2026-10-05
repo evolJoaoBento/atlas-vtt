@@ -85,7 +85,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
   const initiative = projectInitiative(state, new Set(Object.keys(seen)), context.rules, context.resources ?? NO_RESOURCES, initiativeRules);
   const tokens = withCombatantSides(seen, initiative, objects?.tokens);
   const fog = projectFog(objects?.fog, context.memo);
-  const hidden = hiddenFrom(context, lighting !== null);
+  const hidden = hiddenFrom(context, lighting);
   return {
     sceneId: context.sceneId,
     map: projectMap(state.background, cellSize, context),
@@ -102,25 +102,27 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 }
 
 /**
- * What texts and drawings are checked against. Under lighting the darkness is clipped to the map and a
- * coverage grid answers false outside it. So an item wholly outside the map (or on a map of unknown size)
- * counts as hidden, and any other is checked by the part of it inside the map, the only part the darkness
- * can cover: an item whose estimated size pokes past the edge of a lit map is still sent, a dark one is not.
+ * What texts and drawings are checked against. Under lighting the item must be proven shown: wholly outside
+ * the map (or a map of unknown size) it is hidden, and any other item is clipped to the map and sent only when
+ * every darkness cell its clipped bounds touch is shown (`Darkness.shown`, which also holds for a zero-area item:
+ * the cell under it). The GM's fog and the darkness's rectangles apply on top.
  */
-function hiddenFrom(context: ProjectionContext, lit: boolean): Pick<FogCoverage, 'isCovered'> {
+function hiddenFrom(context: ProjectionContext, lighting: LightingFrame | null): Pick<FogCoverage, 'isCovered'> {
   const base = context.darkCoverage ?? context.coverage;
-  if (!lit) return base;
+  if (!lighting) return base;
   const { width: w, height: h } = context.mapSize;
   return {
     isCovered: (b) => {
       const right = b.x + Math.max(0, b.width);
       const bottom = b.y + Math.max(0, b.height);
       if (!(w > 0 && h > 0 && [b.x, b.y, right, bottom].every(Number.isFinite))) return true;
-      // Wholly outside, also touching the edge from outside: nothing of it is in the map, so no darkness covers it.
-      if (right <= 0 || bottom <= 0 || b.x >= w || b.y >= h) return true;
+      // Wholly outside, also touching the edge from outside (an item with no width or height on the edge is on the map).
+      if (right < 0 || bottom < 0 || b.x > w || b.y > h) return true;
+      if ((b.width > 0 && (right <= 0 || b.x >= w)) || (b.height > 0 && (bottom <= 0 || b.y >= h))) return true;
       const x = Math.max(b.x, 0);
       const y = Math.max(b.y, 0);
-      return base.isCovered({ x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y });
+      const clipped = { x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y };
+      return base.isCovered(clipped) || !lighting.darkness.shown(clipped);
     },
   };
 }

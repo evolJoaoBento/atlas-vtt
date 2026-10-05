@@ -19,9 +19,18 @@ export interface Darkness {
   fog: Readonly<Record<string, PlayerFogOp>>;
   /** The dark area as rectangles, for the GM's coverage of what players cannot see (`FogCoverage`). */
   covered: readonly WorldBounds[];
+  /**
+   * A positive check: true only when every darkness cell the part of `bounds` inside the map touches
+   * (its edges included) is proven shown. Anything else is not: a cell dark, a cell not on the raster,
+   * bounds that are not finite or lie wholly outside the map. A text or drawing is sent only when this holds,
+   * where `covered` only names what is surely dark, and misses the last strip of a map whose size is
+   * not a multiple of the fog coverage's cells.
+   */
+  shown(bounds: WorldBounds): boolean;
 }
 
-export const NO_DARKNESS: Darkness = { fog: {}, covered: [] };
+/** Nothing is dark: every part of the map is shown. */
+export const NO_DARKNESS: Darkness = { fog: {}, covered: [], shown: () => true };
 
 export function darknessOf(raster: DarknessRaster): Darkness {
   let grid = raster;
@@ -34,8 +43,29 @@ export function darknessOf(raster: DarknessRaster): Darkness {
       continue;
     }
     const op: PlayerFogOp = { type: 'lasso', erase: false, order: DARKNESS_ORDER, points };
-    return { fog: { [DARKNESS_FOG_ID]: op }, covered: rectangles(grid) };
+    return { fog: { [DARKNESS_FOG_ID]: op }, covered: rectangles(grid), shown: (bounds) => shownOn(grid, bounds) };
   }
+}
+
+/** Whether every cell of `grid` that the part of `bounds` inside the map touches is shown (not dark); fail-closed. */
+function shownOn({ cols, rows, cellSize, map, dark }: DarknessRaster, bounds: WorldBounds): boolean {
+  const right = bounds.x + Math.max(0, bounds.width);
+  const bottom = bounds.y + Math.max(0, bounds.height);
+  if (![bounds.x, bounds.y, right, bottom].every(Number.isFinite)) return false;
+  if (right < 0 || bottom < 0 || bounds.x > map.width || bounds.y > map.height) return false;
+  const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
+  // An edge on a cell boundary touches the next cell as well: that cell counts.
+  const c0 = Math.floor(clamp(bounds.x, map.width) / cellSize);
+  const c1 = Math.min(cols - 1, Math.floor(clamp(right, map.width) / cellSize));
+  const r0 = Math.floor(clamp(bounds.y, map.height) / cellSize);
+  const r1 = Math.min(rows - 1, Math.floor(clamp(bottom, map.height) / cellSize));
+  if (c0 > c1 || r0 > r1) return false;
+  for (let row = r0; row <= r1; row++) {
+    for (let col = c0; col <= c1; col++) {
+      if (dark[row * cols + col] !== 0) return false;
+    }
+  }
+  return true;
 }
 
 /** Half as many cells each way; a cell is dark when any of the cells it holds is. */
