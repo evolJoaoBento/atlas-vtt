@@ -5,18 +5,28 @@ import { collectionFolderName, collectionFolderPath, collectionNameProblem } fro
 import { mapStrings } from '../app/utils/mapStrings';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
-import type { ScenesApi } from './types/scenes';
+import { checkedSceneFields, isPlainRelative, setsSceneFields, type SceneFields } from './savedMapFields';
+import type { SavedMapInput, ScenesApi } from './types/scenes';
 
 type AddInput = Parameters<ScenesApi['addToCollection']>[0];
 
-/** Whether `path` is a plain relative path: no empty, `.` or `..` segment, no leading slash or backslash. */
-function isPlainRelative(path: unknown): path is string {
-  return typeof path === 'string' && path.length > 0 && path.length < 1024 && !path.includes('\\') && !path.startsWith('/')
-    && ![...path].some((character) => character.charCodeAt(0) < 0x20)
-    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+const isInside = (path: string, folder: string): boolean => normalizePath(path).startsWith(`${normalizePath(folder)}/`);
+
+/** The optional fields of `map`, checked (throws before anything is written); null when it sets none, so the file is as before. */
+export function sceneFieldsOf(map: SavedMapInput): SceneFields | null {
+  return setsSceneFields(map) ? checkedSceneFields(map) : null;
 }
 
-const isInside = (path: string, folder: string): boolean => normalizePath(path).startsWith(`${normalizePath(folder)}/`);
+/**
+ * `map`'s scene with every string naming an uploaded image (by its path relative to the folder) turned into its vault
+ * path. Only the scene's own parts are rewritten: a pin's `notePath` and the other optional fields are vault data.
+ */
+export function withImagePaths(map: SavedMapInput, imagePaths: ReadonlyMap<string, string>): SavedMapInput {
+  const rewrite = (text: string): string => imagePaths.get(text) ?? text;
+  const { background, grid, objects, widgets, initiative, lighting } = map;
+  const scene = mapStrings({ background, grid, objects, widgets, initiative }, rewrite);
+  return { ...scene, ...(lighting ? { lighting: mapStrings(lighting, rewrite) } : {}) };
+}
 
 /** The collection `ref` names; a name no collection has creates it. */
 async function resolveCollection(assets: AssetService, ref: AddInput['collection']): Promise<{ id: string; created: boolean }> {
@@ -106,6 +116,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       if (!isPlainRelative(folder) || !isInside(`${folder}/x`, collectionFolderPath(collection.id))) {
         throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${collectionFolderPath(collection.id)}.`);
       }
+      const fields = sceneFieldsOf(input.map);
       const targets = new Map<string, ArrayBuffer>();
       for (const image of input.images as AddInput['images']) {
         const path: unknown = image?.path;
@@ -122,9 +133,8 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       }
       mapPath = freeMapPath(app, folder, input.name, new Set(scenes.flatMap((scene) => (scene.data?.mapPath ? [scene.data.mapPath] : []))));
       const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
-      const map = mapStrings(input.map, (text) => imagePaths.get(text) ?? text);
       written.push(mapPath);
-      await app.vault.create(mapPath, savedMapText(map, mapPath, input.name.trim()));
+      await app.vault.create(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
       const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath } });
       return { sceneId: scene.id, mapPath };
     } catch (error) {

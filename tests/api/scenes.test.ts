@@ -5,52 +5,11 @@ import { bundlesApi } from '../../src/api/bundles';
 import { DisposerSet } from '../../src/api/disposers';
 import { savedMapText } from '../../src/api/savedMap';
 import { scenesApi } from '../../src/api/scenes';
-import type { SavedMapInput, ScenesApi } from '../../src/api/types/scenes';
 import { bundleNoteKeys } from '../../src/app/extensions/bundleNoteKeys';
 import { AssetService } from '../../src/app/services/AssetService';
-import { createDefaultInitiativeState } from '../../src/app/types/initiativeTypes';
-import { createDefaultWidgets, DEFAULT_TOKEN_SETTINGS } from '../../src/app/storeFactory';
-import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
-
-const BACKGROUND = 'atlas-vtt/assets/bg.png';
-const MAP_PATH = 'atlas-vtt/collections/source/scenes/Cave.atlasmap';
-
-/** A PNG header: the signature and an IHDR chunk saying 320 x 200. Only the header is read. */
-const PNG = (): ArrayBuffer => {
-  const bytes = new Uint8Array(24);
-  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
-  new DataView(bytes.buffer).setUint32(16, 320);
-  new DataView(bytes.buffer).setUint32(20, 200);
-  return bytes.buffer;
-};
-
-function emptyMap(overrides: Partial<SavedMapInput> = {}): SavedMapInput {
-  return {
-    background: null, grid: null, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} },
-    widgets: { settings: createDefaultWidgets(), values: {} }, initiative: createDefaultInitiativeState(), ...overrides,
-  };
-}
-
-interface Fixture { scenes: ScenesApi; assets: AssetService; vault: InMemoryApp; sceneId: string; mapPath: string; scope: { id: string; disposers: DisposerSet } }
-
-async function withScene(): Promise<Fixture> {
-  AssetService.resetInstance();
-  const vault = createInMemoryApp();
-  vi.mocked(vault.app.vault.readBinary).mockImplementation(async (file: { path: string }) => (file.path === BACKGROUND ? PNG() : new ArrayBuffer(0)));
-  const assets = AssetService.getInstance(vault.app);
-  await assets.initialize();
-  await assets.createCollection('source');
-  await vault.app.vault.create(BACKGROUND, 'png');
-  const map = JSON.parse(savedMapText(emptyMap({ background: BACKGROUND }), MAP_PATH, 'Cave')) as { state: Record<string, unknown> };
-  // What a real save also holds, and an extension never gets back
-  Object.assign(map.state, { diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask' });
-  Object.assign(map.state.objects as object, { pins: { p1: { id: 'p1', kind: 'pin', x: 5, y: 6, notePath: 'Notes/Cave entrance.md' } }, walls: { w: { id: 'w' } } });
-  Object.assign(map.state, { initiativeTrackerOpen: true, camera: { x: 12, y: 34, scale: 2 }, tokenSettings: { showNameplates: true, showHPBars: false, showStressBars: true, tokenRingSize: 1.5 } });
-  await vault.app.vault.create(MAP_PATH, JSON.stringify(map));
-  const scene = await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
-  const scope = { id: 'ext', disposers: new DisposerSet() };
-  return { scenes: scenesApi(vault.app, scope), assets, vault, sceneId: scene.id, mapPath: MAP_PATH, scope };
-}
+import { DEFAULT_TOKEN_SETTINGS } from '../../src/app/storeFactory';
+import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { BACKGROUND, emptyMap, MAP_PATH, withScene } from './scenesFixture';
 
 beforeEach(() => { AssetService.resetInstance(); });
 afterEach(() => vi.restoreAllMocks());
@@ -190,8 +149,8 @@ describe('scenes', () => {
     const { scenes, mapPath, vault } = await withScene();
     const map = (await scenes.readMap(mapPath))!;
     expect(Object.keys(map).sort()).toEqual([
-      'background', 'camera', 'grid', 'initiative', 'initiativeTrackerOpen', 'lighting', 'lights', 'mapSize', 'objects', 'pins',
-      'tokenSettings', 'walls', 'widgets',
+      'background', 'camera', 'grid', 'initiative', 'initiativeTrackerOpen', 'lightZones', 'lighting', 'lights', 'mapSize', 'objects',
+      'pins', 'tokenSettings', 'walls', 'widgets',
     ]);
     expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
     expect(JSON.stringify(map)).not.toContain('Secret');
@@ -226,6 +185,7 @@ describe('scenes', () => {
     expect(map.pins).toEqual({});
     expect(map.walls).toEqual({});
     expect(map.lights).toEqual({});
+    expect(map.lightZones).toEqual({});
     expect(map.camera).toEqual({ x: 0, y: 0, scale: 1 });
     expect(map.tokenSettings).toEqual(DEFAULT_TOKEN_SETTINGS);
     expect(map.initiativeTrackerOpen).toBe(false);

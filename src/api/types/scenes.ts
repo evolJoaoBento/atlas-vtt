@@ -1,36 +1,47 @@
 import type { Disposer, Json } from './common';
 import type {
-  BackgroundState, GridState, InitiativeState, LightSource, NotePin, SceneLighting, TokenSettings, WallSegment,
+  BackgroundState, GridState, InitiativeState, LightSource, LightZone, NotePin, SceneLighting, TokenSettings, WallSegment,
 } from './records';
 import type { SceneSnapshot } from './views';
 
 export interface SceneRecord { id: string; name: string; collectionId: string; mapPath: string | null }
 
-/** The parts of a saved map an extension may read and write; everything else in the file stays Atlas's. */
+/**
+ * The parts of a saved map an extension may read and write; everything else in the file (the GM's note, the dice log,
+ * explored memory, pinned note previews, the loot roller) stays Atlas's. A field left out is written as Atlas writes a
+ * new map: no pins, walls, lights or light zones, the camera at the origin, Atlas's token settings, the tracker closed.
+ */
 export interface SavedMapInput {
   /** As in `SceneSnapshot`. Written with `addToCollection`, image paths are relative to its `images` and become vault paths; `readMap` returns vault paths. */
   background: BackgroundState; grid: GridState | null; objects: SceneSnapshot['objects'];
   widgets: SceneSnapshot['widgets']; initiative: InitiativeState; lighting?: SceneLighting;
+  /**
+   * The note pins, with their note links. A pin's `notePath` is a vault path, never rewritten as an image path; Atlas
+   * does not check that the note exists (its loader keeps a pin whose note is missing), so write the notes first.
+   * Entries are handed out as saved, also ones Atlas cannot read and skips.
+   */
+  pins?: Readonly<Record<string, NotePin>>;
+  /** The walls, lights and light zones of dynamic lighting. Walls and lights are handed out as saved, also ones Atlas cannot read and skips. */
+  walls?: Readonly<Record<string, WallSegment>>;
+  lights?: Readonly<Record<string, LightSource>>;
+  lightZones?: Readonly<Record<string, LightZone>>;
+  /** Where the GM's camera was when the map was saved: finite x and y, a scale above 0. */
+  camera?: { x: number; y: number; scale: number };
+  /** How the map shows its tokens; Atlas's defaults fill what is not given. */
+  tokenSettings?: Partial<TokenSettings>;
+  /** Whether the initiative tracker was open; only `true` opens it. */
+  initiativeTrackerOpen?: boolean;
 }
 
 /**
- * A saved map as `readMap` reads it: its `SavedMapInput`, the background's size, and the rest of the scene as saved.
+ * A saved map as `readMap` reads it: its `SavedMapInput` and the background's size, ready to hand to `addToCollection`.
  * Atlas 1.13.0 and later always set the optional fields, normalised as Atlas loads the map, also for a file that lacks
- * them; an older Atlas leaves them out.
+ * them (empty records, the camera at the origin, Atlas's token settings, the tracker closed); an older Atlas leaves
+ * them out.
  */
 export type SavedMap = SavedMapInput & {
   mapSize: { width: number; height: number };
-  /** The note pins, with their note links (vault paths), as saved; {} without any. */
-  pins?: Readonly<Record<string, NotePin>>;
-  /** The walls and lights of dynamic lighting, as saved; {} without any. */
-  walls?: Readonly<Record<string, WallSegment>>;
-  lights?: Readonly<Record<string, LightSource>>;
-  /** Where the GM's camera was when the map was saved; x 0, y 0, scale 1 without one. */
-  camera?: { x: number; y: number; scale: number };
-  /** How the map shows its tokens; Atlas's defaults fill what the file does not set. */
   tokenSettings?: TokenSettings;
-  /** Whether the initiative tracker was open; false when the file does not say. */
-  initiativeTrackerOpen?: boolean;
 };
 
 export interface ScenesApi {
@@ -45,7 +56,10 @@ export interface ScenesApi {
   /**
    * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
    * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
-   * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused.
+   * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused, and so is a
+   * malformed optional field of `map` (a pin without a plain vault `notePath`, a camera that is not finite numbers with
+   * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records): it throws
+   * before anything is written. A `readMap` result can be handed in as it is.
    */
   addToCollection(input: {
     collection: { id: string } | { name: string };

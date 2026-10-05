@@ -1,16 +1,14 @@
 import { TFile, type App } from 'obsidian';
 import { imageDimensions } from '../app/imageProcessing/imageDimensions';
 import { readSceneLighting } from '../app/lighting/sceneLightingOptions';
-import { tokenSettingsFromFile } from '../app/resources/resourceFileFormat';
 import { ATLAS_SCHEMA, ATLAS_VERSION, migrateMapFile, parseSceneFile } from '../app/services/MapPersistence';
-import { createDefaultWidgets, DEFAULT_TOKEN_SETTINGS } from '../app/storeFactory';
+import { createDefaultWidgets } from '../app/storeFactory';
 import { createDefaultInitiativeState } from '../app/types/initiativeTypes';
 import { frozenCopy } from './frozen';
+import { readSceneFields, tokenSettingsForFile, type SceneFields } from './savedMapFields';
 import type { SavedMap, SavedMapInput } from './types/scenes';
 
 type SavedState = ReturnType<typeof parseSceneFile>['state'];
-
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The fields of `SavedMapInput`, from a migrated map file. */
 function savedMapInput(state: SavedState, map: ReturnType<typeof migrateMapFile>): SavedMapInput {
@@ -21,19 +19,6 @@ function savedMapInput(state: SavedState, map: ReturnType<typeof migrateMapFile>
     widgets: { settings: { ...createDefaultWidgets(), ...state.widgetSettings }, values: state.widgetValues ?? {} },
     initiative: { ...createDefaultInitiativeState(), ...state.initiative } as SavedMapInput['initiative'],
     lighting: readSceneLighting((state as { lighting?: unknown }).lighting),
-  };
-}
-
-/** The rest of the scene `readMap` hands out, normalised as Atlas loads the map; the GM's note, the dice log and explored memory stay behind. */
-function savedMapExtras(state: SavedState, map: ReturnType<typeof migrateMapFile>): Required<Omit<SavedMap, keyof SavedMapInput | 'mapSize'>> {
-  const tokenSettings = isRecord(state.tokenSettings) ? tokenSettingsFromFile(state.tokenSettings) : {};
-  return {
-    pins: isRecord(map.objects.pins) ? map.objects.pins : {},
-    walls: map.objects.walls,
-    lights: map.objects.lights,
-    camera: map.camera,
-    tokenSettings: { ...DEFAULT_TOKEN_SETTINGS, ...tokenSettings },
-    initiativeTrackerOpen: (state as { initiativeTrackerOpen?: unknown }).initiativeTrackerOpen === true,
   };
 }
 
@@ -56,18 +41,28 @@ export async function readSavedMap(app: App, path: string): Promise<SavedMap | n
   const { state } = parseSceneFile(await app.vault.read(file));
   const map = migrateMapFile(state);
   const input = savedMapInput(state, map);
-  return frozenCopy({ ...input, ...savedMapExtras(state, map), mapSize: await backgroundSize(app, input.background) });
+  // Normalised as Atlas loads the map; the GM's note, the dice log, explored memory, pinned previews and the loot roller stay behind.
+  return frozenCopy({ ...input, ...readSceneFields(state, map), mapSize: await backgroundSize(app, input.background) });
 }
 
-/** The text of a new map file at `mapPath` holding `map`, as Atlas's own save would write it. */
-export function savedMapText(map: SavedMapInput, mapPath: string, name: string): string {
+/**
+ * The text of a new map file at `mapPath` holding `map`, as Atlas's own save would write it. `fields` are the map's
+ * optional fields, already checked (`checkedSceneFields`); without them the file has none, as a new map.
+ */
+export function savedMapText(map: SavedMapInput, mapPath: string, name: string, fields: SceneFields | null = null): string {
+  const zones = fields && Object.keys(fields.lightZones).length > 0 ? { lightZones: fields.lightZones } : {};
   const state = {
     schema: ATLAS_SCHEMA, version: ATLAS_VERSION, name, mapPath,
     background: map.background, grid: map.grid,
-    objects: { tokens: map.objects.tokens, fog: map.objects.fog, pins: {}, texts: map.objects.texts, drawings: map.objects.drawings, walls: {}, lights: {} },
-    camera: { x: 0, y: 0, scale: 1 },
+    objects: {
+      tokens: map.objects.tokens, fog: map.objects.fog, pins: fields?.pins ?? {}, texts: map.objects.texts, drawings: map.objects.drawings,
+      walls: fields?.walls ?? {}, lights: fields?.lights ?? {}, ...zones,
+    },
+    camera: fields?.camera ?? { x: 0, y: 0, scale: 1 },
     widgetSettings: map.widgets.settings, widgetValues: map.widgets.values, initiative: map.initiative,
     ...(map.lighting ? { lighting: map.lighting } : {}),
+    ...(fields ? { tokenSettings: tokenSettingsForFile(fields.tokenSettings) } : {}),
+    ...(fields?.initiativeTrackerOpen ? { initiativeTrackerOpen: true } : {}),
   };
   return JSON.stringify({ state, version: ATLAS_VERSION }, null, 2);
 }
