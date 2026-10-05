@@ -12,6 +12,7 @@ import type { DiceRollResult, DiceSelection } from '../../tools/diceRolling';
 import type { InitiativeRules } from '../../types/initiativeRulesTypes';
 import type { ConditionDefinition } from '../../types/collectionSettingsTypes';
 import { withMeasurementDefaults, type PlayerMeasurement } from '../scene/sceneTypes';
+import { t } from '../../i18n';
 
 export interface OnlineSceneStatus {
   /** The GM's session title. */
@@ -64,7 +65,7 @@ export interface RemoteImages {
 }
 
 /** The session title until the GM's arrives, as on the join page. */
-export const DEFAULT_TABLE_TITLE = 'the table';
+export const DEFAULT_TABLE_TITLE = t('online.scene.defaultTableTitle');
 
 /** The GM's measurement as Atlas's settings. */
 export function atlasMeasurement(measurement: PlayerMeasurement): MeasurementSettings {
@@ -89,7 +90,7 @@ export function initialRemoteScene(): RemoteSceneState {
     resources: {},
     initiativeHealth: {},
     initiativeRules: null,
-    status: { title: DEFAULT_TABLE_TITLE, connection: 'Connecting…', tone: 'pending', message: null, reconnect: false },
+    status: { title: DEFAULT_TABLE_TITLE, connection: t('online.scene.connecting'), tone: 'pending', message: null, reconnect: false },
     following: true,
     notice: null,
     ownRoll: null,

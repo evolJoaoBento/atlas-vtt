@@ -7,14 +7,15 @@ import type { PlayerSessionState } from '../PlayerSession';
 import type { DiceSelection } from '../../tools/diceRolling';
 import { DICE_LIMITS } from '../tools/toolMessages';
 import type { OnlineSceneControls } from './remoteScene';
+import { t } from '../../i18n';
 
-export const ROLL_NOT_SENT_TEXT = "Couldn't send the roll. Check your connection.";
-export const ROLL_WAITING_TEXT = "The GM hasn't let you in yet.";
-export const ROLL_RECONNECTING_TEXT = 'Reconnecting to your GM. Roll again once you are back in.';
-export const ROLL_CONNECTION_LOST_TEXT = 'Lost the connection to your GM. Reconnect, then roll again.';
-export const ROLL_SESSION_ENDED_TEXT = 'The session has ended. Join again to roll.';
-export const ROLL_NOT_ATTACHED_TEXT = "This tab isn't showing the session. Close it and join again.";
-export const ROLL_DICE_COUNT_TEXT = `Roll 1 to ${DICE_LIMITS.dicePerRoll} dice.`;
+export const ROLL_NOT_SENT_TEXT = t('online.roll.notSent');
+export const ROLL_WAITING_TEXT = t('online.roll.waiting');
+export const ROLL_RECONNECTING_TEXT = t('online.roll.reconnecting');
+export const ROLL_CONNECTION_LOST_TEXT = t('online.roll.connectionLost');
+export const ROLL_SESSION_ENDED_TEXT = t('online.roll.sessionEnded');
+export const ROLL_NOT_ATTACHED_TEXT = t('online.roll.notAttached');
+export const ROLL_DICE_COUNT_TEXT = t('online.roll.diceCount', { max: String(DICE_LIMITS.dicePerRoll) });
 
 /** Why the session refused a roll, from its state at that moment. */
 export function rollRefusal(state: PlayerSessionState | null): string {

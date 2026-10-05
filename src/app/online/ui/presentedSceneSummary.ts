@@ -7,6 +7,7 @@
  */
 import { presentedScene, type PresentedSceneInfo } from '../../services/PresentedScene';
 import type { Character, TokenEntity } from '../../types';
+import { t } from '../../i18n';
 
 export interface PresentedCharacter {
   id: string;
@@ -35,7 +36,7 @@ let cached: Cached | null = null;
 
 /** A character's name as the panel lists it, like the nameplate's fallback. */
 export function characterName(token: Character): string {
-  return token.name || token.statblockName || 'Unnamed character';
+  return token.name || token.statblockName || t('online.unnamedCharacter');
 }
 
 function charactersOf(tokens: Record<string, TokenEntity>): PresentedCharacter[] {

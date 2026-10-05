@@ -3,9 +3,10 @@ import { LocateFixed, Maximize } from 'lucide-react';
 import { ToolButton } from '../../../packages/components/primitives/ToolButton';
 import type { ResponsiveToolbarItem } from '../../../packages/components/toolbar/toolbarTypes';
 import type { OnlineSceneControls } from '../../../online/obsidian/remoteScene';
+import { t } from '../../../i18n';
 
-export const FOLLOW_GM_LABEL = 'Follow GM';
-export const FIT_MAP_LABEL = 'Fit map';
+export const FOLLOW_GM_LABEL = t('online.scene.followGm');
+export const FIT_MAP_LABEL = t('online.scene.fitMap');
 
 interface OnlineSceneToolbarOptions {
   fitShortcut: string;

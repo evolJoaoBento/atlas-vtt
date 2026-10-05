@@ -7,6 +7,7 @@ import { usePresentedTabId } from '../../hooks/usePresentedTabId';
 import { useSceneTabStore } from '../../hooks/useSceneTabStore';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { usePresentedSceneSummary } from './useOnlineState';
+import { t } from '../../../i18n';
 
 /** What players see, presenting this view's scene, and stopping. */
 export function OnlinePresenting(): React.ReactElement {
@@ -17,8 +18,10 @@ export function OnlinePresenting(): React.ReactElement {
   const { tabId, name } = usePresentedSceneSummary();
 
   return (
-    <section className="atlas-online-panel__section" aria-label="Presented scene">
-      <p className="atlas-online-panel__help">{tabId ? `Players see ${name ?? 'a scene'}.` : 'Players see no scene.'}</p>
+    <section className="atlas-online-panel__section" aria-label={t('online.panel.presentedScene')}>
+      <p className="atlas-online-panel__help">{tabId
+        ? name !== null ? t('online.panel.playersSee', { name }) : t('online.panel.playersSeeAScene')
+        : t('online.panel.playersSeeNoScene')}</p>
       <div className="atlas-online-panel__actions">
         {activeTabId && presentedHere !== activeTabId && (
           <Button variant="outline" size="sm" onClick={() => { void presentViewToPlayers(view); }}>{PRESENT_LABEL}</Button>

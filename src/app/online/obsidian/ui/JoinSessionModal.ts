@@ -9,8 +9,9 @@ import { sessionReasonText } from '../../page/pageScreen';
 import type { PlayerSessionState } from '../../PlayerSession';
 import { joinedSessionStore } from '../joinedSessionStore';
 import { JOIN_PROBLEM_TEXT, OnlineJoinService } from '../OnlineJoinService';
+import { t } from '../../../i18n';
 
-export const JOIN_DIALOG_TITLE = 'Join online session';
+export const JOIN_DIALOG_TITLE = t('online.join.title');
 
 type JoinPort = Pick<OnlineJoinService, 'join' | 'leave'>;
 
@@ -34,27 +35,27 @@ export class JoinSessionModal extends Modal {
     this.setTitle(JOIN_DIALOG_TITLE);
     const { contentEl } = this;
     new Setting(contentEl)
-      .setName('Join link')
-      .setDesc('The join link you were sent. The same link works in a browser.')
+      .setName(t('online.join.link'))
+      .setDesc(t('online.join.linkDesc'))
       .addText((text) => {
-        text.setPlaceholder('Paste the link here').onChange((value) => { this.link = value; });
-        text.inputEl.setAttribute('aria-label', 'Join link');
+        text.setPlaceholder(t('online.join.linkPlaceholder')).onChange((value) => { this.link = value; });
+        text.inputEl.setAttribute('aria-label', t('online.join.link'));
         text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
         this.linkInput = text.inputEl;
       });
     new Setting(contentEl)
-      .setName('Your name')
-      .setDesc('How the game master and the other players see you.')
+      .setName(t('online.join.name'))
+      .setDesc(t('online.join.nameDesc'))
       .addText((text) => {
         text.setValue(this.name).onChange((value) => { this.name = value; });
-        text.inputEl.setAttribute('aria-label', 'Your name');
+        text.inputEl.setAttribute('aria-label', t('online.join.name'));
         text.inputEl.addEventListener('keydown', (event) => this.submitOnEnter(event));
       });
     this.statusEl = contentEl.createEl('p', { cls: 'atlas-join-modal__status', attr: { role: 'status', 'aria-live': 'polite' } });
     const buttons = contentEl.createDiv({ cls: 'modal-button-container' });
-    this.joinButton = buttons.createEl('button', { cls: 'mod-cta', text: 'Join' });
+    this.joinButton = buttons.createEl('button', { cls: 'mod-cta', text: t('online.join.join') });
     this.joinButton.addEventListener('click', () => this.submit());
-    buttons.createEl('button', { text: 'Cancel' }).addEventListener('click', () => this.close());
+    buttons.createEl('button', { text: t('common.cancel') }).addEventListener('click', () => this.close());
     this.unsubscribe = joinedSessionStore.subscribe((state) => this.show(state.session));
     this.linkInput?.focus();
   }
@@ -88,11 +89,11 @@ export class JoinSessionModal extends Modal {
     if (!this.joining || !session) return;
     switch (session.status) {
       case 'connecting':
-        this.setStatus('Connecting…', false);
+        this.setStatus(t('online.join.connecting'), false);
         this.setBusy(true);
         break;
       case 'waiting':
-        this.setStatus('Waiting for the GM to let you in…', false);
+        this.setStatus(t('online.join.waiting'), false);
         this.setBusy(true);
         break;
       case 'admitted':
@@ -130,7 +131,7 @@ export class JoinSessionModal extends Modal {
 export function openJoinSessionModal(app: App): void {
   const service = OnlineJoinService.forApp(app);
   if (!service) {
-    new Notice('Online play is not ready yet. Try again in a moment.');
+    new Notice(t('online.join.notReady'));
     return;
   }
   new JoinSessionModal(app, service, service.rememberedName()).open();

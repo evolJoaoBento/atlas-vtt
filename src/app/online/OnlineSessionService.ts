@@ -36,15 +36,16 @@ import { HostIdentity } from './sharing/people/hostIdentity';
 import { IdentityDesk } from './sharing/people/IdentityDesk';
 import { PeopleBook } from './sharing/people/PeopleBook';
 import { showJoinRequestNotice, type JoinRequestInfo } from './ui/joinRequestNotice';
+import { t } from '../i18n';
 
 /** Sharing joins a hosted session that has a table; `started` returns what stops it. */
 export interface HostedSharingHooks {
   started(context: { session: GmSession; table: HostedTable }): () => void;
 }
 
-const BAD_PAGE_URL = "The player page address in Settings → Online play isn't a valid web address.";
-const HOSTING_WHILE_JOINED = 'Leave the online session you joined before hosting one.';
-const RELAY_TOO_LONG = 'Your relay (TURN) settings are too long for a join link — remove some.';
+const BAD_PAGE_URL = t('online.badPageUrl');
+const HOSTING_WHILE_JOINED = t('online.hostingWhileJoined');
+const RELAY_TOO_LONG = t('online.relayTooLong');
 
 interface Deps {
   /** Whether this Atlas is in a session it joined; the joined session store unless a test passes its own. */

@@ -4,6 +4,7 @@ import { ToolButton } from '../../../packages/components/primitives/ToolButton';
 import type { ToolbarItemBody } from '../../../packages/components/toolbar/toolbarItems';
 import type { OnlineSessionState } from '../../../online/onlineSessionStore';
 import { ONLINE_SESSION_LABEL } from '../../../online/ui/onlineCopy';
+import { t } from '../../../i18n';
 
 interface OnlineToolbarItemOptions {
   session: Pick<OnlineSessionState, 'status' | 'players'>;
@@ -16,8 +17,8 @@ interface OnlineToolbarItemOptions {
 export function onlineToolbarItem({ session, open, onToggle }: OnlineToolbarItemOptions): ToolbarItemBody {
   const hosting = session.status === 'hosting';
   const waiting = hosting ? session.players.filter((player) => player.status === 'pending').length : 0;
-  const waitingText = `${waiting} waiting to join`;
-  const subtitle = waiting > 0 ? waitingText : hosting ? 'Hosting' : null;
+  const waitingText = t('online.toolbar.waiting', { count: waiting });
+  const subtitle = waiting > 0 ? waitingText : hosting ? t('online.toolbar.hosting') : null;
   return {
     kind: 'button',
     // The panel hangs from this button.

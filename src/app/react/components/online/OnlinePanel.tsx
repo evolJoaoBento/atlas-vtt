@@ -19,8 +19,9 @@ import { useAtlasStore } from '../../ViewStoreContext';
 import { OnlinePlayerList } from './OnlinePlayerList';
 import { OnlinePresenting } from './OnlinePresenting';
 import { useOnlineSession } from './useOnlineState';
+import { t } from '../../../i18n';
 
-export const START_HELP = 'Start a session to get a link your players can open in a browser. You approve each player who joins.';
+export const START_HELP = t('online.panel.startHelp');
 
 /** The online session panel of a map view; shown for the GM while it is open. */
 export function OnlinePanel(): React.ReactElement {
@@ -47,7 +48,7 @@ function OnlinePanelWindow(): React.ReactElement {
       <header className="atlas-online-panel__header">
         <span className="atlas-online-panel__icon"><Network /></span>
         <h2 className="atlas-online-panel__title">{ONLINE_SESSION_LABEL}</h2>
-        <CloseButton onClick={() => setOpen(false)} aria-label="Close online session" />
+        <CloseButton onClick={() => setOpen(false)} aria-label={t('online.panel.close')} />
       </header>
       <div className="atlas-online-panel__body">
         {session.status === 'hosting' && service
@@ -72,7 +73,7 @@ function StartView({ session, service, app }: { session: OnlineSessionState; ser
           {JOIN_SESSION_LABEL}
         </Button>
         <Button variant="default" disabled={starting || !service} onClick={() => { void service?.start(); }}>
-          {starting ? 'Starting…' : START_SESSION_LABEL}
+          {starting ? t('online.panel.starting') : START_SESSION_LABEL}
         </Button>
       </div>
     </section>
@@ -85,10 +86,10 @@ function HostingView({ session, service }: { session: OnlineSessionState; servic
   const sharing = useStore(shareSessionStore, (state) => state.session !== null);
   return (
     <>
-      <section className="atlas-online-panel__section" aria-label="Session status">
+      <section className="atlas-online-panel__section" aria-label={t('online.panel.sessionStatus')}>
         <p className="atlas-online-panel__status">
           <span className="atlas-online-panel__dot" aria-hidden="true" />
-          <span className="atlas-online-panel__status-text">Connected</span>
+          <span className="atlas-online-panel__status-text">{t('online.panel.connected')}</span>
           <LabelTooltip label={STOP_SESSION_LABEL}>
             <Button variant="ghost" size="icon" className="atlas-online-panel__stop" aria-label={STOP_SESSION_LABEL} onClick={() => service.stop()}>
               <Square />
@@ -98,9 +99,9 @@ function HostingView({ session, service }: { session: OnlineSessionState; servic
         {session.error && <p className="atlas-online-panel__error" role="status">{session.error}</p>}
         {url && (
           <div className="atlas-online-panel__link">
-            <input type="text" readOnly value={url} aria-label="Join link" onFocus={(event) => event.currentTarget.select()} />
-            <LabelTooltip label="Copy link">
-              <Button variant="ghost" size="icon" aria-label="Copy link" onClick={() => copyJoinLink(url)}>
+            <input type="text" readOnly value={url} aria-label={t('online.joinLink')} onFocus={(event) => event.currentTarget.select()} />
+            <LabelTooltip label={t('online.copyLink')}>
+              <Button variant="ghost" size="icon" aria-label={t('online.copyLink')} onClick={() => copyJoinLink(url)}>
                 <Copy />
               </Button>
             </LabelTooltip>
@@ -122,7 +123,7 @@ function HostingView({ session, service }: { session: OnlineSessionState; servic
 
 function copyJoinLink(url: string): void {
   void navigator.clipboard.writeText(url).then(
-    () => new Notice('Join link copied'),
-    () => new Notice('Could not copy the join link'),
+    () => new Notice(t('online.linkCopied')),
+    () => new Notice(t('online.copyFailed')),
   );
 }
