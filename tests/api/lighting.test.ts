@@ -178,6 +178,51 @@ describe('lighting', () => {
     expect(answers.at(-1)).toBe('ready');
   });
 
+  it('C-light-1: a snapshot restored in place on a lit scene is pending until its own explored memory is decoded; the memory before never stands in', async () => {
+    vi.useFakeTimers();
+    const memories: Record<string, ExploredImage> = {
+      'data:all': exploredImage(MAP, () => true), 'data:less': exploredImage(MAP, (x) => x < 300),
+    };
+    const decode = vi.fn((mask: string): Promise<ExploredImage> => Promise.resolve(memories[mask]!));
+    const view = fakeView('v1');
+    load(view);
+    view.atlasStore.getState().setSceneLighting({ enabled: true });
+    const lit = walled();
+    view.setPlayerLighting(lit);
+    view.atlasStore.setState({ exploredMask: 'data:all' });
+    const { api } = setup(view, decode);
+    // Behind the wall (x 800) only the memory shows it: the snapshot remembers less.
+    const behindWall = (): number | string => {
+      const answer = api.playerVisibility('v1');
+      if (answer.status !== 'ready') return answer.status;
+      const { cellSize, cols, shown } = answer.darkness;
+      return shown[Math.floor(250 / cellSize) * cols + Math.floor(800 / cellSize)]!;
+    };
+    behindWall();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(behindWall()).toBe(1);
+    const mapPath = view.atlasStore.getState().mapPath;
+    const answers: Array<number | string> = [];
+    view.atlasStore.subscribe(() => { answers.push(behindWall()); });
+    // The restore rewrites the open scene's file and loads it again in place (`AtlasView.reloadActiveScene`).
+    view.atlasStore.getState().setMapLoaded(false);
+    view.setPlayerLighting(null);
+    view.atlasStore.getState().clearMapState();
+    view.atlasStore.getState().setMapLoading(true, 20);
+    view.atlasStore.getState().setSceneLighting({ enabled: true });
+    view.atlasStore.setState({ exploredMask: 'data:less' });
+    view.setPlayerLighting(fixtureLighting({ ready: false }));
+    view.atlasStore.getState().setMapLoading(false);
+    view.setPlayerLighting(lit);
+    view.atlasStore.getState().setMapLoaded(true);
+    expect(view.atlasStore.getState().mapPath).toBe(mapPath);
+    expect(answers).not.toContain('unlit');
+    expect(answers).not.toContain(1);
+    expect(behindWall()).toBe('pending');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(behindWall()).toBe(0);
+  });
+
   it('C-light-1: players never see what the GM forgot, cleared or took back by undo, until the saved mask shows it gone', async () => {
     vi.useFakeTimers();
     const memories: Record<string, ExploredImage> = {

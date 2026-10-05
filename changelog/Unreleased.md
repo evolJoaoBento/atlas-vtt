@@ -17,6 +17,7 @@
 - Extension API: throw a roll decided elsewhere with Atlas's own 3D dice in a map view, once per roll, following your dice display setting
 - Extension API: reading a saved map without opening it also gives its note pins, walls, lights, light zones, camera, token settings and whether the initiative tracker was open, and adding a scene can write them
 - Extension API: an extension can replace the map of a scene it added itself with a newer version, keeping the scene; the GM's own scenes, and scenes open in a view, are never replaced
+- Extension API: follows Atlas 0.6. A scene's own distance per cell reaches extensions (`GridState.unitDistanceOverride`, `MeasurementSettings.ruleDistance`), extension toolbar buttons sit after the dice in the customizable toolbar, and Atlas's own texts around what extensions add follow Obsidian's language
 
 ## Improved
 

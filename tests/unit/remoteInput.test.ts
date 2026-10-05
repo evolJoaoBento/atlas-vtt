@@ -31,6 +31,14 @@ describe("what a remote view takes from its owner", () => {
     expect(Object.isFrozen(state.measurement)).toBe(true);
   });
 
+  it('takes a measurement without ruleDistance, as an extension written for 1.13 sends it, measuring squares like cells', () => {
+    const { ruleDistance: _rule, ...older } = resolveMeasurementSettings(undefined, { enabled: true, size: 70, offsetX: 0, offsetY: 0, opacity: 1, measurementType: 'units', unitDistance: 10 });
+    expect(checkedPlayer(player({ measurement: older })).measurement).toMatchObject({ unitDistance: 10, ruleDistance: 10 });
+    const scene = resolveMeasurementSettings({ measurementMode: 'metric', unitType: 'feet', unitDistance: 5 } as never, { enabled: true, size: 70, offsetX: 0, offsetY: 0, opacity: 1, unitDistanceOverride: 10 });
+    expect(checkedPlayer(player({ measurement: scene })).measurement).toMatchObject({ unitDistance: 10, ruleDistance: 5 });
+    expect(() => checkedPlayer(player({ measurement: { ...scene, ruleDistance: 0 } }))).toThrow(/RemoteView.setPlayer/);
+  });
+
   it('refuses a measurement the ruler cannot use, and malformed ids, definitions and health', () => {
     const measurement = resolveMeasurementSettings(undefined, null);
     const bad = [

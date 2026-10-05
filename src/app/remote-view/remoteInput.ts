@@ -4,7 +4,7 @@
  * and in range; text stays text.
  */
 import { frozenCopy } from '../../api/frozen';
-import type { RemotePlayerState, RemoteSceneInput } from '../../api/types/remoteViews';
+import type { RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput } from '../../api/types/remoteViews';
 import { isValidConeAngle, type MeasurementSettings } from '../grid/measurementFormat';
 
 /** The largest map side a remote scene may have, in world pixels. */
@@ -43,9 +43,10 @@ export function checkedScene(scene: unknown): RemoteSceneInput | null {
   return scene as unknown as RemoteSceneInput;
 }
 
-function isMeasurement(value: unknown): value is MeasurementSettings {
+function isMeasurement(value: unknown): value is RemoteMeasurementInput {
   return isObject(value) && MODES.includes(value.mode) && UNITS.includes(value.unitType) && DIAGONALS.includes(value.diagonalRule)
     && isFiniteNumber(value.unitDistance) && value.unitDistance > 0 && isValidConeAngle(value.coneAngle)
+    && (value.ruleDistance === undefined || (isFiniteNumber(value.ruleDistance) && value.ruleDistance > 0))
     && Array.isArray(value.rangeBands) && value.rangeBands.every((band) => isObject(band) && typeof band.name === 'string' && isFiniteNumber(band.maxSquares));
 }
 
@@ -54,7 +55,7 @@ const isCondition = (value: unknown): boolean => isObject(value) && typeof value
 const isHealth = (value: unknown): boolean => isObject(value) && isFiniteNumber(value.value) && isFiniteNumber(value.max);
 
 /** The player's state, checked and copied (deep, frozen). */
-export function checkedPlayer(state: unknown): RemotePlayerState {
+export function checkedPlayer(state: unknown): RemotePlayerState & { measurement: MeasurementSettings } {
   if (!isObject(state) || !isObject(state.tokenUi) || !isObject(state.initiative)) fail('setPlayer', 'the state must be a RemotePlayerState');
   const { movableTokenIds, measurement, tokenUi, initiative } = state;
   if (!Array.isArray(movableTokenIds) || !movableTokenIds.every((id) => typeof id === 'string')) fail('setPlayer', '"movableTokenIds" must be a list of token ids');
@@ -66,5 +67,7 @@ export function checkedPlayer(state: unknown): RemotePlayerState {
   }
   if (initiative.rules !== null && !isObject(initiative.rules)) fail('setPlayer', '"initiative.rules" must be InitiativeRules or null');
   if (!isObject(initiative.health) || !Object.values(initiative.health).every(isHealth)) fail('setPlayer', '"initiative.health" values must be { value, max } numbers');
-  return frozenCopy(state as unknown as RemotePlayerState);
+  // An extension written before `ruleDistance` existed measures squares like cells.
+  const settings: MeasurementSettings = { ...measurement, ruleDistance: measurement.ruleDistance ?? measurement.unitDistance };
+  return frozenCopy({ ...(state as unknown as RemotePlayerState), measurement: settings });
 }

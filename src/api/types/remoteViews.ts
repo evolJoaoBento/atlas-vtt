@@ -17,9 +17,15 @@ export interface RemoteSceneInput {
   initiative: InitiativeState;
 }
 
+/**
+ * `MeasurementSettings` as a remote view takes them. `ruleDistance` came with 1.14.0: left out, it is `unitDistance`
+ * (they differ only on a scene that sets its own distance per cell).
+ */
+export type RemoteMeasurementInput = Omit<MeasurementSettings, 'ruleDistance'> & { ruleDistance?: number };
+
 export interface RemotePlayerState {
   movableTokenIds: readonly string[];
-  measurement: MeasurementSettings;
+  measurement: RemoteMeasurementInput;
   /**
    * Stand-ins the GM's projection decided on; players never receive the GM's definitions. Decided per token: a resource
    * definition with `visibleToPlayers: false` draws no bar on that token; it still counts for its downed look (`defeatedWhenSpent`).
