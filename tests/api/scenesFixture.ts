@@ -4,6 +4,7 @@ import { DisposerSet } from '../../src/api/disposers';
 import { savedMapText } from '../../src/api/savedMap';
 import { scenesApi } from '../../src/api/scenes';
 import type { SavedMapInput, ScenesApi } from '../../src/api/types/scenes';
+import type { ViewTracker } from '../../src/api/viewTracker';
 import { AssetService } from '../../src/app/services/AssetService';
 import { createDefaultInitiativeState } from '../../src/app/types/initiativeTypes';
 import { createDefaultWidgets } from '../../src/app/storeFactory';
@@ -30,7 +31,7 @@ export function emptyMap(overrides: Partial<SavedMapInput> = {}): SavedMapInput 
 
 export interface Fixture { scenes: ScenesApi; assets: AssetService; vault: InMemoryApp; sceneId: string; mapPath: string; scope: { id: string; disposers: DisposerSet } }
 
-export async function withScene(): Promise<Fixture> {
+export async function withScene(views: ViewTracker | null = null): Promise<Fixture> {
   AssetService.resetInstance();
   const vault = createInMemoryApp();
   vi.mocked(vault.app.vault.readBinary).mockImplementation(async (file: { path: string }) => (file.path === BACKGROUND ? PNG() : new ArrayBuffer(0)));
@@ -46,6 +47,6 @@ export async function withScene(): Promise<Fixture> {
   await vault.app.vault.create(MAP_PATH, JSON.stringify(map));
   const scene = await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
   const scope = { id: 'ext', disposers: new DisposerSet() };
-  return { scenes: scenesApi(vault.app, scope), assets, vault, sceneId: scene.id, mapPath: MAP_PATH, scope };
+  return { scenes: scenesApi(vault.app, scope, views), assets, vault, sceneId: scene.id, mapPath: MAP_PATH, scope };
 }
 

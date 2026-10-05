@@ -5,7 +5,9 @@ import { frozenCopy } from './frozen';
 import { readSavedMap } from './savedMap';
 import { addSceneToCollection } from './sceneImport';
 import type { Json } from './types/common';
+import { replaceSceneMap } from './sceneReplace';
 import type { SceneRecord, ScenesApi } from './types/scenes';
+import type { ViewTracker } from './viewTracker';
 
 /** The asset index, once it has loaded; the API is published even when it failed, and then scene functions reject. */
 async function loadedAssets(app: App): Promise<AssetService> {
@@ -34,7 +36,8 @@ function plainJson(value: unknown): Json {
   return JSON.parse(text) as Json;
 }
 
-export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>): ScenesApi {
+/** `views` tells `replaceMap` which maps are open; none without it. */
+export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>, views: ViewTracker | null = null): ScenesApi {
   const scenes = async (): Promise<SceneAsset[]> => (await loadedAssets(app)).getAssets(undefined, 'scene');
   return Object.freeze({
     list: async (): Promise<SceneRecord[]> => (await scenes()).map((scene) => frozenCopy(recordOf(scene))),
@@ -64,6 +67,8 @@ export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>): ScenesAp
       await loadedAssets(app);
       return readSavedMap(app, mapPath);
     },
-    addToCollection: async (input: Parameters<ScenesApi['addToCollection']>[0]) => addSceneToCollection(app, await loadedAssets(app), input),
+    addToCollection: async (input: Parameters<ScenesApi['addToCollection']>[0]) => addSceneToCollection(app, await loadedAssets(app), input, scope.id),
+    replaceMap: async (sceneId: string, input: Parameters<typeof replaceSceneMap>[5]) =>
+      replaceSceneMap(app, await loadedAssets(app), views, scope.id, sceneId, input),
   });
 }

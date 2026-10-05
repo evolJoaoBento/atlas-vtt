@@ -90,6 +90,8 @@ export interface SceneAssetData {
   mapPath?: string;
   /** What extensions keep on the scene, by extension id (`ScenesApi.setData`). Copies, exports and installs drop it. */
   extensions?: Record<string, Json>;
+  /** The id of the extension that added the scene (`ScenesApi.addToCollection`), which alone may replace its map. Index only, like `extensions`. */
+  createdBy?: string;
 }
 
 export interface EncounterAssetData {

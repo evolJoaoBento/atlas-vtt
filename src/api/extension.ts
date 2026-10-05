@@ -35,6 +35,6 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
     lasers: lasersApi(services.views, scope.disposers), lighting: lightingApi(services.views, services.sightFrames, scope.disposers),
     tokens: tokensApi(services.views), rules: rulesApi(services.app),
     settings: settingsApi(services.settings), storage: storageApi(services.app, scope.id),
-    ui: uiApi(scope, services.views), scenes: scenesApi(services.app, scope), bundles: bundlesApi(scope),
+    ui: uiApi(scope, services.views), scenes: scenesApi(services.app, scope, services.views), bundles: bundlesApi(scope),
     ...(scope.capabilities.has('remote-view') ? { remoteViews: remoteViewsApi(services.app, scope, services.views) } : {}) });
 }

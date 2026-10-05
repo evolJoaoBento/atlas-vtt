@@ -29,7 +29,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.10.0 | shipped in 1.10.0 | none | none | none |
 | 1.11.0 | shipped in 1.11.0 | none | `bundles.forgetNoteProperties` | none |
 | 1.12.0 | shipped in 1.12.0 | `remote-view` | `remoteViews` (optional) | none |
-| 1.13.0 | shipped in 1.13.0 | none | `dice.throw` (optional) | none |
+| 1.13.0 | shipped in 1.13.0 | none | `dice.throw`, `scenes.replaceMap` (optional) | none |
 
 Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
 
@@ -45,6 +45,12 @@ Version 1.13.0 also moves more of the scene into `SavedMapInput`, as optional fi
 - **Reading.** They are normalised as Atlas loads the map, so a file that lacks them reads as empty records, the camera at the origin, Atlas's token settings and a closed tracker. A camera that is not finite numbers with a scale above 0 reads as the default, and only the four known token settings of the right type are kept. Pin, wall and light entries are handed out as saved, also ones Atlas cannot read and skips. They are typed optional because an older Atlas leaves them out.
 - **Writing.** A field left out is written as Atlas writes a new map, so a map without them gives the same file as before 1.13.0. A malformed field throws before anything is written: a pin must be `{ id, kind: 'pin', x, y, notePath }` with a plain vault path, the camera finite with a scale above 0, token settings of the right types, and walls, lights and light zones records by id. A pin's `notePath` is a vault path and is never rewritten as an image path; Atlas does not check that the note exists, so write the notes first and drop pins whose note you could not write. The tracker opens only for `initiativeTrackerOpen: true`.
 - **What stays behind.** The GM's note on the map, the dice log, explored memory, pinned note previews and the loot roller are never read or written.
+
+Version 1.13.0 also adds `scenes.replaceMap(sceneId, { map, images })`, which puts a newer version of a map in place of a scene's old one and keeps the scene's id, name, collection and map path. It takes the same input and checks as `addToCollection`, with images relative to the map file's folder; an image name already taken there gets a number.
+- **Only your own scenes.** Atlas notes in its index (never in record files, exports or copies) which extension added a scene through `addToCollection`. Only that extension may replace the scene's map. Every other scene, including the GM's own maps and a copy of an added scene, is refused: the promise rejects and nothing is written.
+- **Not while open.** A scene that is open in a map view, also as a scene tab that is not shown, is refused, so an open view never saves over the new map. Ask the GM to close it first.
+- **Order.** The new images are written first, then the map file. Only then are the old map's images in that folder removed, keeping any that the new map, another asset, another scene's map or a note still uses. If a write fails, the images it wrote are removed and the old map is put back.
+- **Whole file.** The whole map file is replaced, so the old file's dice log, GM's note and explored memory go with it.
 
 Extension data on scenes (`scenes.setData`) lives only in Atlas's asset index, never in the scene's record file, so it travels in no bundle and no copy. When Atlas cannot read the index and rebuilds it from the collection files, that data is lost, because the files do not hold it.
 

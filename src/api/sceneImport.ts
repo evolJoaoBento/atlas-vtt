@@ -10,7 +10,7 @@ import type { SavedMapInput, ScenesApi } from './types/scenes';
 
 type AddInput = Parameters<ScenesApi['addToCollection']>[0];
 
-const isInside = (path: string, folder: string): boolean => normalizePath(path).startsWith(`${normalizePath(folder)}/`);
+export const isInside = (path: string, folder: string): boolean => normalizePath(path).startsWith(`${normalizePath(folder)}/`);
 
 /** The optional fields of `map`, checked (throws before anything is written); null when it sets none, so the file is as before. */
 export function sceneFieldsOf(map: SavedMapInput): SceneFields | null {
@@ -97,10 +97,11 @@ async function undo(app: App, assets: AssetService, created: { files: readonly s
 
 /**
  * Adds a scene with its images under the asset index lock, so the vault check never adopts the map as a second
- * scene and two calls never pick the same file name. Everything is checked before the first write; a failure
- * afterwards removes what this call wrote (including a folder or collection it created) and rethrows.
+ * scene and two calls never pick the same file name. The index notes `owner`, the extension, as the scene's creator
+ * (`replaceMap`). Everything is checked before the first write; a failure afterwards removes what this call wrote
+ * (including a folder or collection it created) and rethrows.
  */
-export function addSceneToCollection(app: App, assets: AssetService, input: AddInput): Promise<{ sceneId: string; mapPath: string }> {
+export function addSceneToCollection(app: App, assets: AssetService, input: AddInput, owner: string): Promise<{ sceneId: string; mapPath: string }> {
   return assets.runExclusive(async () => {
     if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
       throw new Error('[Atlas API] addToCollection needs { collection, name, folder, map, images }.');
@@ -135,7 +136,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
       written.push(mapPath);
       await app.vault.create(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
-      const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath } });
+      const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath, createdBy: owner } });
       return { sceneId: scene.id, mapPath };
     } catch (error) {
       await undo(app, assets, { files: written, folder: createdFolder, collection: collection.created ? collection.id : null, mapPath, knownScenes });

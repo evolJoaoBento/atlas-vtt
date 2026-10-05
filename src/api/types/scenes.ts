@@ -66,6 +66,20 @@ export interface ScenesApi {
     name: string; folder: string; map: SavedMapInput;
     images: ReadonlyArray<{ path: string; data: ArrayBuffer }>;
   }): Promise<{ sceneId: string; mapPath: string }>;
+  /**
+   * Replaces the map of a scene this extension added with `addToCollection`, keeping its scene id, name, collection and
+   * map path. `map` and `images` are as for `addToCollection`, with images relative to the map file's folder; an image
+   * whose name is taken there gets a number. The new images are written, then the map file, under the asset index lock;
+   * only then are the old map's images in that folder removed, except those the new map, another asset, another map or
+   * a note still uses. The whole file is replaced: the old file's dice log, GM's note and explored memory go with it.
+   * Rejects, writing nothing, for a scene another extension or the GM made (Atlas notes which extension added a scene,
+   * in its index only), for a scene open in any map view or its scene tabs (close it first, so no open view saves over
+   * the new map), and for malformed input. A failed write removes the images it wrote and puts the old map back.
+   */
+  replaceMap?(sceneId: string, input: {
+    map: SavedMapInput;
+    images: ReadonlyArray<{ path: string; data: ArrayBuffer }>;
+  }): Promise<{ sceneId: string; mapPath: string }>;
 }
 
 export interface BundlesApi {
