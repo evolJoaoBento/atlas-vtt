@@ -10,7 +10,8 @@ import type { PlayerLighting } from '../../../src/app/pixi/lighting/playerLighti
 import { PresentedScene, type PresentedSceneInfo, type PresentedView } from '../../../src/app/services/PresentedScene';
 import type { ViewAtlasState } from '../../../src/app/storeFactory';
 import { createTabMetaStore } from '../../../src/app/stores/tabMetaStore';
-import { character, exploredImage, light, MAP, playerLightingOf, scene, wall, type Scene } from './lightingFixtures';
+import type { TextElement } from '../../../src/app/types';
+import { character, exploredImage, light, MAP, playerLightingOf, project, scene, wall, type Scene } from './lightingFixtures';
 import { fakeAssetIds, insideByNonzero } from './sceneFixtures';
 
 /** The presented view's lighting, as a test sets it: `lighting` is what `getPlayerLighting` answers. */
@@ -168,6 +169,77 @@ describe('live lighting of a presentation', () => {
     expect(darkAt(0, DARKNESS_INTERVAL_MS + 10)).toBe(false);
     // A forget (or an undo) moves the count: dark at once, though the new mask has not decoded and the interval has not passed.
     expect(darkAt(1, DARKNESS_INTERVAL_MS + 20)).toBe(true);
+  });
+
+  describe('texts and drawings never follow a darkness held back', () => {
+    const textAt = (x: number, y: number): TextElement => ({ id: 't', kind: 'text', x, y, text: 'a', fontSize: 1, fontFamily: 'serif', color: '#000000', width: 10, height: 10 } as TextElement);
+    const sentIn = (state: Scene, frame: ReturnType<LiveLighting['frame']>): string[] => Object.keys(project(state, frame).texts);
+
+    it('hides a text where a light just went out, though the fog op is held for the interval', () => {
+      const lit = scene({ ambient: 0 }, {
+        tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) },
+        lights: { torch: light('torch', 400, 400) },
+        texts: { t: textAt(420, 400) },
+      });
+      const dark = { ...lit, objects: { ...lit.objects, lights: {} } };
+      const source = lightingSource(playerLightingOf(lit, MAP));
+      const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
+      const first = live.frame({ exploredMask: null, lighting: LIT }, MAP, 0)!;
+      expect(sentIn(lit, first)).toEqual(['t']);
+      source.current = playerLightingOf(dark, MAP);
+      const soon = live.frame({ exploredMask: null, lighting: LIT }, MAP, 10)!;
+      // The fog op still shows the lit spot, held; the text is not sent.
+      expect(soon.darkness).toBe(first.darkness);
+      expect(sentIn(lit, soon)).toEqual([]);
+      live.dispose();
+    });
+
+    it('hides a text in the explored memory when it is switched off', async () => {
+      const night = scene({ ambient: 0 }, { tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) }, texts: { t: textAt(900, 400) } });
+      const decode = vi.fn(async (): Promise<ExploredImage> => exploredImage(MAP, (x) => x > 700));
+      const lighting = playerLightingOf(night, MAP)!;
+      const source = lightingSource(lighting);
+      const live = new LiveLighting(source.info as PresentedSceneInfo, () => {}, decode);
+      live.frame({ exploredMask: 'data:a', lighting: LIT }, MAP, 0);
+      await vi.advanceTimersByTimeAsync(0);
+      const first = live.frame({ exploredMask: 'data:a', lighting: LIT }, MAP, DARKNESS_INTERVAL_MS)!;
+      expect(sentIn(night, first)).toEqual(['t']);
+      source.current = { ...lighting, showsExplored: false };
+      const soon = live.frame({ exploredMask: 'data:a', lighting: LIT }, MAP, DARKNESS_INTERVAL_MS + 10)!;
+      expect(soon.darkness).toBe(first.darkness);
+      expect(sentIn(night, soon)).toEqual([]);
+      live.dispose();
+    });
+
+    it('drops the hold at once when the saved memory is cleared outright (the reset fallback), fog op and texts', async () => {
+      const night = scene({ ambient: 0 }, { tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) }, texts: { t: textAt(900, 400) } });
+      const decode = vi.fn(async (): Promise<ExploredImage> => exploredImage(MAP, (x) => x > 700));
+      const live = new LiveLighting(lightingSource(playerLightingOf(night, MAP)).info as PresentedSceneInfo, () => {}, decode);
+      live.frame({ exploredMask: 'data:a', lighting: LIT }, MAP, 0);
+      await vi.advanceTimersByTimeAsync(0);
+      const first = live.frame({ exploredMask: 'data:a', lighting: LIT }, MAP, DARKNESS_INTERVAL_MS)!;
+      expect(sentIn(night, first)).toEqual(['t']);
+      // The same edit count, the mask gone, 10 ms later: nothing in the old memory is held.
+      const soon = live.frame({ exploredMask: null, lighting: LIT }, MAP, DARKNESS_INTERVAL_MS + 10)!;
+      expect(soon.darkness).not.toBe(first.darkness);
+      expect(sentIn(night, soon)).toEqual([]);
+      live.dispose();
+    });
+
+    it('is not fooled by a darkness held across a map size that was unknown (0 x 0) and then known', () => {
+      const state = scene({ ambient: 1 }, {
+        tokens: { hero: character('hero', 140, 400, { vision: { enabled: true } }) },
+        walls: { w: wall('w', { x: 503, y: -10 }, { x: 503, y: 810 }) },
+        texts: { t: textAt(800, 400) },
+      });
+      const live = new LiveLighting(lightingSource(playerLightingOf(state, MAP)).info as PresentedSceneInfo, () => {});
+      const unknown = live.frame({ exploredMask: null, lighting: LIT }, { width: 0, height: 0 }, 0)!;
+      expect(sentIn(state, unknown)).toEqual([]);
+      const known = live.frame({ exploredMask: null, lighting: LIT }, MAP, 50)!;
+      expect(known.darkness).not.toBe(unknown.darkness);
+      expect(sentIn(state, known)).toEqual([]);
+      live.dispose();
+    });
   });
 
   it('calls back when the view says what players see changed, until disposed', () => {

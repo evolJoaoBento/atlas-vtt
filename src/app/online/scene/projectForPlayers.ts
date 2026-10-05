@@ -122,7 +122,7 @@ function hiddenFrom(context: ProjectionContext, lighting: LightingFrame | null):
       const x = Math.max(b.x, 0);
       const y = Math.max(b.y, 0);
       const clipped = { x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y };
-      return base.isCovered(clipped) || !lighting.darkness.shown(clipped);
+      return base.isCovered(clipped) || !lighting.shown(clipped);
     },
   };
 }
