@@ -24,21 +24,42 @@ function clickOf(owner: string, item: MenuItem): () => unknown {
   };
 }
 
+/** How an open submenu reads its items again: `read` runs the provider anew, `subscribe` says when to. */
+export interface LiveMenu {
+  read: () => readonly MenuItem[];
+  subscribe: (onChange: () => void) => () => void;
+}
+
+// An extension may hand over anything: read it as a list of maybe-items.
+function itemsOf(items: unknown): ReadonlyArray<MenuItem | null | undefined> {
+  return Array.isArray(items) ? (items as ReadonlyArray<MenuItem | null | undefined>) : [];
+}
+
+/** The items of the first submenu labelled `label` among `items`; none when the provider no longer gives it. */
+function submenuOf(items: readonly MenuItem[], label: string): readonly MenuItem[] {
+  const found = itemsOf(items).find((item) => item?.label === label && item.submenu !== undefined);
+  return found?.submenu ?? [];
+}
+
 /**
- * Atlas's menu entries for an extension's items: an item with `submenu` becomes a submenu (recursively; `checked` and
- * `disabled` apply to plain items only), and an item without a label, or a submenu with nothing in it, is left out.
- * Clicks run guarded, so a menu never breaks on an extension.
+ * Atlas's menu entries for an extension's items: an item with `submenu` becomes a submenu (recursively; `checked`,
+ * `disabled` and `keepOpen` apply to plain items only), and an item without a label, or a submenu with nothing in it,
+ * is left out. Clicks run guarded, so a menu never breaks on an extension. With `live`, an open submenu reads its
+ * items again whenever `live.subscribe` reports a change, finding itself by its labels (the first of a label).
  */
-export function menuEntriesOf(owner: string, items: readonly MenuItem[]): ContextMenuEntry[] {
+export function menuEntriesOf(owner: string, items: readonly MenuItem[], live?: LiveMenu): ContextMenuEntry[] {
   const entries: ContextMenuEntry[] = [];
-  // An extension may hand over anything: read it as a list of maybe-items.
-  const list: ReadonlyArray<MenuItem | null | undefined> = Array.isArray(items) ? (items as ReadonlyArray<MenuItem | null | undefined>) : [];
-  for (const item of list) {
+  for (const item of itemsOf(items)) {
     if (!item || typeof item.label !== 'string' || item.label === '') continue;
     const icon = typeof item.icon === 'string' && item.icon !== '' ? { icon: item.icon } : {};
     if (item.submenu !== undefined) {
-      const children = menuEntriesOf(owner, item.submenu);
-      if (children.length > 0) entries.push({ type: 'submenu', label: item.label, children, ...icon });
+      const label = item.label;
+      const sub: LiveMenu | undefined = live && { read: () => submenuOf(live.read(), label), subscribe: live.subscribe };
+      const children = menuEntriesOf(owner, item.submenu, sub);
+      if (children.length === 0) continue;
+      entries.push(sub
+        ? { type: 'submenu', label, children: () => menuEntriesOf(owner, sub.read(), sub), subscribe: sub.subscribe, ...icon }
+        : { type: 'submenu', label, children, ...icon });
       continue;
     }
     entries.push({
@@ -48,15 +69,25 @@ export function menuEntriesOf(owner: string, items: readonly MenuItem[]): Contex
       ...icon,
       ...(item.checked !== undefined ? { checked: item.checked === true } : {}),
       ...(item.disabled !== undefined ? { disabled: item.disabled === true } : {}),
+      ...(item.keepOpen === true ? { keepOpen: true } : {}),
     });
   }
   return entries;
 }
 
-/** The entries every provider registered in `slot` gives for `ctx`, in the order they were added; a provider that throws gives none. */
+/**
+ * The entries every provider registered in `slot` gives for `ctx`, in the order they were added; a provider that throws
+ * gives none. An open submenu runs its provider again on every change of `slot` (`ui.invalidate()` among them), and
+ * shows nothing once the provider is removed.
+ */
 export function providedMenuEntries<C>(slot: SlotRegistry<(ctx: C) => MenuItem[]>, slotName: string, ctx: C): ContextMenuEntry[] {
-  return slot.list().flatMap(({ owner, item: provider }) =>
-    menuEntriesOf(owner, safely(owner, slotName, () => [...provider(ctx)], [])));
+  const subscribe = (onChange: () => void): (() => void) => slot.subscribe(onChange);
+  return slot.list().flatMap((entry) => {
+    const read = (): readonly MenuItem[] => (slot.list().includes(entry)
+      ? safely(entry.owner, slotName, () => [...entry.item(ctx)], [])
+      : []);
+    return menuEntriesOf(entry.owner, read(), { read, subscribe });
+  });
 }
 
 /** What extensions add to a token's context menu, for a GM view; a player view is never asked. */

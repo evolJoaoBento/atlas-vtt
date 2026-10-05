@@ -16,6 +16,11 @@ export interface MenuItem {
   submenu?: MenuItem[];
   checked?: boolean;
   disabled?: boolean;
+  /**
+   * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
+   * provider again after `ui.invalidate()`, so its checkmarks follow; the items of the menu itself are read when it opens.
+   */
+  keepOpen?: boolean;
 }
 
 export interface ToolbarItem {

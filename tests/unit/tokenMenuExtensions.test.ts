@@ -71,7 +71,8 @@ describe('Extension entries in the token context menu', () => {
     const remove = provide(() => [{ label: 'Control', submenu: [{ label: 'Anna', checked: true, onClick }, { label: 'Bob', disabled: true }] }]);
     const entry = rightClick('hero').find((candidate) => 'label' in candidate && candidate.label === 'Control');
     expect(entry).toMatchObject({ type: 'submenu' });
-    const children = (entry as Extract<ContextMenuEntry, { type: 'submenu' }>).children as ContextMenuEntry[];
+    const live = (entry as Extract<ContextMenuEntry, { type: 'submenu' }>).children;
+    const children = typeof live === 'function' ? live() : live;
     expect(children).toMatchObject([{ type: 'item', label: 'Anna', checked: true }, { type: 'item', label: 'Bob', disabled: true }]);
     (children[0] as Extract<ContextMenuEntry, { type: 'item' }>).onClick();
     expect(onClick).toHaveBeenCalledOnce();

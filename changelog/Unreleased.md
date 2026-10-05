@@ -13,6 +13,7 @@
 - Extension API: note properties an extension asks to keep out of exports stay stripped while that extension is switched off, until it removes them itself, which `bundles.forgetNoteProperties` also does
 - Extension API: an optional `remote-view` capability: a read-only map view fed by another plugin, never saved, with the player's tools: dragging the tokens they may move, measuring, the laser and the dice tray into a shared log
 - Extension API: remote views are listed by `views.list()` and announced by `map-loaded` and `map-closed` as `kind: 'remote'`; an extension that picks the GM's map views keeps to `kind === 'map'`
+- Extension API: menu items can stay open when chosen, and an open submenu follows its extension's changes, so several toggles can be set in a row
 
 ## Improved
 

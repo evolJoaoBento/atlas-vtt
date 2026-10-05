@@ -60,7 +60,8 @@ describe('Extension items in the view\'s More options menu', () => {
     const remove = provide(() => [{ label: 'Present', submenu: [{ label: 'To players', onClick }] }]);
     const entry = openMenu().find((candidate) => 'label' in candidate && candidate.label === 'Present') as Extract<ContextMenuEntry, { type: 'submenu' }>;
     expect(entry.type).toBe('submenu');
-    const child = (entry.children as ContextMenuEntry[])[0] as Extract<ContextMenuEntry, { type: 'item' }>;
+    const children = typeof entry.children === 'function' ? entry.children() : entry.children;
+    const child = children[0] as Extract<ContextMenuEntry, { type: 'item' }>;
     child.onClick();
     expect(onClick).toHaveBeenCalledOnce();
     remove();

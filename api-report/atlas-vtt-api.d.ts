@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.12.0";
+export declare const API_VERSION = "1.13.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -643,6 +643,11 @@ export declare interface MenuItem {
     submenu?: MenuItem[];
     checked?: boolean;
     disabled?: boolean;
+    /**
+     * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
+     * provider again after `ui.invalidate()`, so its checkmarks follow; the items of the menu itself are read when it opens.
+     */
+    keepOpen?: boolean;
 }
 
 export declare interface PaletteCommand {
