@@ -37,6 +37,8 @@
 - The Online scene tab no longer fails to open its grid ("Failed to open view") while the map image is still on its way: the automatic grid colour uses white lines while the map shows its placeholder instead of trying to read it.
 - With dynamic lighting on, online players no longer receive texts and drawings that sit in the dark across the map's edge. The darkness stops at the map, so a text or drawing that reached past it was sent; anything not wholly inside the map is now left out while lighting is on.
 - With dynamic lighting on, online players no longer keep seeing explored areas you have forgotten. Forgetting explored areas, and undoing or redoing an edit of them, now reaches players at once instead of after a couple of seconds, and until the new memory has been read they see less, never the area you forgot.
+- With dynamic lighting on, online players no longer receive texts and drawings that sit in the dark across the map's edge. The darkness stops at the map, so a text or drawing that reached past it was sent; anything not wholly inside the map is now left out while lighting is on.
+- Online players no longer receive tokens, texts, drawings and pins hidden by the fog at the right and bottom edge of a map whose width or height is not a multiple of 8, nor anything outside the map, live or in a player-safe map share. A token, text, drawing or pin now reaches players only where the fog surely leaves every cell of it revealed, so one that stands on the edge of the fog stays hidden until it is revealed whole, and a map whose image size Atlas could not read shows players nothing.
 
 ## Important changes
 
