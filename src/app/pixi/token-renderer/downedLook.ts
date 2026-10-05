@@ -1,4 +1,4 @@
-/** How a downed token looks. Part of the shared drawing contract; no PIXI imports. */
+/** How a downed token looks; the downed emblem and overlay read it, so the shared drawing contract matches. No PIXI imports. */
 export const DOWNED_LOOK = {
   /** The skull's height as a share of the token's diameter. */
   skullShare: 0.46,

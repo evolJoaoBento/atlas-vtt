@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { builtInPresetId } from '../../src/app/gameSystems/presets/presetHelpers';
 import { DEFAULT_CONE_ANGLE } from '../../src/app/grid/measurementFormat';
-import { collectionGridDefaultsFor, mapConeAngle, mapMeasurementSettings } from '../../src/app/services/mapMeasurementSettings';
+import { mapConeAngle, mapMeasurementSettings } from '../../src/app/services/mapMeasurementSettings';
 
 const assets = {
   getCollectionForMap: vi.fn(() => 'c'),
@@ -11,12 +11,6 @@ const assets = {
 describe('mapMeasurementSettings', () => {
   it("reads a map's collection, as before", () => {
     expect(mapMeasurementSettings(assets as never, { mapPath: 'a.atlasmap', grid: null })).toMatchObject({ unitType: 'meters', unitDistance: 2 });
-  });
-
-  it("reads a collection's grid defaults, and none outside a collection", () => {
-    expect(collectionGridDefaultsFor(assets as never, 'a.atlasmap')).toMatchObject({ unitType: 'meters' });
-    expect(collectionGridDefaultsFor({ getCollectionForMap: () => null } as never, 'a.atlasmap')).toBeNull();
-    expect(collectionGridDefaultsFor(assets as never, null)).toBeNull();
   });
 
   // Every other view gets `mapConeAngle`, the GM `mapMeasurementSettings`: one function.

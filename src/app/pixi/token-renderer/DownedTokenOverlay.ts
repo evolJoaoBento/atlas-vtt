@@ -5,6 +5,7 @@ import { addFilter, removeFilter } from '../utils/filterList';
 import { animateOnTicker } from '../utils/tickerMotion';
 import { EASE_OUT_CONTROL_POINTS } from '../../utils/motion';
 import { createDownedEmblemTexture, DOWNED_EMBLEM_TEXTURE_SIZE } from './downedEmblemTexture';
+import { DOWNED_LOOK } from './downedLook';
 import type { TokenGroupContainer } from './types';
 
 const MARKER_LABEL = 'downedMarker';
@@ -13,7 +14,7 @@ const MARKER_Z_INDEX = 5;
 /** The skull settles from this scale as it fades in. */
 const MARKER_ENTER_SCALE = 1.15;
 /** The skull is a quiet marker: the grey token already says most of it. */
-const MARKER_OPACITY = 0.72;
+const MARKER_OPACITY = DOWNED_LOOK.markerOpacity;
 const ENTER_DURATION_S = 0.5;
 const EXIT_DURATION_S = 0.35;
 /** Token parts that turn grey; the ring is rebuilt on resize, so `refresh` re-applies it. */

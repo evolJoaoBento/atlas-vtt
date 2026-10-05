@@ -1,7 +1,8 @@
 /**
  * Where a token's resource bars and nameplate sit, in UI units from the token's
  * bottom edge (the anchor `TokenUIRenderer` scales by the token UI scale), and
- * their look. Used by `TokenUIRenderer`, and part of the shared drawing contract; no PIXI imports.
+ * their look. `TokenUIRenderer` reads the nameplate and `ResourceBarView` the bars' look from here, so the
+ * shared drawing contract cannot drift from what Atlas draws; no PIXI imports.
  */
 import { barDimensions } from '../../styles/designTokens';
 import { NAMEPLATE_HEIGHT } from './tokenSizing';

@@ -1,18 +1,13 @@
 import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
 import { collectionConeAngle } from '../gameSystems/coneAngle';
 import type { ViewAtlasState } from '../storeFactory';
-import type { CollectionGridDefaults, CollectionSettings } from '../types/collectionSettingsTypes';
+import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { AssetService } from './AssetService';
 
 /** The settings of the collection holding the map at `mapPath`; null for a map outside a collection. */
 export function collectionSettingsFor(assetService: AssetService, mapPath: string | null): CollectionSettings | null {
   const collectionId = mapPath ? assetService.getCollectionForMap(mapPath) : null;
   return collectionId ? assetService.getCollectionSettings(collectionId) : null;
-}
-
-/** The grid defaults of the collection holding the map at `mapPath`; null for a map outside a collection. */
-export function collectionGridDefaultsFor(assetService: AssetService, mapPath: string | null): CollectionGridDefaults | null {
-  return collectionSettingsFor(assetService, mapPath)?.gridDefaults ?? null;
 }
 
 /**

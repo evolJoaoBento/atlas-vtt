@@ -1,5 +1,6 @@
 import { Texture } from 'pixi.js';
 import { WIDGET_ICON_PATHS } from '../../types/widgetIcons';
+import { DOWNED_LOOK } from './downedLook';
 
 /** Edge length of the rasterised emblem, large enough for big tokens on high-density screens. */
 export const DOWNED_EMBLEM_TEXTURE_SIZE = 384;
@@ -7,7 +8,7 @@ export const DOWNED_EMBLEM_TEXTURE_SIZE = 384;
 /** Widget icons are drawn on a 512×512 canvas. */
 const ICON_SPACE = 512;
 /** Skull height as a share of the emblem, which spans the token's diameter. */
-const SKULL_SHARE = 0.46;
+const SKULL_SHARE = DOWNED_LOOK.skullShare;
 /** Eye socket centres of the skull icon, in icon space. */
 const EYE_SOCKETS = [[166, 256], [346, 256]] as const;
 const EYE_GLOW_RADIUS = 70;
