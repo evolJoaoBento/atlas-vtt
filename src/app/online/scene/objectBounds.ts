@@ -1,6 +1,5 @@
 /** World-space bounds of scene objects, to test them against the fog coverage. */
 import { tokenDiameterInCells } from '../../pixi/token-renderer/tokenSizing';
-import type { TextElement } from '../../types';
 import { finiteOr, positiveOr, positiveOrNull, textOr, textOrNull } from './coerce';
 import type { WorldBounds } from './FogCoverage';
 import type { PlayerDrawing } from './sceneTypes';
@@ -9,6 +8,30 @@ export const DEFAULT_GRID_SIZE = 70;
 export const DEFAULT_FONT_SIZE = 16;
 /** Widest glyph width and line height in font sizes: the GM side over-estimates text boxes (never smaller than drawn), it does not measure them. */
 export const TEXT_CHAR_WIDTH = 1;
+/** Code points from here on (CJK, emoji and the like) are drawn up to this many times as wide as `TEXT_CHAR_WIDTH`. */
+export const WIDE_CHAR_FROM = 0x2e80;
+export const WIDE_CHAR_WIDTH = 2;
+
+/** A line's width in font sizes, counting code points: a wide one counts for `WIDE_CHAR_WIDTH` of them. */
+function lineEms(line: string): number {
+  let ems = 0;
+  for (const char of line) ems += (char.codePointAt(0)! >= WIDE_CHAR_FROM ? WIDE_CHAR_WIDTH : 1) * TEXT_CHAR_WIDTH;
+  return ems;
+}
+
+/** What `textBounds` reads: a GM record or the text as players are sent it. */
+export interface TextBoxSource {
+  x?: unknown;
+  y?: unknown;
+  text?: unknown;
+  fontSize?: unknown;
+  backgroundColor?: unknown;
+  padding?: unknown;
+  scale?: unknown;
+  width?: unknown;
+  height?: unknown;
+  rotation?: unknown;
+}
 export const TEXT_LINE_HEIGHT = 1.25;
 
 /** A token's footprint: its cells (at least one) times the grid size, centred on the token. */
@@ -21,14 +44,14 @@ export function tokenBounds(token: { x: number; y: number; size: number }, gridS
  * A text's estimated box, centred on its position like `TextRenderer` draws it.
  * A rotated text gets a square of the box's diagonal, which holds it at any angle.
  */
-export function textBounds(text: TextElement): WorldBounds {
+export function textBounds(text: TextBoxSource): WorldBounds {
   const fontSize = positiveOr(text.fontSize, DEFAULT_FONT_SIZE);
   // `TextRenderer` draws a background with `padding || 8`, and none without one.
   const hasBackground = textOrNull(text.backgroundColor) !== null;
   const padding = hasBackground ? Math.max(0, finiteOr(text.padding, 0)) || 8 : Math.max(0, finiteOr(text.padding, 0));
   const scale = positiveOr(text.scale, 1);
   const lines = textOr(text.text, '').split('\n');
-  const longest = lines.reduce((max, line) => Math.max(max, line.length), 1);
+  const longest = lines.reduce((max, line) => Math.max(max, lineEms(line)), 1);
   const width = (Math.max(positiveOrNull(text.width) ?? 0, longest * fontSize * TEXT_CHAR_WIDTH) + 2 * padding) * scale;
   const height = (Math.max(positiveOrNull(text.height) ?? 0, lines.length * fontSize * TEXT_LINE_HEIGHT) + 2 * padding) * scale;
   const rotated = finiteOr(text.rotation, 0) % 360 !== 0;
