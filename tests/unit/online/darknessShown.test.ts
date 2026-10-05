@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { darknessOf } from '../../../src/app/online/scene/darknessFog';
+import { darknessOf, shownByScan } from '../../../src/app/online/scene/darknessFog';
 import { darknessCellSize, type DarknessRaster } from '../../../src/app/online/scene/darknessRaster';
 import type { LightingFrame } from '../../../src/app/online/scene/LiveLighting';
 import { drawingBounds, textBounds } from '../../../src/app/online/scene/objectBounds';
@@ -26,7 +26,7 @@ function stroke(id: string, points: Array<{ x: number; y: number }>, width: numb
   return { id, kind: 'drawing', timestamp: 1, type: 'pen', points, color: '#ff0000', width, opacity: 1 };
 }
 
-describe('texts and drawings are sent only where the darkness is proven shown', () => {
+describe('texts and drawings are sent only where the darkness is shown, cell by cell', () => {
   it('sends nothing on an all-dark map whose size is not a multiple of the fog cells', () => {
     const map = { width: 1003, height: 797 };
     const frame = frameOf(raster(map, () => true));
@@ -116,5 +116,32 @@ describe('the text box is checked as players draw it', () => {
     expect(sentWith(224, { latin: words('latin', 100, 'abcdefghij', {}) })).toEqual(['latin']);
     // Astral characters are one code point each, not two units.
     expect(sentWith(224, { emoji: words('emoji', 100, '😀😀😀😀😀', {}) })).toEqual(['emoji']);
+  });
+});
+
+describe('the summed-area table answers as the scan of the cells does', () => {
+  it('agrees over random rasters and bounds, inside, across, on and outside the map edge', () => {
+    let seed = 99;
+    const random = (): number => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+    let shown = 0;
+    let hidden = 0;
+    for (let round = 0; round < 60; round++) {
+      const map = { width: Math.floor(40 + random() * 600) | 1, height: Math.floor(40 + random() * 600) | 1 };
+      const density = random() * 0.15;
+      // One dark cell at least: a raster with none is `NO_DARKNESS`, which leaves bounds outside the map to its caller.
+      const grid = raster(map, (col, row) => (col === 0 && row === 0) || random() < density);
+      const darkness = darknessOf(grid);
+      for (let i = 0; i < 200; i++) {
+        const x = -40 + random() * (map.width + 80);
+        const y = -40 + random() * (map.height + 80);
+        const bounds = { x, y, width: random() < 0.1 ? 0 : random() * 120, height: random() < 0.1 ? 0 : random() * 120 };
+        const expected = shownByScan(grid, bounds);
+        expect(darkness.shown(bounds), `round ${round}`).toBe(expected);
+        if (expected) shown++; else hidden++;
+      }
+    }
+    // The comparison is not a trivial one.
+    expect(shown).toBeGreaterThan(100);
+    expect(hidden).toBeGreaterThan(100);
   });
 });
