@@ -21,6 +21,9 @@ describe("what a remote view takes from its owner", () => {
       { ...remoteScene(), background: { url: null, width: -1, height: 10 } },
       { ...remoteScene(), background: { url: null, width: MAX_REMOTE_MAP_SIDE + 1, height: 10 } },
       { ...remoteScene(), tokenImages: { t1: 7 } },
+      { ...remoteScene(), tokenImages: { t1: 'Art/goblin.png' } },
+      { ...remoteScene(), background: { url: 'Maps/cave.png', width: 10, height: 10 } },
+      { ...remoteScene(), background: { url: 'file:///etc/cave.png', width: 10, height: 10 } },
       { ...remoteScene(), objects: { tokens: {} } },
     ];
     for (const scene of bad) expect(() => checkedScene(scene)).toThrow(/RemoteView.setScene/);

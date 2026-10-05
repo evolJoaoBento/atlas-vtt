@@ -911,7 +911,7 @@ export declare interface RemotePlayerState {
 }
 
 export declare interface RemoteSceneInput {
-    /** Records in Atlas's own types; images by URL (object URLs are released by the caller after replacing them). */
+    /** Records in Atlas's own types; images by `blob:`, `data:` or `https:` URL, never a path (object URLs are released by the caller after replacing them). */
     background: {
         url: string | null;
         width: number;
@@ -926,7 +926,7 @@ export declare interface RemoteSceneInput {
     /** Token image URL by token id. A token's `notePath` and `statblockPath` are dropped: they name another vault's notes. */
     tokenImages: Readonly<Record<string, string | null>>;
     widgets: SceneSnapshot['widgets'];
-    /** The initiative list shows whenever `entries` is non-empty. */
+    /** The initiative list shows whenever `entries` is non-empty. An entry's `statblockPath` is dropped, and an `imagePath` that is not an image URL shows no avatar. */
     initiative: InitiativeState;
 }
 
@@ -961,8 +961,10 @@ export declare interface RemoteStatusAction {
 export declare interface RemoteView {
     readonly viewId: ViewId;
     /**
-     * Shows the scene: copied, so the caller keeps no reference into Atlas, and the snapshot is loaded with the map path
-     * `remote:<viewId>`. Null shows an empty, unloaded scene. A record handed again as the same object is not copied again.
+     * Shows the scene: read once and copied, so the caller keeps no reference into Atlas and nothing it changes later gets
+     * past the checks, and the snapshot is loaded with the map path `remote:<viewId>`. Null shows an empty, unloaded scene.
+     * A record handed again as the same object is not copied again. A malformed scene, or a record that is not plain data,
+     * throws and the scene shown stays.
      */
     setScene(scene: RemoteSceneInput | null): void;
     /** Says what the player may do and how their tokens show; a part equal by value to the one shown is kept, so nothing it draws redraws. */

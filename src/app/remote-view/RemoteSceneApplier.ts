@@ -1,13 +1,16 @@
 /**
- * Writes a remote view's scene (`RemoteSceneInput`) into its store. A record is copied (deep,
- * frozen) only when the extension hands a different object for it or a token's image URL
- * changed, and a store field is written only when it changed, so Atlas's renderers redraw what a
- * local edit would make them redraw and the extension keeps no reference into the store. Writes
- * are untracked: the remote store records no history anyway.
+ * Writes a remote view's scene (`RemoteSceneInput`, as `checkedScene` took it) into its store. A
+ * record is copied (deep, frozen) only when the extension hands a different object for it, a value
+ * equal to the one shown keeps its copy, and a store field is written only when it changed, so
+ * Atlas's renderers redraw what a local edit would make them redraw and the extension keeps no
+ * reference into the store. Writing the scene again (after a drag) reads only those copies, never
+ * the extension's objects. Writes are untracked: the remote store records no history anyway.
  */
 import type { StoreApi } from 'zustand';
 import type { RemoteSceneInput } from '../../api/types/remoteViews';
 import { frozenCopy } from '../../api/frozen';
+import { sameValue } from '../utils/sameValue';
+import { isRemoteImageUrl } from './remoteInput';
 import type { ViewAtlasState } from '../storeFactory';
 import { runUntracked } from '../stores/history';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
@@ -56,15 +59,18 @@ class RecordMemo<S, A> {
   }
 }
 
-/** A frozen copy of one value, made again only when the extension hands a different object. */
+/** A frozen copy of one value, made again only when the extension hands a different object that differs in value. */
 class KeptCopy<T> {
   private source: T | undefined;
   private copy: T | undefined;
 
+  constructor(private readonly convert: (source: T) => T = frozenCopy) {}
+
   of(source: T): T {
     if (this.copy === undefined || source !== this.source) {
       this.source = source;
-      this.copy = frozenCopy(source);
+      const copy = this.convert(source);
+      if (this.copy === undefined || !sameValue(copy, this.copy)) this.copy = copy;
     }
     return this.copy;
   }
@@ -72,15 +78,22 @@ class KeptCopy<T> {
 
 /** A remote token's links into a vault are not this vault's: the view never reads the player's own notes by them. */
 function withoutVaultLinks(token: TokenEntity): TokenEntity {
-  if (token.kind !== 'character') return token;
-  const { notePath: _note, statblockPath: _statblock, ...rest } = token;
+  const { notePath: _note, statblockPath: _statblock, ...rest } = token as TokenEntity & { notePath?: string; statblockPath?: string };
   return rest;
+}
+
+/** The initiative list without links into the owner's vault: an avatar shows only from an image URL, and no statblock opens. */
+function initiativeWithoutVaultLinks(initiative: InitiativeState): InitiativeState {
+  const entries = initiative.entries.map(({ statblockPath: _statblock, ...entry }) => ({ ...entry, imagePath: isRemoteImageUrl(entry.imagePath) ? entry.imagePath : '' }));
+  return frozenCopy({ ...initiative, entries });
 }
 
 const copyRecord = <T>(_id: string, record: T): T => frozenCopy(record);
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 
 export class RemoteSceneApplier {
+  /** The extension's tokens, copied once each; `tokens` places those copies, so writing again never reads the extension's. */
+  private readonly tokenCopies = new RecordMemo<TokenEntity, TokenEntity>();
   private readonly tokens = new RecordMemo<TokenEntity, TokenEntity>();
   private readonly fog = new RecordMemo<FogOperation, FogOperation>();
   private readonly texts = new RecordMemo<TextElement, TextElement>();
@@ -88,7 +101,7 @@ export class RemoteSceneApplier {
   private readonly grid = new KeptCopy<GridState>();
   private readonly widgets = new KeptCopy<WidgetSettings>();
   private readonly values = new KeptCopy<Readonly<Record<string, number>>>();
-  private readonly initiative = new KeptCopy<InitiativeState>();
+  private readonly initiative = new KeptCopy<InitiativeState>(initiativeWithoutVaultLinks);
   private readonly emptyInitiative: InitiativeState;
   private scene: RemoteSceneInput | null = null;
 
@@ -105,21 +118,23 @@ export class RemoteSceneApplier {
     this.emptyInitiative = store.getState().initiative;
   }
 
-  /** Shows `scene`, or an empty, unloaded scene for null. */
+  /**
+   * Shows `scene`, or an empty, unloaded scene for null. Throws, keeping the scene shown, when a record cannot be
+   * copied (a function or a typed array in it).
+   */
   apply(scene: RemoteSceneInput | null): void {
+    const next = scene ? this.stateOf(scene) : this.emptyState();
     this.scene = scene;
-    this.write();
+    this.write(next);
   }
 
   /** Writes the last scene again. */
   refresh(): void {
-    this.write();
+    this.write(this.scene ? this.stateOf(this.scene) : this.emptyState());
   }
 
-  private write(): void {
-    const { scene } = this;
+  private write(next: ReturnType<RemoteSceneApplier['stateOf']>): void {
     const state = this.store.getState();
-    const next = scene ? this.stateOf(scene) : this.emptyState();
     const update: Partial<ViewAtlasState> = {};
     for (const key of Object.keys(next) as Array<keyof typeof next>) {
       if (key !== 'objects' && state[key] !== next[key]) Object.assign(update, { [key]: next[key] });
@@ -148,7 +163,7 @@ export class RemoteSceneApplier {
       grid: scene.grid ? this.grid.of(scene.grid) : NO_GRID,
       objects: {
         // A token without an image URL draws as Atlas's default token.
-        tokens: this.tokens.build(scene.objects.tokens, shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
+        tokens: this.tokens.build(this.tokenCopies.build(scene.objects.tokens, () => '', copyRecord), shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
         fog: this.fog.build(scene.objects.fog, () => '', copyRecord),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),
@@ -169,7 +184,7 @@ export class RemoteSceneApplier {
       background: null,
       grid: NO_GRID,
       objects: {
-        tokens: this.tokens.build(none, () => '', copyRecord),
+        tokens: this.tokens.build(this.tokenCopies.build(none, () => '', copyRecord), () => '', copyRecord),
         fog: this.fog.build(none, () => '', copyRecord),
         texts: this.texts.build(none, () => '', copyRecord),
         drawings: this.drawings.build(none, () => '', copyRecord),

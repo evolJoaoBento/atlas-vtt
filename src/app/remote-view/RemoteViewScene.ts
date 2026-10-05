@@ -55,14 +55,22 @@ export class RemoteViewScene {
 
   setScene(input: unknown): void {
     const scene = checkedScene(input);
-    this.applier.apply(scene);
+    try {
+      this.applier.apply(scene);
+    } catch (error) {
+      throw new Error(`RemoteView.setScene: a record could not be copied (${error instanceof Error ? error.message : String(error)}).`);
+    }
     this.background = scene ? { ...scene.background } : null;
     this.showBackdrop();
   }
 
-  /** Writes the last scene again: a token's shown position changed (a drag ended). */
+  /** Writes the last scene again: a token's shown position changed (a drag ended). Reached from pointer handling, so it never throws. */
   refresh(): void {
-    this.applier.refresh();
+    try {
+      this.applier.refresh();
+    } catch (error) {
+      console.error('[Atlas API] A remote view could not write its scene again:', error);
+    }
   }
 
   setPlayer(input: unknown): void {

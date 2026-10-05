@@ -21,26 +21,65 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isSide = (value: unknown): boolean => isFiniteNumber(value) && value >= 0 && value <= MAX_REMOTE_MAP_SIDE;
-const isUrl = (value: unknown): boolean => value === null || typeof value === 'string';
+/** An image a remote view may load: never a path, which would read the player's own vault. */
+export const isRemoteImageUrl = (value: unknown): value is string => typeof value === 'string' && /^(?:blob:|data:|https:)/i.test(value);
+const isUrl = (value: unknown): boolean => value === null || isRemoteImageUrl(value);
 
 function fail(method: string, what: string): never {
   throw new Error(`RemoteView.${method}: ${what}.`);
 }
 
-export function checkedScene(scene: unknown): RemoteSceneInput | null {
-  if (scene === null) return null;
-  const objects = isObject(scene) ? scene.objects : null;
-  const shaped = isObject(scene) && isObject(scene.background) && isObject(objects) && isObject(scene.widgets)
-    && isObject(scene.tokenImages) && isObject(scene.initiative) && 'grid' in scene
-    && ['tokens', 'texts', 'drawings', 'fog'].every((kind) => isObject(objects[kind]));
+/** `value`'s own entries in a new object, each read once; ids such as "__proto__" stay own properties. */
+function ownEntries(value: unknown): Record<string, unknown> | null {
+  if (!isObject(value)) return null;
+  const copy: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) Object.defineProperty(copy, key, { value: entry, enumerable: true, writable: true, configurable: true });
+  return copy;
+}
+
+/**
+ * The scene's parts, each read once, so neither a getter nor a later change gets past the checks: the background, the
+ * token image URLs and the grid are copied; the records are kept by reference and copied (frozen) when shown.
+ */
+function takenScene(scene: Record<string, unknown>): Record<string, unknown> {
+  const { background, grid, objects, widgets, tokenImages, initiative } = scene;
+  const kinds = ownEntries(objects);
+  const records = kinds && Object.fromEntries(OBJECT_KINDS.map((kind) => [kind, ownEntries(kinds[kind])]));
+  return {
+    background: isObject(background) ? { url: background.url, width: background.width, height: background.height } : null,
+    grid: isObject(grid) ? frozenCopy(grid) : grid,
+    objects: records,
+    tokenImages: ownEntries(tokenImages),
+    widgets: isObject(widgets) ? { settings: widgets.settings, values: widgets.values } : null,
+    initiative,
+  };
+}
+
+const OBJECT_KINDS = ['tokens', 'texts', 'drawings', 'fog'] as const;
+const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/** The scene, read once and checked; the result holds no getter of the caller's. */
+export function checkedScene(input: unknown): RemoteSceneInput | null {
+  if (input === null) return null;
+  if (!isObject(input)) fail('setScene', 'the scene must be a RemoteSceneInput, or null');
+  let scene: Record<string, unknown>;
+  try {
+    scene = takenScene(input);
+  } catch (error) {
+    fail('setScene', `the scene could not be read (${message(error)})`);
+  }
+  const objects = scene.objects as Record<string, unknown> | null;
+  const widgets = scene.widgets as Record<string, unknown> | null;
+  const shaped = isObject(scene.background) && objects !== null && OBJECT_KINDS.every((kind) => objects[kind] !== null)
+    && widgets !== null && isObject(widgets.settings) && isObject(widgets.values) && scene.tokenImages !== null && isObject(scene.initiative);
   if (!shaped) fail('setScene', 'the scene must be a RemoteSceneInput, or null');
   const background = scene.background as Record<string, unknown>;
   const tokenImages = scene.tokenImages as Record<string, unknown>;
-  if (!isUrl(background.url)) fail('setScene', '"background.url" must be a string or null');
+  if (!isUrl(background.url)) fail('setScene', '"background.url" must be a blob:, data: or https: URL, or null');
   if (!isSide(background.width) || !isSide(background.height)) {
     fail('setScene', `"background.width" and "background.height" must be numbers from 0 to ${MAX_REMOTE_MAP_SIDE}`);
   }
-  if (!Object.values(tokenImages).every(isUrl)) fail('setScene', 'every "tokenImages" value must be a string or null');
+  if (!Object.values(tokenImages).every(isUrl)) fail('setScene', 'every "tokenImages" value must be a blob:, data: or https: URL, or null');
   const gridError = scene.grid === null ? null : gridProblem(scene.grid, { width: background.width as number, height: background.height as number });
   if (gridError) fail('setScene', gridError);
   return scene as unknown as RemoteSceneInput;
@@ -57,8 +96,14 @@ const isDefinition = (value: unknown): boolean => isObject(value) && typeof valu
 const isCondition = (value: unknown): boolean => isObject(value) && typeof value.id === 'string' && typeof value.name === 'string';
 const isHealth = (value: unknown): boolean => isObject(value) && isFiniteNumber(value.value) && isFiniteNumber(value.max);
 
-/** The player's state, checked and copied (deep, frozen). */
-export function checkedPlayer(state: unknown): RemotePlayerState & { measurement: MeasurementSettings } {
+/** The player's state, copied (deep, frozen) and then checked, so nothing the caller changes afterwards gets past the checks. */
+export function checkedPlayer(input: unknown): RemotePlayerState & { measurement: MeasurementSettings } {
+  let state: unknown;
+  try {
+    state = structuredClone(input);
+  } catch (error) {
+    fail('setPlayer', `the state could not be copied (${message(error)})`);
+  }
   if (!isObject(state) || !isObject(state.tokenUi) || !isObject(state.initiative)) fail('setPlayer', 'the state must be a RemotePlayerState');
   const { movableTokenIds, measurement, tokenUi, initiative } = state;
   if (!Array.isArray(movableTokenIds) || !movableTokenIds.every((id) => typeof id === 'string')) fail('setPlayer', '"movableTokenIds" must be a list of token ids');
