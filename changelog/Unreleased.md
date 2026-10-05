@@ -3,11 +3,11 @@
 - Extension API: read open map views and their scenes, the rules of a map's collection, the laser, dice and player view settings, and a data folder per extension
 - Extension API: other Obsidian plugins can connect to Atlas through `app.plugins.plugins['atlas-vtt'].api`, which announces itself with the `atlas-vtt:api-ready` workspace event and tidies up every extension's additions when Atlas unloads. See docs/extension-api.md
 - Extension API: present a scene, follow which scene players see, and add an audience besides the player window
-- Extension API: roll dice by a map's collection rules on someone's behalf, hear every roll, and add rolls made elsewhere to the log
+- Extension API: roll dice by a map's collection rules on someone's behalf, hear every roll, and add rolls made elsewhere to the log. A roll made for someone other than the GM shows who rolled it in the dice log and toasts, appears as a result card instead of being thrown on the GM's map, and is never saved in the map file
 - Extension API: follow the GM's laser in a view and draw other people's lasers there, fading like Atlas's own
 - Extension API: ask what the player window shows of a lit scene, token by token and cell by cell, failing closed while sight is not ready
 - Extension API: move tokens like a GM drag (snapped, kept on the map, one undo step), and ask where a dropped token lands
-- Extension API: other plugins can add toolbar buttons, command palette sections, dashboard tiles, entries in a map's More options and a token's menu, and floating panels in Atlas's style
+- Extension API: other plugins can add toolbar buttons, command palette sections, dashboard tiles (an odd last tile takes the whole row), entries in a map's More options and a token's menu, and floating panels in Atlas's style
 - Extension API: list scenes, keep an extension's own data on a scene (never exported), read a saved map without opening it, add a scene with its images in one step, and keep note properties out of exports
 - Extension API: a presented scene carries a `presentationId`, the same while the scene is held and resumed and new for each presentation, so an extension no longer has to guess whether it is the one it knows
 - Extension API: note properties an extension asks to keep out of exports stay stripped while that extension is switched off, until it removes them itself, which `bundles.forgetNoteProperties` also does
@@ -26,8 +26,6 @@
 ## Improved
 
 - The presented scene keeps its marker on the scene tab until you choose Stop presenting, and an open player window follows the scene you present from anywhere. New commands: Present to players, Stop presenting
-- A collection's cone angle is read through one function for the measure tool everywhere, so every view measures cones with the same angle
-- Rolls made by someone other than the GM show who rolled them in the dice log and toasts, appear as a result card instead of being thrown on the GM's map, and are never saved in the map file
 
 ## Fixed
 
@@ -37,9 +35,11 @@
 - Fog that did not change is no longer redrawn when other fog changes
 - The automatic grid colour no longer fails on a map whose texture is not an image
 - Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
-- An odd last tile on the dashboard takes the whole row instead of leaving half of it empty
+- A cone angle edited by hand to a value no cone can open with measures as 90 degrees, in every view alike
+- Renaming a map while its explored areas wait to be saved saves them into the renamed map
+- A statblock note rewritten on export keeps its byte order mark
 - A widget, condition or game system preset whose icon name is not one of Atlas's icons but a built-in word such as `constructor` shows the default icon, or the condition's initial, instead of an empty badge
 
 ## Important changes
 
-- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it.
+- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it. Exporting a collection reads each asset's record file to make sure.
