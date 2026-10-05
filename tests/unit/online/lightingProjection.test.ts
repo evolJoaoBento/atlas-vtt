@@ -95,6 +95,19 @@ describe('dynamic lighting for online players', () => {
     expect(Object.keys(projected.drawings)).toEqual(['in']);
   });
 
+  it('leaves out an item that only touches the map edge from outside, and sends one touching it from inside', () => {
+    const box = (id: string, x: number): TextElement => ({ ...text(id, x, 200), width: 100, height: 20 } as TextElement);
+    const line = (id: string, from: number, to: number): DrawingStroke => ({ ...drawing(id, from, 600), points: [{ x: from, y: 600 }, { x: to, y: 600 }] });
+    // Drawings grow by their width (2) on each side: points -60..-2 end at x = 0, 1002..1060 start at 1000.
+    const state = scene({ ambient: 1 }, {
+      texts: { left: box('left', -50), right: box('right', 1050), inside: box('inside', 950) },
+      drawings: { left: line('left', -60, -2), right: line('right', 1002, 1060), inside: line('inside', 900, 998) },
+    });
+    const projected = projectLit(state);
+    expect(Object.keys(projected.texts)).toEqual(['inside']);
+    expect(Object.keys(projected.drawings)).toEqual(['inside']);
+  });
+
   it('covers what no light reaches at night, shows what the torch lights and the hero standing in the dark', () => {
     const projected = projectLit(torchlit());
     expect(isDark(projected, { x: 400, y: 400 })).toBe(false);
