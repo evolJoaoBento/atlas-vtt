@@ -1,7 +1,7 @@
 /**
  * What extensions keep on scene records (`data.extensions`) belongs to this vault: it never travels in a
  * bundle, a copy or a fingerprint, so an exported scene carries none and an installed one starts without.
- * A `data.sharing` that an older Atlas left on a record is dropped the same way, and so are `data.createdBy`, the
+ * A `data.sharing` that a fork of Atlas left on a record is dropped the same way, and so are `data.createdBy`, the
  * extension that added the scene, and `data.createdImages`, the images Atlas wrote for it: a copy or an installed
  * scene is the GM's, never an extension's to replace. Registered note properties
  * (`bundleNoteKeys`) are stripped from exported and installed notes likewise.

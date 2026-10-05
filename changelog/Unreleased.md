@@ -42,4 +42,4 @@
 
 ## Important changes
 
-- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it. Map shares saved by the online preview are kept for the extension that reads them and are never exported either
+- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it.

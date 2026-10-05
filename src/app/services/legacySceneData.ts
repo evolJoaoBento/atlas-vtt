@@ -2,8 +2,9 @@ import type { Json } from '../../api/types/common';
 import type { Asset } from './AssetService';
 
 /**
- * Atlas versions before the extension API kept a map share on the scene record as `data.sharing`.
- * It moves to `data.extensions[LEGACY_SHARING_EXTENSION_ID]` once, so the extension that wrote it finds it.
+ * Vaults from a fork of Atlas can hold a map share on the scene record as `data.sharing`; Atlas itself never wrote
+ * one. It moves to `data.extensions[LEGACY_SHARING_EXTENSION_ID]` once, the id of the extension that now reads those
+ * shares, so they are kept as extension data: never exported, copied or synced. A record without `sharing` is untouched.
  */
 export const LEGACY_SHARING_EXTENSION_ID = 'atlas-vtt-connect';
 

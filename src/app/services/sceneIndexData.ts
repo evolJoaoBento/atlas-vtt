@@ -1,7 +1,7 @@
 /**
  * What a scene record keeps in the asset index alone, never in its library record file, a bundle, a copy or a
  * fingerprint: the data extensions keep on it (`data.extensions`), the extension that added it (`data.createdBy`)
- * and the images Atlas wrote for that extension (`data.createdImages`), plus a `data.sharing` an older Atlas left.
+ * and the images Atlas wrote for that extension (`data.createdImages`), plus a `data.sharing` a fork of Atlas left.
  * `createdBy` and `createdImages` are permissions (`scenes.replaceMap` acts on them), so they are only ever taken
  * from this device's index, never from a file someone may have copied, edited or forged, and they hold only for the
  * map the index named: a file that moves the scene to another map drops them.
