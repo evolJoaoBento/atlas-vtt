@@ -22,9 +22,11 @@ export class AtlasApiHost {
   /** What those callbacks reach the host through; cleared on dispose so an old host is not retained. */
   private readonly link: { host: AtlasApiHost | null } = { host: this };
   private disposed = false;
+  private readonly capabilities: ReadonlySet<AtlasCapability>;
 
   constructor(private readonly options: ApiHostOptions) {
-    const capabilities = new Set<string>(options.capabilities);
+    this.capabilities = new Set<AtlasCapability>(options.capabilities);
+    const capabilities = this.capabilities;
     this.api = Object.freeze({
       version: API_VERSION,
       has: (capability: AtlasCapability): boolean => capabilities.has(capability),
@@ -74,7 +76,7 @@ export class AtlasApiHost {
       const link = this.link;
       plugin.register(() => link.host?.release(id, plugin));
     }
-    return this.options.build({ id, disposers, events: this.events });
+    return this.options.build({ id, disposers, events: this.events, capabilities: this.capabilities });
   }
 
   /** The extension plugin unloaded: dispose its current connection, unless a newer plugin object took the id. */

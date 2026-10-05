@@ -123,7 +123,7 @@ export function trackerWith(views: FakeView[], active: () => FakeView | null = (
   const { app, layoutChanged } = workspaceWith(views, active);
   const events = new ApiEvents();
   const tracker = new ViewTracker(app, events, {
-    viewType: 'atlas-vtt',
+    viewTypes: ['atlas-vtt'],
     isMapView: (view): view is TrackedMapView => typeof view === 'object' && view !== null && 'atlasStore' in view,
     activeView: (workspaceApp) => (workspaceApp.workspace as unknown as { getActiveViewOfType(): unknown }).getActiveViewOfType(),
   });

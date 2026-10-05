@@ -5,7 +5,7 @@ import type { CameraViewport } from '../app/services/presentedCamera';
 import type { ViewAtlasStore } from '../app/storeFactory';
 import type { TabMetaStore } from '../app/stores/tabMetaStore';
 import type { ApiEvents } from './events';
-import { isLoaded, viewInfo } from './viewInfo';
+import { isLoaded, isRemoteView, viewInfo } from './viewInfo';
 
 /** What the API reads of an open Atlas map view (`AtlasView` provides it). */
 export interface TrackedMapView {
@@ -28,7 +28,8 @@ export interface TrackedMapView {
 
 /** How the tracker recognises Atlas map views; injected so it never loads the view's code itself (`atlasViewHooks.ts` holds the real ones). */
 export interface ViewHooks {
-  readonly viewType: string;
+  /** The leaf types that hold Atlas map views: Atlas's own and the remote view. */
+  readonly viewTypes: readonly string[];
   isMapView(view: unknown): view is TrackedMapView;
   /** The view the user is working in, if it is an Atlas map view. */
   activeView(app: App): unknown;
@@ -69,11 +70,16 @@ export class ViewTracker {
     return view && !view.isClosed ? view : null;
   }
 
-  /** The active map view, once tracked and open. */
+  /** The active map view, once tracked and open; never a remote view. */
   activeView(): TrackedMapView | null {
     const active = this.hooks.activeView(this.app);
-    if (!this.hooks.isMapView(active)) return null;
+    if (!this.hooks.isMapView(active) || isRemoteView(active)) return null;
     return this.view(active.viewId) === active ? active : null;
+  }
+
+  /** Tracks `view` now, without waiting for the layout change that would find it. */
+  adopt(view: TrackedMapView): void {
+    if (!view.isClosed && !this.entries.has(view.viewId)) this.track(view);
   }
 
   /** Calls `callback` once when the view closes (before `map-closed`); the returned function cancels it. A view not open runs nothing. */
@@ -85,9 +91,11 @@ export class ViewTracker {
   }
 
   private scan(): void {
-    for (const leaf of this.app.workspace.getLeavesOfType(this.hooks.viewType)) {
-      const view: unknown = leaf.view;
-      if (this.hooks.isMapView(view) && !view.isClosed && !this.entries.has(view.viewId)) this.track(view);
+    for (const type of this.hooks.viewTypes) {
+      for (const leaf of this.app.workspace.getLeavesOfType(type)) {
+        const view: unknown = leaf.view;
+        if (this.hooks.isMapView(view)) this.adopt(view);
+      }
     }
   }
 

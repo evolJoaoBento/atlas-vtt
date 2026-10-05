@@ -7,12 +7,17 @@ export function isLoaded(state: Pick<ViewAtlasState, 'mapLoaded' | 'isMapLoading
   return state.mapLoaded && !state.isMapLoading;
 }
 
+/** A remote view (`remoteViews.open`): its store has a remote part, and no other view's does. */
+export function isRemoteView(view: Pick<TrackedMapView, 'atlasStore'>): boolean {
+  return view.atlasStore.getState().remoteView !== null;
+}
+
 export function viewInfo(view: TrackedMapView): ViewInfo {
   const state = view.atlasStore.getState();
   const { tabs, activeTabId } = view.tabMetaStore.getState();
   return {
     viewId: view.viewId,
-    kind: 'map',
+    kind: isRemoteView(view) ? 'remote' : 'map',
     activeTabId,
     tabs: tabs.map((tab) => ({ tabId: tab.id, mapPath: tab.filePath, name: tab.displayName })),
     mapPath: state.mapPath,

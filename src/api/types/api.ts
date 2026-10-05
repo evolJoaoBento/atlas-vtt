@@ -4,6 +4,7 @@ import type { DiceApi } from './dice';
 import type { LasersApi } from './lasers';
 import type { LightingApi } from './lighting';
 import type { PresentationApi } from './presentation';
+import type { RemoteViewsApi } from './remoteViews';
 import type { RulesApi } from './rules';
 import type { BundlesApi, ScenesApi } from './scenes';
 import type { AtlasSettingKey, SettingsApi, StorageApi } from './settings';
@@ -53,5 +54,7 @@ export interface AtlasExtension {
   readonly ui: UiApi;
   readonly scenes: ScenesApi;
   readonly bundles: BundlesApi;
+  /** Only when `has('remote-view')`. */
+  readonly remoteViews?: RemoteViewsApi;
   on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }

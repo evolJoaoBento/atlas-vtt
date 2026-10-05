@@ -15,7 +15,7 @@ vi.mock('../../src/app/services/AssetService', () => ({
 vi.mock('../../src/app/services/presentToPlayers', () => ({ presentTabToPlayers: vi.fn(), stopPresenting: vi.fn() }));
 
 vi.mock('../../src/api/atlasViewHooks', () => ({
-  ATLAS_VIEW_HOOKS: { viewType: 'atlas-vtt', isMapView: (): boolean => false, activeView: (): null => null },
+  ATLAS_VIEW_HOOKS: { viewTypes: ['atlas-vtt'], isMapView: (): boolean => false, activeView: (): null => null },
 }));
 
 import type AtlasVTTPlugin from '../../main';

@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.11.0";
+export declare const API_VERSION = "1.12.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -50,6 +50,8 @@ export declare interface AtlasExtension {
     readonly ui: UiApi;
     readonly scenes: ScenesApi;
     readonly bundles: BundlesApi;
+    /** Only when `has('remote-view')`. */
+    readonly remoteViews?: RemoteViewsApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -735,7 +737,7 @@ export declare interface PresentationApi {
     current(): PresentedSceneInfo | null;
     /**
      * Switches `viewId` to `tabId` (default: its active tab), waits for the load, presents. Never throws.
-     * False for a closed view or when nothing new is on screen. After a failed load the scene stays registered
+     * False for a closed view, a remote view, or when nothing new is on screen. After a failed load the scene stays registered
      * as presented but held (`current().held === true`), and `presented(scene, true)` follows if its map later loads.
      */
     present(viewId: ViewId, tabId?: string): Promise<boolean>;
@@ -790,6 +792,38 @@ export declare interface RemoteLaser {
     lifted: boolean;
     /** Milliseconds from each point to the one before it in the stroke, when the sender timed them. */
     dt?: ReadonlyArray<number>;
+}
+
+export declare interface RemoteStatus {
+    title: string;
+    connection: string;
+    tone: 'connected' | 'pending' | 'ended';
+    message: string | null;
+    action?: {
+        label: string;
+        run(): void;
+    };
+}
+
+/**
+ * A remote view: read-only, never saved, with no undo history. Every method does nothing once the view closed, and every
+ * listener runs guarded and is dropped when the view closes. `views.*` and `lasers.*` take its `viewId`;
+ * `views.active()` never returns it, and `tokens.move` and `presentation.present` refuse it.
+ */
+export declare interface RemoteView {
+    readonly viewId: ViewId;
+    /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
+    onClose(listener: () => void): Disposer;
+    close(): void;
+}
+
+export declare interface RemoteViewsApi {
+    /** Opens (or reveals, with `reuse`) a tab of type `atlas-vtt-remote`, owned by the calling extension. */
+    open(options: {
+        title: string;
+        icon?: string;
+        reuse?: boolean;
+    }): Promise<RemoteView>;
 }
 
 export declare interface ResourceDefinition {
@@ -1075,7 +1109,7 @@ export declare interface TokensApi {
     snapPoint(viewId: ViewId, point: Point, tokenSize: number): Readonly<Point>;
     /**
      * Moves tokens as one undo step, like a GM drop: the moved tokens rise to the top of the stack and are no longer held. Checked in this order, and nothing is written when any move
-     * fails: the map is loaded (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
+     * fails: the map is loaded and the view is not a remote view, which is read-only (`not-loaded`), every token exists (`unknown-token`), none is hidden unless
      * `allowHidden` (`hidden`), every position is a number within 1e9 of the origin (`invalid-position`, also when snapping would
      * not give one). A token named twice moves to its last position. Throws when `moves` is not a list or `options` is malformed.
      */
