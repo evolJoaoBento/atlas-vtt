@@ -78,6 +78,17 @@ describe('lasers', () => {
     expect(shown[0]!.points).toEqual([{ x: 1, y: 1 }]);
   });
 
+  it('show reads each point once, so a getter cannot change it after the check', () => {
+    const { hub, lasers } = setup();
+    const shown: RemoteLaser[] = [];
+    hub.onRemote((laser) => shown.push(laser));
+    let reads = 0;
+    const point = { y: 0, get x(): number { return reads++ === 0 ? 1 : Number.NaN; } };
+    lasers.show('v1', { ...LASER, points: [point] });
+    expect(reads).toBe(1);
+    expect(shown[0]!.points).toEqual([{ x: 1, y: 0 }]);
+  });
+
   it('show refuses a malformed laser with a clear error', () => {
     const { lasers } = setup();
     expect(() => lasers.show('v1', { ...LASER, from: '' })).toThrow(/from/);

@@ -53,10 +53,11 @@ export class RemoteViewMotion {
   }
 
   setCamera(camera: ViewCamera, options?: { animate?: boolean; padded?: boolean }): void {
-    const valid = typeof camera === 'object' && camera !== null && isFiniteNumber(camera.centerX) && isFiniteNumber(camera.centerY)
-      && isFiniteNumber(camera.width) && camera.width > 0 && isFiniteNumber(camera.height) && camera.height > 0;
+    // Each field read once, so a getter cannot change it after the check.
+    const { centerX, centerY, width, height } = (typeof camera === 'object' && camera !== null ? camera : {}) as Partial<ViewCamera>;
+    const valid = isFiniteNumber(centerX) && isFiniteNumber(centerY) && isFiniteNumber(width) && width > 0 && isFiniteNumber(height) && height > 0;
     if (!valid) throw new Error('RemoteView.setCamera: the camera must be { centerX, centerY, width, height } numbers, with a size above 0.');
-    const area = { centerX: camera.centerX, centerY: camera.centerY, width: camera.width, height: camera.height };
+    const area = { centerX, centerY, width, height };
     this.follower?.setCamera(area, options?.animate === true, options?.padded === true);
   }
 

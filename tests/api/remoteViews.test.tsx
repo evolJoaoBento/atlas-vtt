@@ -200,6 +200,12 @@ describe('remoteViews', () => {
     expect(fitRemoteMap(view.viewId)).toBe(true);
     expect(moved).toHaveBeenLastCalledWith(false);
     expect(() => view.setCamera({ centerX: 0, centerY: 0, width: 0, height: 1 })).toThrow(/camera/);
+    expect(() => view.setCamera({ centerX: Number.NaN, centerY: 0, width: 10, height: 10 })).toThrow(/camera/);
+    let reads = 0;
+    const shifty = { centerY: 100, width: 400, height: 300, get centerX(): number { return reads++ === 0 ? 200 : Number.NaN; } };
+    view.setCamera(shifty);
+    expect(reads).toBe(1);
+    expect(fake.viewport.center).toEqual({ x: 200, y: 100 });
     const { screenWidth, screenHeight } = fake.viewport;
     view.setCamera({ centerX: 200, centerY: 100, width: 400, height: 300 }, { padded: true });
     expect(fake.viewport.scale.x).toBeCloseTo(Math.min((screenWidth - 32) / 400, (screenHeight - 32) / 300));

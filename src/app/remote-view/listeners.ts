@@ -10,23 +10,27 @@ export function callGuarded<A extends unknown[], R>(what: string, listener: (...
   }
 }
 
-/** Listeners that are dropped all at once when the view closes. */
+/**
+ * Listeners that are dropped all at once when the view closes. Each registration is its own entry, so the same function
+ * added twice runs twice, and each disposer removes only its own registration, once.
+ */
 export class ListenerSet<L> {
-  private readonly listeners = new Set<L>();
+  private readonly entries = new Set<{ readonly listener: L }>();
   private closed = false;
 
   add(listener: L): Disposer {
     if (this.closed || typeof listener !== 'function') return () => undefined;
-    this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
+    const entry = { listener };
+    this.entries.add(entry);
+    return () => { this.entries.delete(entry); };
   }
 
   list(): L[] {
-    return [...this.listeners];
+    return [...this.entries].map((entry) => entry.listener);
   }
 
   close(): void {
     this.closed = true;
-    this.listeners.clear();
+    this.entries.clear();
   }
 }

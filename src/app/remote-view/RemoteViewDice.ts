@@ -4,6 +4,7 @@
  * the rolls the player asks for from the dice tray or Roll again, which go to the owner's
  * `onRoll` listeners. The status bar's status lives here too: it is the owner's text and buttons.
  */
+import { isDiceRollResult, plainCopy } from '../../api/diceRollCheck';
 import { frozenCopy } from '../../api/frozen';
 import { noteThrown, thrownBefore } from '../dice3d/givenThrows';
 import type { RemoteStatus, RemoteStatusAction } from '../../api/types/remoteViews';
@@ -39,12 +40,6 @@ export function rollOfResult(result: DiceRollResult): { dice: Record<string, num
   return { dice, modifier: result.modifiers };
 }
 
-function isRoll(value: unknown): value is DiceRollResult {
-  const roll = value as Partial<DiceRollResult> | null;
-  return typeof roll === 'object' && roll !== null && typeof roll.id === 'string' && typeof roll.formula === 'string'
-    && Array.isArray(roll.rolls) && typeof roll.total === 'number' && typeof roll.timestamp === 'number';
-}
-
 /** The most buttons a status may have, `action` and `actions` together, so the status bar keeps them on one row. */
 export const REMOTE_STATUS_ACTIONS = 3;
 
@@ -56,9 +51,17 @@ function isAction(value: unknown): value is RemoteStatusAction {
   return typeof action === 'object' && action !== null && name(action.id) && name(action.label) && (action.icon === undefined || name(action.icon));
 }
 
-/** The owner's `actions`, checked and copied (frozen), each telling `choose` its id; throws for a malformed list. */
-function checkedActions(actions: unknown, room: number, choose: (id: string) => void): readonly ShownStatusAction[] {
-  const valid = Array.isArray(actions) && actions.length <= room && actions.every(isAction)
+/** Each field of an action read once, so a getter cannot change it after the check. */
+function takenAction(value: unknown): Partial<Record<keyof RemoteStatusAction, unknown>> | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { id, label, icon } = value as Partial<RemoteStatusAction>;
+  return { id, label, icon };
+}
+
+/** The owner's `actions`, copied, checked and frozen, each telling `choose` its id; throws for a malformed list. */
+function checkedActions(given: unknown, room: number, choose: (id: string) => void): readonly ShownStatusAction[] {
+  const actions = Array.isArray(given) ? given.slice(0, room + 1).map(takenAction) : null;
+  const valid = actions !== null && Array.isArray(given) && given.length <= room && actions.every(isAction)
     && new Set(actions.map((action) => action.id)).size === actions.length;
   if (!valid) {
     throw new Error(`RemoteView.setStatus: "actions" must list { id, label, icon? } with distinct ids and non-empty text, at most ${REMOTE_STATUS_ACTIONS} buttons with "action" (${room} left).`);
@@ -69,19 +72,27 @@ function checkedActions(actions: unknown, room: number, choose: (id: string) => 
 }
 
 function checkedStatus(status: unknown, choose: (id: string) => void): ShownStatus {
-  const given = (status ?? {}) as Partial<RemoteStatus>;
+  // Every field is read once, then checked, so a getter cannot change it after the check.
+  const { title, connection, tone, message, action, actions: listed } = (status ?? {}) as Partial<RemoteStatus>;
   const tones: readonly unknown[] = ['connected', 'pending', 'ended'];
-  const action = given.action;
-  const valid = text(given.title) && text(given.connection) && tones.includes(given.tone) && (given.message === null || text(given.message))
-    && (action === undefined || (text(action.label) && typeof action.run === 'function'));
+  const { label, run } = (action ?? {}) as { label?: unknown; run?: unknown };
+  const valid = text(title) && text(connection) && tones.includes(tone) && (message === null || text(message))
+    && (action === undefined || (text(label) && typeof run === 'function'));
   if (!valid) throw new Error('RemoteView.setStatus: the status must be a RemoteStatus.');
-  const actions = given.actions === undefined ? undefined : checkedActions(given.actions, REMOTE_STATUS_ACTIONS - (action ? 1 : 0), choose);
-  const run = action?.run.bind(action);
+  const actions = listed === undefined ? undefined : checkedActions(listed, REMOTE_STATUS_ACTIONS - (action ? 1 : 0), choose);
+  const bound = typeof run === 'function' ? (run as () => void).bind(action) : null;
   return Object.freeze({
-    title: given.title, connection: given.connection, tone: given.tone as RemoteStatus['tone'], message: given.message,
-    ...(action && run ? { action: Object.freeze({ label: action.label, run: (): void => { callGuarded('status action', run); } }) } : {}),
+    title, connection, tone: tone as RemoteStatus['tone'], message,
+    ...(bound ? { action: Object.freeze({ label, run: (): void => { callGuarded('status action', bound); } }) } : {}),
     ...(actions ? { actions } : {}),
   }) as ShownStatus;
+}
+
+/** A copy of `value` to check, so nothing the caller changes afterwards gets past the check; throws for `method` when it is not plain data. */
+function copyToCheck(method: string, value: unknown): unknown {
+  const copy = plainCopy(value);
+  if (copy === null) throw new Error(`RemoteView.${method}: the roll must be plain data.`);
+  return copy;
 }
 
 export class RemoteViewDice {
@@ -98,13 +109,15 @@ export class RemoteViewDice {
   }
 
   setDiceLog(entries: unknown): void {
-    if (!Array.isArray(entries) || !entries.every(isRoll)) throw new Error('RemoteView.setDiceLog: the entries must be dice roll results.');
-    updateRemoteView(this.store, { diceLog: frozenCopy(entries.slice(0, REMOTE_LOG_ENTRIES)) });
+    const kept = copyToCheck('setDiceLog', Array.isArray(entries) ? entries.slice(0, REMOTE_LOG_ENTRIES) : entries);
+    if (!Array.isArray(kept) || !kept.every(isDiceRollResult)) throw new Error('RemoteView.setDiceLog: the entries must be dice roll results.');
+    updateRemoteView(this.store, { diceLog: frozenCopy(kept) });
   }
 
   /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
-  throwRoll(result: unknown): void {
-    if (!isRoll(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
+  throwRoll(given: unknown): void {
+    const result = copyToCheck('throwRoll', given);
+    if (!isDiceRollResult(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
     if (thrownBefore(this.store, result.id)) return;
     noteThrown(this.store, result.id);
     updateRemoteView(this.store, { ownRoll: frozenCopy(result) });

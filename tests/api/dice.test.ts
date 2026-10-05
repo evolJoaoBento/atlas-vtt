@@ -86,8 +86,8 @@ describe('dice', () => {
     const dice = diceApi(createInMemoryApp().app, new DisposerSet());
     const listener = vi.fn();
     dice.onRolled(listener);
-    expect(() => dice.publish({ formula: '1d20' } as unknown as DiceRollResult)).toThrow('[Atlas API] publish needs a roll');
-    expect(() => dice.publish(null as unknown as DiceRollResult)).toThrow('[Atlas API] publish needs a roll');
+    expect(() => dice.publish({ formula: '1d20' } as unknown as DiceRollResult)).toThrow('[Atlas API] dice.publish: the roll must be');
+    expect(() => dice.publish(null as unknown as DiceRollResult)).toThrow('[Atlas API] dice.publish: the roll must be');
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -95,7 +95,7 @@ describe('dice', () => {
     const dice = diceApi(createInMemoryApp().app, new DisposerSet());
     const made = rollFormula('1d20', () => 0.5, 1);
     for (const bad of [{ ...made, rolls: [{}] }, { ...made, rolledBy: 42 }, { ...made, crit: 'x' }, { ...made, total: Number.NaN }]) {
-      expect(() => dice.publish(bad as unknown as DiceRollResult)).toThrow('[Atlas API] publish needs a roll');
+      expect(() => dice.publish(bad as unknown as DiceRollResult)).toThrow('[Atlas API] dice.publish: the roll must be');
     }
     expect(() => dice.publish({ ...made, extra: () => 1 } as unknown as DiceRollResult)).toThrow('plain data');
   });
@@ -103,7 +103,7 @@ describe('dice', () => {
   it('roll checks its request', () => {
     const dice = diceApi(createInMemoryApp().app, new DisposerSet());
     for (const bad of [null, {}, { formula: 4 }, { formula: '1d4', rolledBy: 3 }, { formula: '1d4', mapPath: 3 }]) {
-      expect(() => dice.roll(bad as never)).toThrow('[Atlas API] roll needs');
+      expect(() => dice.roll(bad as never)).toThrow('[Atlas API] dice.roll: ');
     }
   });
 

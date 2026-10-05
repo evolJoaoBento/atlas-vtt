@@ -30,11 +30,14 @@ function checkedLaser(laser: RemoteLaser): RemoteLaser {
   if (typeof from !== 'string' || from === '') throw new Error('lasers.show: "from" must name whose laser it is.');
   if (!isHexColor(color)) throw new Error('lasers.show: "color" must be a #rrggbb colour.');
   if (typeof lifted !== 'boolean') throw new Error('lasers.show: "lifted" must be true or false.');
-  if (!Array.isArray(points) || !points.every(isPoint)) {
+  // Each point's x and y and each gap read once, then checked, so a getter cannot change them after the check.
+  const taken = Array.isArray(points) ? points.map((point: unknown) => (typeof point === 'object' && point !== null ? { x: (point as Point).x, y: (point as Point).y } : null)) : null;
+  if (taken === null || !taken.every(isPoint)) {
     throw new Error('lasers.show: "points" must be a list of { x, y } numbers.');
   }
-  if (dt !== undefined && !(Array.isArray(dt) && dt.every(isFiniteNumber))) throw new Error('lasers.show: "dt" must be a list of numbers.');
-  return { from, color, lifted, points: points.map(({ x, y }) => ({ x, y })), ...(dt ? { dt: [...dt] } : {}) };
+  const gaps: unknown[] | undefined = Array.isArray(dt) ? [...(dt as unknown[])] : undefined;
+  if (dt !== undefined && !(gaps && gaps.every(isFiniteNumber))) throw new Error('lasers.show: "dt" must be a list of numbers.');
+  return { from, color, lifted, points: taken, ...(gaps ? { dt: gaps as number[] } : {}) };
 }
 
 /** An extension's callback must never throw into the GM's pointer handling. */
