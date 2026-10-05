@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.8.0";
+export declare const API_VERSION = "1.9.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -752,6 +752,11 @@ export declare interface PresentationTarget {
 }
 
 export declare interface PresentedSceneInfo {
+    /**
+     * Names one presentation: the same while it is held and resumed, new for every `present` (and every
+     * presentation the GM starts), even of the same tab. Compare it to tell a new presentation from the one you know.
+     */
+    presentationId: string;
     viewId: ViewId;
     tabId: string;
     mapPath: string;

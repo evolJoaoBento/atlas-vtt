@@ -116,6 +116,38 @@ describe('presentation', () => {
     expect(seen).toEqual([false, true]);
   });
 
+  it('C-pres-3: presentationId is stable while a presentation is held and resumed, and new for every present', async () => {
+    const view = fakeView('v1');
+    const { presentation } = setupWith(view);
+    const heard: Array<[string, string]> = [];
+    presentation.subscribe({
+      presented: (scene, resumed) => heard.push([resumed ? 'resumed' : 'presented', scene.presentationId]),
+      held: (scene) => heard.push(['held', scene.presentationId]),
+      cleared: (scene) => heard.push(['cleared', scene.presentationId]),
+    });
+    const tabId = view.tabMetaStore.getState().activeTabId!;
+    expect(await presentation.present('v1', tabId)).toBe(true);
+    const first = presentation.current()!.presentationId;
+    expect(first).toEqual(expect.any(String));
+    view.tabMetaStore.getState().addTab('maps/b.atlasmap', 'B');
+    expect(presentation.current()).toMatchObject({ held: true, presentationId: first });
+    view.tabMetaStore.getState().setActiveTab(tabId);
+    load(view);
+    await Promise.resolve();
+    expect(presentation.current()).toMatchObject({ held: false, presentationId: first });
+    expect(heard).toEqual([['presented', first], ['held', first], ['resumed', first]]);
+    // The same tab presented again is a new presentation
+    expect(await presentation.present('v1', tabId)).toBe(true);
+    const second = presentation.current()!.presentationId;
+    expect(second).not.toBe(first);
+    expect(heard.at(-1)).toEqual(['presented', second]);
+    // So is one that the GM's own eye starts, which the facade did not
+    presentedScene.clear();
+    expect(heard.at(-1)).toEqual(['cleared', second]);
+    presentedScene.present(view as never, tabId);
+    expect(presentation.current()!.presentationId).not.toBe(second);
+  });
+
   it('addTarget rejects an argument that is not a target', () => {
     const { presentation } = setupWith(fakeView('v1'));
     expect(() => presentation.addTarget({ id: 'x', label: 'x' } as never)).toThrow(/addTarget needs/);

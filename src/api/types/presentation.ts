@@ -1,6 +1,13 @@
 import type { Disposer, ViewId } from './common';
 
-export interface PresentedSceneInfo { viewId: ViewId; tabId: string; mapPath: string; held: boolean }
+export interface PresentedSceneInfo {
+  /**
+   * Names one presentation: the same while it is held and resumed, new for every `present` (and every
+   * presentation the GM starts), even of the same tab. Compare it to tell a new presentation from the one you know.
+   */
+  presentationId: string;
+  viewId: ViewId; tabId: string; mapPath: string; held: boolean;
+}
 
 export interface PresentationListener {
   /** `resumed`: a held scene is shown again after its tab came back and loaded. */

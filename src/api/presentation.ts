@@ -8,7 +8,7 @@ import type { PresentationApi, PresentationListener, PresentationTarget, Present
 
 function info(scene: InternalScene, held: boolean): PresentedSceneInfo {
   const tab = scene.view.tabMetaStore.getState().tabs.find((entry) => entry.id === scene.tabId);
-  return Object.freeze({ viewId: scene.view.viewId, tabId: scene.tabId, mapPath: tab?.filePath ?? '', held });
+  return Object.freeze({ presentationId: scene.presentationId, viewId: scene.view.viewId, tabId: scene.tabId, mapPath: tab?.filePath ?? '', held });
 }
 
 export function presentationApi(tracker: ViewTracker, disposers: DisposerSet, owner: string): PresentationApi {
