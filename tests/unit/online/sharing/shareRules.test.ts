@@ -64,7 +64,7 @@ function openedShare(running: boolean): Promise<ReturnType<typeof parseMapPayloa
     rules: () => ({ showGrid: true, showTokenNameplates: true, showWidgets: true, showInitiative: true }),
     collectionGrid: () => null,
   };
-  const catalogue = new SenderCatalogue(sources, items, people as never, nodeHash, async () => ({ width: 100, height: 100 }));
+  const catalogue = new SenderCatalogue(sources, items, people as never, nodeHash, async () => ({ width: 2000, height: 1500 }));
   return catalogue.list(ben).then(async (list) => {
     const mapItem = list.find((item) => item.kind === 'map');
     const opened = mapItem ? await catalogue.open(ben, mapItem.item) : null;

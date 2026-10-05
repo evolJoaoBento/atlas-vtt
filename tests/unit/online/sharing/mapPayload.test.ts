@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { fullPayload, playerSafePayload, readSharedMap, type PayloadContext, type SharedMapSource } from '../../../../src/app/online/sharing/model/buildMapPayload';
+import { hexLayoutOfGrid } from '../../../../src/app/grid/hexLinks';
+import { fullPayload, pinFootprint, playerSafePayload, readSharedMap, type PayloadContext, type SharedMapSource } from '../../../../src/app/online/sharing/model/buildMapPayload';
 import { IMAGE_REF_PREFIX, NOTE_REF_PREFIX, parseMapPayload } from '../../../../src/app/online/sharing/model/mapPayload';
 import { migrateMapFile } from '../../../../src/app/services/MapPersistence';
 
@@ -48,6 +49,75 @@ describe('map payloads', () => {
     expect(payload.images.sort()).toEqual(['H'.repeat(43), 'M'.repeat(43)]);
     expect(JSON.stringify(payload)).not.toMatch(/Notes\/|art\/|maps\/|GM\//);
     expect(parseMapPayload(JSON.parse(JSON.stringify(payload)))).toEqual(payload);
+  });
+
+  describe('the fog over the map edge (F-POS)', () => {
+    const withPins = (fog: Record<string, unknown>): SharedMapSource => {
+      const map = migrateMapFile({
+        ...state,
+        objects: {
+          ...state.objects,
+          tokens: { hero: { id: 'hero', kind: 'character', x: 664, y: 350, imagePath: 'art/hero.png', name: 'Hero' } },
+          pins: {
+            edge: { id: 'edge', kind: 'pin', x: 698, y: 698, notePath: 'Notes/Inn.md' },
+            inside: { id: 'inside', kind: 'pin', x: 300, y: 300, notePath: 'Notes/Inn.md' },
+            out: { id: 'out', kind: 'pin', x: 800, y: 300, notePath: 'Notes/Inn.md' },
+          },
+          fog,
+        },
+      });
+      return { map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetSettings: undefined, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {}, lit: false };
+    };
+    const everything = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 0, y: 0, width: 700, height: 700 } };
+    const pinXs = (payload: ReturnType<typeof playerSafePayload>): number[] => (payload?.pins ?? []).map((pin) => pin.x);
+
+    it('sends no pin or token of a map fogged exactly to its size, and no pin outside the map', () => {
+      const payload = playerSafePayload(withPins(everything), 'Inn', context(['Notes/Inn.md']))!;
+      expect(pinXs(payload)).toEqual([]);
+      expect(payload.scene.tokens).toEqual({});
+    });
+
+    const elsewhere = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 0, y: 0, width: 10, height: 10 } };
+
+    it('sends every pin when no fog is painted, as before, and with fog elsewhere the pins inside the map, the edge one too', () => {
+      expect(pinXs(playerSafePayload(withPins({}), 'Inn', context(['Notes/Inn.md']))).sort((a, b) => a - b)).toEqual([300, 698, 800]);
+      const payload = playerSafePayload(withPins(elsewhere), 'Inn', context(['Notes/Inn.md']))!;
+      expect(pinXs(payload).sort((a, b) => a - b)).toEqual([300, 698]);
+      expect(Object.keys(payload.scene.tokens)).toEqual(['hero']);
+    });
+
+    it('sends nothing of a map whose image size could not be read when fog is painted, and as before when it is not', () => {
+      const unread = { ...context(['Notes/Inn.md']), images: { fingerprints: new Map([['maps/inn.png', 'M'.repeat(43)], ['art/hero.png', 'H'.repeat(43)]]), size: { width: 0, height: 0 } } };
+      const payload = playerSafePayload(withPins(elsewhere), 'Inn', unread)!;
+      expect(pinXs(payload)).toEqual([]);
+      expect(payload.scene.tokens).toEqual({});
+      expect(pinXs(playerSafePayload(withPins({}), 'Inn', unread))).toHaveLength(3);
+    });
+
+    it('checks a pin linked to a hex over the whole hex: a revealed point in a fogged hex hides it', () => {
+      const hexMap = (reveal: { x: number; y: number; width: number; height: number }): SharedMapSource => {
+        const map = migrateMapFile({
+          ...state,
+          grid: { enabled: true, visible: true, type: 'hex-horizontal', size: 70, offsetX: 0, offsetY: 0, opacity: 0.5 },
+          objects: {
+            ...state.objects, tokens: {},
+            pins: { hex: { id: 'hex', kind: 'pin', x: 300, y: 300, notePath: 'Notes/Inn.md', hex: true } },
+            fog: {
+              ...everything,
+              r: { id: 'r', kind: 'fog', type: 'rectangle', timestamp: 2, isErasing: true, ...reveal },
+            },
+          },
+        });
+        return { map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetSettings: undefined, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {}, lit: false };
+      };
+      const layout = hexLayoutOfGrid({ type: 'hex-horizontal', size: 70, offsetX: 0, offsetY: 0 })!;
+      const box = pinFootprint({ id: 'hex', kind: 'pin', x: 300, y: 300, notePath: 'Notes/Inn.md', hex: true } as never, layout);
+      const around = (b: { x: number; y: number; width: number; height: number }, pad: number) => ({ x: b.x - pad, y: b.y - pad, width: b.width + 2 * pad, height: b.height + 2 * pad });
+      // The pin's point and its badge are revealed, the rest of its hex is fogged: hidden.
+      expect(pinXs(playerSafePayload(hexMap({ x: 270, y: 270, width: 60, height: 60 }), 'Inn', context(['Notes/Inn.md'])))).toEqual([]);
+      // The whole hex revealed: shown.
+      expect(pinXs(playerSafePayload(hexMap(around(box, 16)), 'Inn', context(['Notes/Inn.md'])))).toEqual([300]);
+    });
   });
 
   it('player-safe: a pin whose note is not ticked is left out (N-4)', () => {

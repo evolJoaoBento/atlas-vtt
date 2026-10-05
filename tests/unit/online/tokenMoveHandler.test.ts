@@ -131,12 +131,12 @@ describe('token moves on the GM side', () => {
     w.finish();
   });
 
-  it("clamps to the scene's content without a map size", async () => {
+  it('moves nothing without a map size: players are sent nothing then, so there is no content to clamp to', async () => {
     const w = moveWorld({ mapSize: { width: 0, height: 0 } });
     const a = await withHero(w);
-    // hero (140, 140) and ally (280, 140) are what players see: 105..315 × 105..175, one cell around it.
+    // A map of unknown size shows players no token (F-POS), so the hero is not what they see and does not move.
     a.move('hero', 5000, 5000);
-    expect(w.token('hero')).toMatchObject({ x: 385, y: 245 });
+    expect(w.token('hero')).toMatchObject({ x: 140, y: 140 });
     w.finish();
   });
 

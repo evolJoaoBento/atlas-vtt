@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import { GmSession, type SessionPlayer } from '../../../src/app/online/GmSession';
 import { PlayerSession } from '../../../src/app/online/PlayerSession';
@@ -6,7 +6,7 @@ import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMe
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneTypes';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { FOG_TRUNCATED_NOTICE, MAP_SIZE_POLL_MS, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
@@ -83,7 +83,10 @@ function fakeView(state: SceneState): FakeView {
   const tavern = tabs.getState().addTab('maps/tavern.atlasmap', 'Tavern');
   const dungeon = tabs.getState().addTab('maps/dungeon.atlasmap', 'Dungeon');
   tabs.getState().setActiveTab(tavern);
-  const view = { tabMetaStore: tabs, atlasStore: store as unknown as StoreApi<ViewAtlasState>, register: () => {} } as unknown as PresentedView;
+  const view = {
+    tabMetaStore: tabs, atlasStore: store as unknown as StoreApi<ViewAtlasState>, register: () => {},
+    renderer: { getBackgroundSprite: () => ({ width: 2000, height: 5000, destroyed: false }) },
+  } as unknown as PresentedView;
   return { view, store, tabs, tavern, dungeon };
 }
 
@@ -225,6 +228,68 @@ describe('SceneBroadcaster', () => {
     await tick();
     expect(player.scene?.tokens.hero?.x).toBe(300);
     expect(player.scene).toEqual(h.broadcaster.currentProjection());
+  });
+
+  describe('while the map size is unknown', () => {
+    const unsized = (state: SceneState) => {
+      const h = setup();
+      const { view, tavern } = fakeView(state);
+      const size = { width: 0, height: 0 };
+      (view as unknown as { renderer: unknown }).renderer = { getBackgroundSprite: () => (size.width > 0 ? { ...size, destroyed: false } : null) };
+      h.presented.present(view, tavern);
+      return { h, size };
+    };
+    const FOG: Record<string, FogOperation> = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 900, y: 900, width: 400, height: 400 } };
+
+    it('sends what there is when no fog is painted, as a scene without a background does', async () => {
+      const { h } = unsized(sceneState({ hero: character('hero', 140) }));
+      const player = await join(h);
+      expect(player.scene?.tokens.hero?.x).toBe(140);
+    });
+
+    /** How many times the size poll was armed (a timer of `MAP_SIZE_POLL_MS`). */
+    const polls = (): number => spy.mock.calls.filter((call) => call[1] === MAP_SIZE_POLL_MS).length;
+    let spy: MockInstance<typeof window.setTimeout>;
+    beforeEach(() => { spy = vi.spyOn(window, 'setTimeout'); });
+    afterEach(() => { spy.mockRestore(); });
+
+    it('stops looking for the size when the scene is cleared or the broadcaster stops', async () => {
+      const { h } = unsized(sceneState({ hero: character('hero', 140) }, FOG));
+      await join(h);
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 2);
+      expect(polls()).toBeGreaterThan(1);
+      h.presented.clear();
+      const cleared = polls();
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 4);
+      expect(polls()).toBe(cleared);
+
+      const second = unsized(sceneState({ hero: character('hero', 140) }, FOG));
+      await join(second.h);
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 2);
+      second.h.broadcaster.stop();
+      const stopped = polls();
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 4);
+      expect(polls()).toBe(stopped);
+    });
+
+    it('does not look for the size of a scene with no painted fog and no lighting', async () => {
+      const { h } = unsized(sceneState({ hero: character('hero', 140) }));
+      await join(h);
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS * 4);
+      expect(polls()).toBe(0);
+    });
+
+    it('shows nothing under painted fog, then projects again once the size is known, with no change of the store', async () => {
+      const { h, size } = unsized(sceneState({ hero: character('hero', 140) }, FOG));
+      const player = await join(h);
+      expect(player.scene?.tokens).toEqual({});
+      // The background sprite arrives; nothing in the store changes.
+      size.width = 2000;
+      size.height = 1500;
+      await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS + SCENE_TICK_MS);
+      expect(player.scene?.tokens.hero?.x).toBe(140);
+      expect(player.scene).toEqual(h.broadcaster.currentProjection());
+    });
   });
 
   it('batches changes into one patch per tick and sends nothing for an empty diff', async () => {

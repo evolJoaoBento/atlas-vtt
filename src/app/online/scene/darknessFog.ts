@@ -51,17 +51,18 @@ export function darknessOf(raster: DarknessRaster): Darkness {
 }
 
 /** The cells of `grid` the part of `bounds` inside the map touches, edges included; null when there are none or the bounds are unusable. */
-function touchedCells({ cols, rows, cellSize, map }: DarknessRaster, bounds: WorldBounds): { c0: number; c1: number; r0: number; r1: number } | null {
+function touchedCells({ cols, rows, cellSize, map }: DarknessRaster, bounds: WorldBounds, overlapOnly = false): { c0: number; c1: number; r0: number; r1: number } | null {
   const right = bounds.x + Math.max(0, bounds.width);
   const bottom = bounds.y + Math.max(0, bounds.height);
   if (![bounds.x, bounds.y, right, bottom].every(Number.isFinite)) return null;
   if (right < 0 || bottom < 0 || bounds.x > map.width || bounds.y > map.height) return null;
   const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
-  // An edge on a cell boundary touches the next cell as well: that cell counts.
+  // An edge on a cell boundary touches the next cell as well: that cell counts, unless only cells the bounds overlap are asked for.
   const c0 = Math.floor(clamp(bounds.x, map.width) / cellSize);
-  const c1 = Math.min(cols - 1, Math.floor(clamp(right, map.width) / cellSize));
   const r0 = Math.floor(clamp(bounds.y, map.height) / cellSize);
-  const r1 = Math.min(rows - 1, Math.floor(clamp(bottom, map.height) / cellSize));
+  const last = (edge: number, first: number, max: number): number => Math.min(max, overlapOnly ? Math.max(first, Math.ceil(edge) - 1) : Math.floor(edge));
+  const c1 = last(clamp(right, map.width) / cellSize, c0, cols - 1);
+  const r1 = last(clamp(bottom, map.height) / cellSize, r0, rows - 1);
   return c0 > c1 || r0 > r1 ? null : { c0, c1, r0, r1 };
 }
 
@@ -77,11 +78,8 @@ export function shownByScan(grid: DarknessRaster, bounds: WorldBounds): boolean 
   return true;
 }
 
-/**
- * The same answer as `shownByScan` in constant time: a summed-area table of the dark cells, built
- * once per darkness, so a lit map with many large texts and drawings costs no scan for each.
- */
-function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
+/** The dark cells in a rectangle of cells, in constant time: a summed-area table of the dark cells, built once per darkness. */
+function darkCounter(grid: DarknessRaster): (c0: number, c1: number, r0: number, r1: number) => number {
   const { cols, rows, dark } = grid;
   const width = cols + 1;
   const sums = new Int32Array(width * (rows + 1));
@@ -92,11 +90,27 @@ function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
       sums[(row + 1) * width + col + 1] = sums[row * width + col + 1]! + line;
     }
   }
+  return (c0, c1, r0, r1) => sums[(r1 + 1) * width + c1 + 1]! - sums[r0 * width + c1 + 1]! - sums[(r1 + 1) * width + c0]! + sums[r0 * width + c0]!;
+}
+
+/**
+ * The same answer as `shownByScan` in constant time: a summed-area table of the dark cells, built once per
+ * darkness, so a lit map with many large texts and drawings costs no scan for each.
+ */
+export function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
+  const count = darkCounter(grid);
   return (bounds) => {
     const cells = touchedCells(grid, bounds);
-    if (!cells) return false;
-    const { c0, c1, r0, r1 } = cells;
-    return sums[(r1 + 1) * width + c1 + 1]! - sums[r0 * width + c1 + 1]! - sums[(r1 + 1) * width + c0]! + sums[r0 * width + c0]! === 0;
+    return cells !== null && count(cells.c0, cells.c1, cells.r0, cells.r1) === 0;
+  };
+}
+
+/** Whether any cell the part of `bounds` inside the map overlaps is not dark; false for unusable bounds. */
+export function anyShownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
+  const count = darkCounter(grid);
+  return (bounds) => {
+    const cells = touchedCells(grid, bounds, true);
+    return cells !== null && count(cells.c0, cells.c1, cells.r0, cells.r1) < (cells.c1 - cells.c0 + 1) * (cells.r1 - cells.r0 + 1);
   };
 }
 
