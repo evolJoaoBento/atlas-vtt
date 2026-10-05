@@ -29,6 +29,9 @@ export interface Darkness {
   shown(bounds: WorldBounds): boolean;
 }
 
+/** Nothing is shown: for a map of unknown size, or while the view's lighting cannot be read. */
+export const CLOSED_DARKNESS: Darkness = { fog: {}, covered: [], shown: () => false };
+
 /** Nothing is dark: every part of the map is shown. */
 export const NO_DARKNESS: Darkness = { fog: {}, covered: [], shown: () => true };
 

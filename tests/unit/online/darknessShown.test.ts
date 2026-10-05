@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { darknessOf, shownByScan } from '../../../src/app/online/scene/darknessFog';
+import { DARKNESS_FOG_ID, darknessOf, shownByScan } from '../../../src/app/online/scene/darknessFog';
 import { darknessCellSize, type DarknessRaster } from '../../../src/app/online/scene/darknessRaster';
-import type { LightingFrame } from '../../../src/app/online/scene/LiveLighting';
 import { drawingBounds, textBounds } from '../../../src/app/online/scene/objectBounds';
 import type { MapSize } from '../../../src/app/online/scene/sceneTypes';
 import type { DrawingStroke, TextElement } from '../../../src/app/types';
-import { project, scene } from './lightingFixtures';
+import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneTypes';
+import { darknessFor, closedFrame, lightingFrame, type LightingFrame } from '../../../src/app/online/scene/LiveLighting';
+import { MAP, playerLightingOf, project, scene } from './lightingFixtures';
 
 function raster(map: MapSize, dark: (col: number, row: number) => boolean): DarknessRaster {
   const cellSize = darknessCellSize(map);
@@ -16,7 +17,10 @@ function raster(map: MapSize, dark: (col: number, row: number) => boolean): Dark
   return { cols, rows, cellSize, map, dark: cells };
 }
 
-const frameOf = (grid: DarknessRaster): LightingFrame => ({ seen: () => false, darkness: darknessOf(grid) });
+const frameOf = (grid: DarknessRaster): LightingFrame => {
+  const darkness = darknessOf(grid);
+  return { seen: () => false, darkness, shown: (bounds) => darkness.shown(bounds) };
+};
 
 function box(id: string, x: number, y: number, width: number, height: number): TextElement {
   return { id, kind: 'text', x, y, text: 'a', fontSize: 1, fontFamily: 'serif', color: '#000000', width, height } as TextElement;
@@ -54,6 +58,7 @@ describe('texts and drawings are sent only where the darkness is shown, cell by 
     let seed = 12345;
     const random = (): number => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
     const between = (low: number, high: number): number => low + random() * (high - low);
+    let sent = 0;
     for (let round = 0; round < 120; round++) {
       const map = { width: Math.floor(between(60, 1200)) | 1, height: Math.floor(between(60, 900)) | 1 };
       const blocks = Array.from({ length: 24 }, () => random() < 0.5);
@@ -81,12 +86,54 @@ describe('texts and drawings are sent only where the darkness is shown, cell by 
         }
         return true;
       };
+      sent += Object.keys(projected.texts).length + Object.keys(projected.drawings).length;
       for (const id of Object.keys(projected.texts)) expect(allShown(textBounds(texts[id]!)), `text ${id}, round ${round}`).toBe(true);
       for (const id of Object.keys(projected.drawings)) {
         // What players are sent: the points rounded, the width kept in range.
         expect(allShown(drawingBounds(projected.drawings[id]!)), `drawing ${id}, round ${round}`).toBe(true);
       }
     }
+    // The check is not an always-hide one.
+    expect(sent).toBeGreaterThan(0);
+  });
+
+  it('checks a rotated, scaled text by its whole diagonal square', () => {
+    const map = { width: 1000, height: 800 };
+    const grid = raster(map, (col) => col * darknessCellSize(map) >= 960);
+    const text = (id: string, extra: Partial<TextElement>): TextElement => (
+      { id, kind: 'text', x: 860, y: 400, text: 'abcd', fontSize: 16, fontFamily: 'serif', color: '#000000', scale: 3, ...extra } as TextElement
+    );
+    const sentIds = (texts: Record<string, TextElement>): string[] => Object.keys(project(scene({ ambient: 1 }, { texts }), frameOf(grid), map).texts);
+    // Unrotated it reaches 956; turned, its square reaches 960.6, into the dark cell that starts at 960. Scale 1 stays clear.
+    expect(sentIds({ flat: text('flat', {}), turned: text('turned', { rotation: 45 }), small: text('small', { rotation: 45, scale: 1 }) }).sort()).toEqual(['flat', 'small']);
+  });
+
+  it('keeps a coarsened raster conservative: a coarse cell is dark when any cell in it is', () => {
+    const map = { width: 1600, height: 1600 };
+    // A chequerboard of dark cells in the top half makes a ring too long for one fog operation, so the raster is coarsened.
+    const grid = raster(map, (col, row) => row < 100 && (col + row) % 2 === 1);
+    const darkness = darknessOf(grid);
+    const ring = darkness.fog[DARKNESS_FOG_ID];
+    expect(ring?.type === 'lasso' ? ring.points.length : 0).toBeLessThanOrEqual(SCENE_LIMITS.points);
+    const cell = darknessCellSize(map);
+    // The lit cell (0, 0) shares a coarse cell with a dark one; the lit cells of the bottom half are shown.
+    expect(darkness.shown({ x: 1, y: 1, width: cell - 2, height: cell - 2 })).toBe(false);
+    expect(darkness.shown({ x: 10, y: 1000, width: 30, height: 30 })).toBe(true);
+  });
+
+  it('shows nothing while the lighting of the view cannot be read: a closed frame or sight that is not ready', () => {
+    const state = scene({ ambient: 1 }, { texts: { a: box('a', 500, 400, 20, 20) }, drawings: { a: stroke('a', [{ x: 100, y: 100 }, { x: 120, y: 100 }], 2) } });
+    expect(project(state, closedFrame(MAP)).texts).toEqual({});
+    const lighting = playerLightingOf(state, MAP)!;
+    const waiting = { ...lighting, ready: false };
+    const frame = lightingFrame(waiting, darknessFor(waiting, null, MAP));
+    const projected = project(state, frame);
+    expect(projected.texts).toEqual({});
+    expect(projected.drawings).toEqual({});
+    // Ready, the same lit scene sends them.
+    const ready = project(state, lightingFrame(lighting, darknessFor(lighting, null, MAP)));
+    expect(Object.keys(ready.texts)).toEqual(['a']);
+    expect(Object.keys(ready.drawings)).toEqual(['a']);
   });
 });
 
