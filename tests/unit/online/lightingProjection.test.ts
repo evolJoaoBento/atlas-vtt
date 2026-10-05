@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { plainBuilders, playerSceneToAtlasState } from '../../../src/app/online/obsidian/playerSceneToAtlasState';
 import { DARKNESS_FOG_ID, DARKNESS_ORDER } from '../../../src/app/online/scene/darknessFog';
 import { closedFrame, lightingFrame } from '../../../src/app/online/scene/LiveLighting';
+import { FogCoverage } from '../../../src/app/online/scene/FogCoverage';
 import { diffScenes } from '../../../src/app/online/scene/sceneDiff';
 import { patchMessage, snapshotMessages } from '../../../src/app/online/scene/sceneMessages';
 import type { PlayerScene, ScenePoint } from '../../../src/app/online/scene/sceneTypes';
@@ -106,6 +107,20 @@ describe('dynamic lighting for online players', () => {
     const projected = projectLit(state);
     expect(Object.keys(projected.texts)).toEqual(['inside']);
     expect(Object.keys(projected.drawings)).toEqual(['inside']);
+  });
+
+  it('hides a zero-width line or a point drawing inside the dark, and a zero-area box under the darkness', () => {
+    const line = (id: string, x: number, y0: number, y1: number): DrawingStroke => ({ ...drawing(id, x, y0), width: 0, points: [{ x, y: y0 }, { x, y: y1 }] });
+    const state = walled({
+      drawings: { vline: line('vline', 800, 500, 600), point: line('point', 800, 300, 300), seen: line('seen', 200, 500, 600) },
+    });
+    const projected = projectLit(state);
+    expect(Object.keys(projected.drawings)).toEqual(['seen']);
+    // Whatever the drawing's width, the darkness covers a box with no area where it covers the ground.
+    const covered = FogCoverage.fromPlayerFog({}).covering(lightingFrameOf(state, MAP)!.darkness.covered);
+    expect(covered.isCovered({ x: 800, y: 500, width: 0, height: 100 })).toBe(true);
+    expect(covered.isCovered({ x: 800, y: 300, width: 0, height: 0 })).toBe(true);
+    expect(covered.isCovered({ x: 200, y: 500, width: 0, height: 100 })).toBe(false);
   });
 
   it('covers what no light reaches at night, shows what the torch lights and the hero standing in the dark', () => {
