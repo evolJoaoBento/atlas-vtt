@@ -42,14 +42,32 @@ $remote-status-dot-size: 8px;
   font-weight: $font-weight-medium;
 }
 
-.atlas-remote-status-bar__connection,
-.atlas-remote-status-bar__message {
+.atlas-remote-status-bar__connection {
   color: var(--text-muted);
   white-space: nowrap;
 }
 
-// The button sits at the capsule's end: only the corners facing the bar's end follow it.
+.atlas-remote-status-bar__message {
+  @include atlas-truncate;
+  color: var(--text-muted);
+}
+
+// The buttons keep their labels whole; the message gives way first.
 .atlas-remote-status-bar__action {
+  flex-shrink: 0;
+}
+
+.atlas-remote-status-bar__action-icon {
+  display: inline-flex;
+
+  svg {
+    width: $icon-s;
+    height: $icon-s;
+  }
+}
+
+// The last button sits at the capsule's end: only the corners facing the bar's end follow it.
+.atlas-remote-status-bar__action:last-child {
   border-top-right-radius: atlas-panel-inset-radius-value($remote-status-bar-inset, $button-height-s * 0.5);
   border-bottom-right-radius: atlas-panel-inset-radius-value($remote-status-bar-inset, $button-height-s * 0.5);
 }

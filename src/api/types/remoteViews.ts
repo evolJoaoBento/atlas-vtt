@@ -34,12 +34,24 @@ export interface RemotePlayerState {
   initiative: { rules: InitiativeRules | null; health: Readonly<Record<string, { value: number; max: number }>> };
 }
 
+/** A button of the status bar that tells `RemoteView.onStatusAction` its `id`. */
+export interface RemoteStatusAction {
+  /** Distinct among the status's actions. */
+  id: string;
+  label: string;
+  /** Lucide name, drawn before the label. */
+  icon?: string;
+}
+
 export interface RemoteStatus {
   title: string;
   connection: string;
   tone: 'connected' | 'pending' | 'ended';
   message: string | null;
+  /** A button that runs `run`, guarded; it comes first when `actions` are given too. */
   action?: { label: string; run(): void };
+  /** At most 3 more buttons, after `action`; a choice is told to `onStatusAction` by its id. */
+  actions?: readonly RemoteStatusAction[];
 }
 
 export interface RemoteViewsApi {
@@ -64,8 +76,13 @@ export interface RemoteView {
    */
   setScene(scene: RemoteSceneInput | null): void;
   setPlayer(state: RemotePlayerState): void;
-  /** The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus. */
+  /**
+   * The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus,
+   * also for more than 3 `actions`, an id given twice, an empty label, or an icon that is not a name.
+   */
   setStatus(status: RemoteStatus): void;
+  /** The player chose one of the status's `actions`: its id. Not called for `action`, which runs its own `run`. */
+  onStatusAction(listener: (id: string) => void): Disposer;
   /** The shared log shown in this view's dice log (the first 100 entries, copied); Clear is hidden, Roll again calls `onRoll`. */
   setDiceLog(entries: readonly DiceRollResult[]): void;
   /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */

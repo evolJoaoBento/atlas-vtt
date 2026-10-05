@@ -259,7 +259,15 @@ describe('remoteViews', () => {
     expect(store.getState().remoteView?.ownRoll?.id).toBe('r2');
     view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null });
     expect(store.getState().remoteView?.status.connection).toBe('Connected');
+    const statusAction = vi.fn();
+    view.onStatusAction(statusAction);
+    view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null, actions: [{ id: 'shared', label: 'Shared with me' }] });
+    store.getState().remoteView?.status.actions?.[0]?.run();
+    expect(statusAction).toHaveBeenCalledExactlyOnceWith('shared');
     view.close();
+    store.getState().remoteView?.status.actions?.[0]?.run();
+    expect(statusAction).toHaveBeenCalledOnce();
+    expect(() => view.onStatusAction(vi.fn())()).not.toThrow();
     expect(() => view.throwRoll({ ...entry, id: 'r2' })).not.toThrow();
   });
 });

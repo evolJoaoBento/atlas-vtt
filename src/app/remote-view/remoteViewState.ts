@@ -5,7 +5,7 @@
  * names the fields it saves; `merge` never takes this one from a file).
  */
 import type { StoreApi } from 'zustand';
-import type { RemoteStatus } from '../../api/types/remoteViews';
+import type { RemoteStatus, RemoteStatusAction } from '../../api/types/remoteViews';
 import { resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
 import type { ResourceDefinition, ResourceValue } from '../resources/resourceTypes';
 import type { ViewAtlasState } from '../storeFactory';
@@ -14,6 +14,14 @@ import type { ConditionDefinition } from '../types/collectionSettingsTypes';
 import type { InitiativeRules } from '../types/initiativeRulesTypes';
 
 export type { RemoteStatus };
+
+/** A status action as the status bar draws it: the owner's id, label and icon, and the click that tells the owner. */
+export interface ShownStatusAction extends RemoteStatusAction {
+  run(): void;
+}
+
+/** The owner's status as the store keeps it, each of its `actions` with its click. */
+export type ShownStatus = Omit<RemoteStatus, 'actions'> & { actions?: readonly ShownStatusAction[] };
 
 export interface RemoteViewState {
   /** The tokens the player may drag. */
@@ -28,7 +36,7 @@ export interface RemoteViewState {
   initiativeHealth: Readonly<Record<string, ResourceValue>>;
   /** How the initiative list is grouped; null for the player's own collection rules. */
   initiativeRules: InitiativeRules | null;
-  status: RemoteStatus;
+  status: ShownStatus;
   /** The shared dice log the view's dice log shows. */
   diceLog: readonly DiceRollResult[];
   /** The most dice the tray offers for one roll (`remoteViews.open({ maxDice })`). */

@@ -60,6 +60,8 @@ Version 1.14.0 follows Atlas 0.6, where a scene can set its own distance per cel
 
 Version 1.15.0 adds `ToolbarItem.isVisible(ctx)`, which decides per view whether the item shows, among the `views` it is for. Only `true` shows it; a hidden item takes no room in the bar and is not in "More tools", and `ui.invalidate()` asks again. Its context adds `ownRemote`, true in a remote view the asking extension opened, so a button that acts on your own remote view can stay out of other extensions' remote views. A predicate that throws hides the item and is logged once.
 
+Version 1.15.0 also adds `RemoteStatus.actions`, up to 3 more status bar buttons `{ id, label, icon? }` after the single `action`, and `RemoteView.onStatusAction(listener)`, told the id of the one chosen. `action` keeps running its own `run`. More than 3 actions, an id given twice, an empty label or an icon that is not a name throws.
+
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ### Atlas 0.6
@@ -82,7 +84,7 @@ What changed for extensions with Atlas 0.6 besides version 1.14.0:
 - **Moves.** The player drags a movable token with Atlas's drag and ruler, one at a time. `onTokenDrop` reports the drop at the point it snaps to in the view's grid; the token goes back until the next `setScene` moves it. `cancelDrag()` ends a drag in progress, and a new scene or player state ends a drag whose token left the scene or may no longer move.
 - **Camera.** `setCamera(camera, { animate })` shows a world area as large as fits the view and keeps showing it through resizes. `onCameraMoved(true)` fires when the player pans or zooms, and `onCameraMoved(false)` when Fit map (Shift+1) fits the map. Following someone stays the extension's decision: add Follow and Fit buttons as toolbar items with `views: ['remote']`, and `isVisible: (ctx) => ctx.ownRemote` to keep them out of other extensions' remote views.
 - **Dice.** The dice tray, at most the view's `maxDice` (100 by default), and the dice log's Roll again go to `onRoll` listeners and never roll locally. Listeners are asked in the order they were added until one returns null (sent); otherwise the tray shows the first reason returned. `setDiceLog(entries)` is the log the view's dice log shows, without Clear. `throwRoll(result)` throws one of the player's own rolls once per id with their dice look, or shows a result card where WebGL is unavailable.
-- **Status.** `setStatus(status)` fills the status bar at the start of the top row; its optional action is a button.
+- **Status.** `setStatus(status)` fills the status bar at the start of the top row; its optional `action` is a button, and up to 3 `actions` follow it, each telling `onStatusAction` its id. A long message gives way to the buttons.
 - **Other groups.** `views.*` and `lasers.*` take the remote view's id. `views.active()` never returns it, `tokens.move` answers `not-loaded` and `presentation.present` answers false for it, as do Atlas's own Present commands.
 - **Lighting.** `lighting.playerVisibility` and `lighting.watch` answer for a remote id from the remote view's own store, which has no lighting: pending until a scene is shown, then unlit, so everything in it is what that player sees. A lit scene's darkness is the owner's to send, as fog.
 - **Scenes.** `scenes.*` never knows a `remote:` path: `findByMap` finds nothing for one, and `readMap` throws on it, as on any path that is not an `.atlasmap` file.

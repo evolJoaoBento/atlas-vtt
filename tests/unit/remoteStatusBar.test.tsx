@@ -41,6 +41,51 @@ describe("the remote view's status bar", () => {
     expect(screen.queryByText('Reconnect')).toBeNull();
   });
 
+  it('shows the single action first, then the actions, each telling onStatusAction its id, guarded', () => {
+    const { dice, view } = setup();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const run = vi.fn();
+    const heard = vi.fn();
+    dice.statusActions.add(() => { throw new Error('boom'); });
+    dice.statusActions.add(heard);
+    act(() => dice.setStatus({
+      title: '', connection: '', tone: 'pending', message: null, action: { label: 'Reconnect', run },
+      actions: [{ id: 'shared', label: 'Shared with me', icon: 'inbox' }, { id: 'leave', label: 'Leave' }],
+    }));
+    const labels = Array.from(view.container.querySelectorAll('.atlas-remote-status-bar__action')).map((button) => button.textContent);
+    expect(labels).toEqual(['Reconnect', 'Shared with me', 'Leave']);
+    expect(view.container.querySelectorAll('.atlas-remote-status-bar__action-icon')).toHaveLength(1);
+    fireEvent.click(screen.getByText('Shared with me'));
+    expect(heard).toHaveBeenCalledExactlyOnceWith('shared');
+    fireEvent.click(screen.getByText('Reconnect'));
+    expect(run).toHaveBeenCalledOnce();
+    expect(heard).toHaveBeenCalledOnce();
+    dice.dispose();
+    fireEvent.click(screen.getByText('Leave'));
+    expect(heard).toHaveBeenCalledOnce();
+  });
+
+  it('hands the store a frozen copy of the actions', () => {
+    const { dice, store } = setup();
+    const actions = [{ id: 'a', label: 'A' }];
+    dice.setStatus({ title: 'T', connection: '', tone: 'pending', message: null, actions });
+    actions[0]!.label = 'changed';
+    const shown = store.getState().remoteView?.status.actions;
+    expect(shown?.map(({ id, label }) => ({ id, label }))).toEqual([{ id: 'a', label: 'A' }]);
+    expect(Object.isFrozen(shown)).toBe(true);
+    expect(Object.isFrozen(shown?.[0])).toBe(true);
+  });
+
+  it('refuses more than 3 actions, repeated ids, empty labels and icons that are not names', () => {
+    const { dice } = setup();
+    const status = (actions: unknown): unknown => ({ title: 'x', connection: 'y', tone: 'pending', message: null, actions });
+    const a = (id: string, extra: object = {}): object => ({ id, label: id, ...extra });
+    expect(() => dice.setStatus(status([a('1'), a('2'), a('3')]) as never)).not.toThrow();
+    for (const bad of [[a('1'), a('2'), a('3'), a('4')], [a('1'), a('1')], [{ id: '1', label: '' }], [{ id: '', label: 'L' }], [a('1', { icon: '' })], [a('1', { icon: 3 })], 'a', [null]]) {
+      expect(() => dice.setStatus(status(bad) as never)).toThrow(/"actions"/);
+    }
+  });
+
   it('refuses a malformed status', () => {
     const { dice } = setup();
     expect(() => dice.setStatus({ title: 'x', connection: 'y', tone: 'green', message: null } as never)).toThrow(/RemoteStatus/);
