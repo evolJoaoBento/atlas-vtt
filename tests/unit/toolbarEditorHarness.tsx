@@ -14,6 +14,7 @@ import { SettingsService } from '../../src/app/services/SettingsService';
 import { createViewAtlasStore, type ViewAtlasStore } from '../../src/app/storeFactory';
 import type { StoredToolbarLayout } from '../../src/app/toolbar/toolbarLayout';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { memoryPluginData } from '../mocks/pluginData';
 
 /**
  * The jsdom tests of the toolbar editor share this: MainToolbar in the providers a map view
@@ -45,7 +46,10 @@ const CONTROL_WIDTH = 40;
 
 export function renderToolbar({ player = false, stored = {}, space = null, notePreviews, undoBar = false }: ToolbarHarnessOptions = {}): ToolbarHarness {
   const { app } = createInMemoryApp({ files: {} });
-  const settings = new SettingsService(app);
+  // The plugin data holds what the test sets up: a save after the 500 ms debounce reads it first
+  // (`initialize`), which without it would put the default layout back under a slow test.
+  const data = memoryPluginData({ toolbar: stored, onboarding: { enabled: true, completed: { palette: true }, tokenImported: false } });
+  const settings = new SettingsService(app, undefined, data);
   // The palette's first-run tutorial would cover it and take its keys.
   settings.completeTutorial('palette');
   settings.setToolbarLayout(stored);
