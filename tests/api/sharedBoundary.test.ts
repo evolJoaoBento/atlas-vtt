@@ -61,7 +61,8 @@ function walk(entry: string, english: boolean): { files: Set<string>; packages: 
   return { files, packages };
 }
 
-describe('shared modules package', () => {
+// Each entry's walk reads a few hundred modules once; a busy full run can take longer than the default 5 seconds.
+describe('shared modules package', { timeout: 30_000 }, () => {
   for (const entry of ENTRIES) {
     it(`${entry} imports only relative modules and its allowed packages`, () => {
       const { packages } = reach(entry);
