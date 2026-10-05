@@ -48,6 +48,11 @@ class BundleNoteKeys {
     this.changed();
   }
 
+  /** Drops everything remembered for `owner`; its live registrations keep stripping until they end. */
+  forgetAll(owner: string): void {
+    if (this.remembered.delete(owner)) this.changed();
+  }
+
   /** Reads what was remembered from `store` (what it holds is checked) and writes every later change to it. */
   attach(store: NoteKeyStore): void {
     this.store = store;

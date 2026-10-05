@@ -91,3 +91,19 @@ describe('record files of scenes', () => {
     expect(JSON.parse(vault.files.get(added.type === 'scene' ? added.filePath! : '')!)).toEqual({ mapPath: N });
   });
 });
+
+describe('a cleaned record file', () => {
+  const A = 'atlas-vtt/collections/Default/scenes/a.atlasmap';
+  const RECORD = 'atlas-vtt/collections/Default/scenes/old.json';
+
+  it('matches, byte for byte, the file Atlas writes for a new scene with the same data', async () => {
+    const vault = seeded([{ ...scene('old', { mapPath: A, sharing: { item: 'x' } }), filePath: RECORD }]);
+    // an old file: tab indent, a trailing newline and the data the index no longer wants in it
+    vault.files.set(A, '{}');
+    vault.files.set(RECORD, `${JSON.stringify({ mapPath: A, sharing: { item: 'x' } }, null, '\t')}\n`);
+    const service = AssetService.getInstance(vault.app);
+    await service.initialize();
+    const fresh = await service.addAsset({ type: 'scene', name: 'Fresh', collection: 'Default', tags: [], data: { mapPath: A } });
+    expect(vault.files.get(RECORD)).toBe(vault.files.get(fresh.type === 'scene' ? fresh.filePath! : ''));
+  });
+});

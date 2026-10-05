@@ -297,3 +297,16 @@ describe('bundles', () => {
     expect([...bundleNoteKeys.keys()]).toEqual(['key']);
   });
 });
+
+describe('forgetNoteProperties', () => {
+  it('C-bundles-4: forgets what an extension asked for, also from earlier sessions, and nothing of another extension', () => {
+    let saved: Record<string, string[]> = { gone: ['old-key'], other: ['x'] };
+    bundleNoteKeys.attach({ read: () => saved, write: (keys) => { saved = keys; } });
+    const bundles = bundlesApi({ id: 'gone', disposers: new DisposerSet() });
+    expect(bundleNoteKeys.keys().has('old-key')).toBe(true);
+    bundles.forgetNoteProperties();
+    expect(saved).toEqual({ other: ['x'] });
+    expect([...bundleNoteKeys.keys()]).toEqual(['x']);
+    bundleNoteKeys.detach();
+  });
+});

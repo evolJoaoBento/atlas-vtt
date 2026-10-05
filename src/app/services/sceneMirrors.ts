@@ -9,7 +9,11 @@ import { assetFilePath } from './vault-sync/assetFiles';
  */
 export function sceneMirrorText(asset: Asset): string {
   const kept = asset.type === 'scene' ? withoutSceneExtensions(asset) : asset;
-  const data = (kept as { data?: unknown }).data;
+  return mirrorText((kept as { data?: unknown }).data);
+}
+
+/** The one format Atlas writes record files in: two-space indent, no trailing newline. */
+export function mirrorText(data: unknown): string {
   return JSON.stringify(data, null, 2) || '{}';
 }
 
@@ -27,7 +31,7 @@ export async function stripSceneMirrors(adapter: DataAdapter, assets: readonly A
       const text = await adapter.read(path);
       const parsed: unknown = JSON.parse(text);
       const stripped = withoutJsonExtensions(parsed);
-      if (stripped !== parsed) await adapter.write(path, JSON.stringify(stripped, null, 2));
+      if (stripped !== parsed) await adapter.write(path, mirrorText(stripped));
     } catch (error) {
       console.error('[AssetService] Could not take extension data out of a scene record file:', path, error);
     }

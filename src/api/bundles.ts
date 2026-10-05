@@ -17,5 +17,6 @@ export function bundlesApi(scope: Pick<ExtensionScope, 'id' | 'disposers'>): Bun
         bundleNoteKeys.forget(scope.id, keys);
       };
     },
+    forgetNoteProperties: (): void => bundleNoteKeys.forgetAll(scope.id),
   });
 }

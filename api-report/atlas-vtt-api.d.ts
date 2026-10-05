@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.10.0";
+export declare const API_VERSION = "1.11.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -122,9 +122,14 @@ export declare interface BundlesApi {
      * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share').
      * Atlas remembers them per extension id, so they stay stripped when the extension is not loaded (switched off, or
      * Atlas starting first). Unloading the extension does not forget them; calling the returned disposer does, and that
-     * is the only thing that does.
+     * is the only thing that does. Handing the disposer to Obsidian's `this.register()` therefore forgets the keys on
+     * every unload, which is usually not wanted: keep it for an extension that really stops stripping.
+     * The keys of an extension that crashed or was uninstalled stay until something calls the disposer, or
+     * `forgetNoteProperties`.
      */
     stripNoteProperties(keys: readonly string[]): Disposer;
+    /** Forgets every note property this extension asked Atlas to strip, also those remembered from earlier sessions. Keys it registered in this session keep stripping until it unloads. */
+    forgetNoteProperties(): void;
 }
 
 /**

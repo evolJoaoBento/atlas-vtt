@@ -27,11 +27,16 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.8.0 | shipped in 1.8.0 | `scenes`, `bundles` | `scenes`, `bundles` | `scenes-changed` |
 | 1.9.0 | shipped in 1.9.0 | none | none | none |
 | 1.10.0 | shipped in 1.10.0 | none | none | none |
-| 1.11.0 | planned for 1.11.0 | `remote-view` | `remoteViews` (optional) | none |
+| 1.11.0 | shipped in 1.11.0 | none | `bundles.forgetNoteProperties` | none |
+| 1.12.0 | planned for 1.12.0 | `remote-view` | `remoteViews` (optional) | none |
 
 Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
 
 Version 1.9.0 adds `presentationId` to a presented scene: the same while the scene is held and resumed, new for every presentation and never repeated after Atlas reloads. Version 1.10.0 makes `bundles.stripNoteProperties` remember its keys per extension id: they stay stripped when the extension is not loaded, and only the returned disposer forgets them, not the extension unloading.
+
+Version 1.11.0 adds `bundles.forgetNoteProperties()`. Handing the disposer of `bundles.stripNoteProperties` to Obsidian's `this.register()` forgets the keys on every unload, so keep it for an extension that really stops stripping. The keys of an extension that crashed or was uninstalled stay until something calls that disposer or `forgetNoteProperties` (Atlas keeps them in its settings under `extensionNoteKeys`).
+
+Extension data on scenes (`scenes.setData`) lives only in Atlas's asset index, never in the scene's record file, so it travels in no bundle and no copy. When Atlas cannot read the index and rebuilds it from the collection files, that data is lost, because the files do not hold it.
 
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
