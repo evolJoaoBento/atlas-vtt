@@ -26,7 +26,7 @@ export const isRemoteImageUrl = (value: unknown): value is string => typeof valu
 const isUrl = (value: unknown): boolean => value === null || isRemoteImageUrl(value);
 
 function fail(method: string, what: string): never {
-  throw new Error(`RemoteView.${method}: ${what}.`);
+  throw new Error(`[Atlas API] RemoteView.${method}: ${what}.`);
 }
 
 /** `value`'s own entries in a new object, each read once; ids such as "__proto__" stay own properties. */

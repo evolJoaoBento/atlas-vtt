@@ -13,7 +13,7 @@ export function storageApi(app: App, extensionId: string): StorageApi {
   async function folder(): Promise<string> {
     // Checked here, not at connect: an odd id must still get the other namespaces.
     if (!EXTENSION_ID.test(extensionId)) {
-      throw new Error(`[Atlas API] "${extensionId}" cannot have a storage folder: the extension id must be kebab-case (a-z, 0-9, -).`);
+      throw new Error(`[Atlas API] storage.folder: "${extensionId}" cannot have a storage folder: the extension id must be kebab-case (a-z, 0-9, -).`);
     }
     const path = storageFolderOf(extensionId);
     // A folder deleted since the first call is created again.

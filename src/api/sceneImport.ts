@@ -34,12 +34,12 @@ export function withImagePaths(map: SavedMapInput, imagePaths: ReadonlyMap<strin
 async function resolveCollection(assets: AssetService, ref: AddInput['collection']): Promise<{ id: string; created: boolean }> {
   const known = await assets.getCollections();
   if ('id' in ref) {
-    if (!known.some((collection) => collection.id === ref.id)) throw new Error(`[Atlas API] There is no collection with the id "${String(ref.id)}".`);
+    if (!known.some((collection) => collection.id === ref.id)) throw new Error(`[Atlas API] scenes.addToCollection: there is no collection with the id "${String(ref.id)}".`);
     return { id: ref.id, created: false };
   }
   // In English whatever Atlas's language: the error is for the extension's author.
   const problem = typeof ref.name === 'string' ? collectionNameProblemKey(ref.name) : 'names.enter';
-  if (problem) throw new Error(`[Atlas API] The collection name cannot be used: ${String(en[problem])}`);
+  if (problem) throw new Error(`[Atlas API] scenes.addToCollection: the collection name cannot be used: ${String(en[problem])}`);
   const key = ref.name.trim().toLowerCase();
   const match = known.find((collection: CollectionMetadata) => collection.id.toLowerCase() === key || collection.name.toLowerCase() === key);
   if (match) return { id: match.id, created: false };
@@ -107,7 +107,7 @@ async function undo(app: App, assets: AssetService, created: { files: readonly s
 export function addSceneToCollection(app: App, assets: AssetService, input: AddInput, owner: string): Promise<{ sceneId: string; mapPath: string }> {
   return assets.runExclusive(async () => {
     if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
-      throw new Error('[Atlas API] addToCollection needs { collection, name, folder, map, images }.');
+      throw new Error('[Atlas API] scenes.addToCollection: the input must be { collection, name, folder, map, images }.');
     }
     const collection = await resolveCollection(assets, input.collection);
     const written: string[] = [];
@@ -118,16 +118,16 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
     try {
       const folder = typeof input.folder === 'string' ? normalizePath(input.folder) : '';
       if (!isPlainRelative(folder) || !isInside(`${folder}/x`, collectionFolderPath(collection.id))) {
-        throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${collectionFolderPath(collection.id)}.`);
+        throw new Error(`[Atlas API] scenes.addToCollection: the folder must lie inside the collection's folder, ${collectionFolderPath(collection.id)}.`);
       }
       const fields = sceneFieldsOf(input.map);
-      await checkMapGrid(app, input.map, input.images, (message) => { throw new Error(`[Atlas API] ${message}`); });
+      await checkMapGrid(app, input.map, input.images, (message) => { throw new Error(`[Atlas API] scenes.addToCollection: ${message}`); });
       const targets = new Map<string, ArrayBuffer>();
       for (const image of input.images as AddInput['images']) {
         const path: unknown = image?.path;
-        if (!isPlainRelative(path) || !isInside(`${folder}/${path}`, folder)) throw new Error(`[Atlas API] The image path "${String(path)}" must stay inside the folder.`);
+        if (!isPlainRelative(path) || !isInside(`${folder}/${path}`, folder)) throw new Error(`[Atlas API] scenes.addToCollection: the image path "${String(path)}" must stay inside the folder.`);
         const target = `${folder}/${path}`;
-        if (targets.has(target) || app.vault.getAbstractFileByPath(target)) throw new Error(`[Atlas API] There is already a file at ${target}.`);
+        if (targets.has(target) || app.vault.getAbstractFileByPath(target)) throw new Error(`[Atlas API] scenes.addToCollection: there is already a file at ${target}.`);
         targets.set(target, image.data);
       }
       createdFolder = firstMissingFolder(app, folder);

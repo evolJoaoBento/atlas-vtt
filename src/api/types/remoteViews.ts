@@ -62,7 +62,7 @@ export interface RemoteViewsApi {
   /**
    * Opens (or reveals, with `reuse`) a tab of type `atlas-vtt-remote`, owned by the calling extension. `maxDice` is the most
    * dice its tray offers for one roll, a whole number from 1 to 100 (default 100); a revealed view keeps its own title, icon
-   * and `maxDice`. Throws on a malformed option; rejects when the view could not open.
+   * and `maxDice`. The promise rejects on a malformed option and when the view could not open; the call itself never throws.
    */
   open(options: { title: string; icon?: string; reuse?: boolean; maxDice?: number }): Promise<RemoteView>;
 }

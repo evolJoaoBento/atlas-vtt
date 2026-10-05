@@ -29,12 +29,12 @@ function handlesOf(app: App): Set<RemoteViewHandle> {
 
 function checkedOptions(options: unknown): Required<RemoteViewOptions> {
   const given = (typeof options === 'object' && options !== null ? options : {}) as Partial<Record<keyof RemoteViewOptions, unknown>>;
-  if (typeof given.title !== 'string' || given.title.trim() === '') throw new Error('remoteViews.open: "title" must be a non-empty string.');
-  if (given.icon !== undefined && typeof given.icon !== 'string') throw new Error('remoteViews.open: "icon" must be a Lucide icon name.');
-  if (given.reuse !== undefined && typeof given.reuse !== 'boolean') throw new Error('remoteViews.open: "reuse" must be true or false.');
+  if (typeof given.title !== 'string' || given.title.trim() === '') throw new Error('[Atlas API] remoteViews.open: "title" must be a non-empty string.');
+  if (given.icon !== undefined && typeof given.icon !== 'string') throw new Error('[Atlas API] remoteViews.open: "icon" must be a Lucide icon name.');
+  if (given.reuse !== undefined && typeof given.reuse !== 'boolean') throw new Error('[Atlas API] remoteViews.open: "reuse" must be true or false.');
   const maxDice = given.maxDice ?? REMOTE_MAX_DICE;
   if (typeof maxDice !== 'number' || !Number.isInteger(maxDice) || maxDice < 1 || maxDice > REMOTE_MAX_DICE) {
-    throw new Error(`remoteViews.open: "maxDice" must be a whole number from 1 to ${REMOTE_MAX_DICE}.`);
+    throw new Error(`[Atlas API] remoteViews.open: "maxDice" must be a whole number from 1 to ${REMOTE_MAX_DICE}.`);
   }
   return { title: given.title, icon: given.icon ?? 'map', reuse: given.reuse === true, maxDice };
 }
@@ -64,7 +64,7 @@ export async function openRemoteView(app: App, owner: string, options: RemoteVie
       handle.close();
     }
   }
-  if (!made) throw new Error('remoteViews.open: the remote view could not open.');
+  if (!made) throw new Error('[Atlas API] remoteViews.open: the remote view could not open.');
   await app.workspace.revealLeaf(leaf);
   return handle;
 }

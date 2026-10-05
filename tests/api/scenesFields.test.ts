@@ -68,7 +68,7 @@ describe('the optional fields of a saved map', () => {
     const bad = [{ ...grid, size: -1 }, { ...grid, size: Number.NaN }, { ...grid, size: 0.1 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, { ...grid, offsetY: Infinity }];
     for (const value of bad) {
       const input = { collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: value as never }), images: [{ path: 'bg.png', data: PNG() }] };
-      await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\] The map's .*grid/);
+      await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\] scenes.addToCollection: the map's .*grid/);
       expect(await fixture.vault.app.vault.adapter.exists(FOLDER)).toBe(false);
       expect((await fixture.assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
     }

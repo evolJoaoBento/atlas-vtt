@@ -29,7 +29,7 @@ async function backgroundSize(app: App, path: string | null): Promise<SavedMap['
 
 /** The saved map at `path`, migrated, as a frozen copy; null when there is no such file. A file that exists but cannot be read throws. */
 export async function readSavedMap(app: App, path: string): Promise<SavedMap | null> {
-  if (typeof path !== 'string' || !path.endsWith('.atlasmap')) throw new Error('[Atlas API] readMap needs the path of an .atlasmap file.');
+  if (typeof path !== 'string' || !path.endsWith('.atlasmap')) throw new Error('[Atlas API] scenes.readMap: the path must name an .atlasmap file.');
   const file = app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile)) return null;
   const { state } = parseSceneFile(await app.vault.read(file));

@@ -45,13 +45,13 @@ function landOnMap(snapAt: (point: Point) => Point, target: Point, map: { width:
 /** The options with every flag settled; throws on a malformed one. */
 function settled(options: unknown): Required<TokenMoveOptions> {
   if (options !== undefined && (typeof options !== 'object' || options === null || Array.isArray(options))) {
-    throw new Error('tokens.move: "options" must be an object.');
+    throw new Error('[Atlas API] tokens.move: "options" must be an object.');
   }
   const given = (options ?? {}) as Record<string, unknown>;
   const flag = (name: keyof TokenMoveOptions, fallback: boolean): boolean => {
     const value = given[name];
     if (value === undefined) return fallback;
-    if (typeof value !== 'boolean') throw new Error(`tokens.move: "${name}" must be true or false.`);
+    if (typeof value !== 'boolean') throw new Error(`[Atlas API] tokens.move: "${name}" must be true or false.`);
     return value;
   };
   return { snap: flag('snap', true), clampToMap: flag('clampToMap', true), allowHidden: flag('allowHidden', false) };
@@ -59,7 +59,7 @@ function settled(options: unknown): Required<TokenMoveOptions> {
 
 /** Each token's last move; an entry that is not an object, or names no token, is kept under a name no token has. */
 function lastMoves(moves: unknown): Map<string, Partial<TokenMove>> {
-  if (!Array.isArray(moves)) throw new Error('tokens.move: "moves" must be a list of { tokenId, x, y }.');
+  if (!Array.isArray(moves)) throw new Error('[Atlas API] tokens.move: "moves" must be a list of { tokenId, x, y }.');
   const byToken = new Map<string, Partial<TokenMove>>();
   for (const move of moves as unknown[]) {
     const entry = (typeof move === 'object' && move !== null ? move : {}) as Partial<TokenMove>;
@@ -72,9 +72,9 @@ export function tokensApi(tracker: ViewTracker): TokensApi {
   return Object.freeze({
     snapPoint: (viewId: ViewId, point: Point, tokenSize: number): Readonly<Point> => {
       if (typeof point !== 'object' || point === null || !isFiniteNumber(point.x) || !isFiniteNumber(point.y)) {
-        throw new Error('tokens.snapPoint: "point" must be { x, y } numbers.');
+        throw new Error('[Atlas API] tokens.snapPoint: "point" must be { x, y } numbers.');
       }
-      if (!isFiniteNumber(tokenSize) || tokenSize <= 0) throw new Error('tokens.snapPoint: "tokenSize" must be a number above 0.');
+      if (!isFiniteNumber(tokenSize) || tokenSize <= 0) throw new Error('[Atlas API] tokens.snapPoint: "tokenSize" must be a number above 0.');
       const view = tracker.view(viewId);
       if (!view) return frozenPoint(point);
       return frozenPoint(snapDroppedToken(view.atlasStore.getState().grid, { x: point.x, y: point.y }, tokenSize));

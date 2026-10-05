@@ -11,7 +11,7 @@ export function remoteViewsApi(app: App, scope: Pick<ExtensionScope, 'id' | 'dis
     open: async (options: { title: string; icon?: string; reuse?: boolean; maxDice?: number }): Promise<RemoteView> => {
       const handle = await openRemoteView(app, scope.id, options);
       const view = handle.openView;
-      if (!view) throw new Error('remoteViews.open: the remote view closed while it opened.');
+      if (!view) throw new Error('[Atlas API] remoteViews.open: the remote view closed while it opened.');
       // Seen by `views`, `lasers` and the rest at once, before any layout change.
       tracker.adopt(view);
       const api = handle.api;

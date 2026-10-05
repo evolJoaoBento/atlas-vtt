@@ -64,7 +64,7 @@ function checkedActions(given: unknown, room: number, choose: (id: string) => vo
   const valid = actions !== null && Array.isArray(given) && given.length <= room && actions.every(isAction)
     && new Set(actions.map((action) => action.id)).size === actions.length;
   if (!valid) {
-    throw new Error(`RemoteView.setStatus: "actions" must list { id, label, icon? } with distinct ids and non-empty text, at most ${REMOTE_STATUS_ACTIONS} buttons with "action" (${room} left).`);
+    throw new Error(`[Atlas API] RemoteView.setStatus: "actions" must list { id, label, icon? } with distinct ids and non-empty text, at most ${REMOTE_STATUS_ACTIONS} buttons with "action" (${room} left).`);
   }
   return Object.freeze(actions.map(({ id, label, icon }) => Object.freeze({
     id, label, ...(icon !== undefined ? { icon } : {}), run: (): void => { choose(id); },
@@ -78,7 +78,7 @@ function checkedStatus(status: unknown, choose: (id: string) => void): ShownStat
   const { label, run } = (action ?? {}) as { label?: unknown; run?: unknown };
   const valid = text(title) && text(connection) && tones.includes(tone) && (message === null || text(message))
     && (action === undefined || (text(label) && typeof run === 'function'));
-  if (!valid) throw new Error('RemoteView.setStatus: the status must be a RemoteStatus.');
+  if (!valid) throw new Error('[Atlas API] RemoteView.setStatus: the status must be a RemoteStatus.');
   const actions = listed === undefined ? undefined : checkedActions(listed, REMOTE_STATUS_ACTIONS - (action ? 1 : 0), choose);
   const bound = typeof run === 'function' ? (run as () => void).bind(action) : null;
   return Object.freeze({
@@ -91,7 +91,7 @@ function checkedStatus(status: unknown, choose: (id: string) => void): ShownStat
 /** A copy of `value` to check, so nothing the caller changes afterwards gets past the check; throws for `method` when it is not plain data. */
 function copyToCheck(method: string, value: unknown): unknown {
   const copy = plainCopy(value);
-  if (copy === null) throw new Error(`RemoteView.${method}: the roll must be plain data.`);
+  if (copy === null) throw new Error(`[Atlas API] RemoteView.${method}: the roll must be plain data.`);
   return copy;
 }
 
@@ -110,14 +110,14 @@ export class RemoteViewDice {
 
   setDiceLog(entries: unknown): void {
     const kept = copyToCheck('setDiceLog', Array.isArray(entries) ? entries.slice(0, REMOTE_LOG_ENTRIES) : entries);
-    if (!Array.isArray(kept) || !kept.every(isDiceRollResult)) throw new Error('RemoteView.setDiceLog: the entries must be dice roll results.');
+    if (!Array.isArray(kept) || !kept.every(isDiceRollResult)) throw new Error('[Atlas API] RemoteView.setDiceLog: the entries must be dice roll results.');
     updateRemoteView(this.store, { diceLog: frozenCopy(kept) });
   }
 
   /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
   throwRoll(given: unknown): void {
     const result = copyToCheck('throwRoll', given);
-    if (!isDiceRollResult(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
+    if (!isDiceRollResult(result)) throw new Error('[Atlas API] RemoteView.throwRoll: the result must be a dice roll result.');
     if (thrownBefore(this.store, result.id)) return;
     noteThrown(this.store, result.id);
     updateRemoteView(this.store, { ownRoll: frozenCopy(result) });

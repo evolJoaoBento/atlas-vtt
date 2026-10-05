@@ -13,7 +13,7 @@ import type { ViewTracker } from './viewTracker';
 interface ReplaceInput { map: SavedMapInput; images: ReadonlyArray<{ path: string; data: ArrayBuffer }> }
 
 function fail(message: string): never {
-  throw new Error(`[Atlas API] replaceMap: ${message}`);
+  throw new Error(`[Atlas API] scenes.replaceMap: ${message}`);
 }
 
 /** Whether any open map view has `mapPath` loaded or among its scene tabs. */

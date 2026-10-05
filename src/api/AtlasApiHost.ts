@@ -60,13 +60,13 @@ export class AtlasApiHost {
   }
 
   private connect(plugin: ConnectingPlugin): AtlasExtension {
-    if (this.disposed) throw new Error('Atlas VTT has unloaded; wait for atlas-vtt:api-ready.');
+    if (this.disposed) throw new Error('[Atlas API] connect: Atlas VTT has unloaded; wait for atlas-vtt:api-ready.');
     const id = (plugin as Partial<ConnectingPlugin> | null | undefined)?.manifest?.id;
     if (typeof id !== 'string' || id === '') {
-      throw new Error('Atlas VTT: connect(plugin) needs an Obsidian plugin with a manifest id.');
+      throw new Error('[Atlas API] connect: connect(plugin) needs an Obsidian plugin with a manifest id.');
     }
     if (typeof plugin.register !== 'function') {
-      throw new Error('Atlas VTT: connect(plugin) needs an Obsidian plugin with a register function.');
+      throw new Error('[Atlas API] connect: connect(plugin) needs an Obsidian plugin with a register function.');
     }
     this.connected.get(id)?.disposers.disposeAll();
     const disposers = new DisposerSet();

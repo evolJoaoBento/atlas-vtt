@@ -58,7 +58,7 @@ export class RemoteViewScene {
     try {
       this.applier.apply(scene);
     } catch (error) {
-      throw new Error(`RemoteView.setScene: a record could not be copied (${error instanceof Error ? error.message : String(error)}).`);
+      throw new Error(`[Atlas API] RemoteView.setScene: a record could not be copied (${error instanceof Error ? error.message : String(error)}).`);
     }
     this.background = scene ? { ...scene.background } : null;
     this.showBackdrop();

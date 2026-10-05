@@ -27,16 +27,16 @@ function newest(points: unknown, dt: unknown): { points: unknown; dt: unknown } 
 function checkedLaser(laser: RemoteLaser): RemoteLaser {
   const { from, color, lifted, ...sent } = (laser ?? {}) as { [K in keyof RemoteLaser]?: unknown };
   const { points, dt } = newest(sent.points, sent.dt);
-  if (typeof from !== 'string' || from === '') throw new Error('lasers.show: "from" must name whose laser it is.');
-  if (!isHexColor(color)) throw new Error('lasers.show: "color" must be a #rrggbb colour.');
-  if (typeof lifted !== 'boolean') throw new Error('lasers.show: "lifted" must be true or false.');
+  if (typeof from !== 'string' || from === '') throw new Error('[Atlas API] lasers.show: "from" must name whose laser it is.');
+  if (!isHexColor(color)) throw new Error('[Atlas API] lasers.show: "color" must be a #rrggbb colour.');
+  if (typeof lifted !== 'boolean') throw new Error('[Atlas API] lasers.show: "lifted" must be true or false.');
   // Each point's x and y and each gap read once, then checked, so a getter cannot change them after the check.
   const taken = Array.isArray(points) ? points.map((point: unknown) => (typeof point === 'object' && point !== null ? { x: (point as Point).x, y: (point as Point).y } : null)) : null;
   if (taken === null || !taken.every(isPoint)) {
-    throw new Error('lasers.show: "points" must be a list of { x, y } numbers.');
+    throw new Error('[Atlas API] lasers.show: "points" must be a list of { x, y } numbers.');
   }
   const gaps: unknown[] | undefined = Array.isArray(dt) ? [...(dt as unknown[])] : undefined;
-  if (dt !== undefined && !(gaps && gaps.every(isFiniteNumber))) throw new Error('lasers.show: "dt" must be a list of numbers.');
+  if (dt !== undefined && !(gaps && gaps.every(isFiniteNumber))) throw new Error('[Atlas API] lasers.show: "dt" must be a list of numbers.');
   return { from, color, lifted, points: taken, ...(gaps ? { dt: gaps as number[] } : {}) };
 }
 

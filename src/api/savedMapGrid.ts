@@ -33,5 +33,5 @@ export async function checkMapGrid(
   const uploaded = background === null ? undefined : images.find((image) => image?.path === background);
   const size = uploaded ? await sizeOf(async () => uploaded.data) : await vaultImageSize(app, background);
   const problem = gridProblem(map.grid, size);
-  if (problem) fail(`The map's ${problem}.`);
+  if (problem) fail(`the map's ${problem}.`);
 }

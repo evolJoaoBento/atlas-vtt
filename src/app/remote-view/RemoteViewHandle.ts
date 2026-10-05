@@ -46,7 +46,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   /** What the extension holds: the handle's methods, frozen. */
   get api(): RemoteView {
     const view = this.view;
-    if (!view) throw new Error('The remote view has not opened.');
+    if (!view) throw new Error('[Atlas API] RemoteView: the remote view has not opened.');
     this.facade ??= Object.freeze({
       viewId: view.viewId,
       setScene: (scene: unknown): void => { this.scene?.setScene(scene); this.motion?.checkDrag(); },

@@ -38,7 +38,7 @@ describe('settings', () => {
     const laser = api.get('laserPointer');
     expect(() => { laser.size = 99; }).toThrow(TypeError);
     expect(service.getLaserPointerSettings().size).not.toBe(99);
-    expect(() => api.get('constructor' as never)).toThrow('Unknown setting');
+    expect(() => api.get('constructor' as never)).toThrow('settings.get: unknown setting');
   });
 
   it('C-settings-2: a player view switch or the dice look reports its own key; a rule outside the four reports nothing', async () => {

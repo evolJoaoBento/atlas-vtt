@@ -56,7 +56,7 @@ export class RemoteViewMotion {
     // Each field read once, so a getter cannot change it after the check.
     const { centerX, centerY, width, height } = (typeof camera === 'object' && camera !== null ? camera : {}) as Partial<ViewCamera>;
     const valid = isFiniteNumber(centerX) && isFiniteNumber(centerY) && isFiniteNumber(width) && width > 0 && isFiniteNumber(height) && height > 0;
-    if (!valid) throw new Error('RemoteView.setCamera: the camera must be { centerX, centerY, width, height } numbers, with a size above 0.');
+    if (!valid) throw new Error('[Atlas API] RemoteView.setCamera: the camera must be { centerX, centerY, width, height } numbers, with a size above 0.');
     const area = { centerX, centerY, width, height };
     this.follower?.setCamera(area, options?.animate === true, options?.padded === true);
   }

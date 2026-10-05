@@ -30,9 +30,9 @@ function plainJson(value: unknown): Json {
   try {
     text = JSON.stringify(value);
   } catch (error) {
-    throw new Error(`[Atlas API] setData needs plain JSON: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`[Atlas API] scenes.setData: the value must be plain JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
-  if (text === undefined) throw new Error('[Atlas API] setData needs plain JSON (or null to clear).');
+  if (text === undefined) throw new Error('[Atlas API] scenes.setData: the value must be plain JSON, or null to clear it.');
   return JSON.parse(text) as Json;
 }
 
@@ -56,7 +56,7 @@ export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>, views: Vi
       // Re-read right before writing and patch only this extension's key: never anyone else's data, never the scene's own.
       await assets.runExclusive(async () => {
         const scene = await assets.getAssetById(sceneId);
-        if (scene?.type !== 'scene') throw new Error(`[Atlas API] There is no scene with the id "${String(sceneId)}".`);
+        if (scene?.type !== 'scene') throw new Error(`[Atlas API] scenes.setData: there is no scene with the id "${String(sceneId)}".`);
         const current = scene.data?.extensions;
         const next = Object.fromEntries(Object.entries(current ?? {}).filter(([key]) => key !== scope.id));
         if (copy !== null) Object.defineProperty(next, scope.id, { value: copy, enumerable: true, writable: true, configurable: true });

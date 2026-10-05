@@ -21,7 +21,7 @@ export function settingsView(service: SettingsService): AtlasSettingsView {
 export function settingsApi(service: SettingsService): SettingsApi {
   return Object.freeze({
     get: <K extends AtlasSettingKey>(key: K): AtlasSettingsView[K] => {
-      if (!KEYS.includes(key)) throw new Error(`[Atlas API] Unknown setting "${String(key)}".`);
+      if (!KEYS.includes(key)) throw new Error(`[Atlas API] settings.get: unknown setting "${String(key)}".`);
       return frozenCopy(settingsView(service)[key]);
     },
   });
