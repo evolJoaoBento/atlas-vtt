@@ -25,6 +25,8 @@ describe('the limits of a drawable grid', () => {
   it('takes a well-formed grid', () => {
     expect(gridProblem(grid(), { width: 1000, height: 800 })).toBeNull();
     expect(gridProblem(grid({ type: 'hex-vertical', lineType: 'dotted', unitDistanceOverride: 10 }), null)).toBeNull();
+    // As Atlas itself saves grids: a collection's own unit, and fields an older file left out.
+    expect(gridProblem({ enabled: true, size: 70, unitType: 'custom', measurementType: 'daggerheart' }, { width: 1000, height: 800 })).toBeNull();
   });
 
   it('refuses sizes that never finish or take millions of steps, unknown kinds, and numbers that are not finite', () => {
@@ -33,7 +35,7 @@ describe('the limits of a drawable grid', () => {
       grid({ size: -1 }), grid({ size: 0 }), grid({ size: 0.0001 }), grid({ size: Number.NaN }), grid({ size: Infinity }), grid({ size: '70' }),
       grid({ size: MIN_GRID_CELL_SIZE - 0.5 }), grid({ size: 1 }), grid({ size: 49 }),
       grid({ offsetX: Number.NaN }), grid({ opacity: Infinity }), grid({ lineWidth: Number.NaN }),
-      grid({ type: 'triangle' }), grid({ lineType: 'wavy' }), grid({ unitType: 'parsecs' }), null, [],
+      grid({ type: 'triangle' }), grid({ lineType: 'wavy' }), null, [],
     ];
     for (const value of bad) expect(gridProblem(value, map)).toMatch(/grid/);
     expect(gridProblem(grid({ size: 50 }), map)).toBeNull();

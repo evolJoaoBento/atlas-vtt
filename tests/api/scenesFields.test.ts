@@ -76,6 +76,15 @@ describe('the optional fields of a saved map', () => {
     await expect(fixture.scenes.addToCollection(fine)).resolves.toMatchObject({ mapPath: expect.any(String) });
   });
 
+  it('C-scenes-2: a grid as Atlas saves it, read with readMap, is added as it is', async () => {
+    const fixture = await withScene();
+    // A collection's own unit and the fields a new scene gets; no offsets or opacity in an older file.
+    const saved = { enabled: true, visible: true, type: 'hex-vertical', size: 64, unitType: 'custom', unitDistance: 5, lineType: 'dashed', autoDetect: true };
+    const read = await variant(fixture, 'atlas-vtt/collections/source/scenes/Hex.atlasmap', (state) => { state.grid = saved; });
+    const { mapPath } = await fixture.scenes.addToCollection({ collection: { name: 'Imported' }, name: 'Hex', folder: FOLDER, map: read, images: [] });
+    expect((await fixture.scenes.readMap(mapPath))!.grid).toMatchObject({ size: 64, unitType: 'custom', type: 'hex-vertical' });
+  });
+
   it("C-scenes-2: a pin's notePath is a vault path, never rewritten as an image path", async () => {
     const fixture = await withScene();
     const pins = { p: { id: 'p', kind: 'pin' as const, x: 0, y: 0, notePath: 'bg.webp' } };

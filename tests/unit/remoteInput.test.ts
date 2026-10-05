@@ -40,6 +40,7 @@ describe("what a remote view takes from its owner", () => {
     for (const value of bad) expect(() => checkedScene({ ...remoteScene(), background: wide, grid: value })).toThrow(/RemoteView.setScene: .*grid/);
     expect(checkedScene({ ...remoteScene(), grid: { ...grid, size: 50 }, background: wide })).not.toBeNull();
     expect(checkedScene({ ...remoteScene(), grid: null })).not.toBeNull();
+    expect(checkedScene({ ...remoteScene(), grid: { enabled: true, size: 70, unitType: 'custom' } as never })).not.toBeNull();
   });
 
   it('copies a well-formed player state, frozen', () => {
