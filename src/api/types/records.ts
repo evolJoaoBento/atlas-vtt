@@ -1,5 +1,8 @@
 /** Atlas's own record types, as plain data (type-only; nothing here runs). */
-export type { BaseToken, Character, DrawingStroke, TextElement, Token, TokenEntity } from '../../app/types';
+export type { BaseToken, Character, DrawingStroke, NotePin, TextElement, Token, TokenEntity } from '../../app/types';
+export type { LightSource } from '../../app/types/lightingTypes';
+export type { TokenSettings } from '../../app/types/tokenSettingsTypes';
+export type { WallSegment } from '../../app/types/wallTypes';
 export type { FogBrushStroke, FogLassoFill, FogOperation, FogRectangleFill } from '../../app/types/fogTypes';
 export type { GridState } from '../../app/types/gridStateTypes';
 export type { InitiativeEntry, InitiativeState } from '../../app/types/initiativeTypes';

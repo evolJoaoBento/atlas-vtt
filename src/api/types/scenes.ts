@@ -1,5 +1,7 @@
 import type { Disposer, Json } from './common';
-import type { BackgroundState, GridState, InitiativeState, SceneLighting } from './records';
+import type {
+  BackgroundState, GridState, InitiativeState, LightSource, NotePin, SceneLighting, TokenSettings, WallSegment,
+} from './records';
 import type { SceneSnapshot } from './views';
 
 export interface SceneRecord { id: string; name: string; collectionId: string; mapPath: string | null }
@@ -11,6 +13,26 @@ export interface SavedMapInput {
   widgets: SceneSnapshot['widgets']; initiative: InitiativeState; lighting?: SceneLighting;
 }
 
+/**
+ * A saved map as `readMap` reads it: its `SavedMapInput`, the background's size, and the rest of the scene as saved.
+ * Atlas 1.13.0 and later always set the optional fields, normalised as Atlas loads the map, also for a file that lacks
+ * them; an older Atlas leaves them out.
+ */
+export type SavedMap = SavedMapInput & {
+  mapSize: { width: number; height: number };
+  /** The note pins, with their note links (vault paths), as saved; {} without any. */
+  pins?: Readonly<Record<string, NotePin>>;
+  /** The walls and lights of dynamic lighting, as saved; {} without any. */
+  walls?: Readonly<Record<string, WallSegment>>;
+  lights?: Readonly<Record<string, LightSource>>;
+  /** Where the GM's camera was when the map was saved; x 0, y 0, scale 1 without one. */
+  camera?: { x: number; y: number; scale: number };
+  /** How the map shows its tokens; Atlas's defaults fill what the file does not set. */
+  tokenSettings?: TokenSettings;
+  /** Whether the initiative tracker was open; false when the file does not say. */
+  initiativeTrackerOpen?: boolean;
+};
+
 export interface ScenesApi {
   list(): Promise<SceneRecord[]>;
   findByMap(mapPath: string): Promise<SceneRecord | null>;
@@ -19,7 +41,7 @@ export interface ScenesApi {
   /** Sets or (null) clears it. Atlas drops it from copies, exports and imports, and leaves it out of fingerprints. */
   setData(sceneId: string, value: Json | null): Promise<void>;
   /** A saved `.atlasmap` file, migrated to the current format, without opening a view; a frozen copy. Null when there is no such file. */
-  readMap(mapPath: string): Promise<(SavedMapInput & { mapSize: { width: number; height: number } }) | null>;
+  readMap(mapPath: string): Promise<SavedMap | null>;
   /**
    * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
    * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when

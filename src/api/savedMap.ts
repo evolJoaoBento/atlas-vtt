@@ -1,17 +1,19 @@
 import { TFile, type App } from 'obsidian';
 import { imageDimensions } from '../app/imageProcessing/imageDimensions';
 import { readSceneLighting } from '../app/lighting/sceneLightingOptions';
+import { tokenSettingsFromFile } from '../app/resources/resourceFileFormat';
 import { ATLAS_SCHEMA, ATLAS_VERSION, migrateMapFile, parseSceneFile } from '../app/services/MapPersistence';
-import { createDefaultWidgets } from '../app/storeFactory';
+import { createDefaultWidgets, DEFAULT_TOKEN_SETTINGS } from '../app/storeFactory';
 import { createDefaultInitiativeState } from '../app/types/initiativeTypes';
 import { frozenCopy } from './frozen';
-import type { SavedMapInput } from './types/scenes';
+import type { SavedMap, SavedMapInput } from './types/scenes';
 
-export type SavedMap = SavedMapInput & { mapSize: { width: number; height: number } };
+type SavedState = ReturnType<typeof parseSceneFile>['state'];
 
-/** Only the fields of `SavedMapInput`, from a migrated map file; pins, walls, lights, camera, notes and logs stay behind. */
-function savedMapInput(state: ReturnType<typeof parseSceneFile>['state']): SavedMapInput {
-  const map = migrateMapFile(state);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The fields of `SavedMapInput`, from a migrated map file. */
+function savedMapInput(state: SavedState, map: ReturnType<typeof migrateMapFile>): SavedMapInput {
   return {
     background: map.background,
     grid: map.grid,
@@ -19,6 +21,19 @@ function savedMapInput(state: ReturnType<typeof parseSceneFile>['state']): Saved
     widgets: { settings: { ...createDefaultWidgets(), ...state.widgetSettings }, values: state.widgetValues ?? {} },
     initiative: { ...createDefaultInitiativeState(), ...state.initiative } as SavedMapInput['initiative'],
     lighting: readSceneLighting((state as { lighting?: unknown }).lighting),
+  };
+}
+
+/** The rest of the scene `readMap` hands out, normalised as Atlas loads the map; the GM's note, the dice log and explored memory stay behind. */
+function savedMapExtras(state: SavedState, map: ReturnType<typeof migrateMapFile>): Required<Omit<SavedMap, keyof SavedMapInput | 'mapSize'>> {
+  const tokenSettings = isRecord(state.tokenSettings) ? tokenSettingsFromFile(state.tokenSettings) : {};
+  return {
+    pins: isRecord(map.objects.pins) ? map.objects.pins : {},
+    walls: map.objects.walls,
+    lights: map.objects.lights,
+    camera: map.camera,
+    tokenSettings: { ...DEFAULT_TOKEN_SETTINGS, ...tokenSettings },
+    initiativeTrackerOpen: (state as { initiativeTrackerOpen?: unknown }).initiativeTrackerOpen === true,
   };
 }
 
@@ -38,8 +53,10 @@ export async function readSavedMap(app: App, path: string): Promise<SavedMap | n
   if (typeof path !== 'string' || !path.endsWith('.atlasmap')) throw new Error('[Atlas API] readMap needs the path of an .atlasmap file.');
   const file = app.vault.getAbstractFileByPath(path);
   if (!(file instanceof TFile)) return null;
-  const input = savedMapInput(parseSceneFile(await app.vault.read(file)).state);
-  return frozenCopy({ ...input, mapSize: await backgroundSize(app, input.background) });
+  const { state } = parseSceneFile(await app.vault.read(file));
+  const map = migrateMapFile(state);
+  const input = savedMapInput(state, map);
+  return frozenCopy({ ...input, ...savedMapExtras(state, map), mapSize: await backgroundSize(app, input.background) });
 }
 
 /** The text of a new map file at `mapPath` holding `map`, as Atlas's own save would write it. */

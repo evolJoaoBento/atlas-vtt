@@ -26,6 +26,7 @@ import { createPinnedNotePreviewActions, type PinnedNotePreviewSlice } from './s
 import { createInitialLootRollerState, createLootRollerActions, readLootRollerState, type LootRollerSlice } from './stores/lootRollerSlice';
 import { isRecord } from './services/assetMetadataGuards';
 import { initialRemoteViewState, type RemoteViewState } from './remote-view/remoteViewState';
+import type { TokenSettings } from './types/tokenSettingsTypes';
 import { createHistoryOptions, getHistoryStore } from './stores/history';
 import { withoutCollectionWidgets } from './utils/collectionWidgets';
 import { withWidgetOff } from './utils/widgetActivation';
@@ -280,13 +281,7 @@ export interface ViewAtlasState {
   plugin?: Plugin;
   
   // Token settings
-  tokenSettings: {
-    showNameplates: boolean;
-    /** Keys of the collection's resources this map does not show to the GM; see `resources/sceneVisibility.ts`. */
-    hiddenResources: string[];
-    showInstanceBadges: boolean;
-    tokenRingSize: number;
-  };
+  tokenSettings: TokenSettings;
   setTokenSettings: (settings: ViewAtlasState['tokenSettings']) => void;
   
   // --- Initiative Tracker ---

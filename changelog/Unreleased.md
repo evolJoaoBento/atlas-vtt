@@ -15,6 +15,7 @@
 - Extension API: remote views are listed by `views.list()` and announced by `map-loaded` and `map-closed` as `kind: 'remote'`; an extension that picks the GM's map views keeps to `kind === 'map'`
 - Extension API: menu items can stay open when chosen, and an open submenu follows its extension's changes, so several toggles can be set in a row
 - Extension API: throw a roll decided elsewhere with Atlas's own 3D dice in a map view, once per roll, following your dice display setting
+- Extension API: reading a saved map without opening it also gives its note pins, walls, lights, camera, token settings and whether the initiative tracker was open
 
 ## Improved
 

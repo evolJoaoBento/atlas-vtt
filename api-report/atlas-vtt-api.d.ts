@@ -602,6 +602,25 @@ declare type LightKind = 'candle' | 'torch' | 'lantern' | 'magical' | 'darkness'
  */
 export declare type LightLevel = 'bright' | 'dim' | 'dark' | 'magical-dark';
 
+/** A light placed on the map. */
+export declare interface LightSource {
+    id: string;
+    kind: 'light';
+    x: number;
+    y: number;
+    emission: LightEmission;
+    /** Switched off by the GM. */
+    hidden?: boolean;
+    /** Where a light with an `angle` shines, in degrees like a token's rotation: 0 faces up on the map, 90 right. Unset is 0. */
+    rotation?: number;
+    /**
+     * A light that follows the ambient light, like a street lamp: it shines only while the scene's
+     * ambient light (0–1) is at or below this level. Unset, or 1, it always shines. Read with
+     * `ambientGate` and `isLightOn`.
+     */
+    activeBelowAmbient?: number;
+}
+
 /**
  * One Atlas view's lasers for online play: the GM's own as it is drawn (`LaserPointerRenderer`
  * emits, `LaserRelay` listens), and other people's to show (`LaserRelay` shows,
@@ -657,6 +676,22 @@ export declare interface MenuItem {
      * provider again after `ui.invalidate()`, so its checkmarks follow; the items of the menu itself are read when it opens.
      */
     keepOpen?: boolean;
+}
+
+/**
+ * Note pin object that links to an Obsidian note
+ */
+export declare interface NotePin {
+    id: string;
+    kind: 'pin';
+    x: number;
+    y: number;
+    notePath: string;
+    icon?: string;
+    label?: string;
+    gmOnly?: boolean;
+    /** Links the note to the grid cell containing (x, y) instead of marking a point; hex grids show that hex, other grids a pin. */
+    hex?: boolean;
 }
 
 export declare interface PaletteCommand {
@@ -971,6 +1006,33 @@ export declare interface RulesApi {
     forMap(mapPath: string | null): MapRules;
 }
 
+/**
+ * A saved map as `readMap` reads it: its `SavedMapInput`, the background's size, and the rest of the scene as saved.
+ * Atlas 1.13.0 and later always set the optional fields, normalised as Atlas loads the map, also for a file that lacks
+ * them; an older Atlas leaves them out.
+ */
+export declare type SavedMap = SavedMapInput & {
+    mapSize: {
+        width: number;
+        height: number;
+    };
+    /** The note pins, with their note links (vault paths), as saved; {} without any. */
+    pins?: Readonly<Record<string, NotePin>>;
+    /** The walls and lights of dynamic lighting, as saved; {} without any. */
+    walls?: Readonly<Record<string, WallSegment>>;
+    lights?: Readonly<Record<string, LightSource>>;
+    /** Where the GM's camera was when the map was saved; x 0, y 0, scale 1 without one. */
+    camera?: {
+        x: number;
+        y: number;
+        scale: number;
+    };
+    /** How the map shows its tokens; Atlas's defaults fill what the file does not set. */
+    tokenSettings?: TokenSettings;
+    /** Whether the initiative tracker was open; false when the file does not say. */
+    initiativeTrackerOpen?: boolean;
+};
+
 /** The parts of a saved map an extension may read and write; everything else in the file stays Atlas's. */
 export declare interface SavedMapInput {
     /** As in `SceneSnapshot`. Written with `addToCollection`, image paths are relative to its `images` and become vault paths; `readMap` returns vault paths. */
@@ -1027,12 +1089,7 @@ export declare interface ScenesApi {
     /** Sets or (null) clears it. Atlas drops it from copies, exports and imports, and leaves it out of fingerprints. */
     setData(sceneId: string, value: Json | null): Promise<void>;
     /** A saved `.atlasmap` file, migrated to the current format, without opening a view; a frozen copy. Null when there is no such file. */
-    readMap(mapPath: string): Promise<(SavedMapInput & {
-        mapSize: {
-            width: number;
-            height: number;
-        };
-    }) | null>;
+    readMap(mapPath: string): Promise<SavedMap | null>;
     /**
      * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
      * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
@@ -1210,6 +1267,15 @@ declare interface TokenSense {
     range?: number;
 }
 
+/** How a map shows its tokens (the map's token settings), saved in its file. */
+export declare interface TokenSettings {
+    showNameplates: boolean;
+    /** Keys of the collection's resources this map does not show to the GM; see `resources/sceneVisibility.ts`. */
+    hiddenResources: string[];
+    showInstanceBadges: boolean;
+    tokenRingSize: number;
+}
+
 /** How a token sees. Distances are game units. */
 declare interface TokenVision {
     enabled: boolean;
@@ -1309,6 +1375,41 @@ export declare interface ViewsApi {
     /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
     watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;
 }
+
+/** What a wall can stop: the sight of tokens, or light. */
+declare type WallChannel = 'sight' | 'light';
+
+export declare interface WallSegment {
+    id: string;
+    kind: 'wall';
+    type: WallType;
+    p1: {
+        x: number;
+        y: number;
+    };
+    p2: {
+        x: number;
+        y: number;
+    };
+    direction?: 'left' | 'right' | undefined;
+    closed?: boolean;
+    /** A door the GM locked: it is closed and its badge does not open it until it is unlocked. A GM aid; light and sight read only `closed`. */
+    locked?: boolean;
+    /**
+     * The one thing the wall stops: a curtain stops sight and lets light through, glass that glows
+     * stops light and lets sight through. Unset, it stops both. A door keeps its kind.
+     */
+    blocks?: WallChannel | undefined;
+    /**
+     * A hedge, a low wall, a fence: sight and light pass the first limited wall on their way and
+     * stop at the second, so what stands at it or right behind it is seen, and nothing through
+     * two. A solid wall stops them as ever. With `blocks`, it is limited for that thing alone.
+     */
+    limited?: boolean | undefined;
+    chainId?: string;
+}
+
+declare type WallType = 'solid' | 'door' | 'secret-door';
 
 declare interface Widget {
     id: string;

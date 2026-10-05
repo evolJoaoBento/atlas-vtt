@@ -9,7 +9,7 @@ import type { SavedMapInput, ScenesApi } from '../../src/api/types/scenes';
 import { bundleNoteKeys } from '../../src/app/extensions/bundleNoteKeys';
 import { AssetService } from '../../src/app/services/AssetService';
 import { createDefaultInitiativeState } from '../../src/app/types/initiativeTypes';
-import { createDefaultWidgets } from '../../src/app/storeFactory';
+import { createDefaultWidgets, DEFAULT_TOKEN_SETTINGS } from '../../src/app/storeFactory';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
 
 const BACKGROUND = 'atlas-vtt/assets/bg.png';
@@ -44,7 +44,8 @@ async function withScene(): Promise<Fixture> {
   const map = JSON.parse(savedMapText(emptyMap({ background: BACKGROUND }), MAP_PATH, 'Cave')) as { state: Record<string, unknown> };
   // What a real save also holds, and an extension never gets back
   Object.assign(map.state, { diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask' });
-  Object.assign(map.state.objects as object, { pins: { p1: { id: 'p1', notePath: 'DM/Secret.md' } }, walls: { w: { id: 'w' } } });
+  Object.assign(map.state.objects as object, { pins: { p1: { id: 'p1', kind: 'pin', x: 5, y: 6, notePath: 'Notes/Cave entrance.md' } }, walls: { w: { id: 'w' } } });
+  Object.assign(map.state, { initiativeTrackerOpen: true, camera: { x: 12, y: 34, scale: 2 }, tokenSettings: { showNameplates: true, showHPBars: false, showStressBars: true, tokenRingSize: 1.5 } });
   await vault.app.vault.create(MAP_PATH, JSON.stringify(map));
   const scene = await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
   const scope = { id: 'ext', disposers: new DisposerSet() };
@@ -188,14 +189,47 @@ describe('scenes', () => {
   it('C-scenes-3: readMap copies nothing private, hands out a frozen copy and sizes a map without a background 0 x 0', async () => {
     const { scenes, mapPath, vault } = await withScene();
     const map = (await scenes.readMap(mapPath))!;
-    expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'lighting', 'mapSize', 'objects', 'widgets']);
+    expect(Object.keys(map).sort()).toEqual([
+      'background', 'camera', 'grid', 'initiative', 'initiativeTrackerOpen', 'lighting', 'lights', 'mapSize', 'objects', 'pins',
+      'tokenSettings', 'walls', 'widgets',
+    ]);
     expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
     expect(JSON.stringify(map)).not.toContain('Secret');
+    expect(JSON.stringify(map)).not.toContain('mask');
     expect(Object.isFrozen(map)).toBe(true);
     expect(Object.isFrozen(map.objects)).toBe(true);
+    expect(Object.isFrozen(map.pins!.p1)).toBe(true);
+    expect(Object.isFrozen(map.tokenSettings)).toBe(true);
     const plain = 'atlas-vtt/collections/source/scenes/Plain.atlasmap';
     await vault.app.vault.create(plain, savedMapText(emptyMap(), plain, 'Plain'));
     expect((await scenes.readMap(plain))?.mapSize).toEqual({ width: 0, height: 0 });
+  });
+
+  it('C-scenes-3: readMap hands out pins with their note links, walls, lights, camera, token settings and the tracker as saved', async () => {
+    const { scenes, mapPath } = await withScene();
+    const map = (await scenes.readMap(mapPath))!;
+    expect(map.pins).toEqual({ p1: { id: 'p1', kind: 'pin', x: 5, y: 6, notePath: 'Notes/Cave entrance.md' } });
+    expect(map.walls).toEqual({ w: { id: 'w' } });
+    expect(map.lights).toEqual({});
+    expect(map.camera).toEqual({ x: 12, y: 34, scale: 2 });
+    expect(map.initiativeTrackerOpen).toBe(true);
+    // The file's two bar switches become the hidden resources, as when the map loads; Atlas's defaults fill the rest.
+    expect(map.tokenSettings).toEqual({ ...DEFAULT_TOKEN_SETTINGS, showNameplates: true, tokenRingSize: 1.5, hiddenResources: ['hp'] });
+  });
+
+  it('C-scenes-3: readMap gives an old file without them empty records, the default camera and settings, and a closed tracker', async () => {
+    const { scenes, vault } = await withScene();
+    const old = 'atlas-vtt/collections/source/scenes/Old.atlasmap';
+    const state = { schema: 'atlas-vtt', version: 3, background: null, grid: null, objects: { tokens: {}, fog: {}, texts: {}, drawings: {} } };
+    await vault.app.vault.create(old, JSON.stringify({ state, version: 3 }));
+    const map = (await scenes.readMap(old))!;
+    expect(map.pins).toEqual({});
+    expect(map.walls).toEqual({});
+    expect(map.lights).toEqual({});
+    expect(map.camera).toEqual({ x: 0, y: 0, scale: 1 });
+    expect(map.tokenSettings).toEqual(DEFAULT_TOKEN_SETTINGS);
+    expect(map.initiativeTrackerOpen).toBe(false);
+    expect(Object.isFrozen(map.camera)).toBe(true);
   });
 
   it('rejects with a clear error when the asset index failed to load', async () => {
