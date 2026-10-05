@@ -40,6 +40,7 @@
 - The automatic grid colour no longer fails on a map whose texture is not an image
 - Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
 - An odd last tile on the dashboard takes the whole row instead of leaving half of it empty
+- A widget, condition or game system preset whose icon name is not one of Atlas's icons but a built-in word such as `constructor` shows the default icon, or the condition's initial, instead of an empty badge
 
 ## Important changes
 
