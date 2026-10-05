@@ -8,6 +8,10 @@ import type { SceneSnapshot, ViewCamera } from './views';
 export interface RemoteSceneInput {
   /** Records in Atlas's own types; images by URL (object URLs are released by the caller after replacing them). */
   background: { url: string | null; width: number; height: number };
+  /**
+   * Finite numbers, a `size` of at least 4 px and at most 2,000 cells along a side of `background`, and a known `type`
+   * and `lineType`; anything else throws, so a grid Atlas could never finish drawing is never shown.
+   */
   grid: GridState | null;
   objects: SceneSnapshot['objects'];
   /** Token image URL by token id. A token's `notePath` and `statblockPath` are dropped: they name another vault's notes. */

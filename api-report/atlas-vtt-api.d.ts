@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.15.0";
+export declare const API_VERSION = "1.15.1";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -917,6 +917,10 @@ export declare interface RemoteSceneInput {
         width: number;
         height: number;
     };
+    /**
+     * Finite numbers, a `size` of at least 4 px and at most 2,000 cells along a side of `background`, and a known `type`
+     * and `lineType`; anything else throws, so a grid Atlas could never finish drawing is never shown.
+     */
     grid: GridState | null;
     objects: SceneSnapshot['objects'];
     /** Token image URL by token id. A token's `notePath` and `statblockPath` are dropped: they name another vault's notes. */
@@ -1174,8 +1178,9 @@ export declare interface ScenesApi {
      * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
      * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused, and so is a
      * malformed optional field of `map` (a pin without a plain vault `notePath`, a camera that is not finite numbers with
-     * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records): it throws
-     * before anything is written. A `readMap` result can be handed in as it is.
+     * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records), and so is a
+     * grid that is not finite numbers with a `size` of at least 4 px, at most 2,000 cells along a side of the background
+     * image (when Atlas can read its size) and a known `type` and `lineType`: it throws before anything is written. A `readMap` result can be handed in as it is.
      */
     addToCollection(input: {
         collection: {

@@ -5,7 +5,7 @@ import { savedMapText } from '../../src/api/savedMap';
 import type { SavedMap } from '../../src/api/types/scenes';
 import { AssetService } from '../../src/app/services/AssetService';
 import { DEFAULT_TOKEN_SETTINGS } from '../../src/app/storeFactory';
-import { emptyMap, MAP_PATH, withScene, type Fixture } from './scenesFixture';
+import { emptyMap, MAP_PATH, PNG, withScene, type Fixture } from './scenesFixture';
 
 const FIELDS = ['pins', 'walls', 'lights', 'lightZones', 'camera', 'tokenSettings', 'initiativeTrackerOpen'] as const;
 const FOLDER = 'atlas-vtt/collections/Shared with me/Cave';
@@ -59,6 +59,21 @@ describe('the optional fields of a saved map', () => {
       expect((await fixture.assets.getCollections()).map((collection) => collection.id)).not.toContain('Shared with me');
       expect((await fixture.assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
     }
+  });
+
+  it('C-scenes-2: a grid Atlas could never finish drawing throws and leaves nothing behind, a plain map included', async () => {
+    const fixture = await withScene();
+    const grid = { enabled: true, type: 'square' as const, size: 70, offsetX: 0, offsetY: 0, opacity: 0.5 };
+    // PNG() is 320 x 200: a size of 0.1 gives 3,200 cells along its width.
+    const bad = [{ ...grid, size: -1 }, { ...grid, size: Number.NaN }, { ...grid, size: 0.1 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, { ...grid, offsetY: Infinity }];
+    for (const value of bad) {
+      const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: value as never }), images: [{ path: 'bg.png', data: PNG() }] };
+      await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\] The map's .*grid/);
+      expect(await fixture.vault.app.vault.adapter.exists(FOLDER)).toBe(false);
+      expect((await fixture.assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
+    }
+    const fine = { collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: { ...grid, size: 4 } }), images: [{ path: 'bg.png', data: PNG() }] };
+    await expect(fixture.scenes.addToCollection(fine)).resolves.toMatchObject({ mapPath: expect.any(String) });
   });
 
   it("C-scenes-2: a pin's notePath is a vault path, never rewritten as an image path", async () => {

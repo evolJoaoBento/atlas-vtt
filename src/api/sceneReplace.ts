@@ -2,6 +2,7 @@ import { normalizePath, TFile, type App } from 'obsidian';
 import type { AssetService } from '../app/services/AssetService';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
+import { checkMapGrid } from './savedMapGrid';
 import { isPlainRelative } from './savedMapFields';
 import { isInside, sceneFieldsOf, withImagePaths } from './sceneImport';
 import type { SavedMapInput } from './types/scenes';
@@ -101,6 +102,7 @@ export function replaceSceneMap(
     if (isOpenInAView(views, mapPath)) fail('the scene is open in a map view; close its tab first.');
     if (!input || !input.map || !Array.isArray(input.images)) fail('it needs { map, images }.');
     const fields = sceneFieldsOf(input.map);
+    await checkMapGrid(app, input.map, input.images, fail);
     const folder = mapPath.slice(0, mapPath.lastIndexOf('/'));
     const chosen = new Set<string>();
     const targets = new Map<string, { target: string; data: ArrayBuffer }>();

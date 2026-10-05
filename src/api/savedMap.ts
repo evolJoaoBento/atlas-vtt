@@ -1,10 +1,10 @@
 import { TFile, type App } from 'obsidian';
-import { imageDimensions } from '../app/imageProcessing/imageDimensions';
 import { readSceneLighting } from '../app/lighting/sceneLightingOptions';
 import { ATLAS_SCHEMA, ATLAS_VERSION, migrateMapFile, parseSceneFile } from '../app/services/MapPersistence';
 import { createDefaultWidgets } from '../app/storeFactory';
 import { createDefaultInitiativeState } from '../app/types/initiativeTypes';
 import { frozenCopy } from './frozen';
+import { vaultImageSize } from './savedMapGrid';
 import { readSceneFields, tokenSettingsForFile, type SceneFields } from './savedMapFields';
 import type { SavedMap, SavedMapInput } from './types/scenes';
 
@@ -24,13 +24,7 @@ function savedMapInput(state: SavedState, map: ReturnType<typeof migrateMapFile>
 
 /** The background's natural size, read from its file's header; 0 x 0 without a readable one. */
 async function backgroundSize(app: App, path: string | null): Promise<SavedMap['mapSize']> {
-  const file = path ? app.vault.getAbstractFileByPath(path) : null;
-  if (!(file instanceof TFile)) return { width: 0, height: 0 };
-  try {
-    return (await imageDimensions(new Blob([await app.vault.readBinary(file)]))) ?? { width: 0, height: 0 };
-  } catch {
-    return { width: 0, height: 0 };
-  }
+  return (await vaultImageSize(app, path)) ?? { width: 0, height: 0 };
 }
 
 /** The saved map at `path`, migrated, as a frozen copy; null when there is no such file. A file that exists but cannot be read throws. */

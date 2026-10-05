@@ -6,6 +6,7 @@ import { mapStrings } from '../app/utils/mapStrings';
 import { en } from '../app/i18n/locales/en';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
+import { checkMapGrid } from './savedMapGrid';
 import { checkedSceneFields, isPlainRelative, setsSceneFields, type SceneFields } from './savedMapFields';
 import type { SavedMapInput, ScenesApi } from './types/scenes';
 
@@ -120,6 +121,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
         throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${collectionFolderPath(collection.id)}.`);
       }
       const fields = sceneFieldsOf(input.map);
+      await checkMapGrid(app, input.map, input.images, (message) => { throw new Error(`[Atlas API] ${message}`); });
       const targets = new Map<string, ArrayBuffer>();
       for (const image of input.images as AddInput['images']) {
         const path: unknown = image?.path;

@@ -79,6 +79,8 @@ describe('scenes.replaceMap', () => {
       { map: emptyMap({ camera: { x: 0, y: 0, scale: -1 } }), images: [image('new.webp')] },
       { map: emptyMap({ pins: { p: { id: 'p', kind: 'pin', x: 0, y: 0, notePath: '/abs.md' } } }), images: [] },
       { map: emptyMap(), images: [image('../out.webp')] },
+      { map: emptyMap({ grid: { enabled: true, size: -1, offsetX: 0, offsetY: 0, opacity: 1 } }), images: [] },
+      { map: emptyMap({ grid: { enabled: true, size: 70, offsetX: 0, offsetY: 0, opacity: 1, lineType: 'wavy' as never } }), images: [] },
       { map: null, images: [] },
     ]) {
       await expect(fixture.scenes.replaceMap!(sceneId, input as never)).rejects.toThrow(/\[Atlas API\]/);

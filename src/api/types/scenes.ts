@@ -58,8 +58,9 @@ export interface ScenesApi {
    * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
    * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused, and so is a
    * malformed optional field of `map` (a pin without a plain vault `notePath`, a camera that is not finite numbers with
-   * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records): it throws
-   * before anything is written. A `readMap` result can be handed in as it is.
+   * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records), and so is a
+   * grid that is not finite numbers with a `size` of at least 4 px, at most 2,000 cells along a side of the background
+   * image (when Atlas can read its size) and a known `type` and `lineType`: it throws before anything is written. A `readMap` result can be handed in as it is.
    */
   addToCollection(input: {
     collection: { id: string } | { name: string };

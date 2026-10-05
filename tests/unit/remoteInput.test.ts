@@ -26,6 +26,19 @@ describe("what a remote view takes from its owner", () => {
     for (const scene of bad) expect(() => checkedScene(scene)).toThrow(/RemoteView.setScene/);
   });
 
+  it('refuses a grid that would never finish drawing or that Atlas does not know, before anything is stored', () => {
+    const grid = remoteScene().grid!;
+    const bad = [
+      { ...grid, size: -1 }, { ...grid, size: 0 }, { ...grid, size: 0.0001 }, { ...grid, size: Number.NaN },
+      { ...grid, size: 1 }, // 1000 cells per side on this map is fine; on a 100,000 px map it is not
+      { ...grid, offsetX: Infinity }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, 'square',
+    ];
+    const wide = { url: null, width: MAX_REMOTE_MAP_SIDE, height: 800 };
+    for (const value of bad) expect(() => checkedScene({ ...remoteScene(), background: wide, grid: value })).toThrow(/RemoteView.setScene: .*grid/);
+    expect(checkedScene({ ...remoteScene(), grid: { ...grid, size: 50 }, background: wide })).not.toBeNull();
+    expect(checkedScene({ ...remoteScene(), grid: null })).not.toBeNull();
+  });
+
   it('copies a well-formed player state, frozen', () => {
     const state = checkedPlayer(player());
     expect(Object.isFrozen(state.measurement)).toBe(true);

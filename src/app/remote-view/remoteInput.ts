@@ -5,6 +5,7 @@
  */
 import { frozenCopy } from '../../api/frozen';
 import type { RemoteMeasurementInput, RemotePlayerState, RemoteSceneInput } from '../../api/types/remoteViews';
+import { gridProblem } from '../grid/gridLimits';
 import { isValidConeAngle, type MeasurementSettings } from '../grid/measurementFormat';
 
 /** The largest map side a remote scene may have, in world pixels. */
@@ -30,7 +31,7 @@ export function checkedScene(scene: unknown): RemoteSceneInput | null {
   if (scene === null) return null;
   const objects = isObject(scene) ? scene.objects : null;
   const shaped = isObject(scene) && isObject(scene.background) && isObject(objects) && isObject(scene.widgets)
-    && isObject(scene.tokenImages) && isObject(scene.initiative) && (scene.grid === null || isObject(scene.grid))
+    && isObject(scene.tokenImages) && isObject(scene.initiative) && 'grid' in scene
     && ['tokens', 'texts', 'drawings', 'fog'].every((kind) => isObject(objects[kind]));
   if (!shaped) fail('setScene', 'the scene must be a RemoteSceneInput, or null');
   const background = scene.background as Record<string, unknown>;
@@ -40,6 +41,8 @@ export function checkedScene(scene: unknown): RemoteSceneInput | null {
     fail('setScene', `"background.width" and "background.height" must be numbers from 0 to ${MAX_REMOTE_MAP_SIDE}`);
   }
   if (!Object.values(tokenImages).every(isUrl)) fail('setScene', 'every "tokenImages" value must be a string or null');
+  const gridError = scene.grid === null ? null : gridProblem(scene.grid, { width: background.width as number, height: background.height as number });
+  if (gridError) fail('setScene', gridError);
   return scene as unknown as RemoteSceneInput;
 }
 
