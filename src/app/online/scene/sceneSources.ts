@@ -13,7 +13,7 @@ import { NO_DARKNESS, type Darkness } from './darknessFog';
 import { FogCoverage } from './FogCoverage';
 import type { PlayerViewRules } from './playerViewRules';
 import type { ProjectionContext } from './projectForPlayers';
-import { projectFog, type ProjectionMemo } from './projectRecords';
+import { fogTruncated, projectFog, type ProjectionMemo } from './projectRecords';
 import { SCENE_LIMITS } from './sceneTypes';
 
 export interface SceneSession {
@@ -98,17 +98,17 @@ export interface FogCoverages {
 
 /** Coverage rasterised from the fog players receive, and with the darkness over it, each rebuilt only when what it is made of changes. */
 export class FogCoverageCache {
-  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage } | null = null;
+  private fog: { fog: Readonly<Record<string, FogOperation>>; coverage: FogCoverage; dropped: boolean } | null = null;
   private entry: { darkness: Darkness; coverages: FogCoverages } | null = null;
 
   /** A new darkness never replays the fog: it is painted over the fog's cells (`FogCoverage.covering`). */
   get(fog: Readonly<Record<string, FogOperation>>, memo: ProjectionMemo, darkness: Darkness = NO_DARKNESS): FogCoverages {
     const fogChanged = this.fog?.fog !== fog;
-    if (!this.fog || fogChanged) this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)) };
+    if (!this.fog || fogChanged) this.fog = { fog, coverage: FogCoverage.fromPlayerFog(projectFog(fog, memo)), dropped: fogTruncated(fog, memo) };
     if (!this.entry || fogChanged || this.entry.darkness !== darkness) {
       const { coverage } = this.fog;
       const darkCoverage = coverage.covering(darkness.covered);
-      const truncated = Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
+      const truncated = this.fog.dropped || Object.keys(fog).length + Object.keys(darkness.fog).length > SCENE_LIMITS.records;
       this.entry = { darkness, coverages: { coverage, darkCoverage, truncated } };
     }
     return this.entry.coverages;

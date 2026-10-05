@@ -13,7 +13,7 @@ import type { MapSize } from '../../scene/sceneTypes';
 import type { PeopleBook } from '../people/PeopleBook';
 import { keyOf, personKey } from '../people/peopleTypes';
 import { isPerson, partAllows, type Recipient } from './audience';
-import { fullPayload, hashMapImages, playerSafePayload, type MapImages } from './buildMapPayload';
+import { fullPayload, hashMapImages, playerSafePayload, playerSafeRefusal, type MapImages } from './buildMapPayload';
 import { accessFor, type Access, type AccessSources, type MapAccess } from './catalogueAccess';
 import type { MapShareMode } from './mapShare';
 import { previewAsPlaceholder, type PreviewPeople } from './placeholderPreview';
@@ -177,7 +177,7 @@ export class SenderCatalogue {
 
   /** Null when the share is refused: a lit map shared player-safe. */
   private async mapPayload(map: MapAccess): Promise<{ payload: SharePayload; images: MapImages; version: string; bytes: ArrayBuffer } | null> {
-    if (map.entry.share.mode !== 'full' && map.source.lit) return null;
+    if (map.entry.share.mode !== 'full' && playerSafeRefusal(map.source) !== null) return null;
     const images = await hashMapImages(map.source.map, this.sources.images, this.hash, this.dimensions);
     const linked = new Set(map.linked);
     const context = {
