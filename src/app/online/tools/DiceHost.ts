@@ -36,7 +36,6 @@ export class DiceHost implements SessionHandler {
   private readonly history: Array<{ entry: DiceLogEntry; rolledBy: string | null }> = [];
   /** Player rolls on their way through the feed, by roll id: the feed hands back only the result. */
   private readonly rollers = new Map<string, string>();
-  private liveMapPath: string | null = null;
   private readonly stops: Array<() => void> = [];
 
   constructor(private readonly options: DiceHostOptions) {}
@@ -73,14 +72,16 @@ export class DiceHost implements SessionHandler {
   }
 
   /**
-   * The map players have: the presented scene's, or while the GM holds it (looks at another tab of
-   * the view, whose store then holds that tab's map) the one last seen live.
+   * The map players have: the file of the presented tab. The view's store holds whichever tab the
+   * GM looks at, so while the scene is held it names another map; the tab list does not. Without
+   * the tab (nothing presented, or it is gone) no map is named, so Atlas's default rules apply
+   * and never another collection's.
    */
   private playersMapPath(): string | null {
-    const { presented } = this.options;
-    const mapPath = presented.current()?.store.getState().mapPath ?? null;
-    if (!presented.isHeld()) this.liveMapPath = mapPath;
-    return this.liveMapPath ?? mapPath;
+    const scene = this.options.presented.current();
+    if (!scene) return null;
+    const tab = scene.view.tabMetaStore.getState().tabs.find((entry) => entry.id === scene.tabId);
+    return tab?.filePath ?? null;
   }
 
   /** Drops the windows of players who left the session: a reconnect must not reset one. */
