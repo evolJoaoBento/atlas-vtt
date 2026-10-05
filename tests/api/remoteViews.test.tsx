@@ -181,6 +181,9 @@ describe('remoteViews', () => {
     expect(fitRemoteMap(view.viewId)).toBe(true);
     expect(moved).toHaveBeenLastCalledWith(false);
     expect(() => view.setCamera({ centerX: 0, centerY: 0, width: 0, height: 1 })).toThrow(/camera/);
+    const { screenWidth, screenHeight } = fake.viewport;
+    view.setCamera({ centerX: 200, centerY: 100, width: 400, height: 300 }, { padded: true });
+    expect(fake.viewport.scale.x).toBeCloseTo(Math.min((screenWidth - 32) / 400, (screenHeight - 32) / 300));
   });
 
   it('a new scene leaves a dragged token under the pointer, and ends a drag whose token may no longer move', async () => {

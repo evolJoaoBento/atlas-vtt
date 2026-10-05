@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GLIDE_MS, MAX_ZOOM, MIN_ZOOM, ViewportFollower, type FollowViewport, type Frames } from '../../src/app/remote-view/ViewportFollower';
+import { FIT_PADDING, GLIDE_MS, MAX_ZOOM, MIN_ZOOM, ViewportFollower, type FollowViewport, type Frames } from '../../src/app/remote-view/ViewportFollower';
 
 class FakeViewport implements FollowViewport {
   screenWidth = 800;
@@ -87,6 +87,25 @@ describe('ViewportFollower', () => {
     settle();
     expect(viewport.center).toEqual({ x: 500, y: 400 });
     expect(viewport.scale.x).toBeCloseTo(Math.min((800 - 32) / 1000, (600 - 32) / 800));
+  });
+
+  it("leaves Fit map's margin around a padded camera, also after a resize, so it frames an area as Fit map does", () => {
+    expect(FIT_PADDING).toBe(16);
+    const { viewport, follower } = setup();
+    follower.setCamera(CAMERA, false, true);
+    expect(viewport.scale.x).toBeCloseTo(Math.min((800 - 32) / 400, (600 - 32) / 300));
+    viewport.screenWidth = 1600;
+    viewport.screenHeight = 1200;
+    follower.resize();
+    expect(viewport.scale.x).toBeCloseTo(Math.min((1600 - 32) / 400, (1200 - 32) / 300));
+
+    const fitted = setup();
+    fitted.follower.fitMap();
+    fitted.settle();
+    const padded = setup();
+    padded.follower.setCamera({ centerX: 500, centerY: 400, width: 1000, height: 800 }, false, true);
+    expect(padded.viewport.scale.x).toBe(fitted.viewport.scale.x);
+    expect(padded.viewport.center).toEqual(fitted.viewport.center);
   });
 
   it('does nothing for Fit map without a map', () => {

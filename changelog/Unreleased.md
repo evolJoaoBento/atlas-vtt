@@ -20,6 +20,7 @@
 - Extension API: follows Atlas 0.6. A scene's own distance per cell reaches extensions (`GridState.unitDistanceOverride`, `MeasurementSettings.ruleDistance`), extension toolbar buttons sit after the dice in the customizable toolbar, and Atlas's own texts around what extensions add follow Obsidian's language
 - Extension API: a toolbar button can choose per view whether it shows, for example only in the remote views its own extension opened; a hidden button takes no room and is not in More tools
 - Extension API: a remote view's status bar takes up to 3 more buttons beside its action, each telling the extension which was chosen
+- Extension API: a remote view's camera can leave the same margin as Fit map, so an extension's own Fit button frames the map as Shift+1 does
 
 ## Improved
 

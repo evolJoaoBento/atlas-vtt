@@ -89,9 +89,10 @@ export interface RemoteView {
   throwRoll(result: DiceRollResult): void;
   /**
    * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
-   * resizes until the player moves the camera. Throws when `camera` is not finite numbers with a size above 0.
+   * resizes until the player moves the camera. `padded` leaves the margin Atlas's own Fit map leaves around the map (16 screen
+   * pixels), for a Fit button of your own. Throws when `camera` is not finite numbers with a size above 0.
    */
-  setCamera(camera: ViewCamera, options?: { animate?: boolean }): void;
+  setCamera(camera: ViewCamera, options?: { animate?: boolean; padded?: boolean }): void;
   /** Ends a drag in progress; the token goes back. */
   cancelDrag(): void;
   /** The player let go of a token they may move, at the snapped drop point. The token goes back until the scene moves it. */

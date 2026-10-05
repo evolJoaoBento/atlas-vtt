@@ -11,13 +11,20 @@ import type { ViewCamera } from '../services/presentedCamera';
 export const PLAYER_MOVES: ReadonlySet<string> = new Set(['drag', 'wheel', 'pinch', 'decelerate']);
 /** How long the view takes to glide to a camera. */
 export const GLIDE_MS = 150;
-/** Space left around the map when it is fitted, in screen pixels. */
+/** Space left around the map when it is fitted (Fit map, Shift+1), and around a padded camera, in screen pixels. */
 export const FIT_PADDING = 16;
 /** The zoom a camera may ask for, as screen pixels per world unit. */
 export const MIN_ZOOM = 1 / 64;
 export const MAX_ZOOM = 64;
 
 const clampZoom = (zoom: number): number => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+
+/** The zoom that shows `area` as large as fits `screen` with `padding` screen pixels left on each side, within the limits. */
+function fittingZoom(screen: { width: number; height: number }, area: { width: number; height: number }, padding: number): number {
+  const width = Math.max(1, screen.width - 2 * padding) / Math.max(1e-6, area.width);
+  const height = Math.max(1, screen.height - 2 * padding) / Math.max(1e-6, area.height);
+  return clampZoom(Math.min(width, height));
+}
 
 /** The part of pixi-viewport's `Viewport` the follower uses. */
 export interface FollowViewport {
@@ -43,7 +50,7 @@ export const ANIMATION_FRAMES: Frames = {
 
 interface Pose { centerX: number; centerY: number; zoom: number }
 /** What the camera keeps showing through resizes: a world area, or the whole map. */
-type Goal = { kind: 'view'; view: ViewCamera } | { kind: 'fit' };
+type Goal = { kind: 'view'; view: ViewCamera; padded: boolean } | { kind: 'fit' };
 
 export interface ViewportFollowerOptions {
   viewport: FollowViewport;
@@ -70,9 +77,9 @@ export class ViewportFollower {
     options.viewport.on('moved', this.onMoved);
   }
 
-  /** Shows `camera`'s world area as large as fits this view: gliding with `animate`, else at once. */
-  setCamera(camera: ViewCamera, animate: boolean): void {
-    this.goal = { kind: 'view', view: { ...camera } };
+  /** Shows `camera`'s world area as large as fits this view: gliding with `animate`, else at once; `padded` leaves Fit map's margin. */
+  setCamera(camera: ViewCamera, animate: boolean, padded = false): void {
+    this.goal = { kind: 'view', view: { ...camera }, padded };
     this.go(animate);
   }
 
@@ -124,12 +131,11 @@ export class ViewportFollower {
     const screen = { width: Math.max(1, screenWidth), height: Math.max(1, screenHeight) };
     if (goal.kind === 'view') {
       const { view } = goal;
-      return { centerX: view.centerX, centerY: view.centerY, zoom: clampZoom(Math.min(screen.width / view.width, screen.height / view.height)) };
+      return { centerX: view.centerX, centerY: view.centerY, zoom: fittingZoom(screen, view, goal.padded ? FIT_PADDING : 0) };
     }
     const map = this.options.mapSize();
     if (!map) return null;
-    const zoom = Math.min(Math.max(1, screen.width - 2 * FIT_PADDING) / Math.max(1e-6, map.width), Math.max(1, screen.height - 2 * FIT_PADDING) / Math.max(1e-6, map.height));
-    return { centerX: map.width / 2, centerY: map.height / 2, zoom: clampZoom(zoom) };
+    return { centerX: map.width / 2, centerY: map.height / 2, zoom: fittingZoom(screen, map, FIT_PADDING) };
   }
 
   private schedule(): void {

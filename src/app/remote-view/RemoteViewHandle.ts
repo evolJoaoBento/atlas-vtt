@@ -51,7 +51,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
       viewId: view.viewId,
       setScene: (scene: unknown): void => { this.scene?.setScene(scene); this.motion?.checkDrag(); },
       setPlayer: (state: unknown): void => { this.scene?.setPlayer(state); this.motion?.checkDrag(); },
-      setCamera: (camera: ViewCamera, options?: { animate?: boolean }): void => { this.motion?.setCamera(camera, options); },
+      setCamera: (camera: ViewCamera, options?: { animate?: boolean; padded?: boolean }): void => { this.motion?.setCamera(camera, options); },
       cancelDrag: (): void => { this.motion?.cancelDrag(); },
       onTokenDrop: (listener: (move: TokenMove) => void): Disposer => this.motion?.drops.add(listener) ?? noop,
       onCameraMoved: (listener: (byUser: boolean) => void): Disposer => this.motion?.cameraMoves.add(listener) ?? noop,

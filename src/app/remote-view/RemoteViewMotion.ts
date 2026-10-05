@@ -52,11 +52,12 @@ export class RemoteViewMotion {
     host.eventBus.on('background-sprite-updated', this.onBackgroundMoved);
   }
 
-  setCamera(camera: ViewCamera, options?: { animate?: boolean }): void {
+  setCamera(camera: ViewCamera, options?: { animate?: boolean; padded?: boolean }): void {
     const valid = typeof camera === 'object' && camera !== null && isFiniteNumber(camera.centerX) && isFiniteNumber(camera.centerY)
       && isFiniteNumber(camera.width) && camera.width > 0 && isFiniteNumber(camera.height) && camera.height > 0;
     if (!valid) throw new Error('RemoteView.setCamera: the camera must be { centerX, centerY, width, height } numbers, with a size above 0.');
-    this.follower?.setCamera({ centerX: camera.centerX, centerY: camera.centerY, width: camera.width, height: camera.height }, options?.animate === true);
+    const area = { centerX: camera.centerX, centerY: camera.centerY, width: camera.width, height: camera.height };
+    this.follower?.setCamera(area, options?.animate === true, options?.padded === true);
   }
 
   /** Fit map: the whole map, and the owner is told the camera moved, not by the player. */
