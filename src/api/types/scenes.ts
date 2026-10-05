@@ -75,7 +75,8 @@ export interface ScenesApi {
    * calls) that the new map, another asset, another map and resolved note links no longer use. No other file is ever
    * removed. The GM's note link, dice log, pinned note previews and loot roller are kept; explored memory resets.
    * Rejects, writing nothing, for a scene another extension or the GM made (Atlas notes which extension added a scene,
-   * in its index only), for a scene open in any map view or its scene tabs (close it first, so no open view saves over
+   * in its index only, for the map it added; a record file that points the scene at another map drops the note), for a
+   * scene whose map file is not inside its collection's folder, for a scene open in any map view or its scene tabs (close it first, so no open view saves over
    * the new map; checked again just before the map is written), and for malformed input. A failed write removes the images it wrote and puts the old map back.
    */
   replaceMap?(sceneId: string, input: {
@@ -86,13 +87,14 @@ export interface ScenesApi {
 
 export interface BundlesApi {
   /**
-   * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share').
+   * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'my-plugin-id'):
+   * at most 100 non-empty names of at most 200 characters, copied when called; anything else throws.
    * Atlas remembers them per extension id, so they stay stripped when the extension is not loaded (switched off, or
    * Atlas starting first). Unloading the extension does not forget them; calling the returned disposer does, and that
    * is the only thing that does. Handing the disposer to Obsidian's `this.register()` therefore forgets the keys on
    * every unload, which is usually not wanted: keep it for an extension that really stops stripping.
    * The keys of an extension that crashed or was uninstalled stay until something calls the disposer, or
-   * `forgetNoteProperties`.
+   * `forgetNoteProperties`. Calling the disposer again does nothing.
    */
   stripNoteProperties(keys: readonly string[]): Disposer;
   /** Forgets every note property this extension asked Atlas to strip, also those remembered from earlier sessions. Keys it registered in this session keep stripping until it unloads. */

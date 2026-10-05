@@ -264,6 +264,26 @@ describe('bundles', () => {
     expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
   });
 
+  it('C-bundles-3: a disposer called twice forgets nothing a later call remembered, and the caller changing its array changes nothing', () => {
+    const bundles = bundlesApi(scope('ext'));
+    const keys = ['a'];
+    const first = bundles.stripNoteProperties(keys);
+    keys.push('b');
+    expect([...bundleNoteKeys.keys()]).toEqual(['a']);
+    first();
+    bundles.stripNoteProperties(['a']);
+    first();
+    expect([...bundleNoteKeys.keys()]).toEqual(['a']);
+    expect(saved).toEqual({ ext: ['a'] });
+  });
+
+  it('C-bundles-2: refuses more than 100 keys or a key longer than 200 characters', () => {
+    const bundles = bundlesApi(scope('ext'));
+    expect(() => bundles.stripNoteProperties(Array.from({ length: 101 }, (_, index) => `k${index}`))).toThrow(/at most 100/);
+    expect(() => bundles.stripNoteProperties(['x'.repeat(201)])).toThrow(/200 characters/);
+    expect(bundleNoteKeys.keys().size).toBe(0);
+  });
+
   it('C-bundles-3: an explicit dispose forgets the key, unless another registration of the extension still holds it', () => {
     const own = scope('ext');
     const bundles = bundlesApi(own);
