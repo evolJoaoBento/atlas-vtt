@@ -13,14 +13,15 @@ const labelOf = (path: string): string => (path.split('/').pop() ?? path).replac
 
 export function linkedNotesOf(map: MapFile): LinkedNote[] {
   const notes = new Map<string, LinkedNote>();
+  // Any truthy value hides, as the projection (`projectForPlayers`) and the payload (`playerSafePayload`) read it.
   const add = (path: string | undefined, hidden: boolean): void => {
     if (!path) return;
     const known = notes.get(path);
     notes.set(path, { path, label: labelOf(path), hidden: (known?.hidden ?? true) && hidden });
   };
-  for (const pin of Object.values(map.objects.pins)) add(pin.notePath, pin.gmOnly === true);
+  for (const pin of Object.values(map.objects.pins)) add(pin.notePath, Boolean(pin.gmOnly));
   for (const token of Object.values(map.objects.tokens)) {
-    const hidden = token.isHidden === true;
+    const hidden = Boolean(token.isHidden);
     if ('notePath' in token) add(token.notePath, hidden);
     if ('statblockPath' in token) add(token.statblockPath, hidden);
   }

@@ -20,7 +20,7 @@ import { projectForPlayers, type ProjectedState } from '../../scene/projectForPl
 import { createProjectionMemo, fogTruncated, projectFog, type ProjectionMemo } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
-import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
+import { clippedPinText, IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
 import { t } from '../../../i18n';
 
 /** A saved map: its file's map data, the state the projection reads, and the scene settings a full share carries. */
@@ -139,18 +139,31 @@ export function pinFootprint(pin: NotePin, layout: HexLayout | null): WorldBound
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+/** One projection memo per map read, so the dialog, the catalogue and the payload project its fog once between them. */
+const MEMOS = new WeakMap<object, ProjectionMemo>();
+function memoOf(source: SharedMapSource): ProjectionMemo {
+  const key: unknown = source.map.objects.fog;
+  if (typeof key !== 'object' || key === null) return createProjectionMemo();
+  let memo = MEMOS.get(key);
+  if (!memo) {
+    memo = createProjectionMemo();
+    MEMOS.set(key, memo);
+  }
+  return memo;
+}
+
 /**
  * Why a map cannot be shared player-safe, null when it can: it is lit, or its fog cannot be sent whole. The share
  * dialog, the catalogue and the payload all ask this, so they refuse the same maps.
  */
-export function playerSafeRefusal(source: SharedMapSource, memo: ProjectionMemo = createProjectionMemo()): string | null {
+export function playerSafeRefusal(source: SharedMapSource, memo: ProjectionMemo = memoOf(source)): string | null {
   if (source.lit) return LIT_MAP_NOT_PLAYER_SAFE;
   return fogTruncated(source.map.objects.fog, memo) ? FOG_TRUNCATED_NOT_PLAYER_SAFE : null;
 }
 
 /** Null for a map `playerSafeRefusal` refuses: a player-safe share of it is never built. */
 export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload | null {
-  const memo = createProjectionMemo();
+  const memo = memoOf(source);
   if (playerSafeRefusal(source, memo) !== null) return null;
   const coverage = FogCoverage.fromPlayerFog(projectFog(source.map.objects.fog, memo));
   const scene = projectForPlayers(source.state, {
@@ -169,7 +182,7 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
     }
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
-    return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];
+    return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: clippedPinText(pin.icon) } : {}), ...(pin.label ? { label: clippedPinText(pin.label) } : {}), ...(pin.hex ? { hex: true } : {}) }];
   });
   const tokenNotes: Record<string, string> = {};
   for (const id of Object.keys(scene.tokens)) {

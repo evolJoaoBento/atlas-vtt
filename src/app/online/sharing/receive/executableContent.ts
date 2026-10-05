@@ -41,7 +41,7 @@ const REMOTE_TAG = /<(style)(?=[\s/>]|$)|<(img|link|audio|video|source)(?=[\s/>]
  * span, a whole code block in any language, a raw-HTML `<code>`, where entities are decoded first), so its place in
  * the Markdown says nothing. Entity forms of `$` and `=` count too.
  */
-const INLINE_JS = /(?:\$|&#0*36;|&#x0*24;|&dollar;)(?:=|&#0*61;|&#x0*3d;|&equals;)/gi;
+const INLINE_JS = /(?:\$|&#0*36;?|&#x0*24;?|&dollar;)(?:=|&#0*61;?|&#x0*3d;?|&equals;)/gi;
 
 /** `$=` gets an invisible break; an entity form gets its `&` written as `&amp;`, so it no longer decodes. */
 const inertInline = (match: string): string => (match.includes('&') ? match.replace(/&/g, '&amp;') : `$${BREAK}=`);

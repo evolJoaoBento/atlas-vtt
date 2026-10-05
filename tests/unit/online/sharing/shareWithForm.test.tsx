@@ -20,6 +20,15 @@ describe('Share with form', () => {
     expect(save).toHaveBeenCalledWith({ everyone: true, people: ['k/ana', 'name:Zed'], except: ['k/ben'], mode: 'player-safe', notes: [] });
   });
 
+  it('tells a player-safe share that a ticked note goes whole, and a full share nothing of the kind', () => {
+    render(<ShareWithForm rows={rows} initial={{ everyone: false, people: [], except: [] }}
+      map={{ mode: 'player-safe', notes: [{ path: 'Notes/Inn.md', label: 'Inn', private: false }], ticked: [] }}
+      preview={null} warnings={[]} onSave={() => {}} onCancel={() => {}} />);
+    expect(screen.getByText('A ticked note is sent whole, even when its pin or token is under fog.')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Full'));
+    expect(screen.queryByText('A ticked note is sent whole, even when its pin or token is under fog.')).toBeNull();
+  });
+
   it('for maps: player-safe or full, and linked notes, private ones disabled', () => {
     const save = vi.fn();
     render(<ShareWithForm rows={rows} initial={{ everyone: false, people: [], except: [] }}
