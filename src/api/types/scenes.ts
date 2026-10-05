@@ -70,11 +70,12 @@ export interface ScenesApi {
    * Replaces the map of a scene this extension added with `addToCollection`, keeping its scene id, name, collection and
    * map path. `map` and `images` are as for `addToCollection`, with images relative to the map file's folder; an image
    * whose name is taken there gets a number. The new images are written, then the map file, under the asset index lock;
-   * only then are the old map's images in that folder removed, except those the new map, another asset, another map or
-   * a note still uses. The whole file is replaced: the old file's dice log, GM's note and explored memory go with it.
+   * only then are images removed, and only ones Atlas wrote for this scene (`addToCollection`, earlier `replaceMap`
+   * calls) that the new map, another asset, another map and resolved note links no longer use. No other file is ever
+   * removed. The GM's note link, dice log, pinned note previews and loot roller are kept; explored memory resets.
    * Rejects, writing nothing, for a scene another extension or the GM made (Atlas notes which extension added a scene,
    * in its index only), for a scene open in any map view or its scene tabs (close it first, so no open view saves over
-   * the new map), and for malformed input. A failed write removes the images it wrote and puts the old map back.
+   * the new map; checked again just before the map is written), and for malformed input. A failed write removes the images it wrote and puts the old map back.
    */
   replaceMap?(sceneId: string, input: {
     map: SavedMapInput;

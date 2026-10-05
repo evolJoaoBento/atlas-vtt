@@ -136,7 +136,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
       written.push(mapPath);
       await app.vault.create(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
-      const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath, createdBy: owner } });
+      const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath, createdBy: owner, createdImages: [...targets.keys()] } });
       return { sceneId: scene.id, mapPath };
     } catch (error) {
       await undo(app, assets, { files: written, folder: createdFolder, collection: collection.created ? collection.id : null, mapPath, knownScenes });

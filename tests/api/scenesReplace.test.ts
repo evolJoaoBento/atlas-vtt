@@ -101,4 +101,49 @@ describe('scenes.replaceMap', () => {
     view.close();
     await expect(fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] })).resolves.toEqual({ sceneId, mapPath });
   });
+  it('C-scenes-5: removes only images Atlas wrote for the scene, and keeps the list to the live ones', async () => {
+    const fixture = await withScene();
+    const { sceneId, mapPath } = await added(fixture);
+    // The GM drew a token with their own art from the same folder: the old map names it, Atlas never wrote it.
+    await fixture.vault.app.vault.create(`${FOLDER}/gm-art.png`, 'gm art');
+    const file = JSON.parse(fixture.vault.files.get(mapPath)!) as { state: { objects: { tokens: Record<string, { imagePath: string }> } } };
+    file.state.objects.tokens.t1!.imagePath = `${FOLDER}/gm-art.png`;
+    fixture.vault.files.set(mapPath, JSON.stringify(file));
+    await fixture.scenes.replaceMap!(sceneId, { map: emptyMap({ background: 'one.webp' }), images: [image('one.webp')] });
+    expect(files(fixture)).toEqual([`${FOLDER}/Cave.atlasmap`, `${FOLDER}/gm-art.png`, `${FOLDER}/one.webp`]);
+    const created = async (): Promise<string[] | undefined> => (await fixture.assets.getAssetById(sceneId))?.data?.createdImages;
+    expect(await created()).toEqual([`${FOLDER}/one.webp`]);
+    await fixture.scenes.replaceMap!(sceneId, { map: withToken('two.png', { background: 'one.webp' }), images: [image('one.webp', 'again'), image('two.png')] });
+    expect(files(fixture)).toEqual([`${FOLDER}/Cave.atlasmap`, `${FOLDER}/gm-art.png`, `${FOLDER}/one (2).webp`, `${FOLDER}/two.png`]);
+    expect((await created())?.sort()).toEqual([`${FOLDER}/one (2).webp`, `${FOLDER}/two.png`]);
+  });
+
+  it("C-scenes-5: keeps the GM's note link, dice log, pinned previews and loot roller, and resets explored memory", async () => {
+    const fixture = await withScene();
+    const { sceneId, mapPath } = await added(fixture);
+    const play = { dmNotePath: 'DM/Cave.md', diceLog: [{ id: 'r1' }], pinnedNotePreviews: [{ path: 'Notes/a.md' }], lootRoller: { open: true } };
+    const file = JSON.parse(fixture.vault.files.get(mapPath)!) as { state: Record<string, unknown> };
+    Object.assign(file.state, play, { exploredMask: 'mask' });
+    fixture.vault.files.set(mapPath, JSON.stringify(file));
+    await fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] });
+    const state = (JSON.parse(fixture.vault.files.get(mapPath)!) as { state: Record<string, unknown> }).state;
+    expect(state).toMatchObject(play);
+    expect(state).not.toHaveProperty('exploredMask');
+  });
+
+  it('C-scenes-5: checks again just before writing, so a tab opened meanwhile refuses the replace', async () => {
+    const view = fakeView('v1');
+    const fixture = await withScene(trackerWith([view]).tracker);
+    const { sceneId, mapPath } = await added(fixture);
+    const before = new Map(fixture.vault.files);
+    const write = vi.mocked(fixture.vault.app.vault.createBinary);
+    const original = write.getMockImplementation()!;
+    write.mockImplementationOnce(async (path, data) => {
+      view.tabMetaStore.getState().addTab(mapPath, 'Cave');
+      return original(path, data);
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [image('new.webp')] })).rejects.toThrow(/open in a map view/);
+    expect(new Map(fixture.vault.files)).toEqual(before);
+  });
 });

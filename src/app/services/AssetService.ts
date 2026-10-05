@@ -92,6 +92,8 @@ export interface SceneAssetData {
   extensions?: Record<string, Json>;
   /** The id of the extension that added the scene (`ScenesApi.addToCollection`), which alone may replace its map. Index only, like `extensions`. */
   createdBy?: string;
+  /** The images Atlas wrote for that extension's scene (`addToCollection`, `replaceMap`): the only files `replaceMap` may remove. Index only. */
+  createdImages?: string[];
 }
 
 export interface EncounterAssetData {
