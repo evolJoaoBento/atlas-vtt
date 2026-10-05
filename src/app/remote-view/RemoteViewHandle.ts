@@ -23,7 +23,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   private view: RemoteMapView | null = null;
   private done = false;
   private settle: (opened: boolean) => void = () => undefined;
-  private readonly closeListeners = new ListenerSet<() => void>();
+  private readonly closeListeners = new ListenerSet<() => void>('onClose');
   private facade: RemoteView | null = null;
   private scene: RemoteViewScene | null = null;
   private motion: RemoteViewMotion | null = null;

@@ -19,7 +19,7 @@ function dice(): { store: ReturnType<typeof createViewAtlasStore>; dice: RemoteV
 
 describe("a remote view's listeners", () => {
   it('keeps each registration of the same function apart: each disposer removes only its own, and twice is harmless', () => {
-    const set = new ListenerSet<() => void>();
+    const set = new ListenerSet<() => void>('onClose');
     const listener = (): void => undefined;
     const first = set.add(listener);
     const second = set.add(listener);

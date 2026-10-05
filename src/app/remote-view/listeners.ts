@@ -1,3 +1,4 @@
+import { acceptsListener } from '../../api/listenerCheck';
 import type { Disposer } from '../../api/types/common';
 
 /** An extension's callback must never throw into Atlas's store, pointer handling or frame loop. */
@@ -18,8 +19,11 @@ export class ListenerSet<L> {
   private readonly entries = new Set<{ readonly listener: L }>();
   private closed = false;
 
+  /** `method`: the `RemoteView` method that adds to this set, named when it refuses a listener. */
+  constructor(private readonly method: string) {}
+
   add(listener: L): Disposer {
-    if (this.closed || typeof listener !== 'function') return () => undefined;
+    if (!acceptsListener(`RemoteView.${this.method}`, listener) || this.closed) return () => undefined;
     const entry = { listener };
     this.entries.add(entry);
     return () => { this.entries.delete(entry); };

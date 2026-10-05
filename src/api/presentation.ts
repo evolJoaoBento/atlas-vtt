@@ -37,11 +37,17 @@ export function presentationApi(tracker: ViewTracker, disposers: DisposerSet, ow
     },
     stop: (): void => stopPresenting(),
     // The presented scene's own listeners run guarded (`PresentedScene.emit`).
-    subscribe: (listener: PresentationListener): Disposer => disposers.add(presentedScene.subscribe({
-      presented: (scene, resumed) => listener.presented?.(info(scene, false), resumed),
-      held: (scene) => listener.held?.(info(scene, true)),
-      cleared: (previous, wasHeld) => listener.cleared?.(info(previous, wasHeld)),
-    })),
+    subscribe: (listener: PresentationListener): Disposer => {
+      if (typeof listener !== 'object' || listener === null) {
+        console.error('[Atlas API] presentation.subscribe: the listener must be an object of callbacks; nothing was registered.');
+        return () => undefined;
+      }
+      return disposers.add(presentedScene.subscribe({
+        presented: (scene, resumed) => listener.presented?.(info(scene, false), resumed),
+        held: (scene) => listener.held?.(info(scene, true)),
+        cleared: (previous, wasHeld) => listener.cleared?.(info(previous, wasHeld)),
+      }));
+    },
     addTarget: (target: PresentationTarget): Disposer => {
       const known = target && typeof target === 'object' ? kept.get(target) : undefined;
       if (known) return disposers.add(addPresentationTarget(known, owner));

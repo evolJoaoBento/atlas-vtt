@@ -1,5 +1,6 @@
 import { viewCamera, watchViewCamera } from '../app/services/presentedCamera';
 import type { DisposerSet } from './disposers';
+import { acceptsListener } from './listenerCheck';
 import { sceneSnapshot, snapshotSlice, viewInfo } from './viewInfo';
 import type { TrackedMapView, ViewTracker } from './viewTracker';
 import type { SceneSnapshot, ViewCamera, ViewInfo, ViewsApi } from './types/views';
@@ -39,6 +40,7 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
       return view ? sceneSnapshot(view) : null;
     },
     subscribe: (viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer => {
+      if (!acceptsListener('views.subscribe', listener)) return () => undefined;
       const view = tracker.view(viewId);
       if (!view) return disposers.add(() => undefined);
       let slice = snapshotSlice(view.atlasStore.getState());
@@ -56,6 +58,7 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
       return camera ? Object.freeze(camera) : null;
     },
     watchCamera: (viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer => {
+      if (!acceptsListener('views.watchCamera', listener)) return () => undefined;
       const view = tracker.view(viewId);
       if (!view) return disposers.add(() => undefined);
       return ownedByView(tracker, disposers, view, () => watchViewCamera(view, () => {

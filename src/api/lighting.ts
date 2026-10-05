@@ -1,5 +1,6 @@
 import { cellsPerSide, pendingVisibility, visibilityOf } from '../app/lighting/playerDarkness/playerVisibility';
 import type { DisposerSet } from './disposers';
+import { acceptsListener } from './listenerCheck';
 import type { SightFramesByView } from './sightFramesByView';
 import type { TrackedMapView, ViewTracker } from './viewTracker';
 import type { Disposer, ViewId } from './types/common';
@@ -48,6 +49,7 @@ export function lightingApi(tracker: ViewTracker, frames: SightFramesByView, dis
       }
     },
     watch: (viewId: ViewId, listener: () => void): Disposer => {
+      if (!acceptsListener('lighting.watch', listener)) return () => undefined;
       const view = tracker.view(viewId);
       if (!view) return disposers.add(() => undefined);
       let active = true;

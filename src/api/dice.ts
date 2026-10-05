@@ -5,6 +5,7 @@ import { DICE_ROLLED_EVENT, rollByRules, type DiceRollResult } from '../app/tool
 import { isDiceRollResult, plainCopy } from './diceRollCheck';
 import { throwGivenRoll } from './diceThrow';
 import type { DisposerSet } from './disposers';
+import { acceptsListener } from './listenerCheck';
 import { frozenCopy } from './frozen';
 import type { Disposer, ViewId } from './types/common';
 import type { ViewTracker } from './viewTracker';
@@ -37,6 +38,7 @@ export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | n
       return frozenCopy(result);
     },
     onRolled: (listener: (result: DiceRollResult) => void): Disposer => {
+      if (!acceptsListener('dice.onRolled', listener)) return () => undefined;
       const handler = (event: Event): void => {
         try {
           listener(frozenCopy((event as CustomEvent<DiceRollResult>).detail));

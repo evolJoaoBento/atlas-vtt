@@ -38,8 +38,8 @@ function followViewport(viewport: Viewport): FollowViewport {
 const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 export class RemoteViewMotion {
-  readonly drops = new ListenerSet<(move: TokenMove) => void>();
-  readonly cameraMoves = new ListenerSet<(byUser: boolean) => void>();
+  readonly drops = new ListenerSet<(move: TokenMove) => void>('onTokenDrop');
+  readonly cameraMoves = new ListenerSet<(byUser: boolean) => void>('onCameraMoved');
   private readonly follower: ViewportFollower | null;
 
   constructor(private readonly host: RemoteMotionHost) {

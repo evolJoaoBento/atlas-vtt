@@ -96,9 +96,9 @@ function copyToCheck(method: string, value: unknown): unknown {
 }
 
 export class RemoteViewDice {
-  readonly rolls = new ListenerSet<RollListener>();
+  readonly rolls = new ListenerSet<RollListener>('onRoll');
   /** Told the id of the status action the player chose. */
-  readonly statusActions = new ListenerSet<(id: string) => void>();
+  readonly statusActions = new ListenerSet<(id: string) => void>('onStatusAction');
 
   constructor(private readonly store: ViewAtlasStore, private readonly maxDice: number = REMOTE_MAX_DICE) {
     updateRemoteView(store, { maxDice });

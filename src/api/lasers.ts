@@ -2,6 +2,7 @@ import type { LaserHub } from '../app/pixi/laser/LaserHub';
 import { REMOTE_LASER_LIMITS } from '../app/pixi/laser/remoteLasers';
 import { isHexColor } from '../app/utils/hexColor';
 import type { DisposerSet } from './disposers';
+import { acceptsListener } from './listenerCheck';
 import type { ViewTracker } from './viewTracker';
 import type { LasersApi, LocalLaserEvent, RemoteLaser } from './types/lasers';
 import type { Disposer, Point, ViewId } from './types/common';
@@ -53,6 +54,7 @@ export function lasersApi(tracker: ViewTracker, disposers: DisposerSet): LasersA
   const hubOf = (viewId: ViewId): LaserHub | null => tracker.view(viewId)?.renderer?.getLaserHub?.() ?? null;
   return Object.freeze({
     onLocal: (viewId: ViewId, listener: (event: LocalLaserEvent) => void): Disposer => {
+      if (!acceptsListener('lasers.onLocal', listener)) return () => undefined;
       const hub = hubOf(viewId);
       if (!hub) return disposers.add(() => undefined);
       let cancelClose: () => void = () => undefined;

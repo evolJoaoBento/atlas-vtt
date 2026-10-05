@@ -1,6 +1,7 @@
 import { diceApi } from './dice';
 import type { DisposerSet } from './disposers';
-import type { ApiEvents } from './events';
+import { API_EVENTS, type ApiEvents } from './events';
+import { acceptsListener } from './listenerCheck';
 import type { ApiServices } from './services';
 import { lasersApi } from './lasers';
 import { lightingApi } from './lighting';
@@ -28,6 +29,11 @@ export interface ExtensionScope {
 /** One connected extension's view of the API: one line per namespace, each registration owned by `scope`. */
 export function buildExtension(scope: ExtensionScope, services: ApiServices): AtlasExtension {
   function on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer {
+    if (!(API_EVENTS as readonly unknown[]).includes(event)) {
+      console.error(`[Atlas API] on: "${String(event)}" is not an Atlas event; nothing was registered.`);
+      return () => undefined;
+    }
+    if (!acceptsListener(`on('${event}')`, listener)) return () => undefined;
     return scope.disposers.add(scope.events.on(event, listener));
   }
   return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers),
