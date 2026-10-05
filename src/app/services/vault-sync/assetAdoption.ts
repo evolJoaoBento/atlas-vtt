@@ -3,12 +3,13 @@ import { collectionFolderPath, collectionIdOfPath } from '../assetPaths';
 import { isRecord, parseGroupTokenRefs } from '../assetMetadataGuards';
 import { prettifyIdentifier } from '../collectionRecords';
 import { recoveredId, stemOf } from './recoveredIds';
+import { isReservedCollectionPath } from './reservedPaths';
 
 const MAP_JSON = /^atlas-vtt\/collections\/([^/]+)\/maps\/(.+)\.json$/;
 const TYPED_JSON = /^atlas-vtt\/collections\/([^/]+)\/(scenes|encounters|players|characters|statblocks)\/(.+)\.json$/;
 
 /** Whether `path` can hold the JSON of an asset that Atlas takes into its index. */
-export const isAdoptableJson = (path: string): boolean => MAP_JSON.test(path) || TYPED_JSON.test(path);
+export const isAdoptableJson = (path: string): boolean => !isReservedCollectionPath(path) && (MAP_JSON.test(path) || TYPED_JSON.test(path));
 
 const stringOr = (value: unknown, fallback: string): string => (typeof value === 'string' && value.trim() ? value : fallback);
 const tagsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((tag): tag is string => typeof tag === 'string') : []);
@@ -136,7 +137,7 @@ export function adoptUnindexedFiles(
   const adoption = new Adoption(metadata, files, owned, now);
   for (const path of [...json.keys()].sort()) {
     const payload = json.get(path);
-    if (owned.has(path) || !files.has(path) || !isRecord(payload)) continue;
+    if (owned.has(path) || !files.has(path) || !isRecord(payload) || !isAdoptableJson(path)) continue;
     const mapMatch = MAP_JSON.exec(path);
     if (mapMatch) {
       adoption.adoptMapJson(path, mapMatch[1]!, payload);
@@ -149,7 +150,7 @@ export function adoptUnindexedFiles(
   }
 
   for (const path of [...files].sort()) {
-    if (path.endsWith('.atlasmap') && !owned.has(path)) adoption.adoptSceneMap(path);
+    if (path.endsWith('.atlasmap') && !owned.has(path) && !isReservedCollectionPath(path)) adoption.adoptSceneMap(path);
   }
   return adoption.changed;
 }

@@ -38,6 +38,7 @@ import { isShortcutScopeActive } from '../../utils/activeLeafGuard';
 import { EASE_OUT_CONTROL_POINTS as EASE_OUT } from '../../utils/motion';
 import { Button } from '../../packages/components/primitives/button';
 import { CloseButton } from '../../packages/components/primitives/CloseButton';
+import { OverlayScroll } from '../../packages/components/primitives/OverlayScroll';
 import { CommandItem } from './command-palette/CommandItem';
 import { SettingsPanelHeader } from './command-palette/SettingsPanelHeader';
 import { GridSettingsPanel } from './command-palette/GridSettingsPanel';
@@ -49,12 +50,16 @@ import { ExperimentalFeaturesPanel } from './command-palette/ExperimentalFeature
 import { SceneSnapshotsPanel } from './command-palette/SceneSnapshotsPanel';
 import { placePalette, type PalettePosition } from './command-palette/palettePlacement';
 import { useExtensionCommands } from './command-palette/useExtensionCommands';
+import { customizeToolbarCommand } from './command-palette/customizeToolbarCommand';
 import { isSettingsPanelId, type CommandOption, type SettingsPanelId } from './command-palette/types';
+import { t } from '../../i18n';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   toolbarRef?: React.RefObject<HTMLDivElement | null>;
+  /** Starts the toolbar editor; given only where the GM may customize the toolbar. Told whether the keyboard chose it. */
+  onCustomizeToolbar?: (byKeyboard: boolean) => void;
 }
 
 const DEFAULT_PALETTE_WIDTH = 600;
@@ -74,16 +79,16 @@ const paletteVariants = {
 };
 
 const SETTINGS_PANEL_META: Record<SettingsPanelId, { title: string; icon: React.ReactNode }> = {
-  'scene-snapshots': { title: 'Scene Snapshots', icon: <History /> },
-  'grid-settings': { title: 'Grid Settings', icon: <Grid /> },
-  'token-settings': { title: 'Token Settings', icon: <Users /> },
-  'widget-settings': { title: 'Widget Settings', icon: <Palette /> },
-  'local-player-view-settings': { title: 'Local Player View Settings', icon: <MonitorUp /> },
+  'scene-snapshots': { title: t('palette.panel.snapshots'), icon: <History /> },
+  'grid-settings': { title: t('palette.panel.grid'), icon: <Grid /> },
+  'token-settings': { title: t('palette.panel.tokens'), icon: <Users /> },
+  'widget-settings': { title: t('palette.panel.widgets'), icon: <Palette /> },
+  'local-player-view-settings': { title: t('palette.panel.localPlayerView'), icon: <MonitorUp /> },
   'dice-settings': { title: 'Dice Settings', icon: <Dices /> },
   'experimental-features': { title: 'Experimental Features', icon: <FlaskConical /> },
 };
 
-export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPaletteProps): React.ReactElement | null {
+export function CommandPalette({ isOpen, onClose, toolbarRef, onCustomizeToolbar }: CommandPaletteProps): React.ReactElement | null {
   const hotkeyLabel = useHotkeyLabels();
   const store = useViewStoreHook();
   const setActiveTool = useAtlasStore(state => state.setActiveTool);
@@ -115,6 +120,8 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const optionsContainerRef = useRef<HTMLDivElement>(null);
+  // Set while Enter runs the focused option, so an action knows the keyboard chose it.
+  const choosingByKeyboard = useRef(false);
 
   // Grid settings local state
   const gridState = view?.atlasStore?.getState()?.grid;
@@ -194,7 +201,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "move-tool",
       icon: <Hand />,
-      label: "Move Tool",
+      label: t('palette.moveTool'),
       shortcut: hotkeyLabel('move'),
       section: "tools",
       action: () => {
@@ -205,7 +212,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "fog-tool",
       icon: <Cloud />,
-      label: "Fog Tool",
+      label: t('palette.fogTool'),
       shortcut: hotkeyLabel('fog'),
       section: "tools",
       action: () => {
@@ -216,7 +223,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "measure-tool",
       icon: <Ruler />,
-      label: "Measure Tool",
+      label: t('palette.measureTool'),
       shortcut: hotkeyLabel('measure'),
       section: "tools",
       action: () => {
@@ -227,7 +234,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "note-pin-tool",
       icon: <MapPin />,
-      label: "Note Pin Tool",
+      label: t('palette.notePinTool'),
       shortcut: hotkeyLabel('pin'),
       section: "tools",
       action: () => {
@@ -238,7 +245,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "open-scene-browser",
       icon: <FolderOpen />,
-      label: "Open scene browser",
+      label: t('palette.openSceneBrowser'),
       keywords: ["asset manager", "maps", "toggle"],
       section: "tools",
       action: () => {
@@ -249,7 +256,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "scene-snapshots",
       icon: <History />,
-      label: "Scene snapshots",
+      label: t('palette.sceneSnapshots'),
       keywords: ["save", "restore", "reset", "encounter", "state"],
       section: "tools",
       hasSubmenu: true,
@@ -258,7 +265,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "open-dice-log",
       icon: <Dices />,
-      label: "Open dice log",
+      label: t('palette.openDiceLog'),
       keywords: ["roll history", "toggle"],
       shortcut: hotkeyLabel('diceLog'),
       section: "tools",
@@ -270,7 +277,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "open-loot-roller",
       icon: <CoinIcon />,
-      label: "Open loot roller",
+      label: t('palette.openLootRoller'),
       keywords: ["loot", "treasure", "items", "roll", "base", "toggle"],
       shortcut: hotkeyLabel('lootRoller'),
       section: "tools",
@@ -283,7 +290,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "toggle-player-mode",
       icon: isPlayerMode ? <EyeOff /> : <Eye />,
-      label: isPlayerMode ? "Exit Player Mode" : "Enter Player Mode",
+      label: isPlayerMode ? t('palette.exitPlayerMode') : t('palette.enterPlayerMode'),
       section: "mode",
       action: () => {
         setPlayerMode(!isPlayerMode);
@@ -295,14 +302,14 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "freeze-player-camera",
       icon: <Snowflake />,
-      label: "Freeze Player Camera",
+      label: t('palette.freezePlayerCamera'),
       section: "mode",
       action: () => {
         const service = PlayerWindowService.getInstance();
         if (service?.isWindowOpen()) {
           service.toggleCameraFreeze();
         } else {
-          new Notice("No player window is open");
+          new Notice(t('palette.noPlayerWindow'));
         }
       },
       isToggle: true,
@@ -311,7 +318,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "transfer-player-view",
       icon: <MonitorUp />,
-      label: "Send Current Map to Player View",
+      label: t('palette.sendMapToPlayerView'),
       section: "mode",
       action: () => {
         void presentActiveTabInPlayerWindow(app);
@@ -322,14 +329,14 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "grid-settings",
       icon: <Settings />,
-      label: "Grid settings",
+      label: t('palette.gridSettings'),
       section: "settings",
       hasSubmenu: true,
       submenu: [
         {
           id: "grid-all-settings",
           icon: null,
-          label: "Grid appearance",
+          label: t('palette.gridAppearance'),
           section: "grid",
           hasSubmenu: false,
         },
@@ -338,14 +345,14 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "token-settings",
       icon: <Settings />,
-      label: "Token settings",
+      label: t('palette.tokenSettings'),
       section: "settings",
       hasSubmenu: true,
       submenu: [
         {
           id: "token-all-settings",
           icon: null,
-          label: "Token appearance",
+          label: t('palette.tokenAppearance'),
           section: "tokens",
           hasSubmenu: false,
         },
@@ -354,7 +361,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "widget-settings",
       icon: <Settings />,
-      label: "Widget settings",
+      label: t('palette.widgetSettings'),
       section: "settings",
       hasSubmenu: true,
       submenu: [
@@ -363,14 +370,14 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
     {
       id: "local-player-view-settings",
       icon: <UserCheck />,
-      label: "Local player view settings",
+      label: t('palette.localPlayerViewSettings'),
       section: "settings",
       hasSubmenu: true,
       submenu: [
         {
           id: "local-player-view-all-settings",
           icon: null,
-          label: "Player dashboard configuration",
+          label: t('palette.playerDashboard'),
           section: "local-player-view",
           hasSubmenu: false,
         },
@@ -411,6 +418,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
       ],
     },
     ...extensionCommands.options,
+    ...(onCustomizeToolbar ? [customizeToolbarCommand(() => onCustomizeToolbar(choosingByKeyboard.current), onClose)] : []),
   ];
 
   // Derive rows from current state so open-menu toggles stay in sync.
@@ -422,10 +430,10 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
 
   // Tab order for forward and backward keyboard cycling
   const tabs = [
-    { id: "all", label: "All" },
-    { id: "tools", label: "Tools" },
-    { id: "mode", label: "Mode" },
-    { id: "settings", label: "Settings" },
+    { id: "all", label: t('palette.tab.all') },
+    { id: "tools", label: t('palette.tab.tools') },
+    { id: "mode", label: t('palette.tab.mode') },
+    { id: "settings", label: t('palette.tab.settings') },
   ];
 
   // Obsidian sets `contain: strict` on `.workspace-leaf`, which makes the leaf the
@@ -639,7 +647,12 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
             if (option.hasSubmenu) {
               enterSubmenu(option);
             } else if (option.action) {
-              option.action();
+              choosingByKeyboard.current = true;
+              try {
+                option.action();
+              } finally {
+                choosingByKeyboard.current = false;
+              }
             }
           }
           break;
@@ -752,9 +765,9 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
   const activePanel: SettingsPanelId | null = isSettingsPanelId(activeSubmenu) ? activeSubmenu : null;
 
   const sections = [
-    { id: 'tools', title: 'Tools' },
-    { id: 'mode', title: 'Mode' },
-    { id: 'settings', title: 'Settings' },
+    { id: 'tools', title: t('palette.tab.tools') },
+    { id: 'mode', title: t('palette.tab.mode') },
+    { id: 'settings', title: t('palette.tab.settings') },
     ...extensionCommands.sections,
   ].map((section) => ({
     ...section,
@@ -848,8 +861,8 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
             exit="closed"
           >
             {!isTemporarilyHidden && position && <Tutorial id="palette" steps={[
-              { title: 'Find a command', body: 'Search for a tool or setting here. Use the tabs to narrow the list, then arrow keys and Enter to choose.', selector: '.atlas-command-palette-search' },
-              { title: 'Make the map your own', body: `Adjust your grid, tokens, and widgets from Settings. Back on the map, press ${hotkeyLabel('help')} to see shortcuts. Change them in Obsidian Settings → Atlas VTT → Map hotkeys.`, selector: '.atlas-command-palette-tabs' },
+              { title: t('palette.tour.findTitle'), body: t('palette.tour.findBody'), selector: '.atlas-command-palette-search' },
+              { title: t('palette.tour.ownTitle'), body: t('palette.tour.ownBody', { key: hotkeyLabel('help') }), selector: '.atlas-command-palette-tabs' },
             ]} />}
             <div className="atlas-command-palette-backdrop" onClick={onClose} />
 
@@ -880,7 +893,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
                         activePanel === 'grid-settings' ? (
                           <Button variant="secondary" size="sm" onClick={() => store.getState().setGridAlignmentOpen(true)}>
                             <Move />
-                            Enter Alignment Mode
+                            {t('palette.enterAlignment')}
                           </Button>
                         ) : undefined
                       }
@@ -893,7 +906,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
                           <input
                             ref={inputRef}
                             type="text"
-                            placeholder="Search commands..."
+                            placeholder={t('palette.searchPlaceholder')}
                             className="atlas-command-palette-input"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -903,7 +916,7 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
                             spellCheck={false}
                           />
                           {searchQuery && (
-                            <CloseButton placement="inline" onClick={clearSearch} aria-label="Clear search" />
+                            <CloseButton placement="inline" onClick={clearSearch} aria-label={t('common.clearSearch')} />
                           )}
                         </div>
                       </div>
@@ -927,8 +940,9 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
                     </>
                   )}
 
-                  <div
+                  <OverlayScroll
                     ref={optionsContainerRef}
+                    frameClassName="atlas-command-palette-options-frame"
                     className="atlas-command-palette-options"
                     onMouseMove={handleMouseMove}
                   >
@@ -947,36 +961,36 @@ export function CommandPalette({ isOpen, onClose, toolbarRef }: CommandPalettePr
 
                         {filteredOptions.length === 0 && (
                           <div className="atlas-command-palette-empty">
-                            <div className="atlas-command-palette-empty-text">No results found</div>
-                            <div className="atlas-command-palette-empty-hint">Try a different search term</div>
+                            <div className="atlas-command-palette-empty-text">{t('palette.noResults')}</div>
+                            <div className="atlas-command-palette-empty-hint">{t('palette.noResultsHint')}</div>
                           </div>
                         )}
                       </div>
                     )}
-                  </div>
+                  </OverlayScroll>
 
                   {!activePanel && (
                     <div className="atlas-command-palette-footer">
                       <div className="atlas-command-palette-footer-left">
                         <div className="atlas-command-palette-footer-item">
                           <kbd className="atlas-command-palette-kbd">Tab / Shift+Tab</kbd>
-                          <span>to switch tabs</span>
+                          <span>{t('palette.footer.switchTabs')}</span>
                         </div>
                         <div className="atlas-command-palette-footer-item">
                           <span className="atlas-command-palette-footer-arrows">
                             <ArrowUp className="atlas-command-palette-arrow" />
                             <ArrowUp className="atlas-command-palette-arrow atlas-down" />
                           </span>
-                          <span>to navigate</span>
+                          <span>{t('palette.footer.navigate')}</span>
                         </div>
                         <div className="atlas-command-palette-footer-item">
                           <kbd className="atlas-command-palette-kbd">↵</kbd>
-                          <span>to select</span>
+                          <span>{t('palette.footer.select')}</span>
                         </div>
                       </div>
                       <div className="atlas-command-palette-footer-right">
                         <kbd className="atlas-command-palette-kbd">Esc</kbd>
-                        <span>{searchQuery ? "to clear" : "to close"}</span>
+                        <span>{searchQuery ? t('palette.footer.clear') : t('palette.footer.close')}</span>
                       </div>
                     </div>
                   )}

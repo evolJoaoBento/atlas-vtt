@@ -12,6 +12,17 @@ export class Scope {
   }
 }
 
+export class Keymap {
+  /** The pane an event asks for: Ctrl (Cmd on macOS) or a middle click a tab, with Alt a split, with Alt and Shift a window. */
+  static isModEvent(event?: MouseEvent | KeyboardEvent | null): 'tab' | 'split' | 'window' | boolean {
+    if (!event) return false;
+    const mod = Platform.isMacOS ? event.metaKey : event.ctrlKey;
+    if (mod && event.altKey) return event.shiftKey ? 'window' : 'split';
+    if (mod || (event instanceof MouseEvent && event.button === 1)) return 'tab';
+    return false;
+  }
+}
+
 export class App {
   vault: any;
   workspace: any;
@@ -24,7 +35,16 @@ export class App {
     pushScope(scope: Scope): void { this.scopes.push(scope); },
     popScope(scope: Scope): void { this.scopes = this.scopes.filter((candidate) => candidate !== scope); },
   };
+  /** Obsidian's device-local storage of the vault, kept in memory. */
+  localStorage = new Map<string, unknown>();
   constructor() {}
+  loadLocalStorage(key: string): unknown {
+    return this.localStorage.get(key) ?? null;
+  }
+  saveLocalStorage(key: string, data: unknown): void {
+    if (data === null) this.localStorage.delete(key);
+    else this.localStorage.set(key, data);
+  }
 }
 
 export class Plugin {}
@@ -42,30 +62,70 @@ export class View {
   leaf: WorkspaceLeaf;
   app: any;
   containerEl: HTMLElement;
+  scope: Scope | null = null;
+  navigation = false;
 
   constructor(leaf: WorkspaceLeaf) {
     this.leaf = leaf;
     this.app = (leaf as any)?.app ?? (leaf as any)?.view?.app ?? {};
     this.containerEl = document.createElement('div');
   }
+
+  getState(): Record<string, unknown> {
+    return {};
+  }
+
+  async setState(_state: unknown, _result: unknown): Promise<void> {}
+
+  setEphemeralState(_state: unknown): void {}
 }
 
 export class ItemView extends View {
   contentEl: HTMLElement;
+  /** The header's action buttons, as `addAction` makes them. */
+  actionsEl: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
+    this.actionsEl = this.containerEl.createDiv({ cls: 'view-actions' });
     this.contentEl = document.createElement('div');
+  }
+
+  addAction(icon: string, title: string, callback: (evt: MouseEvent) => unknown): HTMLElement {
+    const el = this.actionsEl.createEl('button', { cls: 'clickable-icon view-action', attr: { 'aria-label': title, 'data-icon': icon } });
+    el.addEventListener('click', (event) => callback(event));
+    return el;
   }
 }
 
 export class FileView extends ItemView {
   file: TFile | null;
+  allowNoFile = false;
 
   constructor(leaf: WorkspaceLeaf) {
     super(leaf);
     this.file = null;
   }
+
+  /** As Obsidian's: the file it shows. */
+  getState(): Record<string, unknown> {
+    return this.file ? { file: this.file.path } : {};
+  }
+
+  /** As Obsidian's: a state naming another file loads it, unloading the one shown. */
+  async setState(state: unknown, _result: unknown): Promise<void> {
+    const path = (state as { file?: unknown } | null)?.file;
+    if (typeof path !== 'string' || path === this.file?.path) return;
+    const file = this.app?.vault?.getAbstractFileByPath?.(path);
+    if (!(file instanceof TFile)) return;
+    if (this.file) await this.onUnloadFile(this.file);
+    this.file = file;
+    await this.onLoadFile(file);
+  }
+
+  async onLoadFile(_file: TFile): Promise<void> {}
+
+  async onUnloadFile(_file: TFile): Promise<void> {}
 }
 
 /**
@@ -179,6 +239,10 @@ export function normalizePath(path: string): string {
   return path.replace(/\\/g, '/').replace(/\/+/g, '/');
 }
 
+export function getLanguage(): string {
+  return 'en';
+}
+
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0)).buffer;
 }
@@ -194,6 +258,10 @@ export class Component {
   onunload(): void {}
   register(cb: () => void): void {
     this.cleanups.push(cb);
+  }
+  registerDomEvent<K extends keyof HTMLElementEventMap>(el: HTMLElement, type: K, callback: (event: HTMLElementEventMap[K]) => unknown): void {
+    el.addEventListener(type, callback);
+    this.register(() => el.removeEventListener(type, callback));
   }
   addChild<T>(child: T): T {
     return child;
@@ -262,6 +330,30 @@ export class Modal {
   onOpen(): void {}
   onClose(): void {}
 }
+
+/** Obsidian's editor suggester; Obsidian sets `context` when one of its suggestions is chosen. */
+export abstract class EditorSuggest<T> {
+  context: { editor: unknown; file: unknown; start: unknown; end: unknown; query: string } | null = null;
+  /** Never read: present so a subclass's item type is used. */
+  protected readonly item?: T;
+  constructor(public app: any) {}
+}
+
+/** Obsidian's prompt of suggestions: a modal with a search field; the tests choose items directly. */
+export class SuggestModal<T> extends Modal {
+  emptyStateText = '';
+  inputEl: HTMLInputElement = document.createElement('input');
+  /** Never read: present so a subclass's item type is used. */
+  protected readonly item?: T;
+  setPlaceholder(placeholder: string): void { this.inputEl.placeholder = placeholder; }
+}
+
+export interface FuzzyMatch<T> {
+  item: T;
+  match: { score: number; matches: Array<[number, number]> };
+}
+
+export class FuzzySuggestModal<T> extends SuggestModal<FuzzyMatch<T>> {}
 
 export const Platform = {
   isMacOS: false,
@@ -403,4 +495,36 @@ export function prepareFuzzySearch(query: string): (text: string) => { score: nu
     }
     return { score: -matches.length - (matches[0]?.[0] ?? 0) / 100, matches };
   };
+}
+
+/** Obsidian's menu: the items it was given, and where it was shown; the last one shown is `Menu.shown`. */
+export class MenuItem {
+  title = '';
+  icon: string | null = null;
+  handler: ((event: MouseEvent | KeyboardEvent) => unknown) | null = null;
+  setTitle(title: string): this { this.title = title; return this; }
+  setIcon(icon: string | null): this { this.icon = icon; return this; }
+  setSection(_section: string): this { return this; }
+  onClick(handler: (event: MouseEvent | KeyboardEvent) => unknown): this { this.handler = handler; return this; }
+}
+
+export class Menu {
+  static shown: Menu | null = null;
+  items: MenuItem[] = [];
+  position: { x: number; y: number } | null = null;
+  addItem(build: (item: MenuItem) => unknown): this {
+    const item = new MenuItem();
+    build(item);
+    this.items.push(item);
+    return this;
+  }
+  addSeparator(): this { return this; }
+  showAtPosition(position: { x: number; y: number }): this {
+    this.position = position;
+    Menu.shown = this;
+    return this;
+  }
+  showAtMouseEvent(event: MouseEvent): this {
+    return this.showAtPosition({ x: event.clientX, y: event.clientY });
+  }
 }

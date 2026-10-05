@@ -77,7 +77,7 @@ export class DrawingRenderer {
     this.container.addChild(this.preview);
 
     // Reuses the fog brush cursor — a plain world-space circle at the pointer.
-    this.cursorPreview = new FogCursorPreview();
+    this.cursorPreview = new FogCursorPreview(this.viewport);
     this.cursorPreview.setBrushRadius(DEFAULT_SETTINGS.eraserWidth / 2);
     this.container.addChild(this.cursorPreview.getDisplayObject());
 

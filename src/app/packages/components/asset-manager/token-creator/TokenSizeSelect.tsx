@@ -1,8 +1,8 @@
 import React from 'react';
 import { ObsidianMenuDropdown } from '../../shared/ObsidianMenuDropdown';
-import { TOKEN_SIZE_OPTIONS } from '../../../../pixi/token-renderer/tokenSizing';
+import { tokenSizeOptions } from '../../../../i18n/sharedTexts';
 
-const OPTIONS: Record<string, string> = Object.fromEntries(TOKEN_SIZE_OPTIONS.map(option => [String(option.size), option.label]));
+const OPTIONS: Record<string, string> = Object.fromEntries(tokenSizeOptions().map(option => [String(option.size), option.label]));
 
 /** Picks the default grid footprint of a token; `value` is the size multiplier, undefined means 1×1. */
 export function TokenSizeSelect({ value, onChange, className }: {

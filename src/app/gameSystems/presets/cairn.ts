@@ -36,9 +36,10 @@ export const CAIRN: SystemPreset = {
       { name: 'Fleeing', color: '#f59e0b', icon: 'run' },
     ]),
     resources: [
-      { ...HP_RESOURCE },
-      // STR is the second health track: damage past 0 HP comes off it. The Cairn layout keeps it first in `stats`.
-      { key: 'str', name: 'STR', field: 'stats.0', direction: 'drains', color: '#dc2626', visibleToPlayers: false },
+      // Hit Protection is only the ability to avoid damage: at 0 a character still stands.
+      { ...HP_RESOURCE, defeatedWhenSpent: false },
+      // Damage past 0 HP comes off STR, and STR 0 is death. The Cairn layout keeps it first in `stats`.
+      { key: 'str', name: 'STR', field: 'stats.0', direction: 'drains', color: '#dc2626', defeatedWhenSpent: true, visibleToPlayers: false },
     ],
     lightPresets: CAIRN_LIGHTS,
   },

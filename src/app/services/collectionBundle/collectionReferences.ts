@@ -1,7 +1,8 @@
 import { TFile, type App } from 'obsidian';
-import type { Asset, AssetService, GroupTokenRef } from '../AssetService';
+import type { Asset, AssetService, GroupTokenRef, SceneAsset } from '../AssetService';
 import { isPersistedMapEnvelope, type PersistedMapEnvelope } from '../MapPersistence';
 import { SceneSnapshotService } from '../../snapshots/SceneSnapshotService';
+import { snapshotFolderOf } from '../../snapshots/sceneSnapshotFolders';
 import { isRecord } from '../assetMetadataGuards';
 import { localImage, statblockImageField } from '../statblockImportCandidates';
 import { linkedFilePath } from '../sceneLinks';
@@ -94,7 +95,7 @@ export class CollectionReferenceCollector {
         this.add(asset.thumbnailPath, 'thumbnail');
         break;
       case 'scene':
-        await this.collectScene(asset.data?.mapPath ?? await this.readSceneMapPath(asset));
+        await this.collectScene(asset, asset.data?.mapPath ?? await this.readSceneMapPath(asset));
         break;
       case 'encounter':
       case 'player':
@@ -124,7 +125,7 @@ export class CollectionReferenceCollector {
     }
   }
 
-  private async collectScene(mapPath: string | undefined): Promise<void> {
+  private async collectScene(scene: SceneAsset, mapPath: string | undefined): Promise<void> {
     if (!mapPath) return;
     const mapFile = this.app.vault.getAbstractFileByPath(mapPath);
     if (!(mapFile instanceof TFile)) return;
@@ -139,9 +140,9 @@ export class CollectionReferenceCollector {
     }
     if (isPersistedMapEnvelope(envelope)) this.collectMapState(envelope);
 
-    for (const { snapshot, path, thumbnailPath } of await new SceneSnapshotService(this.app).list(mapPath)) {
-      this.addHidden(path, 'scene-snapshot');
-      this.addHidden(thumbnailPath, 'scene-snapshot-thumbnail');
+    for (const { snapshot, path, thumbnailPath } of await new SceneSnapshotService(this.app).list(snapshotFolderOf(scene))) {
+      this.add(path, 'scene-snapshot');
+      this.add(thumbnailPath ?? undefined, 'scene-snapshot-thumbnail');
       this.collectMapState(snapshot);
     }
   }
@@ -179,11 +180,6 @@ export class CollectionReferenceCollector {
     if (!field || !image) return;
     this.add(image.path, 'statblock-image', entry.owners);
     entry.statblockImage = { key: field.key, path: image.path };
-  }
-
-  /** Records a file in a hidden folder, which the vault index does not list; the caller already found it on disk. */
-  private addHidden(path: string | null, role: BundleFileRole): void {
-    if (path && !this.files.has(path)) this.files.set(path, { vaultPath: path, role, owners: this.owner ? [this.owner.id] : [] });
   }
 
   /** Records `path` for the current asset (or `owners`); returns whether it was newly added. */

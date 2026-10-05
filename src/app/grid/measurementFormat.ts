@@ -16,7 +16,13 @@ import type {
 export interface MeasurementSettings {
   mode: MeasurementMode;
   unitType: GridUnitType;
+  /** Game units one cell of this map spans: the scene's own distance per cell where it sets one. */
   unitDistance: number;
+  /**
+   * Game units one rules square spans: the collection's distance per cell, whatever the scene
+   * sets. Distances written in squares (presets, statblocks) are converted with this one.
+   */
+  ruleDistance: number;
   diagonalRule: DiagonalRule;
   rangeBands: readonly RangeBand[];
   /** Full opening of the cone measurement in degrees. */
@@ -34,26 +40,43 @@ export function isValidConeAngle(angle: unknown): angle is number {
   return typeof angle === 'number' && angle > 0 && angle <= 360;
 }
 
-/** Collection grid defaults win; a map without a collection falls back to its grid state. */
+/** The distance a scene's cells span by its own choice (`GridState.unitDistanceOverride`); a value that is no positive number is none. */
+export function sceneUnitDistance(grid: Pick<GridState, 'unitDistanceOverride'> | null | undefined): number | undefined {
+  const distance = grid?.unitDistanceOverride;
+  return typeof distance === 'number' && Number.isFinite(distance) && distance > 0 ? distance : undefined;
+}
+
+/**
+ * What a map measures in. Collection grid defaults win; a map without a collection falls back to
+ * its grid state. A scene's own distance per cell changes only `unitDistance`, and only where
+ * distances are measured: range bands have no distance per cell, so there it is kept but unused.
+ */
 export function resolveMeasurementSettings(
   collection: CollectionGridDefaults | undefined,
   grid: GridState | null | undefined,
 ): MeasurementSettings {
-  if (collection) {
-    return {
-      mode: collection.measurementMode,
-      unitType: collection.unitType,
-      unitDistance: collection.unitDistance,
-      diagonalRule: collection.diagonalRule ?? 'equidistant',
-      rangeBands: collection.abstractRangeBands ?? [],
-      coneAngle: collection.coneAngle ?? DEFAULT_CONE_ANGLE,
-    };
-  }
+  const rules = collection ? collectionMeasurement(collection) : gridMeasurement(grid);
+  const override = rules.mode === 'abstract' ? undefined : sceneUnitDistance(grid);
+  return { ...rules, unitDistance: override ?? rules.ruleDistance };
+}
+
+function collectionMeasurement(collection: CollectionGridDefaults): Omit<MeasurementSettings, 'unitDistance'> {
+  return {
+    mode: collection.measurementMode,
+    unitType: collection.unitType,
+    ruleDistance: collection.unitDistance,
+    diagonalRule: collection.diagonalRule ?? 'equidistant',
+    rangeBands: collection.abstractRangeBands ?? [],
+    coneAngle: collection.coneAngle ?? DEFAULT_CONE_ANGLE,
+  };
+}
+
+function gridMeasurement(grid: GridState | null | undefined): Omit<MeasurementSettings, 'unitDistance'> {
   return {
     // Older maps may store 'daggerheart' or nothing; both measure in range bands.
     mode: grid?.measurementType === 'units' ? 'metric' : 'abstract',
     unitType: grid?.unitType ?? 'feet',
-    unitDistance: grid?.unitDistance ?? 5,
+    ruleDistance: grid?.unitDistance ?? 5,
     diagonalRule: 'equidistant',
     rangeBands: [],
     coneAngle: DEFAULT_CONE_ANGLE,

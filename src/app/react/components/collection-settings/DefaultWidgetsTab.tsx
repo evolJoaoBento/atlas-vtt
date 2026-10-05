@@ -5,6 +5,7 @@
 import React from 'react';
 import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { InitiativeFields } from './InitiativeFields';
+import { t } from '../../../i18n';
 
 interface DefaultWidgetsTabProps {
   defaultWidgets: Record<string, boolean>;
@@ -17,13 +18,13 @@ interface DefaultWidgetsTabProps {
 const WIDGET_OPTIONS: { key: string; label: string; description: string }[] = [
   {
     key: 'initiativeTracker',
-    label: 'Initiative Tracker',
-    description: 'Turn-order tracker for combat encounters',
+    label: t('csm.widgets.initiative'),
+    description: t('csm.widgets.initiativeDesc'),
   },
   {
     key: 'timer',
-    label: 'Timer',
-    description: 'Countdown timer for timed encounters or breaks',
+    label: t('csm.widgets.timer'),
+    description: t('csm.widgets.timerDesc'),
   },
 ];
 

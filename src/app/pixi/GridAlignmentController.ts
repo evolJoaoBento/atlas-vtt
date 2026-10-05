@@ -12,6 +12,7 @@ import type { Viewport } from 'pixi-viewport';
 import type { GridSystem, GridType } from '../grid/GridSystem';
 import { getQuadrantBounds } from './gridAlignmentMath';
 import type { AlignmentPoint, MapBounds } from './gridAlignmentMath';
+import { MAP_LAYER_Z } from './mapLayerOrder';
 
 // Re-exports so consumers can import from one place
 export type { AlignmentPoint, AlignmentResult } from './gridAlignmentMath';
@@ -92,7 +93,7 @@ export class GridAlignmentController {
       this.cursorPreview = new Graphics();
       this.cursorPreview.eventMode = 'none';
       this.cursorPreview.alpha = 0.5;
-      this.viewport.addChild(this.cursorPreview);
+      this.addMark(this.cursorPreview);
     }
 
     this.cursorPreview.clear();
@@ -119,7 +120,7 @@ export class GridAlignmentController {
     g.eventMode = 'none';
     this.drawCrosshairAt(g, point, 0.6);
 
-    this.viewport.addChild(g);
+    this.addMark(g);
     this.crosshairs[index] = g;
   }
 
@@ -157,7 +158,7 @@ export class GridAlignmentController {
     }
 
     g.stroke({ width: LINE_WIDTH, color: LINE_COLOR });
-    this.viewport.addChild(g);
+    this.addMark(g);
     this.connectingLines[index] = g;
   }
 
@@ -182,7 +183,7 @@ export class GridAlignmentController {
       g.fill({ color: 0x000000, alpha });
     }
 
-    this.viewport.addChild(g);
+    this.addMark(g);
     this.quadrantOverlay = g;
   }
 
@@ -282,6 +283,12 @@ export class GridAlignmentController {
     g.stroke({ width: LINE_WIDTH, color: CROSSHAIR_COLOR });
     g.circle(point.x, point.y, CIRCLE_RADIUS);
     g.fill({ color: CROSSHAIR_COLOR, alpha: fillAlpha });
+  }
+
+  /** Above the lighting, which would darken the marks like the map. */
+  private addMark(g: Graphics): void {
+    g.zIndex = MAP_LAYER_Z.gridAlignment;
+    this.viewport.addChild(g);
   }
 
   private removeGraphics(g: Graphics): void {

@@ -9,7 +9,10 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from reporter import Reporter, ReportError
 
-REPOSITORY = "ByteMirror/atlas-vtt"
+REPOSITORY = "atlas-vtt/atlas-vtt"
+# Atlas 0.5.1 and older accept only receipts under the repository's former owner,
+# whose issue URLs GitHub redirects. Switch once those versions are gone.
+RECEIPT_REPOSITORY = "ByteMirror/atlas-vtt"
 MAX_BODY = 180000
 
 
@@ -26,7 +29,7 @@ def github_create(payload):
     number = issue.get("number")
     if not isinstance(number, int) or number < 1:
         raise ValueError("Invalid issue receipt")
-    return {"number": number, "url": f"https://github.com/{REPOSITORY}/issues/{number}"}
+    return {"number": number, "url": f"https://github.com/{RECEIPT_REPOSITORY}/issues/{number}"}
 
 
 class Server(ThreadingHTTPServer):

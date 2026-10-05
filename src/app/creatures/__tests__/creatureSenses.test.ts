@@ -7,8 +7,8 @@ import * as parser from '../parseSenses';
 import { creatureSenses, effectiveSenses, effectiveVision, inheritedSensesOf, type SensedCreature } from '../creatureSenses';
 import { sensesTextOf } from '../sensesText';
 
-const FEET: GameUnit = { unitType: 'feet', unitDistance: 5 };
-const METRES: GameUnit = { unitType: 'meters', unitDistance: 1.5 };
+const FEET: GameUnit = { unitType: 'feet', ruleDistance: 5 };
+const METRES: GameUnit = { unitType: 'meters', ruleDistance: 1.5 };
 const DND = BUILT_IN_SENSES['builtin:dnd5e']!;
 const PATHFINDER = BUILT_IN_SENSES['builtin:pathfinder2e']!;
 
@@ -108,7 +108,7 @@ describe('creatureSenses', () => {
     expect(named(creatureSenses(record, DND, FEET).senses)).toEqual([['Darkvision', 60]]);
     expect(named(creatureSenses(record, PATHFINDER, FEET).senses, PATHFINDER)).toEqual([['Darkvision', 60], ['Scent', 30]]);
     expect(named(creatureSenses(record, PATHFINDER, METRES).senses, PATHFINDER)).toEqual([['Darkvision', 18], ['Scent', 9]]);
-    expect(named(creatureSenses(record, PATHFINDER, { unitType: 'meters', unitDistance: 3 }).senses, PATHFINDER)).toEqual([['Darkvision', 18], ['Scent', 9]]);
+    expect(named(creatureSenses(record, PATHFINDER, { unitType: 'meters', ruleDistance: 3 }).senses, PATHFINDER)).toEqual([['Darkvision', 18], ['Scent', 9]]);
     expect(parse).toHaveBeenCalledTimes(4);
   });
 

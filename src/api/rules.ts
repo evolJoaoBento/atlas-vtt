@@ -5,7 +5,7 @@ import { AssetService } from '../app/services/AssetService';
 import { mapDiceRules } from '../app/services/mapDiceRules';
 import { mapInitiativeRules } from '../app/services/mapInitiativeRules';
 import { collectionSettingsFor, mapConeAngle } from '../app/services/mapMeasurementSettings';
-import { SettingsService } from '../app/services/SettingsService';
+import { SystemPresetFiles } from '../app/services/systemPresets/SystemPresetFiles';
 import type { ApiEvents } from './events';
 import { frozenCopy } from './frozen';
 import type { MapRules, RulesApi } from './types/rules';
@@ -42,13 +42,8 @@ export function watchRules(app: App, events: ApiEvents, indexSettled = false): (
   const ref = app.workspace.on('atlas-vtt:collection-settings-changed', (collectionId: string) => {
     if (live) events.emit('rules-changed', collectionId ?? null);
   });
-  const settings = SettingsService.forApp(app);
-  const presets = (): string => JSON.stringify(settings?.getSetting('systemPresets') ?? []);
-  let previous = presets();
-  const stopSettings = settings?.onChange(() => {
-    const next = presets();
-    if (next === previous) return;
-    previous = next;
+  // The user's presets are vault files: a save, rename or delete here or on another device.
+  const stopPresets = SystemPresetFiles.forApp(app)?.onChange(() => {
     if (live) events.emit('rules-changed', null);
   });
   if (!indexSettled) {
@@ -60,6 +55,6 @@ export function watchRules(app: App, events: ApiEvents, indexSettled = false): (
   return (): void => {
     live = false;
     app.workspace.offref(ref);
-    stopSettings?.();
+    stopPresets?.();
   };
 }

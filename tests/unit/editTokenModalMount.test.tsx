@@ -49,7 +49,7 @@ describe('openEditTokenModal', () => {
   it('has its sections and fields in the order they are read and tabbed through, which a dialog of one column keeps: token, resources, vision, carried light', () => {
     const app = withDynamicLighting(createInMemoryApp().app);
     const store = createViewAtlasStore(app, `edit-token-order-${Math.random()}`);
-    const token: TokenEntity = { id: 't', kind: 'character', name: 'Mirabel', imagePath: 't.png', x: 0, y: 0, vision: { enabled: true }, light: emissionOf(lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', unitDistance: 5 }, Infinity)[0]!) };
+    const token: TokenEntity = { id: 't', kind: 'character', name: 'Mirabel', imagePath: 't.png', x: 0, y: 0, vision: { enabled: true }, light: emissionOf(lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', ruleDistance: 5 }, Infinity)[0]!) };
     store.setState({ persistenceEnabled: false, objects: { ...store.getState().objects, tokens: { t: token } } });
     act(() => openEditTokenModal(token, store, app, [HP, STR]));
     expect(screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent)).toEqual(['Token', 'Resources', 'Vision', 'Carried light']);
@@ -164,7 +164,7 @@ describe('openEditTokenModal in a collection with senses of its own', () => {
 
 describe('openEditTokenModal: the carried light', () => {
   // The generic lights as a map on the default 5-foot grid offers them.
-  const onMap = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', unitDistance: 5 }, Infinity);
+  const onMap = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', ruleDistance: 5 }, Infinity);
   const torch = onMap.find((preset) => preset.id === 'torch')!;
   const lantern = onMap.find((preset) => preset.id === 'lantern')!;
   const carried = (): HTMLElement => screen.getByRole('switch', { name: 'Carries a light' });

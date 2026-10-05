@@ -17,7 +17,7 @@ vi.mock('../../src/app/creatures/parseSenses', async (original) => {
 });
 
 const DND = BUILT_IN_SENSES['builtin:dnd5e']!;
-const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', unitDistance: 5 } };
+const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', ruleDistance: 5 } };
 const GOBLIN = 'Bestiary/Goblin.md';
 const BOUNDS = { width: 4000, height: 4000 };
 /** 70 px squares of 5 ft: 14 px a foot. */

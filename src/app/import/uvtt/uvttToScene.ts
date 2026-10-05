@@ -1,5 +1,6 @@
 import { normaliseGridOffset } from '../../grid/gridPlacement';
-import { toGameUnits, type GameUnit } from '../../grid/statedDistance';
+import type { MeasurementSettings } from '../../grid/measurementFormat';
+import { toGameUnits } from '../../grid/statedDistance';
 import { withEmissionValue } from '../../lighting/lightEmissionForm';
 import { maxLightRange } from '../../lighting/lightRanges';
 import { unitScaleOf } from '../../lighting/lightingUnits';
@@ -12,7 +13,7 @@ import type { UvttLight, UvttMap, UvttPoint } from './uvttTypes';
 /** Where a file's map goes: onto an image whose cells are `cellSize` world pixels wide, in a collection measuring in `unit`. */
 export interface UvttTarget {
   cellSize: number;
-  unit: GameUnit;
+  unit: Pick<MeasurementSettings, 'unitType' | 'unitDistance'>;
 }
 
 export interface UvttCounts {
@@ -53,7 +54,8 @@ function brightnessOf(color: string): number {
 }
 
 function emissionOf(light: UvttLight, { unit, cellSize }: UvttTarget): LightEmission {
-  const cells = (value: number): number => toGameUnits({ value, unit: 'squares' }, unit);
+  // The file's cells are the scene's own, whatever a rules square spans
+  const cells = (value: number): number => toGameUnits({ value, unit: 'squares' }, { unitType: unit.unitType, ruleDistance: unit.unitDistance });
   const farthest = maxLightRange(unitScaleOf(unit, { size: cellSize }));
   let emission: LightEmission = { bright: 0, dim: 0, color: light.color, intensity: 1, animation: 'none', kind: 'custom' };
   emission = withEmissionValue(emission, 'dim', cells(light.range), farthest);

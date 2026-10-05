@@ -44,7 +44,11 @@ describe('renaming a scene in the Asset Manager', () => {
     expect(files.has(`${scenes}/Old Keep.atlasmap`)).toBe(false);
     const renamed = await read();
     expect(renamed).toMatchObject({ name: 'New Keep', data: { mapPath: `${scenes}/New Keep.atlasmap` } });
-    expect(JSON.parse(files.get(assets.getAssetFilePath(renamed))!)).toEqual({ mapPath: `${scenes}/New Keep.atlasmap` });
+    // Older versions read the payload; the whole record lies beside it.
+    expect(JSON.parse(files.get(assets.getAssetFilePath(renamed))!)).toEqual({
+      mapPath: `${scenes}/New Keep.atlasmap`,
+      atlasRecord: expect.objectContaining({ id: scene.id, type: 'scene', name: 'New Keep' }),
+    });
   });
 
   it('refuses names that are taken or that Obsidian cannot use as a file name', async () => {

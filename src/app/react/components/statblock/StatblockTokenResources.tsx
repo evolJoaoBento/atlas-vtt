@@ -7,6 +7,7 @@ import { tokenQuantities, type TokenQuantity } from '../../../resources/statbloc
 import type { ResourceDefinition } from '../../../resources/resourceTypes';
 import type { StatblockLayout, StatblockMonster } from './statblockTypes';
 import type { TokenVitals } from '../../../services/statblockVitalsSync';
+import { t } from '../../../i18n';
 
 export interface StatblockTokenActions {
   /** The resources of the map's collection. */
@@ -34,7 +35,7 @@ function ResourceControl({ quantity, onChange }: {
       {boxes ? (
         <div className="atlas-sb-token-pips">
           {Array.from({ length: max }, (_, index) => (
-            <LabelTooltip key={index} label={`${label}${fills ? '' : ' damage'} ${index + 1} of ${max}`}>
+            <LabelTooltip key={index} label={t(fills ? 'statblock.pip' : 'statblock.pipDamage', { label, n: index + 1, max })}>
               <input
                 type="checkbox"
                 checked={index < marked}
@@ -48,7 +49,7 @@ function ResourceControl({ quantity, onChange }: {
         </div>
       ) : (
         <div className="atlas-sb-token-gauge-controls">
-          <LabelTooltip label={`Decrease ${label}`}>
+          <LabelTooltip label={t('statblock.decrease', { label })}>
             <Button variant="ghost" size="icon"
               disabled={current <= 0} onClick={() => onChange(current - 1)}><Minus /></Button>
           </LabelTooltip>
@@ -57,7 +58,7 @@ function ResourceControl({ quantity, onChange }: {
             <span className="atlas-sb-token-gauge-fill" style={{ width: `${max > 0 ? current / max * 100 : 0}%` }} />
             <span className="atlas-sb-token-gauge-value">{current} / {max}</span>
           </div>
-          <LabelTooltip label={`Increase ${label}`}>
+          <LabelTooltip label={t('statblock.increase', { label })}>
             <Button variant="ghost" size="icon"
               disabled={current >= max} onClick={() => onChange(current + 1)}><Plus /></Button>
           </LabelTooltip>
@@ -82,7 +83,7 @@ export function StatblockTokenResources({ monster, layout, definitions, tokens, 
       while (used.has(number) || reserved.has(number)) number++;
     }
     used.add(number);
-    return { token, label: `${token.name || monster.name || 'Creature'} #${number}` };
+    return { token, label: `${token.name || monster.name || t('statblock.creature')} #${number}` };
   });
 
   useLayoutEffect(() => {
@@ -109,7 +110,7 @@ export function StatblockTokenResources({ monster, layout, definitions, tokens, 
       onKeyDown={(event) => event.stopPropagation()}>
       {entries.map(({ token, label }) => (
         <div key={token.id} className="atlas-sb-token-entry" role="group" aria-labelledby={`${entryLabelId}-${token.id}`}>
-          <LabelTooltip label={`Locate ${label} on map`}>
+          <LabelTooltip label={t('statblock.locate', { label })}>
             <Button className="atlas-sb-token-name" variant="ghost" size="sm"
               onMouseEnter={() => onHoverToken?.(token.id)} onFocus={() => onHoverToken?.(token.id)}
               onClick={() => onLocateToken(token.id)}>

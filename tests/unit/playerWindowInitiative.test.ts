@@ -9,6 +9,7 @@ import { PlayerWindowService } from '../../src/app/services/PlayerWindowService'
 import { SettingsService } from '../../src/app/services/SettingsService';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { attachFakePlayerWindow } from '../mocks/playerPopout';
+import { memoryPluginData } from '../mocks/pluginData';
 
 vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 const collection = vi.hoisted(() => ({ hpVisibleToPlayers: false }));
@@ -223,13 +224,14 @@ describe('player initiative panel', () => {
   });
 
   it('defaults on for old settings and persists the DM choice across reloads', async () => {
-    const { app } = createInMemoryApp({ files: { 'atlas-vtt/settings.json': JSON.stringify({ localPlayerView: { showWidgets: false } }) } });
-    const settings = new SettingsService(app);
+    const { app } = createInMemoryApp();
+    const data = memoryPluginData({ localPlayerView: { showWidgets: false } });
+    const settings = new SettingsService(app, undefined, data);
     await settings.initialize();
     expect(settings.getLocalPlayerViewSettings().showInitiative).toBe(true);
     settings.setLocalPlayerViewSettings({ showInitiative: false });
     await settings.saveSettingsNow();
-    const reloaded = new SettingsService(app);
+    const reloaded = new SettingsService(app, undefined, data);
     await reloaded.initialize();
     expect(reloaded.getLocalPlayerViewSettings()).toMatchObject({ showInitiative: false, showWidgets: false });
   });

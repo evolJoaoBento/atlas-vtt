@@ -95,7 +95,10 @@ describe('importing a Universal VTT file', () => {
     expect(b.vault.files.has(map.mapFilePath)).toBe(true);
     expect(b.vault.files.get(map.thumbnailPath!)).toBe('THUMB');
     expect(JSON.parse(b.vault.files.get(map.filePath!)!)).toMatchObject({ id: map.id, name: 'Crypt', mapFilePath: map.mapFilePath });
-    expect(JSON.parse(b.vault.files.get(scene.filePath!)!)).toEqual({ mapPath: result.scenePath });
+    expect(JSON.parse(b.vault.files.get(scene.filePath!)!)).toEqual({
+      mapPath: result.scenePath,
+      atlasRecord: expect.objectContaining({ id: scene.id, type: 'scene', name: 'Crypt' }),
+    });
 
     const state = sceneState(b, result.scenePath);
     expect(state.background).toBe(map.mapFilePath);
@@ -460,7 +463,8 @@ describe('an import that fails half way', () => {
       return await importUvttFile(b.deps, uvttFile(cryptFile()), COLLECTION);
     } finally {
       restore();
-      expect(refused).toBe(1);
+      // A failed save of the index is followed by one that puts the library files back, which meets the refusal again.
+      expect(refused).toBeGreaterThanOrEqual(1);
     }
   }
 

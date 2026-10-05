@@ -32,7 +32,10 @@ export interface ToolbarItem {
   icon: string;
   label: string;
   shortcut?: string;
-  /** Where it sits among Atlas's own items, which have 45–100; lower priorities move into "More tools" first. Default 50. */
+  /**
+   * Its place among extensions' items, which sit together after Atlas's dice button: a higher priority sits further
+   * left. The bar moves items into "More tools" from its right end, so lower priorities move there first. Default 50.
+   */
   priority?: number;
   /** Default ['map']. */
   views?: ReadonlyArray<'map' | 'remote'>;

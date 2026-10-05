@@ -7,6 +7,7 @@ import type { ViewAtlasState, ViewAtlasStore } from '../storeFactory';
 import { EventEmitter } from 'events';
 import { getDrawingBounds, type DrawingBounds } from './drawingGeometry';
 import type { LayerVisibility } from './playerSafeFrame';
+import { MAP_LAYER_Z } from './mapLayerOrder';
 
 export class SelectionManager {
   private viewport: Viewport;
@@ -49,11 +50,13 @@ export class SelectionManager {
     this.eventBus = eventBus;
 
     this.marqueeGraphics = new Graphics();
+    this.marqueeGraphics.zIndex = MAP_LAYER_Z.selection;
     this.viewport.addChild(this.marqueeGraphics);
 
     this.selectionOverlay = new Graphics();
     this.selectionOverlay.eventMode = 'none'; // Make overlay non-interactive
     this.selectionOverlay.interactiveChildren = false;
+    this.selectionOverlay.zIndex = MAP_LAYER_Z.selection;
     // Add overlay beneath marquee, or simply to viewport if marquee isn't always first
     const marqueeIndex = this.viewport.getChildIndex(this.marqueeGraphics);
     if (marqueeIndex !== -1) {

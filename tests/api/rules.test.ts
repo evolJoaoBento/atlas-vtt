@@ -4,6 +4,7 @@ import { ApiEvents } from '../../src/api/events';
 import { rulesApi, watchRules } from '../../src/api/rules';
 import { DEFAULT_CONE_ANGLE } from '../../src/app/grid/measurementFormat';
 import { SettingsService } from '../../src/app/services/SettingsService';
+import { SystemPresetFiles } from '../../src/app/services/systemPresets/SystemPresetFiles';
 import { AssetService } from '../../src/app/services/AssetService';
 import { mapDiceRules } from '../../src/app/services/mapDiceRules';
 import { mapConeAngle } from '../../src/app/services/mapMeasurementSettings';
@@ -106,16 +107,22 @@ describe('rules', () => {
     seedCollection();
     const settings = new SettingsService(app, Promise.resolve());
     await settings.initialize();
+    // The user's presets are vault files; any change to them, here or synced from another device, is one notice.
+    const presetListeners = new Set<() => void>();
+    const presets = { onChange: (listener: () => void) => { presetListeners.add(listener); return () => { presetListeners.delete(listener); }; } };
+    vi.spyOn(SystemPresetFiles, 'forApp').mockReturnValue(presets as unknown as SystemPresetFiles);
+    const changePreset = (): void => { for (const listener of [...presetListeners]) listener(); };
     const events = new ApiEvents();
     const listener = vi.fn();
     events.on('rules-changed', listener);
     const stop = watchRules(app, events, true);
     settings.setDiceDisplay('card');
     expect(listener).not.toHaveBeenCalled();
-    settings.setSetting('systemPresets', [{ id: 'mine', name: 'Mine' }]);
+    changePreset();
     expect(listener.mock.calls).toEqual([[null]]);
     stop();
-    settings.setSetting('systemPresets', []);
+    expect(presetListeners.size).toBe(0);
+    changePreset();
     expect(listener).toHaveBeenCalledTimes(1);
   });
 

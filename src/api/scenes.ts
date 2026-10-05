@@ -60,7 +60,7 @@ export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>, views: Vi
         const { extensions: current, ...rest } = scene.data ?? {};
         const next = Object.fromEntries(Object.entries(current ?? {}).filter(([key]) => key !== scope.id));
         if (copy !== null) Object.defineProperty(next, scope.id, { value: copy, enumerable: true, writable: true, configurable: true });
-        await assets.updateAsset(sceneId, { data: Object.keys(next).length > 0 ? { ...rest, extensions: next } : rest });
+        await assets.updateSceneIndexData(sceneId, Object.keys(next).length > 0 ? { ...rest, extensions: next } : rest);
       });
     },
     readMap: async (mapPath: string) => {

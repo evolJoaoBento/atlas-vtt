@@ -8,7 +8,7 @@ import { toolbarSlot } from './slots';
 import { useSlot } from './useSlot';
 import { viewContextOf, type ViewContextState } from './viewContext';
 
-/** Between Atlas's own priorities, which run from 45 to 100. */
+/** An item's place among other extensions' items when it names none: higher sits further left. */
 export const DEFAULT_EXTENSION_PRIORITY = 50;
 
 function ToolBadge({ badge, label }: { badge: string | number | true; label: string }): React.ReactElement {
@@ -39,12 +39,12 @@ export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ct
   const badge = safely(owner, `${slot} badge`, () => drawableBadge(item.badge?.(ctx)), null);
   const select = (): void => safely(owner, `${slot} onClick`, () => { item.onClick(ctx); }, undefined);
   const Icon = obsidianIconComponent(item.icon);
-  const priority = Number.isFinite(item.priority) ? item.priority as number : DEFAULT_EXTENSION_PRIORITY;
   return {
     // Namespaced: ids are React keys and the toolbar's fit keys, and must not meet Atlas's own ('move', 'dice', ...).
     id: `ext:${owner}:${item.id}`,
-    priority,
+    kind: 'button',
     pinned: active,
+    active,
     element: (
       <div className="atlas-ext-tool">
         <ToolButton icon={Icon} label={item.label} isActive={active} onClick={select} {...(item.shortcut ? { shortcut: item.shortcut } : {})} />
@@ -53,6 +53,26 @@ export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ct
     ),
     menuEntry: { icon: Icon, label: item.label, isActive: active, onSelect: select, ...(item.shortcut ? { shortcut: item.shortcut } : {}) },
   };
+}
+
+function priorityOf({ item }: SlotEntry<ToolbarItem>): number {
+  return Number.isFinite(item.priority) ? item.priority as number : DEFAULT_EXTENSION_PRIORITY;
+}
+
+/**
+ * Atlas's controls with the extensions' items placed right after the dice (or before the Command palette, or at the
+ * end, when the bar has no dice). The bar sends controls to "More tools" from its right end, so the items that follow
+ * the extensions' leave first, and among the extensions' a lower priority sits further right and leaves first.
+ */
+export function withExtensionToolbarItems(
+  atlasItems: readonly ResponsiveToolbarItem[],
+  extensionItems: readonly ResponsiveToolbarItem[],
+): ResponsiveToolbarItem[] {
+  if (extensionItems.length === 0) return [...atlasItems];
+  const dice = atlasItems.findIndex((item) => item.id === 'dice');
+  const palette = atlasItems.findIndex((item) => item.id === 'palette');
+  const at = dice >= 0 ? dice + 1 : palette >= 0 ? palette : atlasItems.length;
+  return [...atlasItems.slice(0, at), ...extensionItems, ...atlasItems.slice(at)];
 }
 
 /** The registered toolbar items that belong in this view, to be placed among Atlas's own. None in a player view, except a remote view's own. */
@@ -67,5 +87,8 @@ export function useExtensionToolbarItems(
   if (ctx.isPlayerView && ctx.kind !== 'remote') return [];
   return entries
     .filter(({ item }) => (item.views ?? ['map']).includes(ctx.kind))
-    .map((entry) => extensionToolbarItem(entry, ctx));
+    .map((entry, index) => ({ entry, index, priority: priorityOf(entry) }))
+    // Highest priority first; registration order breaks ties.
+    .sort((a, b) => b.priority - a.priority || a.index - b.index)
+    .map(({ entry }) => extensionToolbarItem(entry, ctx));
 }

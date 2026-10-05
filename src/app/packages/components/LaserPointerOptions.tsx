@@ -1,12 +1,12 @@
+import { t } from '../../i18n';
 import React from "react"
 import { useAtlasSettings } from "../../keyboard/useMapHotkeys"
 import {
   DEFAULT_LASER_POINTER_SETTINGS,
-  LASER_COLOR_HINT,
-  LASER_COLOR_SWATCHES,
   LASER_SIZE_MAX,
   LASER_SIZE_MIN,
 } from "../../tools/laserPointerSettings"
+import { laserColorHint, laserColorSwatches } from "../../i18n/sharedTexts"
 import { DropdownSliderRow } from "./primitives/DropdownSliderRow"
 import { DropdownSwatchGrid } from "./primitives/DropdownSwatchGrid"
 
@@ -18,14 +18,14 @@ export function LaserPointerOptions(): React.ReactElement {
   return (
     <div className="atlas-dropdown-section">
       <DropdownSwatchGrid
-        label="Laser colour"
-        swatches={LASER_COLOR_SWATCHES}
+        label={t('toolbar.laserColour')}
+        swatches={laserColorSwatches()}
         value={color}
         onChange={(value) => settings?.setLaserPointerSettings({ color: value })}
-        hint={LASER_COLOR_HINT}
+        hint={laserColorHint()}
       />
       <DropdownSliderRow
-        label="Laser size"
+        label={t('toolbar.laserSize')}
         value={size}
         min={LASER_SIZE_MIN}
         max={LASER_SIZE_MAX}

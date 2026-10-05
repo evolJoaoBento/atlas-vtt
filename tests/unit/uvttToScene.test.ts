@@ -3,10 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { DAGGERHEART } from '../../src/app/gameSystems/presets/daggerheart';
 import { DND_5E } from '../../src/app/gameSystems/presets/dnd5e';
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
-import type { GameUnit } from '../../src/app/grid/statedDistance';
 import { parseUvtt } from '../../src/app/import/uvtt/parseUvtt';
 import { wallsCrowd } from '../../src/app/import/uvtt/uvttCrowding';
-import { uvttCellSize, uvttToScene, type UvttScene } from '../../src/app/import/uvtt/uvttToScene';
+import { uvttCellSize, uvttToScene, type UvttScene, type UvttTarget } from '../../src/app/import/uvtt/uvttToScene';
 import type { UvttMap } from '../../src/app/import/uvtt/uvttTypes';
 import { sealTolerance } from '../../src/app/lighting/lightingConstants';
 import { gameUnitsToWorld, unitScaleOf } from '../../src/app/lighting/lightingUnits';
@@ -15,7 +14,7 @@ import type { CollectionGridDefaults } from '../../src/app/types/collectionSetti
 import type { WallSegment } from '../../src/app/types/wallTypes';
 import { cryptFile, cryptSetting, cryptWith } from '../fixtures/uvttFiles';
 
-const FEET: GameUnit = { unitType: 'feet', unitDistance: 5 };
+const FEET: UvttTarget['unit'] = { unitType: 'feet', unitDistance: 5 };
 
 function mapOf(file: unknown): UvttMap {
   const result = parseUvtt(JSON.stringify(file));
@@ -23,7 +22,7 @@ function mapOf(file: unknown): UvttMap {
   return result.map;
 }
 
-const sceneOf = (file: unknown, cellSize = 100, unit: GameUnit = FEET): UvttScene => uvttToScene(mapOf(file), { cellSize, unit });
+const sceneOf = (file: unknown, cellSize = 100, unit: UvttTarget['unit'] = FEET): UvttScene => uvttToScene(mapOf(file), { cellSize, unit });
 const ends = (wall: WallSegment): number[] => [wall.p1.x, wall.p1.y, wall.p2.x, wall.p2.y];
 const wallsOf = (scene: UvttScene): WallSegment[] => Object.values(scene.walls);
 

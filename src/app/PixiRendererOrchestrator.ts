@@ -51,6 +51,8 @@ import { findAtlasLeafByViewId } from './utils/atlasLeafLookup';
 import { destroyTree } from './pixi/utils/destroyTree';
 import { requestRender } from './pixi/RenderScheduler';
 import { SCENE_LAYER_Z } from './pixi/sceneLayerOrder';
+import { MAP_LAYER_Z } from './pixi/mapLayerOrder';
+import { t } from './i18n';
 
 export class PixiRendererOrchestrator { // Renamed class
   private _isDestroyed: boolean = false;
@@ -358,7 +360,6 @@ export class PixiRendererOrchestrator { // Renamed class
       getMapRect: () => this.getMapRect(),
     });
     viewport.addChild(this.hexLinkRenderer.container);
-    this.keepHexLinksAboveGrid();
     this.hexLinkInteraction = new HexLinkInteraction({
       viewport,
       store: this.store,
@@ -396,6 +397,7 @@ export class PixiRendererOrchestrator { // Renamed class
         bounds: () => this.getMapRect(),
         albedo: () => (this.backgroundSprite && !this.backgroundSprite.destroyed ? this.backgroundSprite.texture : null),
         onPlayerSightChange: () => { for (const listener of [...this.playerLightingListeners]) listener(); },
+        grid: () => this.gridSystem ?? null,
       });
     }
 
@@ -462,8 +464,7 @@ export class PixiRendererOrchestrator { // Renamed class
       // Add text container to viewport
       const textContainer = this.textRenderer.getContainer?.() || viewport.children.find(child => child.label === 'textContainer');
       if (textContainer) {
-        // Set z-index between tokens and fog
-        textContainer.zIndex = SCENE_LAYER_Z.texts;
+        textContainer.zIndex = MAP_LAYER_Z.text;
       }
     }
     
@@ -597,8 +598,7 @@ export class PixiRendererOrchestrator { // Renamed class
       // Add text container to viewport
       const textContainer = this.textRenderer.getContainer?.() || currentViewport.children.find(child => child.label === 'textContainer');
       if (textContainer) {
-        // Set z-index between tokens and fog
-        textContainer.zIndex = SCENE_LAYER_Z.texts;
+        textContainer.zIndex = MAP_LAYER_Z.text;
       }
     }
     
@@ -625,8 +625,6 @@ export class PixiRendererOrchestrator { // Renamed class
     } else if (currentViewport.getChildAt(0) !== sprite) {
         currentViewport.setChildIndex(sprite, 0);
     }
-
-    this.keepHexLinksAboveGrid();
 
     this.eventBus.emit('background-sprite-updated', {
       x: sprite.x,
@@ -667,24 +665,6 @@ export class PixiRendererOrchestrator { // Renamed class
     const sprite = this.backgroundSprite;
     if (!sprite || sprite.destroyed || !(sprite.width > 0)) return null;
     return { x: sprite.x, y: sprite.y, width: sprite.width, height: sprite.height };
-  }
-
-  /**
-   * Linked hexes sit right above the map and its grid, below tokens. The grid
-   * is always re-inserted directly above the map, so it stays underneath.
-   */
-  private keepHexLinksAboveGrid(): void {
-    const viewport = this.viewport;
-    const container = this.hexLinkRenderer?.container;
-    if (!viewport || !container || container.parent !== viewport) return;
-    const children = viewport.children;
-    const grid = this.gridSystem?.getGridSprite();
-    const below = Math.max(
-      this.backgroundSprite ? children.indexOf(this.backgroundSprite) : -1,
-      grid ? children.indexOf(grid) : -1,
-    );
-    const current = children.indexOf(container);
-    viewport.setChildIndex(container, current > below ? below + 1 : below);
   }
 
   public toggleGrid(visible?: boolean): boolean {
@@ -840,6 +820,8 @@ export class PixiRendererOrchestrator { // Renamed class
           e.preventDefault();
           return;
         }
+        // The toolbar editor ends on this Escape (its own listener); the selection stays.
+        if (this.store.getState().isToolbarEditing) return;
         // Clear token selection
         const selectedIds = this.store.getState().selectedIds;
         if (selectedIds.length > 0) {
@@ -1025,7 +1007,7 @@ export class PixiRendererOrchestrator { // Renamed class
     runInBackground(
       this.spatialAudioEngine.previewSound(soundId),
       `Previewing sound ${soundId}`,
-      'Could not play the sound preview',
+      t('light.previewFailed'),
     );
   }
 

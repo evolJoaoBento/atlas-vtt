@@ -106,11 +106,11 @@ export class WallTool {
 
   /**
    * Continue drawing from an existing wall endpoint.
-   * Starts a new chain whose first vertex is the given position.
+   * Starts a chain whose first vertex is the given position: the chain `chainId` when given, else a new one.
    */
-  continueFromEndpoint(x: number, y: number): void {
+  continueFromEndpoint(x: number, y: number, chainId?: string): void {
     this.finishChain();
-    this.chainId = `chain_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    this.chainId = chainId ?? `chain_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     this.chain = [{ x, y }];
     this.isDrawing = true;
     this.eventBus.emit('wall-chain-start', { x, y });

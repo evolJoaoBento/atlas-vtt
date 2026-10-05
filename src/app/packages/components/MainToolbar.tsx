@@ -1,60 +1,37 @@
-import React, { useState, useCallback, useRef, useMemo, forwardRef } from "react"
+import React, { useState, useCallback, useEffect, useLayoutEffect, useRef, useMemo, forwardRef } from "react"
 import { useAtlasStore, useViewStoreHook } from "src/app/react/ViewStoreContext"
-import { Command, Dices, Eye, EyeOff, ImageIcon, MapPin, Volume2 } from "lucide-react"
+import { AnimatePresence, MotionConfig } from "framer-motion"
+import { useStore } from "zustand"
+import { Eye, EyeOff } from "lucide-react"
 
 import { TooltipProvider } from "./primitives/tooltip"
 import { useHotkeyLabels } from "../../keyboard/useMapHotkeys"
 import { useMapClipboardHotkeys } from "../../clipboard/useMapClipboardHotkeys"
 import { CommandPalette } from "../../react/components/CommandPalette"
 import AssetManager from "./asset-manager/AssetManager"
-import { ToolButton } from "./primitives/ToolButton"
-import { CoinIcon } from "../../react/components/CoinIcon"
 import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
 import { Toggle } from "./primitives/Toggle"
-import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
 import { remoteTrayRoll } from "../../remote-view/remoteControls"
 import { REMOTE_MAX_DICE } from "../../remote-view/RemoteViewDice"
-import { AMBIENT_AUDIO_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
+import { useExtensionToolbarItems, withExtensionToolbarItems } from "../../extensions/extensionToolbarItems"
 import { useExperimentalFeature } from "../../react/hooks/useExperimentalFeature"
-import { useExtensionToolbarItems } from "../../extensions/extensionToolbarItems"
+import type { ExperimentalFeatureId } from "../../experimental/experimentalFeatures"
+import { availableToolbarControls, DEFAULT_TOOLBAR_ORDER } from "../../toolbar/toolbarCatalog"
 import { ResponsiveToolbar } from "./toolbar/ResponsiveToolbar"
-import { MoveToolGroup } from "./toolbar/MoveToolGroup"
-import { FogToolGroup } from "./toolbar/FogToolGroup"
-import { DrawToolGroup } from "./toolbar/DrawToolGroup"
-import { TextToolGroup } from "./toolbar/TextToolGroup"
-import { MeasureToolGroup } from "./toolbar/MeasureToolGroup"
-import { LightingToolGroup } from "./toolbar/LightingToolGroup"
 import { useToolbarHotkeys } from "./toolbar/useToolbarHotkeys"
-import {
-  drawToolFace, fogToolFace, measureToolFace, moveToolFace, textToolFace, lightingToolFace,
-  type Tool, type ToolFace,
-} from "./toolbar/toolFaces"
-import type { ToolGroupControls } from "./toolbar/ToolGroup"
+import { useToolbarLayout } from "./toolbar/useToolbarLayout"
+import { TOOLBAR_CONTROL_ITEMS } from "./toolbar/toolbarControls"
+import { ToolbarEditContext } from "./toolbar/editor/toolbarEditContext"
+import { ToolbarEditor } from "./toolbar/editor/ToolbarEditor"
+import { ToolbarLiveRegion } from "./toolbar/editor/ToolbarLiveRegion"
+import { createToolbarEditStore, ToolbarEditStoreContext } from "./toolbar/editor/toolbarEditStore"
+import { useToolbarRowBridge } from "./toolbar/editor/toolbarRowBridge"
+import { useToolbarEditor } from "./toolbar/editor/useToolbarEditor"
+import type { Tool } from "./toolbar/toolFaces"
+import type { ToolbarContext, ToolMenu } from "./toolbar/toolbarContext"
 import type { ResponsiveToolbarItem } from "./toolbar/toolbarTypes"
-
-/** Tool groups whose options menu is open; only one at a time. */
-type ToolMenu = 'move' | 'fog' | 'draw' | 'text' | 'measure' | 'wall'
-
-/**
- * Which controls a narrow toolbar keeps longest (higher stays longer). The
- * tools a GM reaches for during play outrank setup and reference tools, which
- * also have hotkeys.
- */
-const PRIORITY = {
-  move: 100,
-  measure: 90,
-  fog: 85,
-  assets: 80,
-  dice: 75,
-  pin: 70,
-  draw: 65,
-  palette: 55,
-  text: 50,
-  loot: 45,
-  wall: 40,
-  audio: 35,
-} as const
+import { t } from '../../i18n';
 
 interface MainToolbarProps {
   viewId?: string;
@@ -68,7 +45,18 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const isGMView = useAtlasStore(state => state.isGMView)
   const setGMView = useAtlasStore(state => state.setGMView)
   const hotkeyLabel = useHotkeyLabels()
-  const lightingOn = useExperimentalFeature('dynamicLighting')
+  const experimentalOn: Record<ExperimentalFeatureId, boolean> = {
+    dynamicLighting: useExperimentalFeature('dynamicLighting'),
+  }
+  const liveLayout = useToolbarLayout()
+  // During a drag the bar keeps the layout it began with; changes made elsewhere wait for the drop.
+  // The bottom row shares the drag state with the undo/redo bar, which the editor arranges too.
+  const rowBridge = useToolbarRowBridge()
+  const [ownEditStore] = useState(createToolbarEditStore)
+  const editStore = rowBridge?.editStore ?? ownEditStore
+  const frozenLayout = useStore(editStore.state, s => s.frozenLayout)
+  const layoutAccess = frozenLayout ? { ...liveLayout, layout: frozenLayout } : liveLayout
+  const { layout } = layoutAccess
 
   const isActualPlayerView = view?.getViewType?.() === 'atlas-vtt-player'
   // A remote view: a scene fed from outside, with the player's tools only
@@ -86,6 +74,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const setDiceTrayOpen = useAtlasStore(s => s.setDiceTrayOpen)
   const lootRollerOpen = useAtlasStore(s => s.lootRoller.open)
   const setLootRollerOpen = useAtlasStore(s => s.setLootRollerOpen)
+  const isToolbarEditing = useAtlasStore(s => s.isToolbarEditing)
 
   const [openMenu, setOpenMenu] = useState<ToolMenu | null>(null)
   const closeMenus = useCallback((): void => setOpenMenu(null), [])
@@ -139,113 +128,106 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
     closeMenus,
   })
 
-  const groupControls = (menu: ToolMenu): ToolGroupControls => ({
+  const dm = !isActualPlayerView && !remote
+  const editing = dm && isToolbarEditing
+  // Whether the palette action that started edit mode was chosen with the keyboard.
+  const [editingByKeyboard, setEditingByKeyboard] = useState(false)
+
+  const startEditing = useCallback((byKeyboard: boolean): void => {
+    setEditingByKeyboard(byKeyboard)
+    store.getState().setToolbarEditing(true)
+  }, [store])
+  const stopEditing = useCallback((): void => store.getState().setToolbarEditing(false), [store])
+
+  // Tool menus hang where the editor's tray goes.
+  useEffect(() => {
+    if (editing) closeMenus()
+  }, [editing, closeMenus])
+
+  const ctx: ToolbarContext = {
     activeTool,
     selectTool: handleToolClick,
-    menuOpen: openMenu === menu,
-    toggleMenu: () => setOpenMenu(current => current === menu ? null : menu),
-    closeMenu: closeMenus,
-  })
-
-  /** A tool group: pinned while its tool is active or its options are open. */
-  const toolGroupItem = (menu: ToolMenu, face: ToolFace, shortcut: string, element: React.ReactNode): ResponsiveToolbarItem => ({
-    id: menu,
-    priority: PRIORITY[menu],
-    pinned: face.isActive || openMenu === menu,
-    element,
-    menuEntry: { icon: face.icon, label: face.label, shortcut, isActive: face.isActive, onSelect: () => handleToolClick(face.tool) },
-  })
-
-  /**
-   * A plain button for a tool or a panel. Tools pin while active; panels that
-   * float on their own (loot roller, asset manager, palette) never pin.
-   */
-  const buttonItem = (
-    id: keyof typeof PRIORITY,
-    button: { icon: ToolFace["icon"]; label: string; shortcut: string; isActive: boolean; onClick: () => void },
-    pinned: boolean,
-  ): ResponsiveToolbarItem => ({
-    id,
-    priority: PRIORITY[id],
-    pinned,
-    element: <ToolButton {...button} />,
-    menuEntry: { icon: button.icon, label: button.label, shortcut: button.shortcut, isActive: button.isActive, onSelect: button.onClick },
-  })
-
-  const toolButtonItem = (id: 'pin' | 'audio', tool: Tool, icon: ToolFace["icon"], label: string, shortcut: string): ResponsiveToolbarItem =>
-    buttonItem(id, { icon, label, shortcut, isActive: activeTool === tool, onClick: () => handleToolClick(tool) }, activeTool === tool)
-
-  const dm = !isActualPlayerView && !remote
-  // Items other plugins registered: they sit with Atlas's own by priority and fall into "More tools" like them.
-  const extensionItems = useExtensionToolbarItems(viewId ?? view?.viewId, store, isActualPlayerView)
-
-  const items: ResponsiveToolbarItem[] = [
-    toolGroupItem('move', moveToolFace(activeTool), hotkeyLabel('move'), <MoveToolGroup {...groupControls('move')} />),
-    ...(dm ? [toolGroupItem('fog', fogToolFace(activeTool), hotkeyLabel('fog'), <FogToolGroup {...groupControls('fog')} />)] : []),
-    ...(dm ? [toolGroupItem('draw', drawToolFace(activeTool), hotkeyLabel('draw'), <DrawToolGroup {...groupControls('draw')} />)] : []),
-    ...(dm && isAtlasToolAvailable('text')
-      ? [toolGroupItem('text', textToolFace(activeTool), hotkeyLabel('text'), <TextToolGroup {...groupControls('text')} />)]
-      : []),
-    toolGroupItem('measure', measureToolFace(activeTool), hotkeyLabel('measure'), <MeasureToolGroup {...groupControls('measure')} />),
-    ...(dm && lightingOn
-      ? [toolGroupItem('wall', lightingToolFace(activeTool), hotkeyLabel('wall'), <LightingToolGroup {...groupControls('wall')} />)]
-      : []),
-    ...(dm ? [toolButtonItem('pin', "note-pin", MapPin, "Note Pin Tool", hotkeyLabel('pin'))] : []),
-    ...(dm && AMBIENT_AUDIO_ENABLED
-      ? [toolButtonItem('audio', "audio", Volume2, "Ambient Sound", hotkeyLabel('audio'))]
-      : []),
-    {
-      id: 'dice',
-      priority: PRIORITY.dice,
-      // The dice tray hangs from this button.
-      pinned: isDiceTrayOpen,
-      element: (
-        <div ref={diceButtonRef} className="relative flex items-center">
-          <ToolButton icon={Dices} label="Roll Dice" shortcut={hotkeyLabel('diceTray')} isActive={isDiceTrayOpen} onClick={toggleDiceTray} />
-          {diceTool && (
-            <DiceDropdownMenu
-              diceTool={diceTool}
-              isOpen={isDiceTrayOpen}
-              onToggle={toggleDiceTray}
-              triggerRef={diceButtonRef}
-              // A remote view never rolls locally: its owner's listeners send the roll
-              {...(remote ? { onRoll: remoteTrayRoll(view?.viewId), maxDice: remoteMaxDice } : {})}
-            />
-          )}
-        </div>
-      ),
-      menuEntry: { icon: Dices, label: "Roll Dice", shortcut: hotkeyLabel('diceTray'), isActive: isDiceTrayOpen, onSelect: toggleDiceTray },
+    hotkeyLabel,
+    openMenu,
+    groupControls: (menu) => ({
+      activeTool,
+      selectTool: handleToolClick,
+      menuOpen: openMenu === menu,
+      toggleMenu: () => setOpenMenu(current => current === menu ? null : menu),
+      closeMenu: closeMenus,
+    }),
+    dice: {
+      open: isDiceTrayOpen, toggle: toggleDiceTray, tool: diceTool, buttonRef: diceButtonRef,
+      // A remote view never rolls locally: its owner's listeners send the roll
+      ...(remote && { remote: { onRoll: remoteTrayRoll(view?.viewId), maxDice: remoteMaxDice } }),
     },
-    ...extensionItems,
-    ...(dm ? [
-      buttonItem('loot', { icon: CoinIcon, label: "Loot Roller", shortcut: hotkeyLabel('lootRoller'), isActive: lootRollerOpen, onClick: () => setLootRollerOpen(!lootRollerOpen) }, false),
-      buttonItem('assets', { icon: ImageIcon, label: "Asset Manager", shortcut: hotkeyLabel('assets'), isActive: isAssetManagerOpen, onClick: handleAssetManagerClick }, false),
-      buttonItem('palette', { icon: Command, label: "Command Palette", shortcut: hotkeyLabel('palette'), isActive: isCommandPaletteOpen, onClick: () => setCommandPaletteOpen(!isCommandPaletteOpen) }, false),
-    ] : []),
-  ]
+    loot: { open: lootRollerOpen, setOpen: setLootRollerOpen },
+    assets: { open: isAssetManagerOpen, toggle: handleAssetManagerToggle },
+    palette: { open: isCommandPaletteOpen, setOpen: setCommandPaletteOpen },
+  }
+
+  // The player view's bar ignores the GM's layout.
+  const available = availableToolbarControls(!dm, (feature) => experimentalOn[feature])
+  const order = (dm ? layout.order : DEFAULT_TOOLBAR_ORDER).filter((id) => available.has(id))
+  const items: ResponsiveToolbarItem[] = order.map((id) => ({ id, ...TOOLBAR_CONTROL_ITEMS[id](ctx) }))
+  const editor = useToolbarEditor({ access: layoutAccess, store: editStore, items, available, hotkeyLabel, editing, stop: stopEditing })
+  // Items other plugins registered sit after the dice and leave for "More tools" like Atlas's own. The editor
+  // arranges Atlas's controls only, so while it is open the bar shows those alone.
+  const extensionItems = useExtensionToolbarItems(viewId ?? view?.viewId, store, isActualPlayerView)
+  const barItems = editing ? items : withExtensionToolbarItems(items, extensionItems)
+  const hiddenIds: ReadonlySet<string> = layout.hidden
+  const publishedEdit = editing ? editor.api : null
+
+  // The undo/redo bar beside the bar works through the same editor.
+  useLayoutEffect(() => {
+    rowBridge?.edit.setState({ api: publishedEdit })
+  })
+  useEffect(() => () => rowBridge?.edit.setState({ api: null }), [rowBridge])
 
   return (
     <TooltipProvider delayDuration={300}>
-      <ResponsiveToolbar
-        ref={ref || toolbarRef}
-        items={items}
-        // The GM view switch keeps the bar's last place, after "More tools".
-        end={dm && (
-          <Toggle
-            value={isGMView}
-            onChange={toggleGMView}
-            iconOn={Eye}
-            iconOff={EyeOff}
-            tooltipOn={`GM View (${hotkeyLabel('gmView')})`}
-            tooltipOff={`Session View (${hotkeyLabel('gmView')})`}
-          />
-        )}
-      />
+      <ToolbarEditContext.Provider value={publishedEdit}>
+        <ToolbarEditStoreContext.Provider value={editStore}>
+          <MotionConfig reducedMotion="user">
+            <ResponsiveToolbar
+              ref={ref || toolbarRef}
+              items={barItems}
+              editing={editing}
+              {...(dm && { hiddenIds, motion: editor.motion })}
+              // The GM view switch keeps the bar's last place, after "More tools".
+              end={dm && (
+                <Toggle
+                  value={isGMView}
+                  onChange={toggleGMView}
+                  iconOn={Eye}
+                  iconOff={EyeOff}
+                  tooltipOn={t('toolbar.gmView', { key: hotkeyLabel('gmView') })}
+                  tooltipOff={t('toolbar.sessionView', { key: hotkeyLabel('gmView') })}
+                />
+              )}
+            />
+            <AnimatePresence>
+              {editing && (
+                <ToolbarEditor
+                  key="toolbar-editor"
+                  items={items}
+                  motion={editor.motion}
+                  viewId={viewId}
+                  focusOnEntry={editingByKeyboard}
+                />
+              )}
+            </AnimatePresence>
+          </MotionConfig>
+        </ToolbarEditStoreContext.Provider>
+      </ToolbarEditContext.Provider>
+      {/* Always mounted, so the message that edit mode ended is still read once the tray is gone. */}
+      {dm && <ToolbarLiveRegion announcement={editor.announcement} />}
       {!remote && (
         <CommandPalette
           isOpen={isCommandPaletteOpen}
           onClose={() => setCommandPaletteOpen(false)}
           toolbarRef={toolbarRef}
+          {...(dm && { onCustomizeToolbar: startEditing })}
         />
       )}
       {!remote && (
@@ -267,8 +249,8 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
           borderRadius: 'var(--atlas-radius-l)',
           zIndex: 1000
         }}>
-          <p>Dice tool not initialized. Please try reloading the view.</p>
-          <button onClick={() => setDiceTrayOpen(false)}>Close</button>
+          <p>{t('toolbar.diceFailed')}</p>
+          <button onClick={() => setDiceTrayOpen(false)}>{t('common.close')}</button>
         </div>
       )}
     </TooltipProvider>

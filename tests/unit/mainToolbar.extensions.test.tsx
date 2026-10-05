@@ -19,6 +19,8 @@ const storeState = {
   objects: { tokens: {} },
   selectedIds: [],
   remoteView: null as object | null,
+  isToolbarEditing: false,
+  setToolbarEditing: vi.fn(),
 };
 
 vi.mock('../../src/app/react/ViewStoreContext', () => ({
@@ -50,6 +52,11 @@ vi.mock('../../src/app/packages/components/toolbar/TextToolGroup', () => ({ Text
 vi.mock('../../src/app/packages/components/toolbar/MeasureToolGroup', () => ({ MeasureToolGroup: () => null }));
 vi.mock('../../src/app/packages/components/toolbar/LightingToolGroup', () => ({ LightingToolGroup: () => null }));
 vi.mock('../../src/app/packages/components/primitives/Toggle', () => ({ Toggle: () => null }));
+vi.mock('../../src/app/packages/components/toolbar/editor/ToolbarEditor', () => ({ ToolbarEditor: () => null }));
+vi.mock('../../src/app/react/root/ContextMenuContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/app/react/root/ContextMenuContext')>()),
+  useContextMenu: () => ({ openContextMenu: vi.fn(), closeContextMenu: vi.fn() }),
+}));
 
 import { MainToolbar } from '../../src/app/packages/components/MainToolbar';
 import { toolbarSlot } from '../../src/app/extensions/slots';
@@ -70,6 +77,7 @@ describe('MainToolbar with extension items', () => {
   beforeEach(() => {
     storeState.isPlayerView = false;
     storeState.remoteView = null;
+    storeState.isToolbarEditing = false;
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => {
@@ -157,6 +165,15 @@ describe('MainToolbar with extension items', () => {
     const ids = Array.from(container.querySelectorAll<HTMLElement>('[data-toolbar-item]')).map((el) => el.dataset.toolbarItem);
     expect(ids.indexOf('ext:ext:dice')).toBe(ids.indexOf('dice') + 1);
     expect(ids.indexOf('loot')).toBe(ids.indexOf('ext:ext:dice') + 1);
+    remove();
+  });
+
+  it("leaves the extensions' items out while the toolbar editor arranges Atlas's controls", () => {
+    const remove = add(item());
+    storeState.isToolbarEditing = true;
+    render(<MainToolbar viewId="view-1" />);
+    expect(button()).toBeNull();
+    expect(document.querySelector('[data-toolbar-item="dice"]')).not.toBeNull();
     remove();
   });
 

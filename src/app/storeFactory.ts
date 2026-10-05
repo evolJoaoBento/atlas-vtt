@@ -341,6 +341,8 @@ export interface ViewAtlasState {
   setHeldTokens: UISlice['setHeldTokens'];
   exploredBrush: UISlice['exploredBrush'];
   setExploredBrush: UISlice['setExploredBrush'];
+  isToolbarEditing: UISlice['isToolbarEditing'];
+  setToolbarEditing: UISlice['setToolbarEditing'];
   setGridSettingsOpen: UISlice['setGridSettingsOpen'];
   setDMScreenOpen: UISlice['setDMScreenOpen'];
   setGridAlignmentOpen: UISlice['setGridAlignmentOpen'];

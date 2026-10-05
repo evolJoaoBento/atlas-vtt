@@ -3,47 +3,41 @@ import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../../storeFactory';
 import { beginHistoryTransaction, endHistoryTransaction, runHistoryTransaction } from '../../stores/history';
 import type { WallRenderer } from './WallRenderer';
-import { keptByParts } from '../../lighting/segments';
+import type { Point } from '../../types/visionTypes';
 import type { WallSegment, WallType } from '../../types/wallTypes';
+import { endsAt, snapToWallEnd, type WallEnd } from '../lighting/wallEnds';
+import type { WallEdit } from '../lighting/wallJoints';
 
-const SHARED_VERTEX_TOLERANCE = 2;
+/** Screen pixels a pressed wall end must travel before it follows the pointer: less is a click. */
+const DRAG_THRESHOLD = 3;
 
-interface VertexDragState {
-  type: 'vertex';
-  wallId: string;
-  vertex: 'p1' | 'p2';
-  startX: number;
-  startY: number;
-  linkedVertices: Array<{ wallId: string; vertex: 'p1' | 'p2' }>;
+/** A joint held by the pointer: every wall end there moves as one. */
+interface JointDrag {
+  joint: Point;
+  pressedAt: Point;
+  ends: WallEnd[];
+  /** The other ends of the joint's walls, which stay where they are. */
+  farEnds: Point[];
+  /** The joint has followed the pointer; its history transaction is open. */
+  moved: boolean;
+  /** Pressed without adding to the selection, so a release in place is a click on the joint. */
+  plain: boolean;
 }
 
-type DragState = VertexDragState;
-
 /**
- * Handles wall interaction: multi-selection, endpoint dragging, door toggling,
- * bulk type changes, and deletion. Lights join the selection through
- * `selectLight` (their markers take the pointer themselves, see `LightInteraction`).
+ * Handles wall interaction: multi-selection, joint dragging, door toggling, bulk type changes
+ * and deletion. Lights join the selection through `selectLight` (their markers take the pointer
+ * themselves, see `LightInteraction`).
  *
  * Multi-select: Ctrl/Cmd+click toggles a wall chain in/out of the selection.
  * Plain click replaces the selection with the clicked chain.
  */
-/** Door placement mode: user is sliding a door preview along a wall. */
-interface DoorPlacementState {
-  wallId: string;
-  doorType: 'door' | 'secret-door';
-  /** Current projected position on the wall (0–1 parameter). */
-  t: number;
-}
-
-const DOOR_HALF_WIDTH = 20; // Half-width of the door segment in world pixels
-
 export class WallInteraction {
   private store: StoreApi<ViewAtlasState>;
   private wallRenderer: WallRenderer;
-  private dragState: DragState | null = null;
+  private drag: JointDrag | null = null;
   private selectedWallIds: Set<string> = new Set();
   private selectedLightIds: Set<string> = new Set();
-  private doorPlacement: DoorPlacementState | null = null;
 
   /** `onLightSelection` shows which lights are selected, on their markers. */
   constructor(store: StoreApi<ViewAtlasState>, wallRenderer: WallRenderer, private readonly onLightSelection: (lightIds: string[]) => void = () => undefined) {
@@ -57,7 +51,7 @@ export class WallInteraction {
     const vertexHit = this.wallRenderer.hitTestVertices(worldX, worldY);
     if (vertexHit) {
       this.selectWallChain(vertexHit.wallId, addToSelection);
-      this.startVertexDrag(vertexHit.wallId, vertexHit.vertex, worldX, worldY);
+      this.holdJoint(vertexHit.wallId, vertexHit.vertex, { x: worldX, y: worldY }, !addToSelection);
       return true;
     }
 
@@ -82,33 +76,35 @@ export class WallInteraction {
     return false;
   }
 
-  handlePointerMove(worldX: number, worldY: number): void {
-    if (!this.dragState) return;
-
-    const state = this.store.getState();
-
-    for (const link of this.dragState.linkedVertices) {
-      state.updateWall(link.wallId, {
-        [link.vertex]: { x: worldX, y: worldY },
-      });
+  /** A held joint follows the pointer once it has left the click's reach, landing on a wall end close by unless `free` (Alt). */
+  handlePointerMove(worldX: number, worldY: number, free: boolean = false): void {
+    const drag = this.drag;
+    if (!drag) return;
+    const zoom = this.wallRenderer.zoom;
+    if (!drag.moved && Math.hypot(worldX - drag.pressedAt.x, worldY - drag.pressedAt.y) < DRAG_THRESHOLD / zoom) return;
+    if (!drag.moved) {
+      // Live drag writes hit the store on every move; the transaction folds them into one undo step.
+      drag.moved = true;
+      beginHistoryTransaction(this.store);
     }
+    const state = this.store.getState();
+    const point = { x: worldX, y: worldY };
+    // Never onto the far end of a wall that moves with it, which would shrink that wall to a point.
+    const to = free ? point : snapToWallEnd(point, state.objects.walls, zoom, { skip: new Set(drag.ends.map((end) => end.wallId)), avoid: drag.farEnds });
+    for (const end of drag.ends) state.updateWall(end.wallId, { [end.end]: to });
   }
 
-  handlePointerUp(): void {
+  /** Ends a drag. Returns the joint when it was clicked, pressed and released in place without adding to the selection. */
+  handlePointerUp(): Point | null {
+    const drag = this.drag;
     this.endDrag();
-  }
-
-  /** Live drag writes hit the store on every move; the transaction folds them into one undo step. */
-  private startDrag(dragState: DragState): void {
-    this.endDrag();
-    this.dragState = dragState;
-    beginHistoryTransaction(this.store);
+    return drag && !drag.moved && drag.plain ? drag.joint : null;
   }
 
   private endDrag(): void {
-    if (!this.dragState) return;
-    this.dragState = null;
-    endHistoryTransaction(this.store);
+    const drag = this.drag;
+    this.drag = null;
+    if (drag?.moved) endHistoryTransaction(this.store);
   }
 
   // ─── Bulk Operations ─────────────────────────────────────────────────
@@ -131,6 +127,16 @@ export class WallInteraction {
       this.selectedLightIds.clear();
       this.onLightSelection([]);
     }
+  }
+
+  /** Applies an edit of whole walls as one undo step, and clears the selection. */
+  apply(edit: WallEdit): void {
+    const state = this.store.getState();
+    runHistoryTransaction(this.store, () => {
+      if (edit.remove.length > 0) state.deleteWalls(edit.remove);
+      for (const wall of edit.add) state.addWall(wall);
+    });
+    this.clearSelection();
   }
 
   /** Change the type of all selected walls. */
@@ -156,93 +162,6 @@ export class WallInteraction {
     this.wallRenderer.forceRedraw();
   }
 
-  // ─── Door Placement ───────────────────────────────────────────────
-
-  /** Enter door placement mode: the user will slide a door along `wallId`. */
-  startDoorPlacement(wallId: string, doorType: 'door' | 'secret-door'): void {
-    this.doorPlacement = { wallId, doorType, t: 0.5 };
-    // Highlight the target wall
-    this.selectedWallIds = new Set([wallId]);
-    this.selectedLightIds.clear();
-    this.syncRendererSelection();
-  }
-
-  /** Update the door preview position as the user moves the mouse. */
-  updateDoorPlacement(worldX: number, worldY: number): void {
-    if (!this.doorPlacement) return;
-    const wall = this.store.getState().objects.walls[this.doorPlacement.wallId];
-    if (!wall) { this.cancelDoorPlacement(); return; }
-
-    this.doorPlacement.t = this.projectOntoWall(wall, worldX, worldY);
-    this.wallRenderer.setDoorPreview(wall, this.doorPlacement.t, this.doorPlacement.doorType);
-  }
-
-  /** Confirm door placement: split the wall and insert a door segment. */
-  confirmDoorPlacement(): void {
-    if (!this.doorPlacement) return;
-    const state = this.store.getState();
-    const wall = state.objects.walls[this.doorPlacement.wallId];
-    if (!wall) { this.cancelDoorPlacement(); return; }
-
-    const t = this.doorPlacement.t;
-    const dx = wall.p2.x - wall.p1.x;
-    const dy = wall.p2.y - wall.p1.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-
-    // Door half-width as a proportion of wall length
-    const doorHalfT = len > 0 ? DOOR_HALF_WIDTH / len : 0.1;
-    const tStart = Math.max(0.01, t - doorHalfT);
-    const tEnd = Math.min(0.99, t + doorHalfT);
-
-    const pStart = { x: wall.p1.x + dx * tStart, y: wall.p1.y + dy * tStart };
-    const pMid1 = { x: wall.p1.x + dx * tStart, y: wall.p1.y + dy * tStart };
-    const pMid2 = { x: wall.p1.x + dx * tEnd, y: wall.p1.y + dy * tEnd };
-    const pEnd = { x: wall.p1.x + dx * tEnd, y: wall.p1.y + dy * tEnd };
-
-    const shared = keptByParts(wall);
-    const doorType = this.doorPlacement.doorType;
-
-    // Replacing one wall with up to three segments is a single undoable edit
-    runHistoryTransaction(this.store, () => {
-      state.deleteWall(wall.id);
-
-      if (tStart > 0.02) {
-        state.addWall({ type: wall.type, p1: wall.p1, p2: pStart, ...shared });
-      }
-
-      state.addWall({ type: doorType, p1: pMid1, p2: pMid2, closed: true, ...shared });
-
-      if (tEnd < 0.98) {
-        state.addWall({ type: wall.type, p1: pEnd, p2: wall.p2, ...shared });
-      }
-    });
-
-    this.doorPlacement = null;
-    this.wallRenderer.clearDoorPreview();
-    this.clearSelection();
-  }
-
-  /** Cancel door placement mode. */
-  cancelDoorPlacement(): void {
-    this.doorPlacement = null;
-    this.wallRenderer.clearDoorPreview();
-  }
-
-  isPlacingDoor(): boolean {
-    return this.doorPlacement !== null;
-  }
-
-  /** Project a world point onto a wall segment, returning t in [0, 1]. */
-  private projectOntoWall(wall: { p1: { x: number; y: number }; p2: { x: number; y: number } }, worldX: number, worldY: number): number {
-    const dx = wall.p2.x - wall.p1.x;
-    const dy = wall.p2.y - wall.p1.y;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) return 0.5;
-    return Math.max(0.05, Math.min(0.95,
-      ((worldX - wall.p1.x) * dx + (worldY - wall.p1.y) * dy) / lenSq
-    ));
-  }
-
   // ─── Getters ──────────────────────────────────────────────────────
 
   getSelectedWallIds(): string[] {
@@ -257,8 +176,9 @@ export class WallInteraction {
     return this.selectedWallIds.size > 0 || this.selectedLightIds.size > 0;
   }
 
+  /** A joint is held by the pointer, moved or not yet. */
   isDragging(): boolean {
-    return this.dragState !== null;
+    return this.drag !== null;
   }
 
   // ─── Selection Logic ─────────────────────────────────────────────────
@@ -295,6 +215,13 @@ export class WallInteraction {
     this.syncRendererSelection();
   }
 
+  /** Selects one wall alone, not its chain: the wall a door is placed in. */
+  selectSegment(wallId: string): void {
+    this.selectedWallIds = new Set([wallId]);
+    this.selectedLightIds.clear();
+    this.syncRendererSelection();
+  }
+
   /** Selects a light; with `addToSelection` toggles it in or out. */
   selectLight(lightId: string, addToSelection: boolean): void {
     if (addToSelection) {
@@ -322,36 +249,15 @@ export class WallInteraction {
     this.onLightSelection(Array.from(this.selectedLightIds));
   }
 
-  private startVertexDrag(wallId: string, vertex: 'p1' | 'p2', worldX: number, worldY: number): void {
+  private holdJoint(wallId: string, vertex: 'p1' | 'p2', pressedAt: Point, plain: boolean): void {
     const walls = this.store.getState().objects.walls;
     const wall = walls[wallId];
     if (!wall) return;
-
-    const dragPoint = wall[vertex];
-
-    // Find all walls sharing this vertex position
-    const linked: VertexDragState['linkedVertices'] =[{ wallId, vertex }];
-
-    for (const other of wallList(walls)) {
-      if (other.id === wallId) continue;
-      if (Math.abs(other.p1.x - dragPoint.x) < SHARED_VERTEX_TOLERANCE &&
-          Math.abs(other.p1.y - dragPoint.y) < SHARED_VERTEX_TOLERANCE) {
-        linked.push({ wallId: other.id, vertex: 'p1' });
-      }
-      if (Math.abs(other.p2.x - dragPoint.x) < SHARED_VERTEX_TOLERANCE &&
-          Math.abs(other.p2.y - dragPoint.y) < SHARED_VERTEX_TOLERANCE) {
-        linked.push({ wallId: other.id, vertex: 'p2' });
-      }
-    }
-
-    this.startDrag({
-      type: 'vertex',
-      wallId,
-      vertex,
-      startX: worldX,
-      startY: worldY,
-      linkedVertices: linked,
-    });
+    this.endDrag();
+    const joint = { ...wall[vertex] };
+    const ends = endsAt(joint, walls);
+    const farEnds = ends.flatMap((end) => walls[end.wallId]?.[end.end === 'p1' ? 'p2' : 'p1'] ?? []);
+    this.drag = { joint, pressedAt, ends, farEnds, moved: false, plain };
   }
 
   destroy(): void {

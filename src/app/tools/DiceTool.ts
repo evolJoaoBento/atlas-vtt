@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { DEFAULT_DICE_RULES } from '../gameSystems/diceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
 import { DICE_ROLLED_EVENT, DICE_TYPES, rollByRules, type DiceRollResult } from './diceRolling';
+import { t } from '../i18n';
 
 export type { DiceRollResult } from './diceRolling';
 
@@ -54,7 +55,8 @@ export class DiceTool {
 
   /** Rolls the formula; one without dice (`+3`) is added to the collection's default roll. */
   private parseAndRoll(formula: string): DiceRollResult {
-    return rollByRules(formula, this.getDiceRules());
+    // The shared roll stays free of Obsidian (players' pages use it); the GM's own roll names its roller in Atlas's language.
+    return { ...rollByRules(formula, this.getDiceRules()), player: t('dice.player') };
   }
 
   public clearHistory(): void {

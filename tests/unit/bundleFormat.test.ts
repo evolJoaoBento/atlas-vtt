@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUNDLE_FORMAT, isSafeBundlePath, manifestProblem } from '../../src/app/services/collectionBundle/bundleFormat';
+import { BUNDLE_FORMAT, bundleFormatFor, isLegacySnapshotFile, isSafeBundlePath, manifestProblem } from '../../src/app/services/collectionBundle/bundleFormat';
 
 function manifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -63,3 +63,24 @@ describe('manifest checks', () => {
       .toBe('This collection export contains a file Atlas will not write: atlas-vtt/../.obsidian/app.json');
   });
 });
+describe('scene snapshots', () => {
+  const scene = { id: 'scene-1', type: 'scene', name: 'Cave', tags: [], data: { mapPath: 'atlas-vtt/collections/source/scenes/Cave.atlasmap' } };
+  const snapshot = (vaultPath: string, owners = ['scene-1']): Record<string, unknown> => ({ vaultPath, role: 'scene-snapshot', owners });
+
+  it('names visible paths, which need no exception', () => {
+    expect(isSafeBundlePath('atlas-vtt/collections/source/snapshots/scene-1/s1.json')).toBe(true);
+    expect(isSafeBundlePath('atlas-vtt/collections/source/scenes/.snapshots/Cave/s1.json')).toBe(false);
+    expect(manifestProblem(manifest({ assets: [scene], files: [snapshot('atlas-vtt/collections/source/snapshots/scene-1/s1.json')] }))).toBeNull();
+  });
+
+  it('still accepts the hidden paths earlier versions wrote, for a scene of the bundle', () => {
+    const legacy = 'atlas-vtt/collections/source/scenes/.snapshots/Cave/s1.json';
+    expect(isLegacySnapshotFile({ vaultPath: legacy, role: 'scene-snapshot' })).toBe(true);
+    expect(isLegacySnapshotFile({ vaultPath: legacy, role: 'asset-file' })).toBe(false);
+    expect(isLegacySnapshotFile({ vaultPath: '.obsidian/.snapshots/Cave/s1.json', role: 'scene-snapshot' })).toBe(false);
+    expect(isLegacySnapshotFile({ vaultPath: 'atlas-vtt/.snapshots/Cave/../s1.json', role: 'scene-snapshot' })).toBe(false);
+    expect(manifestProblem(manifest({ assets: [scene], files: [snapshot(legacy)] }))).toBeNull();
+    expect(manifestProblem(manifest({ assets: [scene], files: [snapshot(legacy, ['token-1'])] }))).toMatch(/will not write/);
+  });
+});
+

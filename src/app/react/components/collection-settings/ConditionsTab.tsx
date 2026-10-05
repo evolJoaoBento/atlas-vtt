@@ -13,6 +13,7 @@ import { conditionEffect, withConditionEffect } from '../../../gameSystems/condi
 import { conditionGlyph } from '../../../utils/conditionGlyph';
 import { WidgetIconPicker } from '../WidgetIconPicker';
 import { ConditionBadgePreview } from './ConditionBadgePreview';
+import { t } from '../../../i18n';
 
 interface ConditionsTabProps {
   conditions: ConditionDefinition[];
@@ -93,10 +94,7 @@ export function ConditionsTab({
   return (
     <>
       <p className="atlas-csm-hint">
-        Define conditions that can be toggled on tokens. Each one shows as a badge
-        on the token&apos;s edge, and hovering the token lists them by name. Click a
-        badge to give it an icon, and turn on # for conditions that carry a number,
-        like Frightened 2.
+        {t('csm.conditions.intro')}
       </p>
       {sightEffects && (
         <p className="atlas-csm-hint">
@@ -117,7 +115,7 @@ export function ConditionsTab({
           {conditions.map((cond, i) => (
             <div key={cond.id} className="atlas-csm-condition">
               <div className="atlas-csm-condition-row">
-                <LabelTooltip label="Choose icon">
+                <LabelTooltip label={t('csm.conditions.chooseIcon')}>
                   <button
                     type="button"
                     className="atlas-csm-condition-badge-button"
@@ -130,7 +128,7 @@ export function ConditionsTab({
                 <input
                   type="text"
                   className="atlas-csm-input"
-                  placeholder="Condition name"
+                  placeholder={t('csm.conditions.name')}
                   value={cond.name}
                   onChange={(e) => updateCondition(i, { name: e.target.value })}
                 />
@@ -149,7 +147,7 @@ export function ConditionsTab({
                   className="atlas-csm-color-swatch"
                   style={{ backgroundColor: cond.color }}
                 >
-                  <LabelTooltip label="Pick condition colour">
+                  <LabelTooltip label={t('csm.conditions.pickColour')}>
                     <input
                       type="color"
                       value={cond.color}
@@ -157,7 +155,7 @@ export function ConditionsTab({
                     />
                   </LabelTooltip>
                 </div>
-                <LabelTooltip label={cond.valued ? 'Carries a number, like Frightened 2' : 'Give it a number, like Frightened 2'}>
+                <LabelTooltip label={cond.valued ? t('csm.conditions.valued') : t('csm.conditions.makeValued')}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -168,7 +166,7 @@ export function ConditionsTab({
                     <Hash />
                   </Button>
                 </LabelTooltip>
-                <LabelTooltip label="Remove condition">
+                <LabelTooltip label={t('csm.conditions.remove')}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -181,12 +179,12 @@ export function ConditionsTab({
               </div>
               {iconPickerId === cond.id && (
                 <WidgetIconPicker
-                  label="Condition icon"
+                  label={t('csm.conditions.icon')}
                   value={cond.icon}
                   color={cond.color}
                   onChange={(icon) => updateCondition(i, { icon })}
                   noIcon={{
-                    label: 'Initial',
+                    label: t('csm.conditions.initial'),
                     content: <span className="atlas-csm-condition-initial">{glyphInitial(cond)}</span>,
                     onSelect: () => clearIcon(i),
                   }}
@@ -196,12 +194,12 @@ export function ConditionsTab({
           ))}
         </div>
       ) : (
-        <div className="atlas-csm-empty">No conditions defined</div>
+        <div className="atlas-csm-empty">{t('csm.conditions.empty')}</div>
       )}
 
       <Button variant="ghost" className="atlas-csm-add-btn" onClick={addCondition}>
         <Plus />
-        Add Condition
+        {t('csm.conditions.add')}
       </Button>
     </>
   );

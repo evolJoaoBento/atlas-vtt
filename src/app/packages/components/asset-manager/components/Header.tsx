@@ -15,6 +15,7 @@ import { useHeaderCompaction } from '../hooks/useHeaderCompaction';
 import { SortControls } from './SortControls';
 import { TabSwitcher } from './TabSwitcher';
 import { TokenIcon } from '../../../../react/components/TokenIcon';
+import { t } from '../../../../i18n';
 
 export interface HeaderProps {
   app: App;
@@ -82,7 +83,7 @@ export function Header({
               <PanelLeft />
             </Button>
           </LabelTooltip>
-          <LabelTooltip label="Back">
+          <LabelTooltip label={t('common.back')}>
             <Button
               variant="ghost"
               size="icon"
@@ -93,7 +94,7 @@ export function Header({
               <ChevronLeft />
             </Button>
           </LabelTooltip>
-          <LabelTooltip label="Forward">
+          <LabelTooltip label={t('am.header.forward')}>
             <Button
               variant="ghost"
               size="icon"
@@ -109,8 +110,8 @@ export function Header({
             <>
               <div className="atlas-am-toolbar-divider" />
               <div className="atlas-selection-info">
-                <span>{selectionCount}<span className="atlas-selection-label"> selected</span></span>
-                <LabelTooltip label="Clear selection">
+                <span>{selectionCount}<span className="atlas-selection-label"> {t('am.header.selected')}</span></span>
+                <LabelTooltip label={t('dice.clearSelection')}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -141,27 +142,27 @@ export function Header({
 
           <div className="atlas-am-toolbar-divider" />
 
-          <LabelTooltip label="New folder">
+          <LabelTooltip label={t('am.header.newFolder')}>
             <Button variant="ghost" size="icon" className="atlas-am-icon-btn" onClick={onCreateFolder}>
               <FolderPlus />
             </Button>
           </LabelTooltip>
-          <LabelTooltip label="Refresh">
+          <LabelTooltip label={t('am.menu.refresh')}>
             <Button variant="ghost" size="icon" className="atlas-am-icon-btn" onClick={onRefresh}>
               <RefreshCw />
             </Button>
           </LabelTooltip>
 
           <HeaderMenu
-            label="Create"
+            label={t('am.header.create')}
             triggerClassName="atlas-asset-manager-create-btn"
             triggerVariant="default"
             iconTrigger
             triggerContent={<Plus />}
             items={[
-              { key: 'token', label: 'Create Token', icon: <TokenIcon />, onSelect: onCreateTokens },
-              { key: 'map', label: 'Add Map', icon: <MapIcon />, onSelect: onCreateMap },
-              { key: 'collection', label: 'Create Collection', icon: <FolderOpen />, separated: true, onSelect: onCreateCollection },
+              { key: 'token', label: t('am.header.createToken'), icon: <TokenIcon />, onSelect: onCreateTokens },
+              { key: 'map', label: t('am.header.addMap'), icon: <MapIcon />, onSelect: onCreateMap },
+              { key: 'collection', label: t('am.header.createCollection'), icon: <FolderOpen />, separated: true, onSelect: onCreateCollection },
             ]}
           />
         </div>

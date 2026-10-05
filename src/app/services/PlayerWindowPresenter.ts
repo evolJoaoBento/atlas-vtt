@@ -5,6 +5,7 @@ import { AtlasView, ATLAS_VIEW_TYPE } from '../atlas-view';
 import type { ViewAtlasState } from '../storeFactory';
 import { playerWindowStore } from '../stores/playerWindowStore';
 import type { SceneTab } from '../types/sceneTabTypes';
+import { t } from '../i18n';
 import type { PlayerFrameSource } from './PlayerFrameMirror';
 import { PlayerWindowService } from './PlayerWindowService';
 import { rendersOnChange, requestRender, setBeforeRender } from '../pixi/RenderScheduler';
@@ -21,7 +22,7 @@ export async function presentActiveTabInPlayerWindow(app: App): Promise<void> {
   const activeTabId = view?.tabMetaStore.getState().activeTabId ?? null;
   // A remote view shows a scene fed from outside, never one of this vault's maps.
   if (!view || view.isRemote || !activeTabId) {
-    new Notice('No active map to send to the player view');
+    new Notice(t('present.noMap'));
     return;
   }
   await presentTabInPlayerWindow(app, view, activeTabId);
@@ -41,7 +42,7 @@ export async function presentTabInPlayerWindow(app: App, view: AtlasView, tabId:
 
   const source = await waitForRenderedFrameSource(view);
   if (!source) {
-    new Notice('No map canvas found. Please ensure a map is loaded.');
+    new Notice(t('present.noCanvas'));
     return;
   }
   if (view.isClosed) return;
@@ -57,7 +58,7 @@ export async function presentTabInPlayerWindow(app: App, view: AtlasView, tabId:
   streamed = { store: view.atlasStore, tabId };
   followPresentedScene();
   presentedScene.present(view, tabId);
-  new Notice(`Player view shows ${tab.displayName}`);
+  new Notice(t('present.shows', { name: tab.displayName }));
 }
 
 /** Reconnect a restored workspace leaf without opening another popout. */
@@ -77,7 +78,7 @@ export async function restorePlayerWindow(app: App, player: LocalPlayerView): Pr
     if (tab) { sourceView = leaf.view; sourceTab = tab; break; }
   }
   if (!sourceView || !sourceTab) {
-    player.contentEl.setText('Open the presented scene and send it to the player view to reconnect.');
+    player.contentEl.setText(t('present.reconnect'));
     return;
   }
   const previousTabId = sourceView.tabMetaStore.getState().activeTabId;
@@ -85,7 +86,7 @@ export async function restorePlayerWindow(app: App, player: LocalPlayerView): Pr
   if (player.isClosed) return;
   await sourceView.switchToTab(sourceTab.id);
   if (sourceView.tabMetaStore.getState().activeTabId !== sourceTab.id) {
-    player.contentEl.setText('The presented scene could not be loaded. Send a scene to reconnect.');
+    player.contentEl.setText(t('present.loadFailed'));
     return;
   }
   const source = await waitForRenderedFrameSource(sourceView);

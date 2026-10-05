@@ -7,11 +7,12 @@ import { ExperimentalFeaturesPanel } from '../../src/app/react/components/comman
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { App } from 'obsidian';
+import { memoryPluginData } from '../mocks/pluginData';
 
-/** A vault whose settings file holds `stored`, read. */
+/** Settings whose plugin data holds `stored`, read. */
 async function settingsFrom(stored: unknown): Promise<SettingsService> {
-  const app = { vault: { adapter: { exists: async () => true, read: async () => JSON.stringify(stored) } } };
-  const settings = new SettingsService(app as never);
+  const settings = new SettingsService(new App(), undefined, memoryPluginData(stored));
   await settings.initialize();
   return settings;
 }

@@ -16,6 +16,7 @@ export function drawSquareGrid(
   offsetY: number,
   lineType: GridLineType,
   markerThickness: number = 1,
+  markerArm: number = gridMarkerArmLength(size),
 ): void {
   const { minX, minY, maxX, maxY } = bounds;
   const localWidth = maxX - minX;
@@ -29,14 +30,13 @@ export function drawSquareGrid(
   const startWorldY = firstLine(minY, offsetY);
 
   if (lineType === 'dotted') {
-    const arm = gridMarkerArmLength(size);
     for (let worldX = startWorldX; worldX <= maxX; worldX += size) {
       const localX = worldX - minX;
       if (localX < 0 || localX > localWidth) continue;
       for (let worldY = startWorldY; worldY <= maxY; worldY += size) {
         const localY = worldY - minY;
         if (localY < 0 || localY > localHeight) continue;
-        drawVertexMarker(graphics, localX, localY, CROSS_ARMS, arm, markerThickness);
+        drawVertexMarker(graphics, localX, localY, CROSS_ARMS, markerArm, markerThickness);
       }
     }
     return;

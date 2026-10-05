@@ -35,6 +35,11 @@ import { WALL_PUSH_GLSL, wallPushGlsl } from './wallPushGlsl';
  * Two wall fields: uField holds the walls that stop light (the faces of walls and the bounce
  * read it), uSightField those that stop sight (the explored memory's blur must not cross them).
  * They are one texture bound twice unless a wall of the scene blocks one thing only.
+ * While the grid is marked (uGrid 1, or 2 for a colour picked to contrast with the map; `UnlitGrid`)
+ * it drew no colour but erased the alpha beneath its lines, which the tokens drawn after it fill in
+ * again: uBackTexture's missing alpha is how much of the grid shows, painted unlit in uGridColor
+ * (sRGB); a colour picked to contrast with the map is white where the ambient light is low. The GM
+ * sees it everywhere, the players wherever their picture shows the map, now or from memory.
  */
 export const compositeFragment = `${GLSL_VERSION}
 in vec2 vTextureCoord;
@@ -77,6 +82,8 @@ uniform vec2 uDarkLevels;
 uniform sampler2D uZones;
 uniform sampler2D uZonesLifted;
 uniform float uHasZones;
+uniform float uGrid;
+uniform vec3 uGridColor;
 ${fieldGlsl('uField')}
 ${fieldGlsl('uSightField')}
 float clearance(vec2 w) { return uFieldClearance(w); }
@@ -91,6 +98,8 @@ ${SRGB_GLSL}
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 // Share of its colour an area no token sees loses in the GM view.
 const float UNSEEN_FADE = 0.4;
+// Ambient light below which a grid coloured against the map is drawn white: a bright map lies too dark there for black lines.
+const float GRID_DARK_AMBIENT = 0.35;
 
 // Khronos PBR Neutral: colours stay as painted up to ~0.8, highlights roll off to white.
 vec3 neutral(vec3 color) {
@@ -181,7 +190,10 @@ vec3 litAsBright(vec3 albedo, vec4 lamps, vec3 bounce, vec3 ambient) {
 void main() {
   vec2 screen = vTextureCoord * uInputSize.xy + uAreaOrigin;
   vec2 world = (uScreenToWorld * vec3(screen, 1.0)).xy;
-  vec3 albedo = toLinear(textureLod(uBackTexture, vTextureCoord, 0.0).rgb);
+  vec4 back = textureLod(uBackTexture, vTextureCoord, 0.0);
+  // A marked grid erased the alpha beneath it, premultiplied: what is left of the scene there is its colour scaled by the alpha.
+  float grid = uGrid > 0.5 ? clamp(1.0 - back.a, 0.0, 1.0) : 0.0;
+  vec3 albedo = toLinear(uGrid > 0.5 ? back.rgb / max(back.a, 1.0 / 255.0) : back.rgb);
   // rgb: the lights' light; alpha: its luminance had every light its bright level here.
   vec4 lamps = textureLod(uLightMap, world / uLightWorld, 0.0);
   vec3 bounce = bounceAt(world);
@@ -289,7 +301,18 @@ void main() {
   vec3 unseen = mix(gmLit, vec3(dot(gmLit, LUMA)), UNSEEN_FADE);
   vec3 gm = mix(unseen, 1.0 - (1.0 - visible) * (1.0 - floorColor), seen) + uGmVeil * dark.r;
 
-  vec3 color = uMode > 0.5 ? player : gm;
+  vec3 color = max(uMode > 0.5 ? player : gm, 0.0);
+  vec3 shown = toSrgb(color);
+  if (grid > 0.0) {
+    // The players see the grid where a light or a sense shows them the map, or where they remember it; never over what they have not seen.
+    float byLight = max(uAllSeen, sight.r) * smoothstep(0.01, 0.06, level);
+    float bySense = max(sight.g, sight.b) * sensed;
+    float gridShown = uMode > 0.5 ? max(max(byLight, bySense), explored) : 1.0;
+    // A colour picked to contrast with the map was picked for the map lit: where the ambient light (the scene's, or a zone's)
+    // is low, the floor is dark and the grid is white. Lights never change it, or the grid would shade through every light's fade.
+    vec3 ink = uGrid > 1.5 && dot(ambientGiven, LUMA) < GRID_DARK_AMBIENT ? vec3(1.0) : uGridColor;
+    shown = mix(shown, ink, grid * clamp(gridShown, 0.0, 1.0));
+  }
   float dither = (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
-  finalColor = vec4(toSrgb(max(color, 0.0)) + dither, 1.0);
+  finalColor = vec4(shown + dither, 1.0);
 }`;

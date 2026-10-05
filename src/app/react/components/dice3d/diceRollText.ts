@@ -28,7 +28,7 @@ export function rollBreakdown(result: DiceRollResult, scene: DiceScene): string 
   const diceTotal = result.total - result.modifiers;
 
   if (scene.plan[0]?.role === 'tens') {
-    return `Tens ${(scene.faces[0]! - 1) * 10}, units ${scene.faces[1]! % 10}${suffix}`;
+    return `Tens ${(scene.faces[0]! % 10) * 10}, units ${scene.faces[1]! % 10}${suffix}`;
   }
   if (values.length > 6) return `${values.length} dice, ${diceTotal}${suffix}`;
   if (scene.plan.some((die) => die.fold !== undefined)) {

@@ -6,6 +6,8 @@ import { LaserPointerRenderer } from '../../src/app/pixi/LaserPointerRenderer';
 import type { ViewAtlasStore } from '../../src/app/storeFactory';
 import { beamWidth, type BeamWidth } from '../../src/app/pixi/laser/LaserBeam';
 import { COLOR_VISIONS, colorDifference, seenAs } from '../fixtures/colorVision';
+import { App } from 'obsidian';
+import { memoryPluginData } from '../mocks/pluginData';
 import {
   DEFAULT_LASER_POINTER_SETTINGS,
   LASER_COLOR_SWATCHES,
@@ -22,8 +24,7 @@ vi.mock('../../src/app/pixi/laser/LaserBeam', async (importOriginal) => {
 });
 
 function settingsFrom(stored: unknown): Promise<SettingsService> {
-  const app = { vault: { adapter: { exists: async () => true, read: async () => JSON.stringify(stored) } } };
-  const settings = new SettingsService(app as never);
+  const settings = new SettingsService(new App(), undefined, memoryPluginData(stored));
   return settings.initialize().then(() => settings);
 }
 

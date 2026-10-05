@@ -6,7 +6,7 @@ import { useAtlasUI } from '../root/AtlasUIContext';
 import { useAtlasStore } from '../ViewStoreContext';
 
 /** A 5-foot grid, for a toolbar that has no Obsidian app to ask about its map. */
-const FALLBACK_UNIT = { unitType: 'feet', unitDistance: 5 } as const;
+const FALLBACK_UNIT = { unitType: 'feet', ruleDistance: 5 } as const;
 
 /** The light presets offered on the view's map, in what the map measures in (`mapLightPresets`). */
 export function useMapLightPresets(): readonly LightPresetDefinition[] {

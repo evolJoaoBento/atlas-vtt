@@ -4,6 +4,8 @@
  * labels ("[[Monster Manual]] p.114" is the option "Monster Manual").
  */
 
+import { statblockLinksAsText } from '../services/statblockLinks';
+
 const VULGAR_FRACTIONS: Readonly<Record<string, number>> = {
   '½': 1 / 2, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 1 / 4, '¾': 3 / 4, '⅛': 1 / 8, '⅜': 3 / 8, '⅝': 5 / 8, '⅞': 7 / 8,
 };
@@ -55,37 +57,15 @@ export function formatRating(value: number): string {
 /** Longer text is a description, not a category. */
 const MAX_OPTION_LENGTH = 80;
 
-/** Fantasy Statblocks' encoding of links in bestiary values: `<STATBLOCK-WIKI-LINK>path|alias<STATBLOCK-WIKI-LINK>`. */
-const ENCODED_LINK = /<STATBLOCK-(WIKI|MARKDOWN)-LINK>([\s\S]*?)<STATBLOCK-\1-LINK>/g;
-const WIKI_LINK = /!?\[\[([^\]|#]*)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g;
-const MARKDOWN_LINK = /!?\[([^\]]*)\]\([^)]*\)/g;
 const PAGE_REFERENCE = /[\s,;]*\b(?:pp?|pg|page)\.?\s*\d+(?:\s*[-–]\s*\d+)?\s*$/i;
 /** Private-use characters: glyphs of a PDF's own font that no other font draws (text copied from rulebooks). */
 const PRIVATE_USE = /[\uE000-\uF8FF]/g;
 /** A detail in brackets at the end: "humanoid (goblinoid)", "Horde (10/HP)". */
 const TRAILING_DETAIL = /\s*\([^()]*\)\s*$/;
 
-/** A linked note by its name: no folders, no extension, no URL escapes. */
-function noteName(target: string): string {
-  let name = target.trim().split('/').pop() ?? '';
-  try { name = decodeURI(name); } catch { /* keep the escaped name */ }
-  return name.replace(/\.md$/i, '');
-}
-
-function linkText(target: string, alias: string | undefined): string {
-  return alias?.trim() ? alias.trim() : noteName(target);
-}
-
 /** Statblock text as it reads: links as what they show, rulebook-font glyphs dropped, spaces single. */
 export function plainText(text: string): string {
-  return text
-    .replace(PRIVATE_USE, '')
-    .replace(ENCODED_LINK, (_match, _kind: string, link: string) => {
-      const [target = '', alias] = link.split('|');
-      return linkText(target, alias);
-    })
-    .replace(WIKI_LINK, (_match, target: string, alias: string | undefined) => linkText(target, alias))
-    .replace(MARKDOWN_LINK, (_match, label: string) => label)
+  return statblockLinksAsText(text.replace(PRIVATE_USE, ''))
     .replace(/\s+/g, ' ')
     .trim();
 }

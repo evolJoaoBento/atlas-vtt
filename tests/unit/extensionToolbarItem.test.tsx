@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_EXTENSION_PRIORITY, extensionToolbarItem } from '../../src/app/extensions/extensionToolbarItems';
+import { DEFAULT_EXTENSION_PRIORITY, extensionToolbarItem, withExtensionToolbarItems } from '../../src/app/extensions/extensionToolbarItems';
 import type { ToolbarItem, ViewContext } from '../../src/api/types/ui';
 
 const ctx: ViewContext = { viewId: 'v1', kind: 'map', isPlayerView: false };
@@ -8,10 +8,10 @@ const entry = (item: Partial<ToolbarItem> = {}): Parameters<typeof extensionTool
 });
 
 describe('extensionToolbarItem', () => {
-  it('has priority 50 unless the item gives one, and a namespaced id', () => {
+  it('is a plain button with a namespaced id, active and pinned with its isActive', () => {
     expect(DEFAULT_EXTENSION_PRIORITY).toBe(50);
-    expect(extensionToolbarItem(entry(), ctx)).toMatchObject({ id: 'ext:ext:x', priority: 50 });
-    expect(extensionToolbarItem(entry({ priority: 72 }), ctx).priority).toBe(72);
+    expect(extensionToolbarItem(entry(), ctx)).toMatchObject({ id: 'ext:ext:x', kind: 'button', active: false, pinned: false });
+    expect(extensionToolbarItem(entry({ isActive: () => true }), ctx)).toMatchObject({ active: true, pinned: true });
   });
 
   it('is pinned exactly while it is active, and a throwing isActive counts as inactive', () => {
@@ -32,5 +32,26 @@ describe('extensionToolbarItem', () => {
     const throwing = extensionToolbarItem(entry({ onClick: () => { throw new Error('boom'); } }), ctx).menuEntry;
     expect(() => throwing.onSelect()).not.toThrow();
     vi.restoreAllMocks();
+  });
+});
+
+describe('withExtensionToolbarItems', () => {
+  const item = (id: string): Parameters<typeof withExtensionToolbarItems>[0][number] =>
+    ({ id, kind: 'button', pinned: false, active: false, element: null, menuEntry: { icon: () => null, label: id, isActive: false, onSelect: vi.fn() } });
+  const ids = (items: ReadonlyArray<{ id: string }>): string[] => items.map(({ id }) => id);
+  const extension = [item('ext:a:1'), item('ext:b:2')];
+
+  it("places the extensions' items right after the dice, in the order given", () => {
+    expect(ids(withExtensionToolbarItems(['move', 'dice', 'loot', 'palette'].map(item), extension)))
+      .toEqual(['move', 'dice', 'ext:a:1', 'ext:b:2', 'loot', 'palette']);
+  });
+
+  it('places them before the Command palette when the bar has no dice, else at its end', () => {
+    expect(ids(withExtensionToolbarItems(['move', 'loot', 'palette'].map(item), extension))).toEqual(['move', 'loot', 'ext:a:1', 'ext:b:2', 'palette']);
+    expect(ids(withExtensionToolbarItems(['move', 'measure'].map(item), extension))).toEqual(['move', 'measure', 'ext:a:1', 'ext:b:2']);
+  });
+
+  it("leaves Atlas's controls as they are without extension items", () => {
+    expect(ids(withExtensionToolbarItems(['move', 'dice'].map(item), []))).toEqual(['move', 'dice']);
   });
 });

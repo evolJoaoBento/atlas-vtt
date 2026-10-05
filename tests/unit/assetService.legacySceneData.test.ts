@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AssetService } from '../../src/app/services/AssetService';
+import { AssetService, type Asset } from '../../src/app/services/AssetService';
+import { RECORD_KEY, serializeRecord } from '../../src/app/services/library/recordFile';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
 
 const METADATA_PATH = 'atlas-vtt/.atlas-data/assets-metadata.json';
@@ -16,9 +17,15 @@ function indexWith(assets: object[]): string {
   });
 }
 
-function seeded(assets: object[]): InMemoryApp {
-  return createInMemoryApp({ folders: ['atlas-vtt/collections', 'atlas-vtt/collections/Default'], files: { [METADATA_PATH]: indexWith(assets) } });
+function seeded(assets: object[], files: Record<string, string> = {}): InMemoryApp {
+  return createInMemoryApp({ folders: ['atlas-vtt/collections', 'atlas-vtt/collections/Default'], files: { [METADATA_PATH]: indexWith(assets), ...files } });
 }
+
+/** The vault's files a sync tool carries: everything outside dot folders. */
+const syncedFiles = (vault: InMemoryApp): Record<string, string> =>
+  Object.fromEntries([...vault.files].filter(([path]) => !path.split('/').some((part) => part.startsWith('.'))));
+
+const dataOf = async (service: AssetService, id: string): Promise<unknown> => ((await service.getAssetById(id)) as { data?: unknown } | null)?.data;
 
 beforeEach(() => { AssetService.resetInstance(); });
 
@@ -31,79 +38,120 @@ it('moves a legacy map share to the Connect extension when the index loads, and 
   const service = AssetService.getInstance(vault.app);
   await service.initialize();
 
-  expect((await service.getAssetById('moved'))?.type === 'scene' && (await service.getAssetById('moved'))?.data)
-    .toEqual({ mapPath: 'a.atlasmap', extensions: { 'atlas-vtt-connect': { item: 'x' } } });
-  expect((await service.getAssetById('newer') as { data: unknown }).data).toEqual({ mapPath: 'b.atlasmap', extensions: { 'atlas-vtt-connect': { item: 'new' } } });
-  expect((await service.getAssetById('plain') as { data: unknown }).data).toEqual({ mapPath: 'c.atlasmap' });
+  expect(await dataOf(service, 'moved')).toEqual({ mapPath: 'a.atlasmap', extensions: { 'atlas-vtt-connect': { item: 'x' } } });
+  expect(await dataOf(service, 'newer')).toEqual({ mapPath: 'b.atlasmap', extensions: { 'atlas-vtt-connect': { item: 'new' } } });
+  expect(await dataOf(service, 'plain')).toEqual({ mapPath: 'c.atlasmap' });
   const stored = vault.files.get(METADATA_PATH)!;
   expect(stored).not.toContain('"sharing"');
 });
 
-it('does not save the index when no scene has a legacy share', async () => {
-  const vault = seeded([scene('plain', { mapPath: 'c.atlasmap' })]);
-  await AssetService.getInstance(vault.app).initialize();
-  expect(vault.app.vault.adapter.write).not.toHaveBeenCalled();
-});
-
-it('moves a share that comes back with a re-read of the index', async () => {
-  const vault = seeded([scene('plain', { mapPath: 'c.atlasmap' })]);
-  const service = AssetService.getInstance(vault.app);
-  await service.initialize();
-  vault.files.set(METADATA_PATH, indexWith([scene('plain', { mapPath: 'c.atlasmap', sharing: { item: 'back' } })]));
-  await service.refreshMetadata();
-  expect((await service.getAssetById('plain') as { data: unknown }).data).toEqual({ mapPath: 'c.atlasmap', extensions: { 'atlas-vtt-connect': { item: 'back' } } });
-});
-
 describe('record files of scenes', () => {
-  const RECORD = 'atlas-vtt/collections/Default/scenes/moved.json';
   const A = 'atlas-vtt/collections/Default/scenes/a.atlasmap';
   const C = 'atlas-vtt/collections/Default/scenes/c.atlasmap';
   const N = 'atlas-vtt/collections/Default/scenes/n.atlasmap';
-  const PLAIN = 'atlas-vtt/collections/Default/scenes/plain.json';
+  const RECORD = 'atlas-vtt/collections/Default/scenes/moved.json';
+  const maps = { [A]: '{}', [C]: '{}', [N]: '{}' };
 
-  it('lose the extension data and legacy share they already carry when the index loads', async () => {
+  it('never hold extension data, a legacy share or the extension that added the scene; the index keeps them', async () => {
     const vault = seeded([
-      { ...scene('moved', { mapPath: A, sharing: { item: 'x' }, extensions: { other: 1 } }), filePath: RECORD },
-      { ...scene('plain', { mapPath: C }), filePath: PLAIN },
-    ]);
-    const plain = JSON.stringify({ mapPath: C });
-    vault.files.set(RECORD, JSON.stringify({ mapPath: A, sharing: { item: 'x' }, extensions: { other: 1 } }, null, 2));
-    vault.files.set(PLAIN, plain);
-    for (const map of [A, C, N]) vault.files.set(map, '{}');
-    await AssetService.getInstance(vault.app).initialize();
+      { ...scene('moved', { mapPath: A, sharing: { item: 'x' }, extensions: { other: 1 }, createdBy: 'ext', createdImages: ['i.webp'] }), filePath: RECORD },
+    ], { ...maps, [RECORD]: JSON.stringify({ mapPath: A, sharing: { item: 'x' }, extensions: { other: 1 } }, null, 2) });
+    const service = AssetService.getInstance(vault.app);
+    await service.initialize();
 
-    expect(JSON.parse(vault.files.get(RECORD)!)).toEqual({ mapPath: A });
-    expect(vault.files.get(PLAIN)).toBe(plain);
-    // the index keeps it
+    const file = JSON.parse(vault.files.get(RECORD)!) as Record<string, unknown>;
+    expect(file).toMatchObject({ mapPath: A });
+    for (const key of ['extensions', 'sharing', 'createdBy', 'createdImages']) {
+      expect(file, key).not.toHaveProperty(key);
+      expect(file[RECORD_KEY], key).not.toHaveProperty(key);
+    }
+    expect(vault.files.get(RECORD)).not.toContain('atlas-vtt-connect');
+    expect(await dataOf(service, 'moved')).toEqual({
+      mapPath: A, extensions: { other: 1, 'atlas-vtt-connect': { item: 'x' } }, createdBy: 'ext', createdImages: ['i.webp'],
+    });
     expect(vault.files.get(METADATA_PATH)).toContain('"atlas-vtt-connect"');
   });
 
-  it('never get extension data written into them', async () => {
-    const vault = seeded([{ ...scene('moved', { mapPath: A }), filePath: RECORD }]);
-    vault.files.set(RECORD, JSON.stringify({ mapPath: A }));
-    for (const map of [A, C, N]) vault.files.set(map, '{}');
+  it('stay byte for byte the same when an extension saves its data on the scene', async () => {
+    const vault = seeded([{ ...scene('moved', { mapPath: A }), filePath: RECORD }], { ...maps, [RECORD]: JSON.stringify({ mapPath: A }) });
     const service = AssetService.getInstance(vault.app);
     await service.initialize();
-    await service.updateAsset('moved', { data: { mapPath: A, extensions: { ext: { item: 1 } } } });
-    expect(JSON.parse(vault.files.get(RECORD)!)).toEqual({ mapPath: A });
-    expect(((await service.getAssetById('moved')) as { data: unknown }).data).toEqual({ mapPath: A, extensions: { ext: { item: 1 } } });
-    const added = await service.addAsset({ type: 'scene', name: 'New', collection: 'Default', tags: [], data: { mapPath: N, extensions: { ext: 1 } } });
-    expect(JSON.parse(vault.files.get(added.type === 'scene' ? added.filePath! : '')!)).toEqual({ mapPath: N });
+    const before = vault.files.get(RECORD);
+
+    await service.updateSceneIndexData('moved', { mapPath: A, extensions: { ext: { item: 1 } } });
+    expect(vault.files.get(RECORD)).toBe(before);
+    expect(await dataOf(service, 'moved')).toEqual({ mapPath: A, extensions: { ext: { item: 1 } } });
+
+    const added = await service.addAsset({ type: 'scene', name: 'New', collection: 'Default', tags: [], data: { mapPath: N, extensions: { ext: 1 }, createdBy: 'ext' } });
+    const written = JSON.parse(vault.files.get(added.type === 'scene' ? added.filePath! : '')!) as Record<string, unknown>;
+    expect(written).toMatchObject({ mapPath: N });
+    expect(written).not.toHaveProperty('extensions');
+    expect(written).not.toHaveProperty('createdBy');
+  });
+
+  it('are the same text with and without extension data', () => {
+    const plain = { ...scene('s', { mapPath: A }), filePath: RECORD } as Asset;
+    const kept = { ...scene('s', { mapPath: A, extensions: { ext: { a: 1 } }, createdBy: 'ext', createdImages: ['x.webp'], sharing: {} }), filePath: RECORD } as Asset;
+    expect(serializeRecord(kept)).toBe(serializeRecord(plain));
   });
 });
 
-describe('a cleaned record file', () => {
+describe('a scene record file another device or a sync tool changed', () => {
   const A = 'atlas-vtt/collections/Default/scenes/a.atlasmap';
-  const RECORD = 'atlas-vtt/collections/Default/scenes/old.json';
+  const RECORD = 'atlas-vtt/collections/Default/scenes/moved.json';
+  const FOREIGN = 'atlas-vtt/collections/Default/scenes/foreign.json';
 
-  it('matches, byte for byte, the file Atlas writes for a new scene with the same data', async () => {
-    const vault = seeded([{ ...scene('old', { mapPath: A, sharing: { item: 'x' } }), filePath: RECORD }]);
-    // an old file: tab indent, a trailing newline and the data the index no longer wants in it
-    vault.files.set(A, '{}');
-    vault.files.set(RECORD, `${JSON.stringify({ mapPath: A, sharing: { item: 'x' } }, null, '\t')}\n`);
+  async function started(files: Record<string, string>, metadata?: string): Promise<{ vault: InMemoryApp; service: AssetService }> {
+    AssetService.resetInstance();
+    const vault = createInMemoryApp({ folders: ['atlas-vtt/collections', 'atlas-vtt/collections/Default'], files: { ...files, ...(metadata ? { [METADATA_PATH]: metadata } : {}) } });
     const service = AssetService.getInstance(vault.app);
     await service.initialize();
-    const fresh = await service.addAsset({ type: 'scene', name: 'Fresh', collection: 'Default', tags: [], data: { mapPath: A } });
-    expect(vault.files.get(RECORD)).toBe(vault.files.get(fresh.type === 'scene' ? fresh.filePath! : ''));
+    return { vault, service };
+  }
+
+  const editedFile = (text: string, edit: (file: Record<string, unknown>, record: Record<string, unknown>) => void): string => {
+    const file = JSON.parse(text) as Record<string, unknown>;
+    edit(file, file[RECORD_KEY] as Record<string, unknown>);
+    return JSON.stringify(file, null, 2);
+  };
+
+  it('brings its own content and keeps what extensions keep on this device', async () => {
+    const local = { ...scene('moved', { mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext', createdImages: ['i.webp'] }), filePath: RECORD };
+    const { vault, service } = await started({ [A]: '{}' }, indexWith([local]));
+    // Another device renamed the scene; its file never carried the extension data.
+    await vault.app.vault.adapter.write(RECORD, editedFile(vault.files.get(RECORD)!, (_file, record) => { record.name = 'Renamed'; record.modifiedAt = 5; }));
+    await service.refreshMetadata();
+
+    const asset = await service.getAssetById('moved');
+    expect(asset?.name).toBe('Renamed');
+    expect((asset as { data?: unknown }).data).toEqual({ mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext', createdImages: ['i.webp'] });
+  });
+
+  it('never hands an extension, a creator or images to a scene, whatever the file says', async () => {
+    const first = await started({ [A]: '{}' }, indexWith([{ ...scene('moved', { mapPath: A }), filePath: RECORD }]));
+    // A device that never had the scene in its cache builds it from the synced file alone, with hand-added keys in it.
+    const synced = syncedFiles(first.vault);
+    synced[RECORD] = editedFile(synced[RECORD]!, (file) => { file.extensions = { ext: { item: 'forged' } }; file.createdBy = 'ext'; file.createdImages = ['../../notes.md']; });
+    synced[FOREIGN] = editedFile(synced[RECORD]!, (_file, record) => { record.id = 'foreign'; record.name = 'Foreign'; });
+    const { service } = await started(synced);
+    await service.refreshMetadata();
+
+    expect(await dataOf(service, 'moved')).toEqual({ mapPath: A });
+    expect(await dataOf(service, 'foreign')).toEqual({ mapPath: A });
+  });
+
+  it('a copy a sync tool made carries no extension data', async () => {
+    const local = { ...scene('moved', { mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext' }), filePath: RECORD };
+    const { vault, service } = await started({ [A]: '{}' }, indexWith([local]));
+    const copy = 'atlas-vtt/collections/Default/scenes/moved (copy).json';
+    await vault.app.vault.adapter.write(copy, editedFile(vault.files.get(RECORD)!, (file) => { file.extensions = { ext: { item: 2 } }; file.createdBy = 'ext'; }));
+    await service.reconcileWithVault();
+
+    for (const asset of await service.getAssets('Default', 'scene')) {
+      if (asset.id === 'moved') continue;
+      expect((asset as { data?: Record<string, unknown> }).data).not.toHaveProperty('extensions');
+      expect((asset as { data?: Record<string, unknown> }).data).not.toHaveProperty('createdBy');
+    }
+    expect(await dataOf(service, 'moved')).toEqual({ mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext' });
   });
 });

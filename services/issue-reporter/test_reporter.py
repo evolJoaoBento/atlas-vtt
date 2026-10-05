@@ -8,7 +8,7 @@ from reporter import Reporter, ReportError
 REPORT = dict(type="crash", area="vision", title="Fog freezes", description="Fog freezes on reveal",
               steps="Reveal fog", environment="Atlas: 0.2.0", errors="Renderer failed")
 KEY = "db305e49-f8d5-481d-908f-aaafcc428f03"
-RECEIPT = dict(number=42, url="https://github.com/ByteMirror/atlas-vtt/issues/42")
+RECEIPT = dict(number=42, url="https://github.com/atlas-vtt/atlas-vtt/issues/42")
 
 class Reports(unittest.TestCase):
     def setUp(self):

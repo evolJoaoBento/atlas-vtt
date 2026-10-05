@@ -8,7 +8,7 @@ import { playerDoorSight, playerLightingLayers } from '../playerLightingLayers';
 import { SIZE, visionToken } from './rendererHarness';
 import { createScene, type SavedScene, type Scene } from './sceneLightingHarness';
 
-vi.mock('obsidian', () => ({ Notice: class {} }));
+vi.mock('obsidian', () => ({ Notice: class {}, getLanguage: () => 'en' }));
 
 const door = (id: string, type: WallSegment['type'], x1: number, y1: number, x2: number, y2: number): WallSegment =>
   ({ id, kind: 'wall', type, p1: { x: x1, y: y1 }, p2: { x: x2, y: y2 }, closed: true });

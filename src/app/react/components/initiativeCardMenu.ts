@@ -3,6 +3,7 @@ import { SIDE_LABELS, otherSide, sideOf } from '../../initiative/sides';
 import type { TokenUpdates } from '../../storeFactory';
 import type { TokenEntity } from '../../types';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
+import { t } from '../../i18n';
 
 interface CardMenuActions {
   roll: () => void;
@@ -29,9 +30,9 @@ export function initiativeCardMenu(
   const item = (label: string, icon: string, onClick: () => void): ContextMenuEntry => ({ type: 'item', label, icon, onClick });
 
   return [
-    ...(mode.bySides ? [] : [item('Roll Initiative', 'dice', actions.roll)]),
-    item('Move to Front', 'arrow-up-to-line', actions.moveToFront),
-    item('Move to Back', 'arrow-down-to-line', actions.moveToBack),
+    ...(mode.bySides ? [] : [item(t('initiative.roll'), 'dice', actions.roll)]),
+    item(t('initiative.toFront'), 'arrow-up-to-line', actions.moveToFront),
+    item(t('initiative.toBack'), 'arrow-down-to-line', actions.moveToBack),
     ...(mode.bySides
       ? [
         item(`Move to ${SIDE_LABELS[other]}`, 'arrow-left-right', () => actions.updateToken({ side: other })),
@@ -39,8 +40,8 @@ export function initiativeCardMenu(
           ? [item(entry.sitsOut ? 'Act This Round' : 'Sit Out This Round', entry.sitsOut ? 'play' : 'pause', () => actions.setSitsOut(!entry.sitsOut))]
           : []),
       ]
-      : [item('Edit Initiative', 'pencil', actions.edit)]),
+      : [item(t('initiative.edit'), 'pencil', actions.edit)]),
     item(hidden ? 'Show to Players' : 'Hide from Players', hidden ? 'eye' : 'eye-off', () => actions.updateToken({ isHidden: !hidden })),
-    { type: 'item', label: 'Remove from Initiative', icon: 'trash-2', destructive: true, onClick: actions.remove },
+    { type: 'item', label: t('initiative.remove'), icon: 'trash-2', destructive: true, onClick: actions.remove },
   ];
 }

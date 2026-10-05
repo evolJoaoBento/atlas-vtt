@@ -7,7 +7,8 @@ import { abandonHistoryTransaction, beginHistoryTransaction, endHistoryTransacti
 import type { WallToolSubMode } from '../../tools/WallTool';
 import type { Point } from '../../types/visionTypes';
 import { LightZoneOverlay } from './LightZoneOverlay';
-import { closesDraft, snapToWallEnd, zoneCornerAt, zoneHandleAt, type ZoneCorner } from './lightZoneGeometry';
+import { closesDraft, zoneCornerAt, zoneHandleAt, type ZoneCorner } from './lightZoneGeometry';
+import { snapToWallEnd } from './wallEnds';
 
 export interface LightZoneEditorDeps {
   viewport: Viewport;

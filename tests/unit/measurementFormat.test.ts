@@ -47,7 +47,7 @@ describe('rangeBandName', () => {
 });
 
 describe('formatDistance', () => {
-  const metric: MeasurementSettings = { mode: 'metric', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 };
+  const metric: MeasurementSettings = { mode: 'metric', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 };
 
   it('multiplies cells by the unit distance and rounds', () => {
     expect(formatDistance(6, metric)).toBe('30ft');
@@ -73,7 +73,7 @@ describe('resolveMeasurementSettings', () => {
       { unitType: 'meters', unitDistance: 2, measurementMode: 'metric', diagonalRule: 'alternating' },
       { ...grid, unitType: 'feet', unitDistance: 5, measurementType: 'abstract' },
     );
-    expect(settings).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 2, diagonalRule: 'alternating', rangeBands: [], coneAngle: 90 });
+    expect(settings).toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 2, ruleDistance: 2, diagonalRule: 'alternating', rangeBands: [], coneAngle: 90 });
   });
 
   it('defaults collections without a diagonal rule to every diagonal counting 1', () => {
@@ -82,9 +82,33 @@ describe('resolveMeasurementSettings', () => {
 
   it('falls back to the map grid, measuring in range bands unless it asks for units', () => {
     expect(resolveMeasurementSettings(undefined, { ...grid, measurementType: 'units', unitType: 'meters', unitDistance: 3 }))
-      .toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 3, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 });
+      .toEqual({ mode: 'metric', unitType: 'meters', unitDistance: 3, ruleDistance: 3, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 });
     expect(resolveMeasurementSettings(undefined, grid).mode).toBe('abstract');
     expect(resolveMeasurementSettings(undefined, null)).toMatchObject({ unitType: 'feet', unitDistance: 5 });
+  });
+
+  // #84: a map drawn at another scale than the rest of its collection.
+  it("takes a scene's own distance per cell over the collection's, in the collection's unit, and keeps the rules square", () => {
+    const collection = { unitType: 'feet', unitDistance: 5, measurementMode: 'metric' } as const;
+    expect(resolveMeasurementSettings(collection, { ...grid, unitDistanceOverride: 10 })).toMatchObject({ unitType: 'feet', unitDistance: 10, ruleDistance: 5 });
+    const loose = { ...grid, measurementType: 'units', unitDistance: 5, unitDistanceOverride: 2.5 } as const;
+    expect(resolveMeasurementSettings(undefined, loose)).toMatchObject({ unitDistance: 2.5, ruleDistance: 5 });
+  });
+
+  it('leaves the override out where distances are range bands, and keeps it stored for measuring again', () => {
+    const bands = { unitType: 'feet', unitDistance: 5, measurementMode: 'abstract' } as const;
+    const scene = { ...grid, unitDistanceOverride: 50 };
+    expect(resolveMeasurementSettings(bands, scene)).toMatchObject({ unitDistance: 5, ruleDistance: 5 });
+    expect(resolveMeasurementSettings(undefined, { ...scene, unitDistance: 5 }).unitDistance).toBe(5);
+    expect(resolveMeasurementSettings({ ...bands, measurementMode: 'metric' }, scene).unitDistance).toBe(50);
+  });
+
+  it("ignores the copy of the collection's distance a new scene is written with, and overrides that are no positive number", () => {
+    const collection = { unitType: 'meters', unitDistance: 1.5, measurementMode: 'metric' } as const;
+    expect(resolveMeasurementSettings(collection, { ...grid, unitDistance: 5 }).unitDistance).toBe(1.5);
+    for (const unitDistanceOverride of [0, -5, Number.NaN, '10' as unknown as number]) {
+      expect(resolveMeasurementSettings(collection, { ...grid, unitDistanceOverride }).unitDistance).toBe(1.5);
+    }
   });
 });
 
@@ -115,7 +139,7 @@ describe('unitLabelFor', () => {
 });
 
 describe('formatReach', () => {
-  const metric = (unitDistance: number, unitType: 'feet' | 'meters'): MeasurementSettings => ({ mode: 'metric', unitType, unitDistance, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 });
+  const metric = (unitDistance: number, unitType: 'feet' | 'meters'): MeasurementSettings => ({ mode: 'metric', unitType, unitDistance, ruleDistance: unitDistance, diagonalRule: 'equidistant', rangeBands: [], coneAngle: 90 });
 
   it('words a set distance with one decimal where it has one', () => {
     expect(formatReach(12, metric(5, 'feet'))).toBe('60ft');
@@ -125,7 +149,7 @@ describe('formatReach', () => {
   });
 
   it('names the range band, or counts squares where the collection has none', () => {
-    const bands = { mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'equidistant', rangeBands: [{ name: 'Close', maxSquares: 2 }, { name: 'Far', maxSquares: 10 }] } as MeasurementSettings;
+    const bands = { mode: 'abstract', unitType: 'feet', unitDistance: 5, ruleDistance: 5, diagonalRule: 'equidistant', rangeBands: [{ name: 'Close', maxSquares: 2 }, { name: 'Far', maxSquares: 10 }], coneAngle: 90 } as MeasurementSettings;
     expect(formatReach(6, bands)).toBe('Far');
     expect(formatReach(1.5, { ...bands, rangeBands: [] })).toBe('1.5 sq');
   });
