@@ -6,7 +6,8 @@
 import type { NameResolver } from '../model/audience';
 import { parseShareRule } from '../model/shareRule';
 import type { TagTone } from './tagDisplay';
-import { formatList, t } from '../../../i18n';
+import { t } from '../../../i18n';
+import { listFor } from './shareList';
 
 /** `not-met`: a name added before meeting them. `unrecognised`: an entry Atlas cannot read, or a name it does not know. */
 export type ShareEntryStatus = 'ok' | 'not-met' | 'unrecognised';
@@ -64,7 +65,6 @@ export function shareItemLabels(item: unknown, people: NameResolver): ShareEntry
   ];
 }
 
-const listed = (names: readonly string[]): string => formatList(names);
 
 /** Who the whole value reaches, in the order `ruleReaches` decides it. */
 export function shareSummary(value: unknown, people: NameResolver): string {
@@ -72,11 +72,11 @@ export function shareSummary(value: unknown, people: NameResolver): string {
   if (rule.unreadable) return t('share.summary.unreadable');
   if (rule.private) return t('share.summary.private');
   const blocking = rule.except.filter((name) => !known(name, people, true));
-  if (blocking.length > 0) return t('share.summary.blocked', { count: blocking.length, names: listed(blocking) });
-  if (rule.public) return rule.except.length > 0 ? t('share.summary.everyoneExcept', { names: listed(rule.except) }) : t('share.summary.everyone');
+  if (blocking.length > 0) return t('share.summary.blocked', { count: blocking.length, names: listFor('share.summary.blocked', blocking) });
+  if (rule.public) return rule.except.length > 0 ? t('share.summary.everyoneExcept', { names: listFor('share.summary.everyoneExcept', rule.except) }) : t('share.summary.everyone');
   const excepted = (name: string): boolean => rule.except.some((other) => other.toLowerCase() === name.toLowerCase());
   const reached = rule.only.filter((name) => known(name, people, false) && !excepted(name));
-  if (reached.length > 0) return t('share.summary.people', { names: listed(reached) });
+  if (reached.length > 0) return t('share.summary.people', { names: listFor('share.summary.people', reached) });
   return rule.except.length > 0 && rule.only.length === 0 ? t('share.summary.nobodyAddPublic') : t('share.summary.nobody');
 }
 

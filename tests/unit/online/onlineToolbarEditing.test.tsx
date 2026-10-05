@@ -32,3 +32,16 @@ describe("the Online session button and upstream's toolbar editor", () => {
     expect(barIds(harness.container)).not.toContain('online');
   });
 });
+
+describe('the online panel and toolbar edit mode', () => {
+  it('ends edit mode when the panel opens, and closes the panel when edit mode starts, as the dice tray does', () => {
+    const harness = renderToolbar();
+    startEditing(harness);
+    act(() => harness.store.getState().setOnlinePanelOpen(true));
+    expect(harness.store.getState()).toMatchObject({ isOnlinePanelOpen: true, isToolbarEditing: false });
+    startEditing(harness);
+    expect(harness.store.getState()).toMatchObject({ isOnlinePanelOpen: false, isToolbarEditing: true });
+    act(() => harness.store.getState().setOnlinePanelOpen(false));
+    expect(harness.store.getState().isToolbarEditing).toBe(true);
+  });
+});

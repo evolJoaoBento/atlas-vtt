@@ -8,7 +8,6 @@ export const online = {
   'online.stopSession': 'Stop online session',
   'online.present': 'Present to players',
   'online.stopPresenting': 'Stop presenting',
-  'online.removePlayer': 'Remove player',
   'online.openPlayerWindow': 'Open player window',
   'online.sectionTitle': 'Online play',
   'online.joinSession': 'Join online session…',

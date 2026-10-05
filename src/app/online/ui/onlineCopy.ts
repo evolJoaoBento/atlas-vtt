@@ -6,7 +6,6 @@ export const START_SESSION_LABEL = t('online.startSession');
 export const STOP_SESSION_LABEL = t('online.stopSession');
 export const PRESENT_LABEL = t('online.present');
 export const STOP_PRESENTING_LABEL = t('online.stopPresenting');
-export const REMOVE_PLAYER_LABEL = t('online.removePlayer');
 export const OPEN_PLAYER_WINDOW_LABEL = t('online.openPlayerWindow');
 export const ONLINE_SECTION_TITLE = t('online.sectionTitle');
 export const JOIN_SESSION_LABEL = t('online.joinSession');
