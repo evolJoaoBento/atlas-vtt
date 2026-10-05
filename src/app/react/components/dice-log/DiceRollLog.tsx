@@ -11,9 +11,9 @@ import { Notice } from 'obsidian';
 import { remoteTrayRoll } from '../../../remote-view/remoteControls';
 import { rollOfResult } from '../../../remote-view/RemoteViewDice';
 import type { DiceRollResult } from '../../../tools/diceRolling';
+import { t } from '../../../i18n';
 
 const NO_ROLLS: DiceRollResult[] = [];
-import { t } from '../../../i18n';
 
 interface DiceRollLogProps {
   isOpen: boolean;
@@ -57,7 +57,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
       return;
     }
     const roll = rollOfResult(result);
-    const problem = roll ? remoteTrayRoll(view?.viewId)(roll.dice, roll.modifier) : "Can't roll that again.";
+    const problem = roll ? remoteTrayRoll(view?.viewId)(roll.dice, roll.modifier) : t('remote.cannotRollAgain');
     if (problem !== null) new Notice(problem);
   }, [remote, repeatRoll, view]);
 

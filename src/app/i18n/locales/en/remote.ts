@@ -5,4 +5,5 @@ export const remote = {
   'remote.defaultTitle': 'Remote view',
   'remote.rollDiceCount': 'Roll 1 to {max} dice.',
   'remote.rollNotSent': 'The roll could not be sent.',
+  'remote.cannotRollAgain': "Can't roll that again.",
 } as const satisfies Record<string, Message>;
