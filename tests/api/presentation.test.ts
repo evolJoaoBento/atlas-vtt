@@ -18,7 +18,7 @@ function setupWith(view: FakeView): { presentation: ReturnType<typeof presentati
   Object.setPrototypeOf(view, AtlasView.prototype);
   load(view);
   const disposers = new DisposerSet();
-  return { presentation: presentationApi(trackerWith([view]).tracker, disposers), disposers };
+  return { presentation: presentationApi(trackerWith([view]).tracker, disposers, 'ext'), disposers };
 }
 
 describe('presentation', () => {

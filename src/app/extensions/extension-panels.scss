@@ -1,0 +1,57 @@
+// The frame around a floating panel an extension added (the GM's map view). Imported inside the
+// `.atlas-vtt-plugin` scope of styles/main.scss.
+
+@use '../../../styles/tokens' as *;
+@use '../../../styles/mixins' as *;
+
+$extension-panel-width: 360px;
+$extension-panel-top: 64px; // below the scene tabs, where the loot roller first opens
+
+// Panels open in one stack; the stack itself takes no clicks, so the map stays usable around it.
+.atlas-extension-panels {
+  @include atlas-flex-col($spacing-m);
+  position: absolute;
+  top: $extension-panel-top;
+  right: $spacing-m;
+  z-index: 45;
+  align-items: flex-end;
+  max-height: calc(100% - #{$extension-panel-top} - #{$spacing-m});
+  pointer-events: none;
+}
+
+.atlas-extension-panel {
+  @include atlas-elevated-surface;
+  @include atlas-panel-radius($radius-2xl);
+  display: flex;
+  flex-direction: column;
+  width: $extension-panel-width;
+  max-width: calc(100% - 2 * #{$spacing-m});
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: auto;
+  color: var(--text-normal);
+  font-size: $font-ui-small;
+  transform-origin: top center;
+}
+
+.atlas-extension-panel__header {
+  @include atlas-flex-row($spacing-s);
+  @include atlas-close-header($spacing-m);
+  flex-shrink: 0;
+  border-bottom: $border-width-s solid var(--divider-color);
+}
+
+.atlas-extension-panel__title {
+  flex: 1;
+  margin: 0;
+  font-size: $font-ui-medium;
+  font-weight: $font-weight-semibold;
+  line-height: 1.2;
+}
+
+// The extension draws in here, with its own padding.
+.atlas-extension-panel__body {
+  @include atlas-scrollbar;
+  min-height: 0;
+  overflow-y: auto;
+}

@@ -35,6 +35,7 @@ import { useMapNavigationHotkeys } from './useMapNavigationHotkeys';
 import { useExperimentalFeature } from './hooks/useExperimentalFeature';
 import type { AtlasView } from '../atlas-view';
 import { runInBackground } from '../utils/backgroundTask';
+import { ExtensionPanels } from '../extensions/ExtensionPanels';
 
 interface UIRootProps {
   app: App;
@@ -233,6 +234,9 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
           {!isPlayerView && <PanelBoundary name="the loot roller"><LootRoller /></PanelBoundary>}
           {!isPlayerView && lightingOn && <PanelBoundary name="the light settings"><LightPopoverHost /><LightZonePopoverHost /></PanelBoundary>}
           {!isPlayerView && lightingOn && <PanelBoundary name="the scene lighting"><SceneLightingPanelHost /></PanelBoundary>}
+
+          {/* Floating panels other plugins added - GM view only */}
+          {!isPlayerView && <PanelBoundary name="the extension panels"><ExtensionPanels /></PanelBoundary>}
 
           {/* Player Character Sheet - REMOVED: Players should only edit via their character sheet file */}
           

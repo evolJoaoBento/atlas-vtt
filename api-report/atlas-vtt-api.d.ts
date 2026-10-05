@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.6.0";
+export declare const API_VERSION = "1.7.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -45,6 +45,7 @@ export declare interface AtlasExtension {
     readonly rules: RulesApi;
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
+    readonly ui: UiApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -210,6 +211,16 @@ declare type CritRule = 'natural' | 'roll-under' | 'doubles' | 'high-total' | 'n
  * them, `colour` the map's own colours.
  */
 declare type DarkSightLook = 'system' | 'grey' | 'colour';
+
+export declare interface DashboardTile {
+    /** Unique among this extension's tiles. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    title: string;
+    description: string;
+    onClick(): void;
+}
 
 /**
  * How diagonal steps count on square grids: `equidistant` counts each as 1 (D&D 5e),
@@ -603,6 +614,53 @@ export declare interface MeasurementSettings {
     coneAngle: number;
 }
 
+export declare interface MenuItem {
+    label: string;
+    /** Lucide name */
+    icon?: string;
+    onClick?(): void;
+    submenu?: MenuItem[];
+    checked?: boolean;
+    disabled?: boolean;
+}
+
+export declare interface PaletteCommand {
+    /** Unique within its section. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    label: string;
+    keywords?: string[];
+    run(): void;
+}
+
+export declare interface PaletteSection {
+    /** Unique among this extension's sections. */
+    id: string;
+    title: string;
+    /** Read again each time the palette draws and after `invalidate()`. */
+    commands(ctx: ViewContext): PaletteCommand[];
+}
+
+export declare interface PanelHandle {
+    /** Opens the panel in `viewId`, default the active map view; does nothing when there is none. */
+    open(viewId?: ViewId): void;
+    /** Closes the panel in the active map view. */
+    close(): void;
+    toggle(viewId?: ViewId): void;
+    isOpen(viewId?: ViewId): boolean;
+    /** Closes the panel in every view and removes it; calling it again does nothing. */
+    dispose(): void;
+}
+
+export declare interface PanelSpec {
+    /** Unique among this extension's panels. */
+    id: string;
+    title: string;
+    /** Runs when the panel opens in a view; the returned disposer runs when it closes, its view closes, or the panel is disposed. */
+    mount(container: HTMLElement, ctx: ViewContext): Disposer;
+}
+
 /** How the player window shows a token: seen, outlined only (sensed), or not at all. */
 export declare type Perception = 'seen' | 'sensed' | 'unseen';
 
@@ -888,6 +946,12 @@ export declare interface Token extends BaseToken {
  */
 export declare type TokenEntity = Token | Character;
 
+/** What a token menu provider is told: the view, the token, and its kind (`tokenKind`, since `kind` is the view's). */
+export declare type TokenMenuContext = ViewContext & {
+    tokenId: string;
+    tokenKind: TokenEntity['kind'];
+};
+
 export declare interface TokenMove {
     tokenId: string;
     x: number;
@@ -969,12 +1033,51 @@ declare interface TokenVision {
     senses?: TokenSense[];
 }
 
+export declare interface ToolbarItem {
+    /** Unique among this extension's toolbar items. */
+    id: string;
+    /** Lucide name */
+    icon: string;
+    label: string;
+    shortcut?: string;
+    /** Where it sits among Atlas's own items, which have 45–100; lower priorities move into "More tools" first. Default 50. */
+    priority?: number;
+    /** Default ['map']. */
+    views?: ReadonlyArray<'map' | 'remote'>;
+    /** Draws the button as the one in use, and keeps it in the bar rather than in "More tools". */
+    isActive?(ctx: ViewContext): boolean;
+    /** A dot (`true`) or a count on the button; `null` shows nothing. */
+    badge?(ctx: ViewContext): string | number | true | null;
+    onClick(ctx: ViewContext): void;
+}
+
+export declare interface UiApi {
+    addToolbarItem(item: ToolbarItem): Disposer;
+    addPaletteSection(section: PaletteSection): Disposer;
+    addDashboardTile(tile: DashboardTile): Disposer;
+    /** The map's "More options" menu. */
+    addViewMenuItems(provider: (ctx: ViewContext) => MenuItem[]): Disposer;
+    /** A token's context menu (GM views only); `tokenKind` lets a provider act on characters only. */
+    addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
+    /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
+    addPanel(panel: PanelSpec): PanelHandle;
+    /** Re-reads `isActive`, `badge`, palette commands and menu providers now. */
+    invalidate(): void;
+}
+
 /** The visible world area: its centre and size in world units. */
 export declare interface ViewCamera {
     centerX: number;
     centerY: number;
     width: number;
     height: number;
+}
+
+/** What a slot callback is told about the view it is drawn or run in. */
+export declare interface ViewContext {
+    viewId: ViewId;
+    kind: 'map' | 'remote';
+    isPlayerView: boolean;
 }
 
 /** An Atlas map view (`AtlasView.viewId`); never reused once the view closed. */

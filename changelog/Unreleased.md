@@ -7,6 +7,7 @@
 - Extension API: follow the GM's laser in a view and draw other people's lasers there, fading like Atlas's own
 - Extension API: ask what the player window shows of a lit scene, token by token and cell by cell, failing closed while sight is not ready
 - Extension API: move tokens like a GM drag (snapped, kept on the map, one undo step), and ask where a dropped token lands
+- Extension API: other plugins can add toolbar buttons, command palette sections, dashboard tiles, entries in a map's More options and a token's menu, and floating panels in Atlas's style
 
 ## Improved
 

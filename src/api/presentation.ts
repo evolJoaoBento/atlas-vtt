@@ -11,7 +11,7 @@ function info(scene: InternalScene, held: boolean): PresentedSceneInfo {
   return Object.freeze({ viewId: scene.view.viewId, tabId: scene.tabId, mapPath: tab?.filePath ?? '', held });
 }
 
-export function presentationApi(tracker: ViewTracker, disposers: DisposerSet): PresentationApi {
+export function presentationApi(tracker: ViewTracker, disposers: DisposerSet, owner: string): PresentationApi {
   return Object.freeze({
     current: (): PresentedSceneInfo | null => {
       const scene = presentedScene.current();
@@ -42,7 +42,7 @@ export function presentationApi(tracker: ViewTracker, disposers: DisposerSet): P
       if (!target || typeof target.id !== 'string' || typeof target.label !== 'string' || typeof target.isActive !== 'function') {
         throw new Error('[Atlas API] addTarget needs { id: string, label: string, isActive(): boolean }.');
       }
-      return disposers.add(addPresentationTarget(target));
+      return disposers.add(addPresentationTarget(target, owner));
     },
   });
 }
