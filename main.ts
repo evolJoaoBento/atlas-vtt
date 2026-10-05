@@ -21,6 +21,8 @@ import { PlayerWindowService } from './src/app/services/PlayerWindowService';
 import { presentedScene } from './src/app/services/PresentedScene';
 import { OnlineJoinService } from './src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from './src/app/online/OnlineSessionService';
+import { moveTableKeyToDevice, ownOldTableKey, tableKeyStore } from './src/app/online/sharing/identity/tableKey';
+import { obsidianLocalStore } from './src/app/online/sharing/identity/deviceKeys';
 import { registerOnline } from './src/app/online/registerOnline';
 import { PeopleBook } from './src/app/online/sharing/people/PeopleBook';
 import { ShareItems } from './src/app/online/sharing/model/ShareItems';
@@ -110,6 +112,12 @@ export default class AtlasVTTPlugin extends Plugin {
 
     await storageReady;
     await this.settingsService.initialize();
+    // Before anything hosts: the table key leaves the synced settings for this device's local storage.
+    try {
+      moveTableKeyToDevice(this.settingsService, tableKeyStore(obsidianLocalStore(this.app)), await ownOldTableKey(this.app));
+    } catch (error) {
+      console.error('[Atlas online] Could not move the table key to this device:', error);
+    }
     const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
     registerOnline(this, onlineSessions);
     registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), pulled: PulledItems.forApp(this.app), settings: this.settingsService, sessions: onlineSessions });

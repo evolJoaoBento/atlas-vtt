@@ -19,7 +19,8 @@ import { peerServerOptions } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
-import { ensureTableIdentity } from './sharing/identity/tableKey';
+import { ensureTableIdentity, tableKeyStore } from './sharing/identity/tableKey';
+import { obsidianLocalStore } from './sharing/identity/deviceKeys';
 import { AssetServer } from './assets/AssetServer';
 import { vaultImageFiles } from './assets/vaultImageFiles';
 import { AssetRegistry, type ImageFiles } from './scene/AssetRegistry';
@@ -136,7 +137,9 @@ export class OnlineSessionService {
     this.initiativeRules = deps.initiativeRules ?? ((mapPath) => mapInitiativeRules(app, mapPath));
     this.watchResources = deps.watchResources ?? ((listener) => watchCollectionResources(app, listener));
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
-    this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.settings, this.identityCrypto));
+    // The table key stays on this device, never in the synced settings.
+    const tableKeys = tableKeyStore(obsidianLocalStore(app));
+    this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(tableKeys, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
   }
 
