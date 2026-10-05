@@ -145,6 +145,20 @@ describe('views', () => {
     stop();
   });
 
+  it('C-views-5: camera and watchCamera give the visible world area, frozen, after each frame', () => {
+    const viewport = new FakeViewport();
+    const view = fakeView('v1', { viewport });
+    const { api } = setup([view]);
+    expect(api.camera('v1')).toEqual({ centerX: 500, centerY: 400, width: 800, height: 600 });
+    expect(Object.isFrozen(api.camera('v1'))).toBe(true);
+    const cameras = vi.fn();
+    api.watchCamera('v1', cameras);
+    viewport.center = { x: 10, y: 20 };
+    viewport.frame();
+    expect(cameras).toHaveBeenLastCalledWith({ centerX: 10, centerY: 20, width: 800, height: 600 });
+    expect(Object.isFrozen(cameras.mock.calls[0]![0])).toBe(true);
+  });
+
   it('C-views-6: closing a view disposes its subscribe and watchCamera registrations; nothing fires after', () => {
     const viewport = new FakeViewport();
     const view = fakeView('v1', { viewport });

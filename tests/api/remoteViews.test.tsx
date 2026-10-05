@@ -130,6 +130,36 @@ describe('remoteViews', () => {
     error.mockRestore();
   });
 
+  it('does nothing once closed, whatever is called, and keeps no listener', async () => {
+    const { api } = await remoteHarness();
+    const view = await api.open({ title: 'A' });
+    view.close();
+    const listener = vi.fn();
+    expect(() => {
+      view.setScene(remoteScene());
+      view.setPlayer({ movableTokenIds: [], measurement: resolveMeasurementSettings(undefined, null), tokenUi: { conditions: [], resources: {} }, initiative: { rules: null, health: {} } });
+      view.setStatus({ title: 'T', connection: 'C', tone: 'ended', message: null });
+      view.setDiceLog([]);
+      view.throwRoll({ id: 'r', timestamp: 0, formula: '1d6', rolls: [{ die: 'd6', value: 1, max: 6 }], modifiers: 0, total: 1 } as never);
+      view.setCamera({ centerX: 0, centerY: 0, width: 10, height: 10 });
+      view.cancelDrag();
+      view.close();
+      for (const add of [view.onTokenDrop, view.onCameraMoved, view.onRoll, view.onClose, view.onStatusAction!]) add(listener)();
+    }).not.toThrow();
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('a view revealed again with reuse keeps the title, icon and dice limit it opened with', async () => {
+    const harness = await remoteHarness();
+    const first = await harness.api.open({ title: 'First', icon: 'network', reuse: true, maxDice: 20 });
+    await harness.api.open({ title: 'Second', icon: 'map', reuse: true, maxDice: 5 });
+    const leaf = harness.workspace.leavesOf('atlas-vtt-remote')[0]!;
+    const view = leaf.view as { getDisplayText(): string; getIcon(): string };
+    expect(view.getDisplayText()).toBe('First');
+    expect(view.getIcon()).toBe('network');
+    expect(storeOf(harness, first.viewId).getState().remoteView?.maxDice).toBe(20);
+  });
+
   it('hands out a frozen handle and refuses a malformed title', async () => {
     const { api } = await remoteHarness();
     const view = await api.open({ title: 'A' });
