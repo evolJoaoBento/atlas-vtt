@@ -102,7 +102,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 }
 
 /**
- * What texts and drawings are checked against, and what is hidden. Every item must be wholly or partly in the map
+ * What texts and drawings are checked against, and what is hidden. Under painted fog, or lighting, every item must be wholly or partly in the map
  * (`clipToMap`) and surely revealed by the fog over every cell its in-map part touches (`FogCoverage.reveal`). Under
  * lighting it must also be shown per lighting cell (`LightingFrame.shown`), and clear of what the darkness
  * rectangles cover.
@@ -110,10 +110,13 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 function hiddenFrom(context: ProjectionContext, lighting: LightingFrame | null): Pick<FogCoverage, 'isCovered'> {
   const base = context.darkCoverage ?? context.coverage;
   const reveal = context.coverage.reveal(context.mapSize);
+  // Without painted fog the fog hides nothing, as in the player window, so a scene with no background (or items off the map) works.
+  const fogged = context.coverage.hasPaintedFog;
   return {
     isCovered: (b) => {
+      if (!fogged && lighting === null) return false;
       const clipped = clipToMap(b, context.mapSize);
-      if (!clipped || !reveal.revealed(clipped)) return true;
+      if (!clipped || (fogged && !reveal.revealed(clipped))) return true;
       return lighting !== null && (base.isCovered(clipped) || !lighting.shown(clipped));
     },
   };
@@ -195,10 +198,12 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // The fog sees what the GM draws (raw values); the wire gets clamped values. The player window draws a token half under the fog,
+  // The fog sees what the GM draws (raw values); the wire gets clamped values. Only painted fog hides a token. The player window draws a token half under the fog,
   // so a token is sent when some cell of it inside the map is surely revealed; cells at the map edge or outside it prove nothing.
-  const inMap = clipToMap(tokenBounds({ x, y, size }, cellSize), context.mapSize);
-  if (!inMap || !context.coverage.reveal(context.mapSize).partlyRevealed(inMap)) return null;
+  if (context.coverage.hasPaintedFog) {
+    const inMap = clipToMap(tokenBounds({ x, y, size }, cellSize), context.mapSize);
+    if (!inMap || !context.coverage.reveal(context.mapSize).partlyRevealed(inMap)) return null;
+  }
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;

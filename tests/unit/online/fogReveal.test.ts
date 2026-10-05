@@ -69,8 +69,13 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
     expect(keys(projectOn(map, fogged, both))).toEqual([]);
   });
 
-  it('sends them when nothing is fogged, but never what lies outside the map', () => {
-    const scene = projectOn(map, [], both);
+  it('sends everything as before when no fog is painted, also what lies off the map (a fog that was only erased is none)', () => {
+    expect(keys(projectOn(map, [], both))).toEqual(['edge', 'out', 'edge', 'out', 'edge', 'out']);
+    expect(keys(projectOn(map, [rect('r', 1, true, 0, 0, 700, 500)], both))).toEqual(['edge', 'out', 'edge', 'out', 'edge', 'out']);
+  });
+
+  it('with painted fog elsewhere, sends the unfogged edge items but never what lies outside the map', () => {
+    const scene = projectOn(map, [rect('f', 1, false, 0, 0, 10, 10)], both);
     expect(keys(scene)).toEqual(['edge', 'edge', 'edge']);
     expect(Object.keys(scene.tokens)).toEqual(['edge']);
   });
@@ -94,13 +99,17 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
     const strip = { tokens: { strip: hero('strip', 698, 250), straddle: hero('straddle', 700, 250) } };
     expect(Object.keys(projectOn(map, [fogged], strip, 4).tokens)).toEqual([]);
     expect(Object.keys(projectOn(map, [fogged, rect('r', 2, true, 0, 0, 696, 500)], strip, 4).tokens)).toEqual([]);
-    // Nothing fogged: the strip is revealed like the rest of the map, the straddling token has its part inside it, and a token off the map has none.
-    expect(Object.keys(projectOn(map, [], { tokens: { ...strip.tokens, off: hero('off', 760, 250) } }, 4).tokens)).toEqual(['strip', 'straddle']);
+    // Fog painted elsewhere: the strip is revealed like the rest of the map, the straddling token has its part inside it, and a token off the map has none.
+    const elsewhere = [rect('e', 1, false, 0, 0, 10, 10)];
+    expect(Object.keys(projectOn(map, elsewhere, { tokens: { ...strip.tokens, off: hero('off', 760, 250) } }, 4).tokens)).toEqual(['strip', 'straddle']);
   });
 
-  it('shows nothing on a map of unknown size, and everything again once it is known', () => {
-    expect(keys(projectOn({ width: 0, height: 0 }, [], edgeItems))).toEqual([]);
-    expect(keys(projectOn(map, [], edgeItems))).toHaveLength(3);
+  it('on a map of unknown size sends everything when no fog is painted, and nothing under painted fog', () => {
+    const unknown = { width: 0, height: 0 };
+    expect(keys(projectOn(unknown, [], edgeItems))).toHaveLength(3);
+    expect(keys(projectOn(unknown, [rect('r', 1, true, 0, 0, 10, 10)], edgeItems))).toHaveLength(3);
+    expect(keys(projectOn(unknown, [rect('f', 1, false, 0, 0, 10, 10)], edgeItems))).toEqual([]);
+    expect(keys(projectOn(map, [rect('f', 1, false, 0, 0, 10, 10)], edgeItems))).toHaveLength(3);
   });
 
   it('works the check out again for a new map size, never holding the closed one of an unknown size', () => {
@@ -130,7 +139,8 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
       const size = { width: Math.floor(between(50, 260)) | 1, height: Math.floor(between(50, 200)) | 1 };
       const ops: FogOperation[] = [];
       for (let i = 0; i < 1 + Math.floor(random() * 6); i++) {
-        const isErasing = random() < 0.5;
+        // The first operation paints, so the scene has painted fog and the check applies.
+        const isErasing = i > 0 && random() < 0.5;
         const kind = random();
         const px = (): number => between(-10, size.width + 10);
         const py = (): number => between(-10, size.height + 10);
