@@ -9,6 +9,8 @@
 export const MIN_GRID_CELL_SIZE = 4;
 /** The most cells a grid may have along one side of its map. */
 export const MAX_GRID_CELLS_PER_SIDE = 2000;
+/** The farthest a grid's origin may lie from the map's, in pixels: the largest map side a remote scene may have. */
+export const MAX_GRID_OFFSET = 100_000;
 
 const GRID_TYPES: readonly unknown[] = ['square', 'hex-horizontal', 'hex-vertical'];
 const GRID_LINE_TYPES: readonly unknown[] = ['solid', 'dashed', 'dotted'];
@@ -34,6 +36,8 @@ export function gridProblem(grid: unknown, mapSize: { width: number; height: num
   if (!isFiniteNumber(fields.size) || fields.size < MIN_GRID_CELL_SIZE) return `"grid.size" must be a number of at least ${MIN_GRID_CELL_SIZE}`;
   const notFinite = OPTIONAL_NUMBERS.find((key) => fields[key] !== undefined && !isFiniteNumber(fields[key]));
   if (notFinite) return `"grid.${notFinite}" must be a finite number when set`;
+  const far = (['offsetX', 'offsetY'] as const).find((key) => fields[key] !== undefined && Math.abs(fields[key] as number) > MAX_GRID_OFFSET);
+  if (far) return `"grid.${far}" must be from -${MAX_GRID_OFFSET} to ${MAX_GRID_OFFSET}`;
   if (fields.type !== undefined && !GRID_TYPES.includes(fields.type)) return '"grid.type" must be square, hex-horizontal or hex-vertical';
   if (fields.lineType !== undefined && !GRID_LINE_TYPES.includes(fields.lineType)) return '"grid.lineType" must be solid, dashed or dotted';
   if (mapSize && !isDrawableGrid(fields.size, mapSize.width, mapSize.height)) {

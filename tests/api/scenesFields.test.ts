@@ -65,7 +65,7 @@ describe('the optional fields of a saved map', () => {
     const fixture = await withScene();
     const grid = { enabled: true, type: 'square' as const, size: 70, offsetX: 0, offsetY: 0, opacity: 0.5 };
     // PNG() is 320 x 200: a size of 0.1 gives 3,200 cells along its width.
-    const bad = [{ ...grid, size: -1 }, { ...grid, size: Number.NaN }, { ...grid, size: 0.1 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, { ...grid, offsetY: Infinity }];
+    const bad = [{ ...grid, size: -1 }, { ...grid, size: Number.NaN }, { ...grid, size: 0.1 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, { ...grid, offsetY: Infinity }, { ...grid, size: 38.52, offsetX: 5.53816e87 }];
     for (const value of bad) {
       const input = { collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: value as never }), images: [{ path: 'bg.png', data: PNG() }] };
       await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\] scenes.addToCollection: the map's .*grid/);

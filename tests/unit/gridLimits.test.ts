@@ -36,9 +36,11 @@ describe('the limits of a drawable grid', () => {
       grid({ size: MIN_GRID_CELL_SIZE - 0.5 }), grid({ size: 1 }), grid({ size: 49 }),
       grid({ offsetX: Number.NaN }), grid({ opacity: Infinity }), grid({ lineWidth: Number.NaN }),
       grid({ type: 'triangle' }), grid({ lineType: 'wavy' }), null, [],
+      grid({ offsetX: 5.53816e87 }), grid({ offsetY: -100_001 }),
     ];
     for (const value of bad) expect(gridProblem(value, map)).toMatch(/grid/);
     expect(gridProblem(grid({ size: 50 }), map)).toBeNull();
+    expect(gridProblem(grid({ size: 50, offsetX: -100_000, offsetY: 100_000 }), map)).toBeNull();
   });
 
   it(`allows at most ${MAX_GRID_CELLS_PER_SIDE} cells along a side`, () => {

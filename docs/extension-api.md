@@ -67,7 +67,7 @@ Version 1.15.0 also adds `setCamera(camera, { padded: true })`, which leaves the
 
 Version 1.15.0 also keeps what `setPlayer` writes when it did not change: each part (the movable tokens, the measurement, the condition and resource definitions, the initiative rules and the HP bars) equal by value to the one shown keeps its object, so the initiative list and the badges are not drawn again, and a state equal to the last one writes nothing.
 
-Version 1.15.1 checks the grid of `RemoteView.setScene`, `scenes.addToCollection` and `scenes.replaceMap`: its numbers must be finite, its `size` at least 4 px and at most 2,000 cells along a side of the map (for a saved map, when Atlas can read the background image's size), and its `type` and `lineType` known values; anything else throws before anything is shown or written. Atlas draws no grid at all for a size of 0 or less, or past 2,000 cells along a side, wherever it comes from.
+Version 1.15.1 checks the grid of `RemoteView.setScene`, `scenes.addToCollection` and `scenes.replaceMap`: the numbers it sets must be finite, its `size` at least 4 px and at most 2,000 cells along a side of the map (for a saved map, when Atlas can read the background image's size), its offsets within 100,000 px, and its `type` and `lineType` known values; anything else throws before anything is shown or written. Atlas draws no grid at all for a size of 0 or less, or past 2,000 cells along a side, wherever it comes from, and a saved grid whose origin lies farther than 100,000 px away is moved next to the map by whole cells when the map loads, which draws the same grid.
 
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 

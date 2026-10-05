@@ -937,8 +937,8 @@ export declare interface RemoteSceneInput {
         height: number;
     };
     /**
-     * Finite numbers, a `size` of at least 4 px and at most 2,000 cells along a side of `background`, and a known `type`
-     * and `lineType`; anything else throws, so a grid Atlas could never finish drawing is never shown.
+     * Finite numbers, a `size` of at least 4 px and at most 2,000 cells along a side of `background`, offsets within
+     * 100,000 px, and a known `type` and `lineType`; anything else throws, so a grid Atlas could never finish drawing is never shown.
      */
     grid: GridState | null;
     objects: SceneSnapshot['objects'];
@@ -1206,7 +1206,7 @@ export declare interface ScenesApi {
      * malformed optional field of `map` (a pin without a plain vault `notePath`, a camera that is not finite numbers with
      * a scale above 0, token settings of the wrong types, walls, lights or light zones that are not records), and so is a
      * grid that is not finite numbers with a `size` of at least 4 px, at most 2,000 cells along a side of the background
-     * image (when Atlas can read its size) and a known `type` and `lineType`: the promise rejects before anything is written. A `readMap` result can be handed in as it is.
+     * image (when Atlas can read its size), offsets within 100,000 px and a known `type` and `lineType`: the promise rejects before anything is written. A `readMap` result can be handed in as it is.
      */
     addToCollection(input: {
         collection: {

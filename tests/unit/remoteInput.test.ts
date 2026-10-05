@@ -34,7 +34,7 @@ describe("what a remote view takes from its owner", () => {
     const bad = [
       { ...grid, size: -1 }, { ...grid, size: 0 }, { ...grid, size: 0.0001 }, { ...grid, size: Number.NaN },
       { ...grid, size: 1 }, // 1000 cells per side on this map is fine; on a 100,000 px map it is not
-      { ...grid, offsetX: Infinity }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, 'square',
+      { ...grid, offsetX: Infinity }, { ...grid, size: 38.52, offsetX: 5.53816e87 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, 'square',
     ];
     const wide = { url: null, width: MAX_REMOTE_MAP_SIDE, height: 800 };
     for (const value of bad) expect(() => checkedScene({ ...remoteScene(), background: wide, grid: value })).toThrow(/RemoteView.setScene: .*grid/);

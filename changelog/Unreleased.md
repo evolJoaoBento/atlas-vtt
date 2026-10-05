@@ -29,7 +29,7 @@
 
 ## Fixed
 
-- A grid too fine to draw (a size of 0 or less, or more than 2,000 cells along a side of the map) is no longer drawn, instead of freezing Obsidian
+- A grid too fine to draw (a size of 0 or less, or more than 2,000 cells along a side of the map) is no longer drawn, and one whose origin lies extremely far from the map is moved next to it by whole cells, instead of freezing Obsidian
 - The laser pointer is let go when Obsidian loses focus in the middle of a stroke, instead of staying drawn until the next click
 - When a map image is replaced, the old image is released only after its sprite has left the map, so it is never freed while still showing
 - Fog that did not change is no longer redrawn when other fog changes
