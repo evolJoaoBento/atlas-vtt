@@ -24,7 +24,8 @@ import { trustedSections, type SectionTrust } from '../model/sectionTrust';
 import { partError, partWarnings } from './partWarnings';
 import { unlinkedExceptWarning, unlinkedMapWarnings } from './unlinkedWarnings';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
-import { formatList, t } from '../../../i18n';
+import { t } from '../../../i18n';
+import { listFor } from '../display/shareList';
 
 export const SHARE_DIALOG_TITLE = t('share.with.title');
 const FULL_CONFIRM = {
@@ -85,7 +86,7 @@ class ShareWithModal extends Modal {
     const problems = partProblemsInNote(text, trustedSections(this.app, this.deps.sections, this.file, text));
     const warnings = [
       ...(unreadableRule ? [t('share.with.unreadableProperty', { property: SHARE_PROPERTY })] : []),
-      ...(unknown.length ? [t('share.with.unknownNames', { names: formatList(unknown) })] : []),
+      ...(unknown.length ? [t('share.with.unknownNames', { names: listFor('share.with.unknownNames', unknown) })] : []),
       ...unlinkedExceptNames(text, this.deps.people).map((name) => unlinkedExceptWarning(name)),
       ...partWarnings(problems),
     ];

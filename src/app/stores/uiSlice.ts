@@ -140,7 +140,11 @@ export function createUIActions(
       draft.isDiceTrayOpen = open;
       if (open) draft.isToolbarEditing = false;
     }),
-    setOnlinePanelOpen: (open) => set((draft) => { draft.isOnlinePanelOpen = open; }),
+    // Like the dice tray: the online panel and the toolbar editor's tray take the same place.
+    setOnlinePanelOpen: (open) => set((draft) => {
+      draft.isOnlinePanelOpen = open;
+      if (open) draft.isToolbarEditing = false;
+    }),
     openLightPopover: (lightId) => set((draft) => {
       draft.lightPopover = lightId;
       draft.lightZonePopover = null;
@@ -157,6 +161,7 @@ export function createUIActions(
     setToolbarEditing: (on) => set((draft) => {
       draft.isToolbarEditing = on;
       if (on) draft.isDiceTrayOpen = false;
+      if (on) draft.isOnlinePanelOpen = false;
     }),
   };
 }
