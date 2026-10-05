@@ -1,11 +1,16 @@
-import type { ViewCamera } from '../../app/services/presentedCamera';
 import type { Disposer, ViewId } from './common';
 import type {
   BackgroundState, DrawingStroke, FogOperation, GridState, InitiativeState, SceneLighting,
   TextElement, TokenEntity, WidgetSettings, WidgetValues,
 } from './records';
 
-export type { ViewCamera };
+/** The visible world area of a view: its centre and size in world units. */
+export interface ViewCamera {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+}
 
 /** A view as `views.list()`, `views.active()` and the `map-loaded` and `map-closed` events describe it; frozen. */
 export interface ViewInfo {

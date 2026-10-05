@@ -4,6 +4,8 @@
  * sees gestures, programmatic moves and resizes alike (`ViewAtlasState.camera` is never
  * written, so it cannot be used). No PIXI imports: the viewport is described by what is read.
  */
+import type { ViewCamera } from '../../api/types/views';
+
 /** What the camera needs of a view: its renderer's viewport, when there is one. */
 export interface CameraView {
   readonly renderer?: { getViewportInstance?(): CameraViewport | null } | null;
@@ -19,13 +21,7 @@ export interface CameraViewport {
   off(event: 'frame-end', listener: () => void): unknown;
 }
 
-/** The visible world area: its centre and size in world units. */
-export interface ViewCamera {
-  centerX: number;
-  centerY: number;
-  width: number;
-  height: number;
-}
+export type { ViewCamera };
 
 function liveViewport(view: CameraView): CameraViewport | null {
   const viewport = view.renderer?.getViewportInstance?.() ?? null;

@@ -7,7 +7,7 @@ export interface MapRules {
   readonly collectionId: string | null;
   readonly gridDefaults: CollectionGridDefaults | null;
   /**
-   * The measure tool's settings, with the cone angle the GM measures with (`mapConeAngle`).
+   * The measure tool's settings, with the cone angle the GM measures with in this collection.
    * Outside a collection these are the defaults; the map's own grid units then decide.
    * Combine with `resolveMeasurementSettings(null, snapshot.grid)` from `@atlas-vtt/shared/grid` and this `coneAngle`.
    * These are the collection's: a scene that sets its own distance per cell (`GridState.unitDistanceOverride`) measures

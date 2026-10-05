@@ -1,9 +1,9 @@
-import type { LaserHub, LocalLaserEvent, RemoteLaser } from '../app/pixi/laser/LaserHub';
+import type { LaserHub } from '../app/pixi/laser/LaserHub';
 import { REMOTE_LASER_LIMITS } from '../app/pixi/laser/remoteLasers';
 import { isHexColor } from '../app/utils/hexColor';
 import type { DisposerSet } from './disposers';
 import type { ViewTracker } from './viewTracker';
-import type { LasersApi } from './types/lasers';
+import type { LasersApi, LocalLaserEvent, RemoteLaser } from './types/lasers';
 import type { Disposer, Point, ViewId } from './types/common';
 
 function isFiniteNumber(value: unknown): value is number {

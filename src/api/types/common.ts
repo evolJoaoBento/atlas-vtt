@@ -1,7 +1,7 @@
 /** Removes a registration; calling it again does nothing. */
 export type Disposer = () => void;
 
-/** An Atlas map view (`AtlasView.viewId`); never reused once the view closed. */
+/** Names one open map view or remote view (`ViewInfo.viewId`); never reused once the view closed. */
 export type ViewId = string;
 
 export interface Point {
