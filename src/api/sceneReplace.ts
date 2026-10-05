@@ -1,5 +1,6 @@
 import { normalizePath, TFile, type App } from 'obsidian';
 import type { AssetService } from '../app/services/AssetService';
+import { collectionFolderPath } from '../app/services/assetPaths';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
 import { checkMapGrid } from './savedMapGrid';
@@ -99,6 +100,8 @@ export function replaceSceneMap(
     const mapPath = scene.data.mapPath;
     const file = mapPath ? app.vault.getAbstractFileByPath(mapPath) : null;
     if (!mapPath || !(file instanceof TFile)) fail('the scene has no map file.');
+    // Only a map inside the scene's own collection folder: a record that points elsewhere never makes replaceMap write there.
+    if (!isInside(mapPath, collectionFolderPath(scene.collection))) fail("the scene's map file is not inside its collection's folder.");
     if (isOpenInAView(views, mapPath)) fail('the scene is open in a map view; close its tab first.');
     if (!input || !input.map || !Array.isArray(input.images)) fail('it needs { map, images }.');
     const fields = sceneFieldsOf(input.map);
@@ -119,8 +122,9 @@ export function replaceSceneMap(
     const written: string[] = [];
     try {
       for (const { target, data } of targets.values()) {
-        written.push(target);
         await app.vault.createBinary(target, data);
+        // Listed once written: a failed write must not let the undo trash a file another wrote at that path meanwhile.
+        written.push(target);
       }
       // Again just before writing: a tab opened meanwhile would save the old map over the new one.
       if (isOpenInAView(views, mapPath)) fail('the scene is open in a map view; close its tab first.');

@@ -2,7 +2,7 @@ import type { AssetMetadata } from '../AssetService';
 import type { PathMove } from '../renamedPaths';
 import type { FileReading } from './libraryReader';
 import type { FileStamp, LibraryState } from './libraryState';
-import type { SceneIndexData } from '../sceneIndexData';
+import type { KeptSceneIndexData } from '../sceneIndexData';
 
 export interface LibraryMergeResult {
   changed: boolean;
@@ -30,7 +30,7 @@ export interface MergeContext {
    * whose file moves (another device moved it to another collection) may vanish in one read and come back from its
    * new path in the next, and takes that data back then. Never filled from a file.
    */
-  droppedIndexData?: Map<string, SceneIndexData>;
+  droppedIndexData?: Map<string, KeptSceneIndexData>;
   result: LibraryMergeResult;
 }
 

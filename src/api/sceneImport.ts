@@ -133,13 +133,14 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       createdFolder = firstMissingFolder(app, folder);
       await ensureFolder(app, folder);
       for (const [target, data] of targets) {
-        written.push(target);
         await app.vault.createBinary(target, data);
+        // Listed once written: a failed write must not let the undo trash a file another wrote at that path meanwhile.
+        written.push(target);
       }
       mapPath = freeMapPath(app, folder, input.name, new Set(scenes.flatMap((scene) => (scene.data?.mapPath ? [scene.data.mapPath] : []))));
       const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
-      written.push(mapPath);
       await app.vault.create(mapPath, savedMapText(withImagePaths(input.map, imagePaths), mapPath, input.name.trim(), fields));
+      written.push(mapPath);
       const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath, createdBy: owner, createdImages: [...targets.keys()] } });
       return { sceneId: scene.id, mapPath };
     } catch (error) {

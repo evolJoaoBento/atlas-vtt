@@ -98,6 +98,7 @@ describe('record files of scenes', () => {
 
 describe('a scene record file another device or a sync tool changed', () => {
   const A = 'atlas-vtt/collections/Default/scenes/a.atlasmap';
+  const C = 'atlas-vtt/collections/Default/scenes/c.atlasmap';
   const RECORD = 'atlas-vtt/collections/Default/scenes/moved.json';
   const FOREIGN = 'atlas-vtt/collections/Default/scenes/foreign.json';
 
@@ -125,6 +126,16 @@ describe('a scene record file another device or a sync tool changed', () => {
     const asset = await service.getAssetById('moved');
     expect(asset?.name).toBe('Renamed');
     expect((asset as { data?: unknown }).data).toEqual({ mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext', createdImages: ['i.webp'] });
+  });
+
+  it('drops the creator and images, keeping extension data, when a file points the scene at another map', async () => {
+    const local = { ...scene('moved', { mapPath: A, extensions: { ext: { item: 1 } }, createdBy: 'ext', createdImages: ['i.webp'] }), filePath: RECORD };
+    const { vault, service } = await started({ [A]: '{}', [C]: '{}' }, indexWith([local]));
+    // A forged or sync-conflicted file names the GM's own map: replaceMap must not follow it there.
+    await vault.app.vault.adapter.write(RECORD, editedFile(vault.files.get(RECORD)!, (file, record) => { file.mapPath = C; record.modifiedAt = 5; }));
+    await service.refreshMetadata();
+
+    expect(await dataOf(service, 'moved')).toEqual({ mapPath: C, extensions: { ext: { item: 1 } } });
   });
 
   it('never hands an extension, a creator or images to a scene, whatever the file says', async () => {

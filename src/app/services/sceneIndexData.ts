@@ -3,7 +3,8 @@
  * fingerprint: the data extensions keep on it (`data.extensions`), the extension that added it (`data.createdBy`)
  * and the images Atlas wrote for that extension (`data.createdImages`), plus a `data.sharing` an older Atlas left.
  * `createdBy` and `createdImages` are permissions (`scenes.replaceMap` acts on them), so they are only ever taken
- * from this device's index, never from a file someone may have copied, edited or forged.
+ * from this device's index, never from a file someone may have copied, edited or forged, and they hold only for the
+ * map the index named: a file that moves the scene to another map drops them.
  */
 import type { Asset, SceneAssetData } from './AssetService';
 
@@ -12,7 +13,12 @@ export const SCENE_INDEX_KEYS = ['extensions', 'sharing', 'createdBy', 'createdI
 /** The index-only keys a scene keeps across a file read: all but the legacy `sharing`, which moves into `extensions` on load. */
 export type SceneIndexData = Pick<SceneAssetData, 'extensions' | 'createdBy' | 'createdImages'>;
 
+/** A scene's index-only data with the map path the index held beside it (`indexedMapPath`, never written to the record). */
+export type KeptSceneIndexData = SceneIndexData & { readonly indexedMapPath?: string | undefined };
+
 const KEPT_KEYS: readonly string[] = ['extensions', 'createdBy', 'createdImages'];
+/** The keys that grant `scenes.replaceMap`: valid only for the map they were written for. */
+const PERMISSION_KEYS: readonly string[] = ['createdBy', 'createdImages'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -28,11 +34,11 @@ export function withoutSceneExtensions(asset: Asset): Asset {
     : asset;
 }
 
-/** The index-only data `asset` holds (a scene's), or null when it holds none. */
-export function sceneIndexDataOf(asset: Asset | undefined): SceneIndexData | null {
+/** The index-only data `asset` holds (a scene's), with its indexed map path; null when it holds none. */
+export function sceneIndexDataOf(asset: Asset | undefined): KeptSceneIndexData | null {
   if (asset?.type !== 'scene' || !asset.data) return null;
   const own = Object.fromEntries(Object.entries(asset.data).filter(([key]) => KEPT_KEYS.includes(key))) as SceneIndexData;
-  return Object.keys(own).length > 0 ? own : null;
+  return Object.keys(own).length > 0 ? { ...own, indexedMapPath: asset.data.mapPath } : null;
 }
 
 /**
@@ -40,10 +46,15 @@ export function sceneIndexDataOf(asset: Asset | undefined): SceneIndexData | nul
  * a file another device or a sync tool changed brings the scene's own content and never takes away, or hands out,
  * what extensions keep.
  */
-export function withIndexOnlySceneData(fromFile: Asset, kept: SceneIndexData | null): Asset {
+export function withIndexOnlySceneData(fromFile: Asset, kept: KeptSceneIndexData | null): Asset {
   const plain = withoutSceneExtensions(fromFile);
   if (plain.type !== 'scene' || !kept) return plain;
-  return { ...plain, data: { ...plain.data, ...kept } };
+  const { indexedMapPath, ...data } = kept;
+  // A file that points the scene at another map gets no permission over it: they were granted for the indexed map.
+  const granted = indexedMapPath === undefined || plain.data?.mapPath === indexedMapPath
+    ? data
+    : Object.fromEntries(Object.entries(data).filter(([key]) => !PERMISSION_KEYS.includes(key)));
+  return { ...plain, data: { ...plain.data, ...granted } };
 }
 
 /** A parsed record file (a scene's JSON mirror, whose keys sit at the root, or a whole scene record) without its index-only data. */

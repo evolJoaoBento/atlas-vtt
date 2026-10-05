@@ -71,6 +71,30 @@ describe('scenes.replaceMap', () => {
     expect(fixture.vault.files.get(mapPath)).toBe(before.get(mapPath));
   });
 
+  it("C-scenes-5: refuses a scene whose map file lies outside its collection's folder", async () => {
+    const fixture = await withScene();
+    const { sceneId } = await added(fixture);
+    // The index says this extension added it, but the record now names a map elsewhere (the GM's own Cave).
+    const record = (await fixture.assets.getAssetById(sceneId))!;
+    await fixture.assets.updateAsset(sceneId, { data: { ...(record as { data: object }).data, mapPath: MAP_PATH } } as never);
+    const before = await fixture.vault.app.vault.adapter.read(MAP_PATH);
+    await expect(fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [] })).rejects.toThrow(/not inside its collection's folder/);
+    expect(await fixture.vault.app.vault.adapter.read(MAP_PATH)).toBe(before);
+  });
+
+  it('C-scenes-5: an image whose write fails is not undone, so a file another wrote at that path stays', async () => {
+    const fixture = await withScene();
+    const { sceneId } = await added(fixture);
+    const createBinary = fixture.vault.app.vault.createBinary;
+    vi.mocked(createBinary).mockImplementationOnce(async (path: string) => {
+      await fixture.vault.app.vault.create(path, 'someone else');
+      throw new Error('taken');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await expect(fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [image('new.webp')] })).rejects.toThrow('taken');
+    expect(await fixture.vault.app.vault.adapter.read(`${FOLDER}/new.webp`)).toBe('someone else');
+  });
+
   it('C-scenes-5: malformed input, or a write that fails, leaves the map and its folder as they were', async () => {
     const fixture = await withScene();
     const { sceneId } = await added(fixture);
