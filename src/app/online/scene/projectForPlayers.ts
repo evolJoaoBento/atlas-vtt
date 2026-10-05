@@ -114,7 +114,8 @@ function hiddenFrom(context: ProjectionContext, lit: boolean): Pick<FogCoverage,
       const right = b.x + Math.max(0, b.width);
       const bottom = b.y + Math.max(0, b.height);
       if (!(w > 0 && h > 0 && [b.x, b.y, right, bottom].every(Number.isFinite))) return true;
-      if (right < 0 || bottom < 0 || b.x > w || b.y > h) return true;
+      // Wholly outside, also touching the edge from outside: nothing of it is in the map, so no darkness covers it.
+      if (right <= 0 || bottom <= 0 || b.x >= w || b.y >= h) return true;
       const x = Math.max(b.x, 0);
       const y = Math.max(b.y, 0);
       return base.isCovered({ x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y });
