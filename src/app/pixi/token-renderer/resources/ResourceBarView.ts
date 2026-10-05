@@ -5,16 +5,15 @@ import type { VisibleResource } from '../../../resources/resourceTypes';
 import { ResourceBarLabel } from '../../ResourceBarLabel';
 import { destroyTree } from '../../utils/destroyTree';
 import { AnimatedBarFill } from '../AnimatedBarFill';
-import { BAR_BORDER, BAR_FILL_INSET, BAR_STYLE } from '../tokenUiLayout';
 
 /** The look every resource shares, bar or wheel: a thin grey border, a dark track, a fill set in from the border, faint ticks. */
 export const BAR_LOOK = {
-  border: BAR_BORDER,
-  borderColor: BAR_STYLE.border,
-  trackColor: BAR_STYLE.inside,
-  fillInset: BAR_FILL_INSET,
-  tickColor: BAR_STYLE.tick,
-  tickAlpha: BAR_STYLE.tickAlpha,
+  border: 0.75,
+  borderColor: 0x888888,
+  trackColor: 0x1a1a1a,
+  fillInset: 1,
+  tickColor: 0x333333,
+  tickAlpha: 0.5,
 } as const;
 
 const BORDER = BAR_LOOK.border;
