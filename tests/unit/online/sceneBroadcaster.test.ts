@@ -6,7 +6,7 @@ import { decodeControl, encodeControl, MAX_CONTROL_MESSAGE_BYTES, type ControlMe
 import { AssetRegistry } from '../../../src/app/online/scene/AssetRegistry';
 import { SCENE_LIMITS } from '../../../src/app/online/scene/sceneTypes';
 import type { PlayerViewRules } from '../../../src/app/online/scene/playerViewRules';
-import { FOG_TRUNCATED_NOTICE, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
+import { FOG_TRUNCATED_NOTICE, MAP_SIZE_POLL_MS, SCENE_TICK_MS, SCENE_TOO_LARGE_NOTICE, SceneBroadcaster } from '../../../src/app/online/scene/SceneBroadcaster';
 import { patchMessage, snapshotMessages, splitParts } from '../../../src/app/online/scene/sceneMessages';
 import { MemoryNetwork } from '../../../src/app/online/transport/MemoryTransport';
 import type { PeerLink } from '../../../src/app/online/transport/types';
@@ -227,6 +227,21 @@ describe('SceneBroadcaster', () => {
     expect(player.scene?.tokens.hero?.x).toBe(140);
     await tick();
     expect(player.scene?.tokens.hero?.x).toBe(300);
+    expect(player.scene).toEqual(h.broadcaster.currentProjection());
+  });
+
+  it('shows nothing while the map size is unknown, then projects again once it is known, with no change of the store', async () => {
+    const h = setup();
+    const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140) }));
+    let size = { width: 0, height: 0 };
+    (view as unknown as { renderer: unknown }).renderer = { getBackgroundSprite: () => (size.width > 0 ? { ...size, destroyed: false } : null) };
+    h.presented.present(view, tavern);
+    const player = await join(h);
+    expect(player.scene?.tokens).toEqual({});
+    // The background sprite arrives; nothing in the store changes.
+    size = { width: 2000, height: 1500 };
+    await vi.advanceTimersByTimeAsync(MAP_SIZE_POLL_MS + SCENE_TICK_MS);
+    expect(player.scene?.tokens.hero?.x).toBe(140);
     expect(player.scene).toEqual(h.broadcaster.currentProjection());
   });
 

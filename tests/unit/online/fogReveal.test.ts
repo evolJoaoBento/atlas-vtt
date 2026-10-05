@@ -25,11 +25,11 @@ function state(objects: Partial<ProjectedState['objects']>): ProjectedState {
   } as ProjectedState;
 }
 
-function projectOn(map: MapSize, fog: FogOperation[], objects: Partial<ProjectedState['objects']>) {
+function projectOn(map: MapSize, fog: FogOperation[], objects: Partial<ProjectedState['objects']>, gridSize = 70) {
   const memo = createProjectionMemo();
   const record = Object.fromEntries(fog.map((op) => [op.id, op]));
   const coverage = FogCoverage.fromPlayerFog(projectFog(record, memo));
-  const st = state({ ...objects, fog: record });
+  const st = { ...state({ ...objects, fog: record }), grid: { ...state({}).grid!, size: gridSize } } as ProjectedState;
   return projectForPlayers(st, { sceneId: 's', rules: RULES, coverage, assets, mapSize: map, memo });
 }
 
@@ -83,6 +83,19 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
   it('hides an item when the reveal stops short of the map edge it touches', () => {
     const partly = [rect('f', 1, false, 0, 0, 700, 500), rect('r', 2, true, 0, 0, 690, 500)];
     expect(Object.keys(projectOn(map, partly, edgeItems).texts)).toEqual([]);
+  });
+
+  it('sends a token with some cell of it revealed, as the player window draws it, and hides one in the edge strip or off the map only', () => {
+    const fogged = rect('f', 1, false, 0, 0, 700, 500);
+    const half = [fogged, rect('r', 2, true, 0, 0, 350, 500)];
+    // Half in a revealed area: sent. Wholly under the fog: hidden.
+    expect(Object.keys(projectOn(map, half, { tokens: { half: hero('half', 350, 250), under: hero('under', 600, 250) } }).tokens)).toEqual(['half']);
+    // On a grid of 4 px a token is 4 px wide: this one is only in the x 696 to 699 strip, and this one only in the strip and past the edge.
+    const strip = { tokens: { strip: hero('strip', 698, 250), straddle: hero('straddle', 700, 250) } };
+    expect(Object.keys(projectOn(map, [fogged], strip, 4).tokens)).toEqual([]);
+    expect(Object.keys(projectOn(map, [fogged, rect('r', 2, true, 0, 0, 696, 500)], strip, 4).tokens)).toEqual([]);
+    // Nothing fogged: the strip is revealed like the rest of the map, the straddling token has its part inside it, and a token off the map has none.
+    expect(Object.keys(projectOn(map, [], { tokens: { ...strip.tokens, off: hero('off', 760, 250) } }, 4).tokens)).toEqual(['strip', 'straddle']);
   });
 
   it('shows nothing on a map of unknown size, and everything again once it is known', () => {
@@ -146,11 +159,20 @@ describe('the fog leaves an item revealed only where it surely does (F-POS)', ()
         for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!revealed[y * size.width + x]) return false;
         return true;
       };
+      const anyRevealed = (bounds: { x: number; y: number; width: number; height: number }): boolean => {
+        const x0 = Math.floor(Math.max(bounds.x, 0));
+        const x1 = Math.ceil(Math.min(bounds.x + bounds.width, size.width));
+        const y0 = Math.floor(Math.max(bounds.y, 0));
+        const y1 = Math.ceil(Math.min(bounds.y + bounds.height, size.height));
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (revealed[y * size.width + x]) return true;
+        return false;
+      };
       for (const id of Object.keys(tokens)) {
         const token = tokens[id]!;
         if (id in scene.tokens) {
           sent++;
-          expect(allRevealed(tokenBounds({ x: token.x, y: token.y, size: 1 }, 70)), `token ${id}, round ${round}`).toBe(true);
+          // A token needs some pixel of it revealed (the window draws it half under the fog), none at all would be a leak.
+          expect(anyRevealed(tokenBounds({ x: token.x, y: token.y, size: 1 }, 70)), `token ${id}, round ${round}`).toBe(true);
         } else withheld++;
       }
       for (const id of Object.keys(texts)) {

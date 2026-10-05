@@ -93,14 +93,14 @@ describe('projectForPlayers', () => {
     expect(projectForPlayers(withTokens({ rock: white }), context()).tokens.rock?.ring).toBe('#ffffff');
   });
 
-  it('drops a token under fog, also one half under it, and sends one clear of it', () => {
+  it('drops a token completely under fog, and sends one half under it and one clear of it', () => {
     const coverage = fogOver(0, 0, 500, 500);
     const hiddenByFog = hero({ id: 'a', x: 200, y: 200 });
     const halfUnder = hero({ id: 'b', x: 500, y: 200 });
     const clear = hero({ id: 'c', x: 800, y: 200 });
     const scene = projectForPlayers(withTokens({ a: hiddenByFog, b: halfUnder, c: clear }), context({ coverage }));
-    // A token reaches players only where the fog surely leaves every cell of it revealed (F-POS): half under is not.
-    expect(Object.keys(scene.tokens)).toEqual(['c']);
+    // The player window draws a token half under the fog, so one with some cell surely revealed is sent (F-POS).
+    expect(Object.keys(scene.tokens)).toEqual(['b', 'c']);
   });
 
   it('gives each image one asset id and the map its size', () => {

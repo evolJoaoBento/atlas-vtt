@@ -32,6 +32,9 @@ interface Prepared {
   fog: FogCoverages;
 }
 
+/** How often the map's size is looked for while it is unknown. */
+export const MAP_SIZE_POLL_MS = 250;
+
 export class SceneBroadcaster implements SessionHandler {
   private readonly stops: Array<() => void> = [];
   private readonly projectionListeners = new Set<(scene: PlayerScene | null) => void>();
@@ -48,6 +51,8 @@ export class SceneBroadcaster implements SessionHandler {
   /** The presented view's lighting, while a scene is shown. */
   private lighting: LiveLighting | null = null;
   private tickTimer: number | null = null;
+  /** Looks again for the map's size while it is unknown, which hides everything from players. */
+  private sizeTimer: number | null = null;
   /** The presentation whose oversize the GM was told about, so the notice shows once. */
   private noticeShownFor: string | null = null;
   private fogNoticeShownFor: string | null = null;
@@ -168,6 +173,8 @@ export class SceneBroadcaster implements SessionHandler {
 
   private detach(): void {
     this.cancelTick();
+    if (this.sizeTimer !== null) window.clearTimeout(this.sizeTimer);
+    this.sizeTimer = null;
     this.live?.unsubscribe();
     this.live = null;
     this.lighting?.dispose();
@@ -248,9 +255,29 @@ export class SceneBroadcaster implements SessionHandler {
   /** The store, what the view's lighting hides now (null while unlit) and the coverage, worked out once per projection. */
   private prepare(live: LiveScene): Prepared {
     const state = live.scene.store.getState();
+    this.watchMapSize(live);
     const lighting = this.lighting?.frame(state, live.scene.mapSize()) ?? null;
     // Rebuilt only when the fog operations or the darkness change.
     return { state, lighting, fog: this.fogCache.get(state.objects?.fog ?? {}, this.memo, lighting?.darkness) };
+  }
+
+  /**
+   * Players are shown nothing while the map's size is unknown (the fog and the darkness say nothing outside the map), and the size
+   * is read from the background sprite, which can arrive without any change of the store. So while it is unknown, look again
+   * every `MAP_SIZE_POLL_MS`, and project once it is known.
+   */
+  private watchMapSize(live: LiveScene): void {
+    const known = (): boolean => {
+      const { width, height } = live.scene.mapSize();
+      return width > 0 && height > 0;
+    };
+    if (known() || this.sizeTimer !== null) return;
+    this.sizeTimer = window.setTimeout(() => {
+      this.sizeTimer = null;
+      if (this.live !== live || live.loading) return;
+      if (known()) this.scheduleTick();
+      else this.watchMapSize(live);
+    }, MAP_SIZE_POLL_MS);
   }
 
   private clearForTruncatedFog(live: LiveScene): void {

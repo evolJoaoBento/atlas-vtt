@@ -2,6 +2,7 @@
  * Builds a map's payload on the sender's machine, from the saved map file. Images are hashed
  * first (and the background's size read), so the payload never goes out without its art.
  */
+import { pinSize } from '../../../styles/designTokens';
 import { imageDimensions } from '../../../imageProcessing/imageDimensions';
 import { readSceneLighting } from '../../../lighting/sceneLightingOptions';
 import { isPersistedMapEnvelope, migrateMapFile, type MapFile } from '../../../services/MapPersistence';
@@ -119,8 +120,9 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
   // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
     if (pin.gmOnly) return [];
-    // A pin is shown only where the fog surely leaves the map revealed, inside the map.
-    const inMap = clipToMap({ x: pin.x, y: pin.y, width: 1, height: 1 }, context.images.size);
+    // A pin is shown only where the fog surely leaves the map revealed, inside the map, over the badge it is drawn as
+    // (PinRenderer: a circle of `pinSize.badgeRadius` about the pin; a pin linked to a hex is drawn at the hex centre, which is not known here).
+    const inMap = clipToMap({ x: pin.x - pinSize.badgeRadius, y: pin.y - pinSize.badgeRadius, width: 2 * pinSize.badgeRadius, height: 2 * pinSize.badgeRadius }, context.images.size);
     if (!inMap || !coverage.reveal(context.images.size).revealed(inMap)) return [];
     const note = context.noteItem(pin.notePath);
     if (!note) return [];

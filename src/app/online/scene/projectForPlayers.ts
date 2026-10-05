@@ -171,9 +171,10 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // The fog sees what the GM draws (raw values); the wire gets clamped values. A token reaches players only where the fog surely leaves the map revealed.
+  // The fog sees what the GM draws (raw values); the wire gets clamped values. The player window draws a token half under the fog,
+  // so a token is sent when some cell of it inside the map is surely revealed; cells at the map edge or outside it prove nothing.
   const inMap = clipToMap(tokenBounds({ x, y, size }, cellSize), context.mapSize);
-  if (!inMap || !context.coverage.reveal(context.mapSize).revealed(inMap)) return null;
+  if (!inMap || !context.coverage.reveal(context.mapSize).partlyRevealed(inMap)) return null;
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
