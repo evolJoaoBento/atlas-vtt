@@ -4,6 +4,7 @@ import { isSafeBundlePath, zipPathFor, type BundleFile } from './bundleFormat';
 import { linkedFilePath } from '../sceneLinks';
 import type { OpenedBundle } from './bundleReader';
 import { mayRewrite, rewriteContent } from './bundleContent';
+import { withoutSceneExtensions } from './bundleExtensionData';
 import { withLootBases } from './bundleSettings';
 import { assetFingerprint, fieldFingerprint } from './fingerprints';
 import { sha256 } from './hashing';
@@ -46,7 +47,7 @@ interface ImportInputs {
 
 /** The record the import stores for a bundle asset: paths and ids rewritten, filed under the target collection. */
 export function installedAsset(asset: Asset, targets: ImportTargets): Asset {
-  return { ...remapPaths(asset, targets.rewrites), id: targets.assetIds.get(asset.id) ?? asset.id, collection: targets.collectionId };
+  return { ...remapPaths(withoutSceneExtensions(asset), targets.rewrites), id: targets.assetIds.get(asset.id) ?? asset.id, collection: targets.collectionId };
 }
 
 /** Asset fields naming files that deleting the asset trashes; an import must never point them outside Atlas's folder. */

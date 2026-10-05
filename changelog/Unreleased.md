@@ -31,3 +31,7 @@
 - The automatic grid colour no longer fails on a map whose texture is not an image
 - Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
 - An odd last tile on the dashboard takes the whole row instead of leaving half of it empty
+
+## Important changes
+
+- Data that other plugins keep on scenes never travels in collection exports, copies or installs. Map shares saved by the online preview are kept for the extension that reads them and are never exported either

@@ -18,7 +18,9 @@ import { assetFilePath, groupTokenRefs } from './vault-sync/assetFiles';
 import { reconcileIndex, type VaultReconciliation } from './vault-sync/reconcileIndex';
 import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
+import type { Json } from '../../api/types/common';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
+import { movedLegacySceneData } from './legacySceneData';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { trashVaultItem } from '../utils/trashVaultItem';
 
@@ -84,6 +86,8 @@ export type EncounterDifficulty = 'easy' | 'medium' | 'hard' | 'deadly';
 export interface SceneAssetData {
   /** Vault path of the scene's .atlasmap file. */
   mapPath?: string;
+  /** What extensions keep on the scene, by extension id (`ScenesApi.setData`). Copies, exports and installs drop it. */
+  extensions?: Record<string, Json>;
 }
 
 export interface EncounterAssetData {
@@ -445,6 +449,14 @@ export class AssetService {
       // Collections without any read as their preset's (`collectionResources`).
       if (collection.settings.resources !== undefined) {
         collection.settings.resources = parseResourceDefinitions(collection.settings.resources);
+      }
+    }
+
+    for (const [id, asset] of Object.entries(this.metadata.assets)) {
+      const moved = movedLegacySceneData(asset);
+      if (moved) {
+        this.metadata.assets[id] = moved;
+        needsSave = true;
       }
     }
 

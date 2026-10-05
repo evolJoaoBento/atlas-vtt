@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TFile } from 'obsidian';
 import { AtlasView } from '../../src/app/atlas-view';
+import { bundleNoteKeys } from '../../src/app/extensions/bundleNoteKeys';
 import { AssetService } from '../../src/app/services/AssetService';
 import { transferAssets } from '../../src/app/services/assetTransfer/assetTransfer';
 import { groupContents } from '../../src/app/services/collectionBundle/bundleContents';
@@ -199,6 +200,38 @@ describe('exporting', () => {
     const notes = 'atlas-vtt/collections/source/notes/Lore';
     expect(fan.vault.files.get(`${notes}/Cave.md`)).toBe('# Door\nLocked.');
     expect(JSON.parse(fan.vault.files.get(MAP_PATH)!).state.objects.pins.p1.notePath).toBe(`${notes}/Cave.md#Door`);
+  });
+
+  it("strips a registered note property from the bundle, installs without it and leaves the sender's note alone", async () => {
+    const stop = bundleNoteKeys.add('test', ['atlas-share']);
+    try {
+      const creator = await creatorVault();
+      const lore = '---\natlas-share: [Ana]\nstatus: draft\n---\n# Door\nLocked.';
+      const goblin = '---\nstatblock: true\natlas-share: public\nimage: "[[goblin.png]]"\n---\nA goblin.';
+      await pinNote(creator, 'Lore/Cave.md#Door', lore);
+      creator.vault.files.set(NOTE_PATH, goblin);
+      const blob = await exportFrom(creator);
+      const { default: JSZip } = await import('jszip');
+      const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+      const manifest = await manifestOf(blob) as PackedManifest & { files: Array<{ vaultPath: string; sha256: string }> };
+      const packed = async (path: string): Promise<string> => zip.file(`files/${path}`)!.async('string');
+      expect(await packed('Lore/Cave.md')).toBe('---\nstatus: draft\n---\n# Door\nLocked.');
+      expect(await packed(NOTE_PATH)).toBe('---\nstatblock: true\nimage: "[[goblin.png]]"\n---\nA goblin.');
+      // The checksum is of the bytes in the zip, so a later install sees them as the sender's release
+      for (const path of ['Lore/Cave.md', NOTE_PATH]) {
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await zip.file(`files/${path}`)!.async('arraybuffer')))).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+        expect(manifest.files.find((file) => file.vaultPath === path)?.sha256).toBe(digest);
+      }
+      expect(creator.vault.files.get('Lore/Cave.md')).toBe(lore);
+      expect(creator.vault.files.get(NOTE_PATH)).toBe(goblin);
+
+      const fan = await emptyVault();
+      await importInto(fan, blob);
+      expect(fan.vault.files.get('atlas-vtt/collections/source/notes/Lore/Cave.md')).toBe('---\nstatus: draft\n---\n# Door\nLocked.');
+      expect([...fan.vault.files.values()].some((text) => text.includes('atlas-share'))).toBe(false);
+    } finally {
+      stop();
+    }
   });
 
   it('packs the chosen cover, keeps it with the collection and installs it with the collection', async () => {
@@ -1094,6 +1127,25 @@ describe('refreshing the index during an import', () => {
     const filesAfter = [...fan.vault.files].filter(([path]) => !path.includes('/backups/'));
     expect(new Map(filesAfter)).toEqual(filesBefore);
     expect(await reloadedTokenNames(fan)).toEqual(['Goblin']);
+  });
+});
+
+describe('extension data on scenes', () => {
+  const data = { mapPath: MAP_PATH, extensions: { 'some-extension': { item: 'i'.repeat(22), notes: ['Secret/Plan.md'] } }, sharing: { notes: ['Secret/Plan.md'] } };
+
+  it('stays out of an exported bundle, whether an extension or an older Atlas wrote it', async () => {
+    const creator = await creatorVault();
+    const [scene] = await creator.assets.getAssets('source', 'scene');
+    await creator.assets.updateAsset(scene!.id, { data } as never);
+    const blob = await exportFrom(creator);
+    const { default: JSZip } = await import('jszip');
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+    const everything = await Promise.all(Object.values(zip.files).filter((entry) => !entry.dir && /\.json$/.test(entry.name)).map((entry) => entry.async('string')));
+    expect(everything.join('\n')).not.toContain('Secret/Plan.md');
+    expect(everything.join('\n')).not.toContain('"sharing"');
+    expect(everything.join('\n')).not.toContain('"extensions"');
+    // the creator keeps what the extension stored
+    expect((await creator.assets.getAssetById(scene!.id))?.data).toEqual(data);
   });
 });
 
