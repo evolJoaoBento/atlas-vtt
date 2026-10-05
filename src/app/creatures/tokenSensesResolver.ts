@@ -56,7 +56,7 @@ export interface TokenSensesResolver {
 
 function sameRules(a: SenseRules, b: SenseRules): boolean {
   return a.unit.unitType === b.unit.unitType
-    && a.unit.unitDistance === b.unit.unitDistance
+    && a.unit.ruleDistance === b.unit.ruleDistance
     && (a.definitions === b.definitions || sameSenses(a.definitions, b.definitions));
 }
 

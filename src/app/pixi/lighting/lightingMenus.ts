@@ -3,12 +3,16 @@ import { readLight, readWall } from '../../lighting/lightingObjects';
 import type { ViewAtlasStore } from '../../storeFactory';
 import type { WallChannel } from '../../types/wallTypes';
 import { openContextMenuGlobal, type ContextMenuEntry } from '../../react/root/ContextMenuContext';
+import type { DoorPlacement } from '../vision/DoorPlacement';
 import type { WallInteraction } from '../vision/WallInteraction';
 import type { WallRenderer } from '../vision/WallRenderer';
+import { removeDoor, removeJoint } from './wallJoints';
+import { t } from '../../i18n';
 
 export interface LightingMenuContext {
   store: ViewAtlasStore;
   walls: WallInteraction;
+  doors: DoorPlacement;
   wallRenderer: WallRenderer;
   /** The light whose marker is at the world point. */
   lightAt: (worldX: number, worldY: number) => string | null;
@@ -18,14 +22,14 @@ export function showLightMenu(context: LightingMenuContext, lightId: string, scr
   const light = readLight(context.store.getState().objects.lights[lightId]);
   if (!light) return;
   const entries: ContextMenuEntry[] = [
-    { type: 'item', label: 'Configure light…', icon: 'settings', onClick: () => context.store.getState().openLightPopover(lightId) },
+    { type: 'item', label: t('light.configure'), icon: 'settings', onClick: () => context.store.getState().openLightPopover(lightId) },
     {
       type: 'item',
-      label: light.hidden ? 'Turn on' : 'Turn off',
+      label: light.hidden ? t('light.turnOn') : t('light.turnOff'),
       icon: light.hidden ? 'lightbulb' : 'lightbulb-off',
       onClick: () => context.store.getState().updateLight(lightId, { hidden: !light.hidden }),
     },
-    { type: 'item', label: 'Delete light', icon: 'trash-2', onClick: () => context.store.getState().deleteLight(lightId) },
+    { type: 'item', label: t('light.delete'), icon: 'trash-2', onClick: () => context.store.getState().deleteLight(lightId) },
   ];
   openContextMenuGlobal(entries, { x: screenX, y: screenY });
 }
@@ -57,25 +61,37 @@ export function showWallMenu(context: LightingMenuContext, worldX: number, world
     return;
   }
 
-  // A right-click on an unselected wall selects it first, alone. Not as a press would: that opens a door, and takes hold of a wall's end.
-  const hitWallId = wallRenderer.hitTestWalls(worldX, worldY) ?? wallRenderer.hitTestVertices(worldX, worldY)?.wallId;
+  // A right-click on an unselected wall selects it first, with its chain. Not as a press would: that opens a door, and takes hold of a wall's end.
+  const allWalls = store.getState().objects.walls;
+  const vertexHit = wallRenderer.hitTestVertices(worldX, worldY);
+  const joint = vertexHit ? allWalls[vertexHit.wallId]?.[vertexHit.vertex] : undefined;
+  const segmentId = joint ? null : wallRenderer.hitTestWalls(worldX, worldY);
+  const hitWallId = segmentId ?? vertexHit?.wallId;
   if (hitWallId && !walls.getSelectedWallIds().includes(hitWallId)) walls.selectWallChain(hitWallId, false);
   if (!walls.hasSelection()) return;
 
   const selected = walls.getSelectedWallIds();
-  const allWalls = store.getState().objects.walls;
   const directions = new Set(selected.map((id) => allWalls[id]?.direction ?? 'both'));
-  const single = selected.length === 1 ? allWalls[selected[0]!] : undefined;
+  // The wall under the pointer, also one of a chain; without one, the one wall selected.
+  const segment = (segmentId ? allWalls[segmentId] : undefined) ?? (selected.length === 1 ? allWalls[selected[0]!] : undefined);
+  const at = segmentId ? { x: worldX, y: worldY } : undefined;
   const entries: ContextMenuEntry[] = [];
 
-  if (single?.type === 'solid') {
+  if (segment?.type === 'solid') {
     entries.push(
-      { type: 'item', label: 'Place door', icon: 'door-open', onClick: () => walls.startDoorPlacement(single.id, 'door') },
-      { type: 'item', label: 'Place secret door', icon: 'lock', onClick: () => walls.startDoorPlacement(single.id, 'secret-door') },
+      { type: 'item', label: t('wall.placeDoor'), icon: 'door-open', onClick: () => context.doors.start(segment.id, 'door', at) },
+      { type: 'item', label: t('wall.placeSecretDoor'), icon: 'lock', onClick: () => context.doors.start(segment.id, 'secret-door', at) },
     );
   }
 
-  if (single) entries.push(...doorMenuEntries(store, single.id));
+  if (segment) {
+    entries.push(...doorMenuEntries(store, segment.id));
+    const doorRemoval = removeDoor(allWalls, segment.id);
+    if (doorRemoval) entries.push({ type: 'item', label: 'Remove door', icon: 'brick-wall', onClick: () => walls.apply(doorRemoval) });
+  }
+
+  const jointRemoval = joint ? removeJoint(allWalls, joint) : null;
+  if (jointRemoval) entries.push({ type: 'item', label: 'Remove point', icon: 'circle-minus', onClick: () => walls.apply(jointRemoval) });
 
   const direction = (label: string, value: 'left' | 'right' | undefined): ContextMenuEntry => ({
     type: 'item',
@@ -85,9 +101,9 @@ export function showWallMenu(context: LightingMenuContext, worldX: number, world
   });
   entries.push({
     type: 'submenu',
-    label: 'Light direction',
+    label: t('wall.direction'),
     icon: 'arrow-left-right',
-    children: [direction('Block both sides', undefined), direction('Allow from left', 'left'), direction('Allow from right', 'right')],
+    children: [direction(t('wall.blockBoth'), undefined), direction(t('wall.allowLeft'), 'left'), direction(t('wall.allowRight'), 'right')],
   });
 
   // What the selected walls block, as they are read (a kind that is none reads as both).
@@ -110,9 +126,12 @@ export function showWallMenu(context: LightingMenuContext, worldX: number, world
     entries.push({ type: 'item', label: 'Limited (see past the first)', icon: 'grip-horizontal', checked: allLimited, onClick: () => walls.updateSelected({ limited: allLimited ? undefined : true }) });
   }
 
+  if (segmentId && selected.length > 1) {
+    entries.push({ type: 'item', label: 'Delete this wall', icon: 'trash', onClick: () => walls.apply({ remove: [segmentId], add: [] }) });
+  }
   entries.push({
     type: 'item',
-    label: selected.length > 1 ? `Delete (${selected.length} walls)` : 'Delete',
+    label: selected.length > 1 ? t('wall.deleteMany', { count: selected.length }) : t('common.delete'),
     icon: 'trash-2',
     onClick: () => walls.deleteSelected(),
   });

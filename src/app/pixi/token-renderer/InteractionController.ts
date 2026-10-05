@@ -41,6 +41,7 @@ import { conditionsSubmenu } from '../../react/components/context-menu/condition
 import { controlledBySubmenu } from '../../online/ui/controlledByMenu';
 import { mayMoveAsOnlinePlayer, ONLINE_DRAG_CANCEL, ONLINE_TOKEN_DROPPED } from '../../online/obsidian/remoteTokenMoves';
 import { holdTokens } from '../../lighting/sightOnDrop';
+import { t } from '../../i18n';
 
 interface DragState {
   isDragging: boolean;
@@ -622,7 +623,7 @@ export class InteractionController implements ITokenInteractionController {
     const hideTargets = this.contextMenuTargets(token.id);
     entries.push({
       type: 'item',
-      label: isHidden ? 'Show' : 'Hide',
+      label: isHidden ? t('token.show') : t('token.hide'),
       icon: isHidden ? 'eye' : 'eye-off',
       onClick: () => this.store.getState().updateTokens(
         hideTargets.map((id) => ({ id, changes: { isHidden: !isHidden } })),
@@ -646,19 +647,19 @@ export class InteractionController implements ITokenInteractionController {
       const groupIds = selectedIds.includes(token.id) ? selectedIds : [token.id];
       entries.push({
         type: 'item',
-        label: 'Duplicate',
+        label: t('common.duplicate'),
         icon: 'files',
         onClick: () => this.store.getState().duplicateMapObjects(groupIds),
       });
       entries.push({
         type: 'item',
-        label: 'Copy',
+        label: t('common.copy'),
         icon: 'copy',
         onClick: () => copyMapObjects(this.store, groupIds),
       });
       entries.push({
         type: 'item',
-        label: 'Save as Encounter',
+        label: t('token.saveEncounter'),
         icon: 'swords',
         onClick: () => {
           void saveMapTokensAsEncounter(this.obsApp, this.store, this.gridSystem, groupIds);
@@ -669,7 +670,7 @@ export class InteractionController implements ITokenInteractionController {
     // Edit Token
     entries.push({
       type: 'item',
-      label: 'Edit Token',
+      label: t('editToken.title'),
       icon: 'edit',
       onClick: () => this.showEditTokenModal(token),
     });
@@ -680,7 +681,7 @@ export class InteractionController implements ITokenInteractionController {
     const initiativeTargets = this.contextMenuTargets(token.id);
     entries.push({
       type: 'item',
-      label: isInInitiative ? 'Remove from Initiative' : 'Add to Initiative',
+      label: isInInitiative ? t('initiative.remove') : t('token.addInitiative'),
       icon: 'swords',
       onClick: () => this.handleInitiativeToggle(initiativeTargets, isInInitiative),
     });
@@ -692,7 +693,7 @@ export class InteractionController implements ITokenInteractionController {
     if (statblockPath) {
       entries.push({
         type: 'item',
-        label: 'Edit Statblock',
+        label: t('token.editStatblock'),
         icon: 'file-text',
         onClick: async () => {
           if (obsApp) {
@@ -703,7 +704,7 @@ export class InteractionController implements ITokenInteractionController {
       });
       entries.push({
         type: 'item',
-        label: 'Unlink Statblock',
+        label: t('am.menu.unlinkStatblock'),
         icon: 'unlink',
         onClick: async () => {
           if (obsApp && token.imagePath) {
@@ -716,7 +717,7 @@ export class InteractionController implements ITokenInteractionController {
     } else {
       entries.push({
         type: 'item',
-        label: 'Link Statblock',
+        label: t('am.menu.linkStatblock'),
         icon: 'link',
         onClick: () => {
           if (obsApp && token.imagePath) {
@@ -731,10 +732,10 @@ export class InteractionController implements ITokenInteractionController {
                     this.store.getState().updateToken(token.id, { statblockPath });
                   }),
                   `Linking statblock ${statblockPath}`,
-                  'Could not link the statblock',
+                  t('token.linkFailed'),
                 );
               },
-              character?.name || 'Token',
+              character?.name || t('initiative.token'),
               { imagePath: token.imagePath, showRing: token.showRing },
             );
           }
@@ -746,22 +747,22 @@ export class InteractionController implements ITokenInteractionController {
     // Ring color submenu
     const currentRingColor = token.ringColor;
     const ringColors = [
-      { name: 'Default', value: null },
-      { name: 'Blue', value: '#086ddd' },
-      { name: 'Orange', value: '#ec7500' },
-      { name: 'Red', value: '#e93147' },
-      { name: 'Yellow', value: '#e0ac00' },
-      { name: 'Brown', value: '#a97142' },
-      { name: 'Purple', value: '#7852ee' },
-      { name: 'Green', value: '#08b94e' },
-      { name: 'Pink', value: '#d53984' },
-      { name: 'Cyan', value: '#00bfbc' },
-      { name: 'Gray', value: '#ababab' },
-      { name: 'White', value: '#ffffff' },
+      { name: t('color.default'), value: null },
+      { name: t('color.blue'), value: '#086ddd' },
+      { name: t('color.orange'), value: '#ec7500' },
+      { name: t('color.red'), value: '#e93147' },
+      { name: t('color.yellow'), value: '#e0ac00' },
+      { name: t('color.brown'), value: '#a97142' },
+      { name: t('color.purple'), value: '#7852ee' },
+      { name: t('color.green'), value: '#08b94e' },
+      { name: t('color.pink'), value: '#d53984' },
+      { name: t('color.cyan'), value: '#00bfbc' },
+      { name: t('color.gray'), value: '#ababab' },
+      { name: t('color.white'), value: '#ffffff' },
     ];
     entries.push({
       type: 'submenu',
-      label: 'Ring Color',
+      label: t('token.ringColor'),
       icon: 'circle',
       children: ringColors.map(color => ({
         type: 'item' as const,

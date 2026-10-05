@@ -22,6 +22,14 @@ it('preserves legacy portraits and removes the frame for an explicit opt-out', (
   expect(view.container.querySelector('.atlas-token-portrait--unframed')).toBeTruthy();
 });
 
+// The ring image is a 230 KB data URI: set inline, every card made the browser parse it again (#137).
+it('leaves the ring image to the stylesheet and sets only the tint inline', () => {
+  const view = render(<TokenPortrait src="goblin.webp" alt="Goblin" ringColor="#aa0000" />);
+  const ring = view.container.querySelector<HTMLElement>('.atlas-token-ring')!;
+  expect(ring.style.getPropertyValue('--atlas-token-ring-image')).toBe('');
+  expect(ring.style.getPropertyValue('--atlas-token-ring-color')).toBe('#aa0000');
+});
+
 it('keeps unframed art proportional and unmasked when resized or reframed', () => {
   const container = Object.assign(new Container(), { tokenData: { showRing: false } }) as TokenGroupContainer;
   const sprite = new Sprite(new Texture({ source: new TextureSource({ width: 200, height: 100 }) }));

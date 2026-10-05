@@ -5,6 +5,7 @@ import { AssetService, type Asset, type EncounterAsset, type SceneAsset, type To
 import { FileReferenceService } from '../../src/app/services/FileReferenceService';
 import { transferAssets, type AssetTransferResult } from '../../src/app/services/assetTransfer/assetTransfer';
 import { createSnapshot } from '../../src/app/snapshots/sceneSnapshotFormat';
+import { sceneSnapshotFolder } from '../../src/app/snapshots/snapshotPaths';
 import { createInMemoryApp, parseFrontmatter, type InMemoryApp } from '../mocks/inMemoryVault';
 
 vi.mock('../../src/app/atlas-view', () => ({
@@ -54,14 +55,13 @@ async function seededVault(): Promise<Vault> {
   })) {
     await vault.app.vault.create(path, content);
   }
-  const snapshot = createSnapshot(JSON.parse(mapFile(goblinOnMap)) as never, 'snap1', 'Start', 1000);
-  await vault.app.vault.adapter.write(`${SOURCE}/scenes/.snapshots/Cave/snap1.json`, JSON.stringify(snapshot));
-  await vault.app.vault.adapter.write(`${SOURCE}/scenes/.snapshots/Cave/snap1.jpg`, 'SNAPJPG');
-
   await assets.createTag('source', 'tokens', 'Goblinoid');
   await assets.updateCollectionSettings('target', { conditions: [{ id: 'poisoned', name: 'Poisoned', color: '#0f0' }], defaultWidgets: { hpBar: true } });
   await assets.addTokenAsset({ name: 'Goblin', imagePath: TOKEN_IMAGE, thumbnailPath: TOKEN_THUMB, statblockPath: STATBLOCK, collection: 'source', tags: ['goblinoid'] });
-  await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
+  const scene = await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
+  const snapshot = createSnapshot(JSON.parse(mapFile(goblinOnMap)) as never, 'snap1', 'Start', 1000);
+  await vault.app.vault.create(`${sceneSnapshotFolder('source', scene.id)}/snap1.json`, JSON.stringify(snapshot));
+  await vault.app.vault.create(`${sceneSnapshotFolder('source', scene.id)}/snap1.jpg`, 'SNAPJPG');
   return { vault, assets };
 }
 
@@ -121,12 +121,15 @@ describe('moving assets to another collection', () => {
     expect(moved.filePath?.startsWith(`${TARGET}/scenes/`)).toBe(true);
     expect(vault.vault.files.has(MAP_PATH)).toBe(false);
     expect(vault.vault.files.get(`${TARGET}/scenes/Cave.thumb.jpg`)).toBe('JPG');
-    expect(vault.vault.files.get(`${TARGET}/scenes/.snapshots/Cave/snap1.jpg`)).toBe('SNAPJPG');
+    // Snapshots follow the scene's id into the target collection; the emptied folder goes.
+    expect(vault.vault.files.get(`${sceneSnapshotFolder('target', scene.id)}/snap1.jpg`)).toBe('SNAPJPG');
+    expect([...vault.vault.files.keys()].some((path) => path.startsWith(`${SOURCE}/snapshots/`))).toBe(false);
+    expect(vault.vault.folders.has(sceneSnapshotFolder('source', scene.id))).toBe(false);
     expect(vault.assets.getCollectionForMap(newMap)).toBe('target');
 
     const state = mapState(vault, newMap);
     expect(state.objects.tokens.t1!.conditions).toEqual(['poisoned']);
-    const snapshot = JSON.parse(vault.vault.files.get(`${TARGET}/scenes/.snapshots/Cave/snap1.json`)!) as { state: { objects: { tokens: Record<string, { conditions: string[] }> } } };
+    const snapshot = JSON.parse(vault.vault.files.get(`${sceneSnapshotFolder('target', scene.id)}/snap1.json`)!) as { state: { objects: { tokens: Record<string, { conditions: string[] }> } } };
     expect(snapshot.state.objects.tokens.t1!.conditions).toEqual(['poisoned']);
   });
 
@@ -157,7 +160,8 @@ describe('moving assets to another collection', () => {
     const moved = (await vault.assets.getAssetById(scene.id)) as SceneAsset;
     expect(moved).toMatchObject({ name: 'Cave-2', data: { mapPath: `${TARGET}/scenes/Cave-2.atlasmap` } });
     expect(vault.vault.files.get(`${TARGET}/scenes/Cave-2.thumb.jpg`)).toBe('JPG');
-    expect(vault.vault.files.has(`${TARGET}/scenes/.snapshots/Cave-2/snap1.json`)).toBe(true);
+    // Snapshots are found by the scene's id, so the map's new name does not touch them.
+    expect(vault.vault.files.has(`${sceneSnapshotFolder('target', scene.id)}/snap1.json`)).toBe(true);
   });
 
   it('leaves the artwork of a token that stays behind shared with a moved encounter', async () => {
@@ -189,18 +193,6 @@ describe('moving assets to another collection', () => {
     expect(vault.vault.files.get(`${TARGET}/tokens/orc.webp`)).toBe('ORC');
   });
 
-  it('does not give a scene the name of a leftover snapshot folder', async () => {
-    const vault = await seededVault();
-    await vault.vault.app.vault.adapter.write(`${TARGET}/scenes/.snapshots/Cave/old.json`, '{}');
-    const scene = await only(vault.assets, 'source', 'scene');
-
-    await move(vault, [scene.id]);
-
-    expect(((await vault.assets.getAssetById(scene.id)) as SceneAsset).data?.mapPath).toBe(`${TARGET}/scenes/Cave-2.atlasmap`);
-    expect(vault.vault.files.has(`${TARGET}/scenes/.snapshots/Cave-2/snap1.json`)).toBe(true);
-    expect(vault.vault.files.get(`${TARGET}/scenes/.snapshots/Cave/old.json`)).toBe('{}');
-  });
-
   it('puts every file back and changes no record when the transfer fails', async () => {
     const vault = await seededVault();
     const scene = await only(vault.assets, 'source', 'scene');
@@ -221,7 +213,8 @@ describe('moving assets to another collection', () => {
 
     await expect(copy(vault, [map.id])).rejects.toThrow('Disk full. Nothing was changed.');
 
-    expect([...vault.vault.files.keys()].filter((path) => path.startsWith(`${TARGET}/`))).toEqual([]);
+    // The target collection's own record is all its folder holds.
+    expect([...vault.vault.files.keys()].filter((path) => path.startsWith(`${TARGET}/`))).toEqual([`${TARGET}/collection.json`]);
   });
 });
 
@@ -277,8 +270,14 @@ describe('copying assets to another collection', () => {
     expect(state.objects.pins.p1!.notePath).toBe(`${TARGET}/notes/Entrance.md#Door`);
     expect(state.objects.tokens.t1!.conditions).toEqual(['poisoned']);
     expect(vault.vault.files.get(`${TARGET}/notes/Entrance.md`)).toBe('# Door');
-    expect(vault.vault.files.get(`${TARGET}/scenes/.snapshots/Cave/snap1.jpg`)).toBe('SNAPJPG');
-    expect(vault.vault.files.get(copied.filePath!)).toBe(JSON.stringify({ mapPath: newMap }, null, 2));
+    // The copy's snapshots are its own, under its new id; the original keeps its own.
+    expect(vault.vault.files.get(`${sceneSnapshotFolder('target', copied.id)}/snap1.jpg`)).toBe('SNAPJPG');
+    expect(vault.vault.files.has(`${sceneSnapshotFolder('target', copied.id)}/snap1.json`)).toBe(true);
+    expect(vault.vault.files.get(`${sceneSnapshotFolder('source', scene.id)}/snap1.jpg`)).toBe('SNAPJPG');
+    expect(JSON.parse(vault.vault.files.get(copied.filePath!)!)).toEqual({
+      mapPath: newMap,
+      atlasRecord: expect.objectContaining({ id: copied.id, type: 'scene', name: 'Cave' }),
+    });
   });
 
   it('keeps the statblock link of a copy whose note lives in the collection and comes along', async () => {

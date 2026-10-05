@@ -7,7 +7,7 @@ import type { TokenSense } from '../../src/app/types/senseTypes';
 import { creatureVault, type CreatureVault } from '../mocks/creatureVault';
 
 const DND = BUILT_IN_SENSES['builtin:dnd5e']!;
-const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', unitDistance: 5 } };
+const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', ruleDistance: 5 } };
 const GOBLIN = 'Bestiary/Goblin.md';
 
 function named(senses: readonly TokenSense[]): Array<[string, number?]> {

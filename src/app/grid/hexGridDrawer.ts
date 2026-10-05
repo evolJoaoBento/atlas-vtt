@@ -91,9 +91,8 @@ function drawEdges(graphics: GridPath, lattice: HexLattice, lineType: GridLineTy
 }
 
 /** One crow's-foot marker per lattice vertex, enumerated the same way the zig-zags are. */
-function drawVertexMarkers(graphics: GridPath, lattice: HexLattice, thickness: number): void {
+function drawVertexMarkers(graphics: GridPath, lattice: HexLattice, thickness: number, arm: number): void {
   const { size, radius } = lattice;
-  const arm = gridMarkerArmLength(size);
   const cos30 = Math.sqrt(3) / 2;
   // The lattice has two vertex kinds; their three incident edges point in these directions.
   const outerArms = [lattice.toDirection(0, -1), lattice.toDirection(cos30, 0.5), lattice.toDirection(-cos30, 0.5)];
@@ -122,10 +121,11 @@ export function drawHexGrid(
   layout: HexLayout,
   lineType: GridLineType,
   markerThickness: number = 1,
+  markerArm: number = gridMarkerArmLength(layout.size),
 ): void {
   const lattice = createLattice(bounds, layout);
   if (lineType === 'dotted') {
-    drawVertexMarkers(graphics, lattice, markerThickness);
+    drawVertexMarkers(graphics, lattice, markerThickness, markerArm);
   } else {
     drawEdges(graphics, lattice, lineType);
   }

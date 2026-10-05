@@ -72,6 +72,9 @@ export function atlasMeasurement(measurement: PlayerMeasurement): MeasurementSet
     mode: measurement.mode,
     unitType: measurement.unitType,
     unitDistance: measurement.unitDistance,
+    // Players get the distance the scene measures in, never the collection's rules square; nothing
+    // they draw converts distances written in squares (presets, statblocks), so the two are one here.
+    ruleDistance: measurement.unitDistance,
     diagonalRule: measurement.diagonalRule,
     rangeBands: measurement.rangeBands.map((band) => ({ name: band.name, maxSquares: band.maxSquares })),
     coneAngle: measurement.coneAngle,

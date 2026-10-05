@@ -17,9 +17,9 @@ import { useAssetCatalog } from './token-creator/useAssetCatalog';
 import { useAssetTags } from './token-creator/useAssetTags';
 import { useTokenPreviews } from './token-creator/useTokenPreviews';
 import { useFrameProgress } from '../primitives/useFrameProgress';
-import { modeNoun } from './token-creator/types';
 import { uvttFilesAmong, type ImportMaps } from './hooks/useUvttImport';
 import type { CreatorMode, EditTokenInput } from './token-creator/types';
+import { t } from '../../../i18n';
 
 interface TokenCreatorProps {
   isOpen: boolean;
@@ -132,7 +132,7 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
       if (saved === total) onClose();
       else if (saved > 0) setSaveError(`Saved ${saved} of ${total}. The others stay here so you can try again.`);
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Could not save previews.');
+      setSaveError(error instanceof Error ? error.message : t('creator.savePreviewsFailed'));
       if (error instanceof AssetRegistrationUncertainError) setSaveBlocked(true);
     } finally {
       setIsSubmitting(false);
@@ -184,7 +184,7 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
   if (!isOpen) return null;
 
   const count = previews.previews.length;
-  const title = editToken ? `Edit ${modeNoun(mode, 1)}` : `Create ${modeNoun(mode, 2)}`;
+  const title = editToken ? t(`creator.${mode}.edit`) : t(`creator.${mode}.create`);
 
   return (
     <motion.div {...dialogOverlayMotion} className="atlas-vtt-plugin atlas-vtt-root atlas-token-creator" data-token-creator="true" onClick={() => { if (!isSubmitting) onClose(); }}>
@@ -225,7 +225,7 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
         <header className="atlas-token-creator__header">
           <h2>
             <span id={titleId}>{title}</span>
-            {!usingStatblocks && count > 0 && <span className="atlas-token-creator__subtitle">{count} {modeNoun(mode, count)}</span>}
+            {!usingStatblocks && count > 0 && <span className="atlas-token-creator__subtitle">{t(`creator.${mode}.count`, { count })}</span>}
           </h2>
           <CloseButton onClick={() => { if (!isSubmitting) onClose(); }} />
         </header>
@@ -236,8 +236,8 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
           {count === 0 ? (
             <div className="atlas-token-creator__empty">
               <div className="atlas-token-creator__empty-icon"><ImageIcon /></div>
-              <h3>No {modeNoun(mode, 2)} yet</h3>
-              <p>Drop images anywhere in this window. You can crop, zoom and name each one before creating.</p>
+              <h3>{t(`creator.${mode}.none`)}</h3>
+              <p>{t('creator.emptyHint')}</p>
             </div>
           ) : (
             <PreviewGrid
@@ -268,7 +268,7 @@ export function TokenCreator({ isOpen, onClose, mode = 'token', selectedCollecti
         {isDragging && (
           <div className="atlas-token-creator__drop-overlay">
             <div className="atlas-token-creator__drop-overlay-icon"><Upload /></div>
-            <span>Drop to add {modeNoun(mode, 2)}</span>
+            <span>{t(`creator.${mode}.drop`)}</span>
           </div>
         )}
       </motion.div>

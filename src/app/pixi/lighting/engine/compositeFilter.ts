@@ -12,6 +12,7 @@ import {
 import { BOUNCE, DARKNESS, EXPOSURE, PURKINJE, wallBand, wallCore } from '../../../lighting/lightingConstants';
 import { DEFAULT_AMBIENT_COLOR, DEFAULT_EXPLORED_COLOR, DEFAULT_UNEXPLORED_COLOR } from '../../../lighting/sceneLightingOptions';
 import { srgbToLinear } from '../../../lighting/srgb';
+import type { GridMarkColor } from '../../../grid/gridLightingMark';
 import { ENGINE_SHADERS } from './engineShaders';
 import type { DarknessMap } from './DarknessMap';
 import type { ZoneMap } from './ZoneMap';
@@ -49,6 +50,8 @@ export interface CompositeFilter {
   setMemoryColours(explored: string | undefined, unexplored: string | undefined): void;
   /** The caller owns `texture` and rebinds before destroying it. */
   setExplored(texture: Texture): void;
+  /** The marked grid's colour (`UnlitGrid`), or null while no grid is marked and shown. */
+  setGrid(mark: GridMarkColor | null): void;
   /** Maps screen pixels of the render being drawn to world pixels; `zoom` is screen px per world px. */
   setView(screenToWorld: Matrix, zoom: number): void;
 }
@@ -90,6 +93,8 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
   const unexplored = new Float32Array(3);
   const greyTint = new Float32Array(3);
   const darkTint = new Float32Array([1, 1, 1]);
+  const gridColor = new Float32Array(3);
+  let gridMark: number | undefined;
   const group = new UniformGroup({
     uScreenToWorld: { value: screenToWorld, type: 'mat3x3<f32>' },
     uPixelWorld: { value: 1, type: 'f32' },
@@ -121,6 +126,8 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     uGreyLevel: { value: 0, type: 'f32' },
     uDarkLevels: { value: new Float32Array([DARK_SIGHT_LEVELS.dim, DARK_SIGHT_LEVELS.bright]), type: 'vec2<f32>' },
     uFluSpacing: { value: BOUNCE.probe, type: 'f32' },
+    uGrid: { value: 0, type: 'f32' },
+    uGridColor: { value: gridColor, type: 'vec3<f32>' },
   });
   const u = group.uniforms;
   // Bound while the scene has no darkness source and no ambient zone, so the filter never holds a destroyed map.
@@ -205,6 +212,16 @@ export function createCompositeFilter(world: LightingWorld, explored: Texture): 
     },
     setExplored(texture): void {
       filter.resources.uExplored = texture.source;
+    },
+    setGrid(mark): void {
+      // Set at every render: the uniforms are uploaded only when the grid changes.
+      const kind = mark ? (mark.contrasting ? 2 : 1) : 0;
+      if (kind === u.uGrid && mark?.color === gridMark) return;
+      u.uGrid = kind;
+      gridMark = mark?.color;
+      const color = new Color(mark?.color ?? 0);
+      gridColor.set([color.red, color.green, color.blue]);
+      group.update();
     },
     setView(matrix, zoom): void {
       screenToWorld.copyFrom(matrix);

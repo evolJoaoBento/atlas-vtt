@@ -16,6 +16,7 @@ import type { AtlasView } from '../../../../atlas-view';
 import type { TokenInput } from '../../../../storeFactory';
 import { loadAtlasView } from '../../../../plugin/atlasLeaves';
 import { tokenFromFile } from '../../../../resources/resourceFileFormat';
+import { t } from '../../../../i18n';
 import { mapVisionDefaults } from '../../../../gameSystems/visionDefaults';
 import { systemPresetsOf } from '../../../../services/mapCollectionRules';
 import type { TokenVision, TokenVisionDefaults } from '../../../../types/lightingTypes';
@@ -173,7 +174,7 @@ async function resolveTokenSource(ctx: SpawnContext, ref: TokenSourceRef): Promi
   }
   return {
     imagePath,
-    name: ref.name || 'Token',
+    name: ref.name || t('initiative.token'),
     statblockPath: record?.statblockPath ?? ref.statblockPath ?? null,
     size: record?.size ?? ref.size,
     showRing: record?.showRing ?? ref.showRing,
@@ -325,8 +326,8 @@ export async function spawnEncounterTokens(
 
   const ids = addSpawnedTokens(target, tokens);
   new Notice(ids.length < tokensToSpawn.length
-    ? `Spawned ${ids.length} of ${tokensToSpawn.length} tokens from "${encounter.name}" (some had missing images)`
-    : `Spawned ${ids.length} tokens from "${encounter.name}"`);
+    ? t('am.spawnedPartial', { count: ids.length, expected: tokensToSpawn.length, name: encounter.name })
+    : t('am.spawned', { count: ids.length, name: encounter.name }));
   return ids;
 }
 

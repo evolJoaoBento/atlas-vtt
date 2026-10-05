@@ -12,6 +12,7 @@ import { sceneNameOf } from '../utils/sceneName';
 import { settledWithin } from '../utils/settledWithin';
 import { LatestRequestQueue } from './latestRequestQueue';
 import { fillStoreFromMapFile } from './mapFileFallback';
+import { t } from '../i18n';
 
 /** How long a scene may take to load before the load is given up. */
 export const STALLED_LOAD_MS = 30_000;
@@ -64,7 +65,7 @@ export class MapService {
       if (this.store.getState().mapLoaded) this.eventBus.emit('map-unloading');
 
       // Show loading overlay FIRST before any state changes
-      this.store.getState().setMapLoading(true, 0, 'Loading map...');
+      this.store.getState().setMapLoading(true, 0, t('map.loadingShort'));
 
       // Get the actual renderer object from the service
       const renderer = rendererService.getRenderer();
@@ -103,10 +104,10 @@ export class MapService {
       history?.pause();
       
       // Update loading progress
-      storeState.setMapLoading(true, 20, 'Clearing previous data...');
+      storeState.setMapLoading(true, 20, t('map.clearing'));
       
       // Update loading progress
-      storeState.setMapLoading(true, 40, 'Loading map image...');
+      storeState.setMapLoading(true, 40, t('map.loadingImage'));
       
       // Load and display the map in the renderer
       // Note: this loads the actual map image and sets up the grid
@@ -123,7 +124,7 @@ export class MapService {
 
       if (this.currentMapData) {
         // Update loading progress
-        storeState.setMapLoading(true, 60, 'Restoring map data...');
+        storeState.setMapLoading(true, 60, t('map.restoring'));
         
         // Set the background from loaded map data BEFORE rehydration
         // This ensures we have a valid background even if rehydration fails
@@ -148,7 +149,7 @@ export class MapService {
         storeState.setPersistenceEnabled(true);
         
         // Update loading progress
-        storeState.setMapLoading(true, 80, 'Loading tokens and pins...');
+        storeState.setMapLoading(true, 80, t('map.loadingTokens'));
 
         // After rehydration, populate what it did not load from the map file data
         fillStoreFromMapFile(this.store, this.currentMapData);
@@ -159,7 +160,7 @@ export class MapService {
       }
       
       if (this.store.getState().grid?.autoDetect) {
-        storeState.setMapLoading(true, 85, 'Detecting grid...');
+        storeState.setMapLoading(true, 85, t('map.detectingGrid'));
         // Let the overlay paint before the CPU-bound detection blocks the thread.
         await new Promise(resolve => window.setTimeout(resolve, 30));
         if (isSuperseded()) return null;
@@ -171,7 +172,7 @@ export class MapService {
       // Update loading progress
       const finalState = this.store.getState();
       const tokenCount = Object.keys(finalState.objects?.tokens || {}).length;
-      const loadingMessage = tokenCount > 0 ? `Loading ${tokenCount} tokens...` : 'Finalizing...';
+      const loadingMessage = tokenCount > 0 ? t('map.loadingNTokens', { count: tokenCount }) : t('map.finalizing');
       storeState.setMapLoading(true, 90, loadingMessage);
       
       // Get current grid settings from store (live settings) instead of static map file data
@@ -214,7 +215,7 @@ export class MapService {
   private recoverFromFailedLoad(rendererService: RendererService, filePath: string, error: unknown): void {
     // Without this the view only shows an empty canvas
     const reason = describeError(error).replace(/^\[\w+\]\s*/, '');
-    new Notice(`Atlas VTT could not open the scene ${sceneNameOf(filePath)} (${reason}).`, 0);
+    new Notice(t('map.openFailed', { name: sceneNameOf(filePath), reason }), 0);
 
     // A load that failed before it switched the store leaves the previous map open and saved as before
     const mapStillLoaded = this.store.getState().mapLoaded;

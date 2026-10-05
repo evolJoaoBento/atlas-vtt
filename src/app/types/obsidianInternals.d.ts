@@ -1,5 +1,5 @@
 import 'obsidian';
-import type { EventRef, Menu, Plugin, TAbstractFile, View } from 'obsidian';
+import type { Component, EditorSuggest, EventRef, Menu, Plugin, TAbstractFile, TFile, View } from 'obsidian';
 
 /**
  * Obsidian members that exist at runtime but are missing from the public
@@ -20,6 +20,34 @@ declare module 'obsidian' {
     customCss?: {
       theme?: string;
     };
+    /** Renders `![[file]]` embeds and hover previews of non-markdown files, by extension. */
+    embedRegistry?: EmbedRegistry;
+  }
+
+  /** What Obsidian hands an embed creator: where to render and which link asked for it. */
+  interface EmbedContext {
+    app: App;
+    containerEl: HTMLElement;
+    linktext: string;
+    sourcePath: string;
+    depth: number;
+    /** Set for embeds in notes (reading view and live preview); unset in hover previews. */
+    showInline?: boolean;
+  }
+
+  /** An embed: Obsidian adds it as a child of the note's component and then calls `loadFile`. */
+  interface FileEmbed extends Component {
+    loadFile(): Promise<void>;
+  }
+
+  /** Returns null to let Obsidian show its plain file embed. */
+  type EmbedCreator = (context: EmbedContext, file: TFile, subpath: string) => FileEmbed | null;
+
+  interface EmbedRegistry {
+    /** Throws when the extension already has an embed. */
+    registerExtension(extension: string, creator: EmbedCreator): void;
+    unregisterExtension(extension: string): void;
+    isExtensionRegistered(extension: string): boolean;
   }
 
   interface FileManager {
@@ -46,6 +74,11 @@ declare module 'obsidian' {
       container: HTMLElement | ShadowRoot,
       options?: { focus?: boolean },
     ): void;
+
+    /** Editor suggesters in the order they are asked; the first that triggers wins. */
+    editorSuggest?: {
+      suggests: EditorSuggest<unknown>[];
+    };
 
     on(
       name: 'link-menu',

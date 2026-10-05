@@ -11,6 +11,7 @@ import { Notice } from 'obsidian';
 import { rollOfResult } from '../../../online/obsidian/onlineDice';
 import { sendOnlineRoll } from '../../../online/obsidian/onlineRollRefusal';
 import type { DiceRollResult } from '../../../tools/diceRolling';
+import { t } from '../../../i18n';
 
 interface DiceRollLogProps {
   isOpen: boolean;
@@ -114,10 +115,10 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
     <div ref={panelRef} className="dice-roll-log">
       {/* Header */}
       <div className="dice-roll-log__header">
-        <span className="dice-roll-log__title">Dice Log</span>
+        <span className="dice-roll-log__title">{t('dice.log')}</span>
         <div className="dice-roll-log__actions">
           {history.length > 0 && !remote && (
-            <LabelTooltip label="Clear history">
+            <LabelTooltip label={t('dice.clearHistory')}>
               <button
                 className="btn btn--ghost btn--icon dice-roll-log__action-btn"
                 onClick={clearHistory}
@@ -126,7 +127,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
               </button>
             </LabelTooltip>
           )}
-          <LabelTooltip label={isPinned ? 'Unpin panel' : 'Pin panel open'}>
+          <LabelTooltip label={isPinned ? t('dice.unpin') : t('dice.pin')}>
             <button
               className={`btn btn--ghost btn--icon dice-roll-log__action-btn ${isPinned ? 'dice-roll-log__action-btn--active' : ''}`}
               onClick={() => setIsPinned(prev => !prev)}
@@ -134,7 +135,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
               {isPinned ? <PinOff /> : <Pin />}
             </button>
           </LabelTooltip>
-          <CloseButton onClick={handleClose} title="Close (Enter or Esc)" />
+          <CloseButton onClick={handleClose} title={t('dice.closeHint')} />
         </div>
       </div>
 
@@ -143,7 +144,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
         {history.length === 0 ? (
           <div className="dice-roll-log__empty">
             <Dices className="dice-roll-log__empty-icon" />
-            <span>No rolls yet</span>
+            <span>{t('dice.noRolls')}</span>
           </div>
         ) : (
           history.map((result, index) => (

@@ -3,6 +3,8 @@ import { BUILT_IN_SYSTEM_PRESETS } from '../../src/app/gameSystems/builtInPreset
 import { AssetService } from '../../src/app/services/AssetService';
 import { mapLightPresets } from '../../src/app/services/mapCollectionRules';
 import type { GridState } from '../../src/app/services/MapPersistence';
+import { gameUnitsToWorld, unitScaleOf } from '../../src/app/lighting/lightingUnits';
+import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
 import type { CollectionSettings } from '../../src/app/types/collectionSettingsTypes';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
@@ -49,6 +51,18 @@ describe('the rules of the collection that holds a map', () => {
     const grid = { unitType: 'meters', unitDistance: 2, size: 70 } as GridState;
     const torch = mapLightPresets(app, { mapPath: 'maps/other.atlasmap', grid }).find((light) => light.id === 'torch')!;
     expect([torch.bright, torch.dim]).toEqual([8, 16]);
+  });
+
+  // #84: lights written in squares count the collection's rules square, not the scene's cells.
+  it("gives a scene with its own distance per cell the lights its collection's rules square makes", () => {
+    const gridDefaults = { unitType: 'feet', unitDistance: 5, measurementMode: 'metric' } as const;
+    const app = appWith({ gridDefaults });
+    const grid = { size: 70, unitDistanceOverride: 50 } as GridState;
+    const torch = mapLightPresets(app, { mapPath: 'maps/cave.atlasmap', grid }).find((light) => light.id === 'torch')!;
+    expect([torch.bright, torch.dim]).toEqual([20, 40]);
+    // A torch placed before is 40 ft as well, and both reach 0.8 of a 50 ft cell
+    const cells = (feet: number): number => gameUnitsToWorld(feet, unitScaleOf(resolveMeasurementSettings(gridDefaults, grid), grid)) / 70;
+    expect(cells(torch.dim)).toBeCloseTo(0.8);
   });
 
   it('stops every light at the farthest one may reach on the map', () => {

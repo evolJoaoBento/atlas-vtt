@@ -6,14 +6,14 @@ import { sameSenses } from '../../src/app/gameSystems/senseRules';
 import { SightRulesWatch } from '../../src/app/pixi/lighting/SightRulesWatch';
 import { AssetService } from '../../src/app/services/AssetService';
 import { mapSenseRules, mapSenseRulesSource } from '../../src/app/services/mapSenseRules';
-import { SettingsService } from '../../src/app/services/SettingsService';
+import { SystemPresetFiles } from '../../src/app/services/systemPresets/SystemPresetFiles';
 import { SystemPresetService } from '../../src/app/services/SystemPresetService';
 import type { ViewAtlasStore } from '../../src/app/storeFactory';
 import type { TokenEntity } from '../../src/app/types';
 import type { CollectionSettings } from '../../src/app/types/collectionSettingsTypes';
 import { sightSources } from '../../src/app/vision/sight';
 import { creatureVault, type CreatureVault } from '../mocks/creatureVault';
-import { memorySettings } from '../mocks/memorySettings';
+import { memoryPresets } from '../mocks/memoryPresets';
 
 const MAP = 'atlas-vtt/collections/dungeon/scenes/cave.atlasmap';
 const BOUNDS = { width: 4000, height: 4000 };
@@ -26,15 +26,15 @@ describe('the watch on a user preset\'s senses', () => {
   let resolver: TokenSensesResolver;
   let watch: SightRulesWatch;
   let rebuilt: ReturnType<typeof vi.fn>;
-  let atlas: ReturnType<typeof memorySettings>;
+  let atlas: ReturnType<typeof memoryPresets>;
   let presetId: string;
   const state = { mapPath: MAP, grid: null };
 
   beforeEach(() => {
     current = creatureVault();
-    atlas = memorySettings({ systemPresets: [] });
+    atlas = memoryPresets();
     presetId = new SystemPresetService(atlas).create('Homebrew', dnd.rules).id;
-    vi.spyOn(SettingsService, 'forApp').mockReturnValue(atlas as unknown as SettingsService);
+    vi.spyOn(SystemPresetFiles, 'forApp').mockReturnValue(atlas as unknown as SystemPresetFiles);
     settings = { systemPresetId: presetId, conditions: [] } as unknown as CollectionSettings;
     const assets = AssetService.getInstance(current.app);
     vi.spyOn(assets, 'getCollectionForMap').mockReturnValue('dungeon');

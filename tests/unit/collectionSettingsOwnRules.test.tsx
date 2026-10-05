@@ -10,10 +10,10 @@ import { SystemPresetService } from '../../src/app/services/SystemPresetService'
 import type { CollectionSettings } from '../../src/app/types/collectionSettingsTypes';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { withDynamicLighting } from '../mocks/experimentalFeatures';
-import { memorySettings } from '../mocks/memorySettings';
+import { memoryPresets } from '../mocks/memoryPresets';
 import { AMMO, HP } from '../mocks/resourceFixtures';
 
-const service = new SystemPresetService(memorySettings());
+const service = new SystemPresetService(memoryPresets());
 vi.mock('../../src/app/react/hooks/useSystemPresets', () => ({
   useSystemPresets: () => ({ service, presets: service.list() }),
 }));

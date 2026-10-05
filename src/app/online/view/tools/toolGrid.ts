@@ -36,7 +36,8 @@ export function toolGridOf(scene: PlayerScene): ToolGrid {
     snapDrag: (point, tokenSize) => (scene.measurement.snapToGrid && snapGrid
       ? snapTokenCenter(point, tokenSize, snapGrid.type, snapGrid.size, (cell) => cellCenterAt(snapGrid, cell))
       : { x: point.x, y: point.y }),
-    label: (points) => dragRulerLabel(geometry, points, scene.measurement),
+    // The page converts no distances written in squares, so the rules square is the scene's cell.
+    label: (points) => dragRulerLabel(geometry, points, { ...scene.measurement, ruleDistance: scene.measurement.unitDistance }),
     coneOpening: (scene.measurement.coneAngle * Math.PI) / 180,
   };
 }

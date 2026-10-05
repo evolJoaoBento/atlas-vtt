@@ -11,6 +11,7 @@ import { Viewport } from 'pixi-viewport';
 import type { TextElement } from '../types';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
+import { MAP_LAYER_Z } from './mapLayerOrder';
 
 /** Gap between the top of the text and the handle. */
 const HANDLE_OFFSET = 28;
@@ -39,6 +40,7 @@ export class TextRotationUI {
 
     this.container = new Container();
     this.container.label = 'textRotationUI';
+    this.container.zIndex = MAP_LAYER_Z.textHandles;
     this.container.visible = false;
     this.viewport.addChild(this.container);
 

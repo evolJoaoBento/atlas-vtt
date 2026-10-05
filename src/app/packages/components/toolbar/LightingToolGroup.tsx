@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { BrickWall, Flame, FlameKindling, Footprints, Lamp, Lightbulb, Moon, MousePointer2, Pencil, Sparkles, SunMoon } from "lucide-react"
+import { t } from '../../../i18n';
 import { useHotkeyLabels } from "../../../keyboard/useMapHotkeys"
 import { useAtlasStore } from "../../../react/ViewStoreContext"
 import { chosenLightPreset } from "../../../lighting/lightPresetChoice"
@@ -18,16 +19,16 @@ type RowIcon = DropdownMenuItemProps['icon']
 
 /** What the tool does with a click. */
 const SUB_MODES: readonly { value: WallToolSubMode; icon: RowIcon; label: string }[] = [
-  { value: 'draw', icon: BrickWall, label: 'Draw walls' },
-  { value: 'place-light', icon: Lightbulb, label: 'Place lights' },
+  { value: 'draw', icon: BrickWall, label: t('toolbar.drawWalls') },
+  { value: 'place-light', icon: Lightbulb, label: t('toolbar.placeLights') },
   { value: 'light-zone', icon: SunMoon, label: 'Light zones' },
   { value: 'explored-memory', icon: Footprints, label: 'Explored memory' },
 ]
 
 
 const DRAW_MODES: readonly { value: WallToolMode; icon: RowIcon; label: string }[] = [
-  { value: 'point-to-point', icon: MousePointer2, label: 'Point to point' },
-  { value: 'freeform', icon: Pencil, label: 'Freehand' },
+  { value: 'point-to-point', icon: MousePointer2, label: t('toolbar.pointToPoint') },
+  { value: 'freeform', icon: Pencil, label: t('toolbar.freehand') },
 ]
 
 /** A row's icon for each kind of light a preset can be. */
@@ -73,7 +74,7 @@ export function LightingToolGroup({ activeTool, selectTool, menuOpen, toggleMenu
     <ToolGroup
       face={face}
       shortcut={hotkeyLabel('wall')}
-      menuLabel="Lighting options"
+      menuLabel={t('toolbar.lightingOptions')}
       menuOpen={menuOpen}
       onSelect={() => selectTool(face.tool)}
       onMenuToggle={toggleMenu}

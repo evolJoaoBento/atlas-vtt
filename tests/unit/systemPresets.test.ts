@@ -67,11 +67,13 @@ describe('built-in presets', () => {
   it('give every built-in system HP, Cairn STR from its stat row and Daggerheart Stress', () => {
     for (const preset of BUILT_IN_SYSTEM_PRESETS) {
       const hp = preset.rules.resources?.find((r) => r.key === 'hp');
-      expect(hp?.defeatedWhenSpent, preset.name).toBe(true);
+      // In Cairn a character at 0 HP still stands; STR 0 is death
+      expect(hp?.defeatedWhenSpent, preset.name).toBe(preset.name !== 'Cairn');
       expect(preset.rules.defaultWidgets?.hpBar, preset.name).toBeUndefined();
     }
     const cairn = BUILT_IN_SYSTEM_PRESETS.find((p) => p.name === 'Cairn')!;
     expect(cairn.rules.resources?.map((r) => [r.key, r.field, r.direction])).toEqual([['hp', 'hp', 'drains'], ['str', 'stats.0', 'drains']]);
+    expect(cairn.rules.resources?.filter((r) => r.defeatedWhenSpent).map((r) => r.key)).toEqual(['str']);
     const daggerheart = BUILT_IN_SYSTEM_PRESETS.find((p) => p.name === 'Daggerheart')!;
     expect(daggerheart.rules.resources?.map((r) => [r.key, r.direction])).toEqual([['hp', 'drains'], ['stress', 'fills']]);
   });

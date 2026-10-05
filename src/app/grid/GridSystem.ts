@@ -3,7 +3,9 @@ import { Viewport } from 'pixi-viewport';
 import type { RenderLayer } from 'pixi.js';
 import { drawSquareGrid } from './squareGridDrawer';
 import { drawHexGrid } from './hexGridDrawer';
+import { gridMarkerArmLength } from './gridLineStyle';
 import type { GridBounds, GridLineType } from './gridLineStyle';
+import { GridLines } from './gridLines';
 import { createHexLayout, hexCellExtent, isHexGridType } from './hexGeometry';
 import { cellCenterAt } from './gridDistance';
 import type { HexLayout } from './hexGeometry';
@@ -14,6 +16,7 @@ import { hexLattice } from './hexLattice';
 import { squareLattice } from './squareLattice';
 import { CellNumberLabels, type CellNumberView } from './cellNumberLabels';
 import { destroyTree } from '../pixi/utils/destroyTree';
+import { applyGridMark, createMarkBacking, type GridMarkColor, type UnlitGrid } from './gridLightingMark';
 
 export type GridType = 'square' | 'hex-horizontal' | 'hex-vertical';
 
@@ -61,10 +64,9 @@ export const ALIGNMENT_GRID_COLOR = 0x00ff00;
  * Manages a static grid overlay that exactly matches a background sprite,
  * staying locked under pan/zoom by the Pixi‑Viewport container.
  */
-export class GridSystem {
+export class GridSystem implements UnlitGrid {
   /** Holds the grid lines and, on a numbered grid, the cell numbers. */
   private gridSprite: Container | null = null;
-  private gridMask: Graphics | null = null;
   private cellNumberLabels: CellNumberLabels | null = null;
   private readonly onViewportZoomed = (): void => {
     this.cellNumberLabels?.setView(this.numberView());
@@ -83,6 +85,10 @@ export class GridSystem {
   private isDestroying: boolean = false;
   private _isCreating: boolean = false;
   private autoColor: number | null = null;
+  /** Whether the lighting composite draws the grid (`UnlitGrid`). */
+  private marked = false;
+  private markBacking: Graphics | null = null;
+  private drawnColor: GridMarkColor = { color: 0xffffff, contrasting: true };
 
   /**
    * @param app      – the Pixi Application
@@ -179,31 +185,21 @@ export class GridSystem {
 
     // `??`, not `||`: black is 0x000000 and must not fall through to the automatic colour
     const gridColor = isAligning ? ALIGNMENT_GRID_COLOR : (color ?? this.getAutoColor(bgSprite));
-    const gridAlpha = isAligning ? Math.min(alpha! * 1.5, 1) : alpha!;
 
-    const lines = new Graphics();
-    lines.setStrokeStyle({
-      width: lineWidth!,
+    const lines = new GridLines({
+      lineType,
+      lineWidth: lineWidth!,
       color: gridColor,
-      alpha: gridAlpha,
-      alignment: 0,
-      cap: 'round',
-      join: 'miter'
+      alpha: isAligning ? Math.min(alpha! * 1.5, 1) : alpha!,
+      markerArm: gridMarkerArmLength(size),
+      trace: (path, thickness, arm) => {
+        if (hexLayout) drawHexGrid(path, bounds, hexLayout, lineType, thickness, arm);
+        else drawSquareGrid(path, bounds, size, offsetX, offsetY, lineType, thickness, arm);
+      },
     });
 
-    if (hexLayout) {
-      drawHexGrid(lines, bounds, hexLayout, lineType, lineWidth);
-    } else {
-      drawSquareGrid(lines, bounds, size, offsetX, offsetY, lineType, lineWidth);
-    }
-    if (lineType === 'dotted') {
-      lines.fill({ color: gridColor, alpha: gridAlpha });
-    } else {
-      lines.stroke();
-    }
-
     const grid = new Container({ label: 'grid', eventMode: 'none', interactiveChildren: false });
-    grid.addChild(lines);
+    grid.addChild(lines.graphics);
     grid.position.set(bounds.minX, bounds.minY);
 
     const cellNumbers = this.options.cellNumbers;
@@ -220,14 +216,19 @@ export class GridSystem {
       grid.addChild(this.cellNumberLabels.container);
     }
 
-    // Clip the grid to the map bounds
+    // Clip the grid to the map bounds. The mask is the grid's own child so it is hidden with it:
+    // a visible mask whose grid is hidden is left out of PIXI's batch yet still updated in place on
+    // every zoom, writing its corners over whatever took its slot (the map folded towards a pin).
     const maskGraphics = new Graphics();
     maskGraphics.rect(0, 0, bgSprite.width, bgSprite.height);
     maskGraphics.fill(0xffffff);
-    maskGraphics.position.set(bgX, bgY);
+    maskGraphics.position.set(bgX - bounds.minX, bgY - bounds.minY);
+    grid.addChild(maskGraphics);
     grid.mask = maskGraphics;
-    this.gridMask = maskGraphics;
-    this.viewport.addChild(maskGraphics);
+    this.markBacking = createMarkBacking(bgX - bounds.minX, bgY - bounds.minY, bgSprite.width, bgSprite.height);
+    grid.addChildAt(this.markBacking, 0);
+    applyGridMark(grid, this.markBacking, this.marked);
+    this.drawnColor = { color: gridColor, contrasting: !isAligning && color === undefined };
 
     // Keep geometry ready for player capture even when the DM hides the grid.
     grid.visible = this.options.enabled !== false;
@@ -271,14 +272,7 @@ export class GridSystem {
   /** Clean up grid-only resources */
   private destroyGridResources(): void {
     this.cellNumberLabels = null;
-    if (this.gridMask) {
-      if (this.gridMask.parent) {
-        this.gridMask.parent.removeChild(this.gridMask);
-      }
-      this.gridMask.destroy();
-      this.gridMask = null;
-    }
-
+    this.markBacking = null;
     if (!this.gridSprite) return;
 
     this.gridSprite.visible = false;
@@ -313,6 +307,16 @@ export class GridSystem {
         // Silently ignore destruction errors
       }
     });
+  }
+
+  setMarking(on: boolean): void {
+    if (on === this.marked) return;
+    this.marked = on;
+    if (this.gridSprite && this.markBacking) applyGridMark(this.gridSprite, this.markBacking, on);
+  }
+
+  markColor(): GridMarkColor | null {
+    return this.marked && this.gridSprite?.visible ? this.drawnColor : null;
   }
 
   /** Toggle visibility */

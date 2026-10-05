@@ -131,7 +131,7 @@ describe('playerSceneToAtlasState', () => {
     });
     const parts = playerSceneToAtlasState(scene, images);
     expect(parts.measurement).toEqual({
-      mode: 'abstract', unitType: 'custom', unitDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
+      mode: 'abstract', unitType: 'custom', unitDistance: 1, ruleDistance: 1, diagonalRule: 'alternating', rangeBands: [{ name: 'Close', maxSquares: 2 }], coneAngle: 53.13,
     });
     expect(parts.state.grid).toMatchObject({ snapToGrid: false, measurementType: 'abstract' });
     expect(parts.state.grid).not.toHaveProperty('unitType');

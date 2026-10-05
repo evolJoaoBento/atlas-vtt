@@ -7,6 +7,7 @@ import { openOnlineSession } from '../../online/ui/openOnlineSession';
 import { presentedScene } from '../../services/PresentedScene';
 import { presentViewToPlayers, stopPresenting } from '../../services/presentToPlayers';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
+import { t } from '../../i18n';
 
 interface ViewActionsMenuProps {
   app: App;
@@ -35,9 +36,9 @@ export const ViewActionsMenu: React.FC<ViewActionsMenuProps> = ({ app, filePath 
     if (!activeLeaf) return;
 
     const entries: ContextMenuEntry[] = [
-      { type: 'item', label: 'Split right', icon: 'separator-vertical', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'vertical') },
-      { type: 'item', label: 'Split down', icon: 'separator-horizontal', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'horizontal') },
-      { type: 'item', label: 'Move to new window', icon: 'maximize', onClick: () => app.workspace.moveLeafToPopout(activeLeaf) },
+      { type: 'item', label: t('view.splitRight'), icon: 'separator-vertical', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'vertical') },
+      { type: 'item', label: t('view.splitDown'), icon: 'separator-horizontal', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'horizontal') },
+      { type: 'item', label: t('view.newWindow'), icon: 'maximize', onClick: () => app.workspace.moveLeafToPopout(activeLeaf) },
       { type: 'item', label: 'Online session…', icon: 'radio-tower', onClick: () => openOnlineSession(app) },
       { type: 'item', label: 'Present to players', icon: 'cast', onClick: () => presentViewToPlayers(activeLeaf.view) },
     ];
@@ -48,33 +49,33 @@ export const ViewActionsMenu: React.FC<ViewActionsMenuProps> = ({ app, filePath 
     if (filePath) {
       entries.push(
         {
-          type: 'item', label: 'Reveal in file explorer', icon: 'folder-open',
+          type: 'item', label: t('view.reveal'), icon: 'folder-open',
           onClick: async () => {
             const file = app.vault.getAbstractFileByPath(filePath);
             if (file) app.showInFolder(file.path);
           },
         },
         {
-          type: 'item', label: 'Copy file path', icon: 'copy',
+          type: 'item', label: t('view.copyPath'), icon: 'copy',
           onClick: () => {
             navigator.clipboard.writeText(filePath).then(
-              () => new Notice('File path copied to clipboard'),
+              () => new Notice(t('view.pathCopied')),
               (error: unknown) => {
                 console.error('[ViewActionsMenu] Copying the file path failed:', error);
-                new Notice('Could not copy the file path');
+                new Notice(t('view.copyFailed'));
               },
             );
           },
         },
         {
-          type: 'item', label: 'Rename...', icon: 'pencil',
+          type: 'item', label: t('view.rename'), icon: 'pencil',
           onClick: async () => {
             const file = app.vault.getAbstractFileByPath(filePath);
             if (file) app.fileManager.promptForFileRename?.(file);
           },
         },
         {
-          type: 'item', label: 'Delete', icon: 'trash', destructive: true,
+          type: 'item', label: t('common.delete'), icon: 'trash', destructive: true,
           onClick: async () => {
             const file = app.vault.getAbstractFileByPath(filePath);
             if (file) await app.fileManager.trashFile(file);
@@ -84,7 +85,7 @@ export const ViewActionsMenu: React.FC<ViewActionsMenuProps> = ({ app, filePath 
     }
 
     entries.push(
-      { type: 'item', label: 'Close', icon: 'x', onClick: () => activeLeaf.detach() },
+      { type: 'item', label: t('common.close'), icon: 'x', onClick: () => activeLeaf.detach() },
     );
 
     const rect = (e.target as HTMLElement).getBoundingClientRect();
@@ -97,7 +98,7 @@ export const ViewActionsMenu: React.FC<ViewActionsMenuProps> = ({ app, filePath 
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >
-      <LabelTooltip label="More options">
+      <LabelTooltip label={t('view.more')}>
         <button
           className={`atlas-view-actions-btn clickable-icon view-action ${isVisible ? 'visible' : ''}`}
           onClick={showMenu}

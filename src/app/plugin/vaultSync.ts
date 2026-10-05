@@ -4,8 +4,9 @@ import { FileReferenceService } from '../services/FileReferenceService';
 import { MapThumbnailService } from '../services/MapThumbnailService';
 import type { PathMove } from '../services/renamedPaths';
 import { stemOf } from '../services/vault-sync/recoveredIds';
-import { moveSceneSnapshots, trashSceneSnapshots } from '../snapshots/snapshotFolderSync';
+import { followLegacySnapshots, followSceneSnapshots } from '../snapshots/sceneSnapshotFolders';
 import { runInBackground } from '../utils/backgroundTask';
+import { isLibraryFile } from '../services/library/libraryPaths';
 import { EXTENSION_ATLASMAP, isScenePath } from '../utils/sceneFiles';
 import { closeMapTab, getLoadedAtlasView } from './atlasLeaves';
 
@@ -38,19 +39,16 @@ export function registerVaultSync(plugin: Plugin): void {
 
   /** Moves that reach the rest of the vault's references; one pass for every file of a renamed folder. */
   let pendingMoves: PathMove[] = [];
-  const propagateMoves = async (moves: readonly PathMove[]): Promise<void> => {
-    await fileReferences.handleFilesMoved(moves);
-    for (const { from, to } of moves) {
-      if (isScenePath(from) && isScenePath(to)) await moveSceneSnapshots(app, from, to);
-    }
-  };
+  const propagateMoves = (moves: readonly PathMove[]): Promise<void> => fileReferences.handleFilesMoved(moves);
   const flushMoves = (): void => {
     const moves = pendingMoves;
     pendingMoves = [];
     runInBackground(propagateMoves(moves), 'Updating references to moved files');
   };
 
-  // Files deleted since the last check; a deleted map's snapshots and thumbnail wait for it, since the map may have only moved.
+  // Files deleted since the last check; a deleted map's thumbnail waits for it, since the map may have only moved.
+  // Snapshots are never trashed here: a deletion may be another device's rename arriving in halves,
+  // and a trash here would sync back to it. The device that deletes a scene trashes them.
   const deleted = new Set<string>();
   const deletedMaps = new Set<string>();
   const check = async (): Promise<void> => {
@@ -63,12 +61,12 @@ export function registerVaultSync(plugin: Plugin): void {
     const moved = new Set([...result.fileMoves, ...filesOfMovedFolders(app, result.folderMoves)].map(({ from }) => from));
     for (const map of maps) {
       if (moved.has(map) || app.vault.getFileByPath(map)) continue;
-      await trashSceneSnapshots(app, map);
       await sceneThumbnails.trashThumbnail(map);
     }
   };
   const scheduleCheck = debounce(() => runInBackground(check(), 'Checking Atlas files against the vault'), SETTLE_MS, true);
   plugin.register(() => scheduleCheck.cancel());
+  plugin.register(() => assets.cancelScheduledChecks());
 
   /** Moves the check found reach the open map and every stored reference, like renames Obsidian reports. */
   const followReconciliation = async (result: VaultReconciliation): Promise<void> => {
@@ -76,6 +74,7 @@ export function registerVaultSync(plugin: Plugin): void {
     const view = getLoadedAtlasView(app);
     for (const { from, to } of moves) view?.handleFileRenamed(from, to, stemOf(to));
     if (moves.length > 0) await propagateMoves(moves);
+    await followSceneSnapshots(app, await assets.getAssets(undefined, 'scene'));
     app.workspace.trigger('atlas-vtt:refresh-assets');
   };
   plugin.register(assets.onReconciled((result) => runInBackground(followReconciliation(result), 'Following files moved outside Atlas')));
@@ -90,6 +89,7 @@ export function registerVaultSync(plugin: Plugin): void {
         // Obsidian reports every file of a renamed folder in the same task; one pass handles them all.
         if (pendingMoves.length === 0) queueMicrotask(flushMoves);
         pendingMoves.push({ from: oldPath, to: file.path });
+        if (isScenePath(oldPath) && isScenePath(file.path)) runInBackground(followLegacySnapshots(app, oldPath, file.path), 'Moving the snapshots of a renamed map');
       }
       scheduleCheck();
     })
@@ -103,6 +103,13 @@ export function registerVaultSync(plugin: Plugin): void {
       }
       deleted.add(file.path);
       scheduleCheck();
+    })
+  );
+
+  // A sync tool rewrites library files in place: the check takes their new content into the index.
+  plugin.registerEvent(
+    app.vault.on('modify', (file) => {
+      if (isLibraryFile(file.path)) scheduleCheck();
     })
   );
 

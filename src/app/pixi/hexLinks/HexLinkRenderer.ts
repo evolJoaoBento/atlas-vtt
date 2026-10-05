@@ -13,6 +13,7 @@ import { noteLinkTitle } from '../../utils/pathUtils';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../utils/colorUtils';
 import { destroyTree } from '../utils/destroyTree';
 import { createHexLinkChip } from './hexLinkChip';
+import { MAP_LAYER_Z } from '../mapLayerOrder';
 
 const HOVER_FILL_ALPHA = 0.28;
 const PRESSED_FILL_ALPHA = 0.45;
@@ -42,7 +43,7 @@ export interface HexLinkRendererOptions {
  * pin (drawn by `PinRenderer`). DM-only, like pins.
  */
 export class HexLinkRenderer {
-  readonly container = new Container({ label: 'hex-links', eventMode: 'none', interactiveChildren: false });
+  readonly container = new Container({ label: 'hex-links', zIndex: MAP_LAYER_Z.hexLinks, eventMode: 'none', interactiveChildren: false });
   private readonly highlightGraphics = new Graphics();
   private chip: Container | null = null;
   private highlight: Highlight | null = null;

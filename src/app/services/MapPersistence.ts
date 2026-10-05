@@ -37,6 +37,12 @@ export interface GridState {
   mapScale?: number; // Scale factor used during grid alignment
   unitType?: 'feet' | 'yards' | 'meters' | 'units';
   unitDistance?: number;
+  /**
+   * Game units one cell of this scene spans, in place of its collection's (a map drawn at
+   * another scale than the rest). Unset follows the collection. `unitDistance` is no override:
+   * new scenes are written with a copy of the collection's distance, which then goes stale.
+   */
+  unitDistanceOverride?: number;
   lineType?: 'solid' | 'dashed' | 'dotted'; // Grid line style
   lineWidth?: number; // Grid line width in pixels
   measurementType?: 'units' | 'abstract'; // Measurement system to use

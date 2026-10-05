@@ -93,6 +93,17 @@
   }
 }
 
+// `.atlas-vtt-plugin .btn` gives every button wide side padding, a fixed height and
+// one line. A tab label longer than the column (other languages) wraps inside its tab
+// and the tab grows; labels that fit keep their place, since they are centred.
+.atlas-collection-settings-sidebar .atlas-collection-settings-tab.btn {
+  height: auto;
+  min-height: $button-height-l;
+  padding-inline: $spacing-s;
+  white-space: normal;
+  text-align: center;
+}
+
 // ── Content Area ───────────────────────────────────────────────────────────
 .atlas-collection-settings-content {
   flex: 1;

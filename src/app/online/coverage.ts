@@ -169,6 +169,8 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   unitType: SENT,
   unitDistance: SENT,
   measurementType: SENT,
+  // A scene's own distance per cell: players get the measurement's `unitDistance` it gives.
+  unitDistanceOverride: SENT,
 };
 
 /** The store fields the projection reads (`sliceOf` in `sceneSources.ts` watches them, and those of `LIGHTING_STATE_COVERAGE`). */
