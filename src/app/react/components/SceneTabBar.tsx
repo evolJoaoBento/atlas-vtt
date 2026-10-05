@@ -74,8 +74,9 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
   if (tabs.length === 0) return null;
 
   const presentLabel = (tab: SceneTab, isPresented: boolean): string => {
-    if (isPresented) return hosting ? `Stop presenting ${tab.displayName}` : `${tab.displayName} is shown to players`;
-    return hosting ? `Present ${tab.displayName} to players` : `Show ${tab.displayName} on the player view`;
+    const name = tab.displayName;
+    if (isPresented) return t(hosting ? 'online.present.stopTab' : 'online.present.tabShown', { name });
+    return t(hosting ? 'online.present.presentTab' : 'tabs.show', { name });
   };
 
   return (

@@ -67,13 +67,13 @@ function registerPlayerViewCommands(plugin: Plugin, imageDisplay: ImageDisplaySe
 
   plugin.addCommand({
     id: 'present-to-players',
-    name: 'Present to players',
+    name: t('online.present'),
     callback: () => void presentActiveTabToPlayers(plugin.app),
   });
 
   plugin.addCommand({
     id: 'stop-presenting',
-    name: 'Stop presenting',
+    name: t('online.stopPresenting'),
     checkCallback: (checking) => {
       if (!presentedScene.current()) return false;
       if (!checking) stopPresenting();

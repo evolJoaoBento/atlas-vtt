@@ -39,11 +39,11 @@ export const ViewActionsMenu: React.FC<ViewActionsMenuProps> = ({ app, filePath 
       { type: 'item', label: t('view.splitRight'), icon: 'separator-vertical', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'vertical') },
       { type: 'item', label: t('view.splitDown'), icon: 'separator-horizontal', onClick: () => app.workspace.createLeafBySplit(activeLeaf, 'horizontal') },
       { type: 'item', label: t('view.newWindow'), icon: 'maximize', onClick: () => app.workspace.moveLeafToPopout(activeLeaf) },
-      { type: 'item', label: 'Online session…', icon: 'radio-tower', onClick: () => openOnlineSession(app) },
-      { type: 'item', label: 'Present to players', icon: 'cast', onClick: () => presentViewToPlayers(activeLeaf.view) },
+      { type: 'item', label: t('online.sessionMenu'), icon: 'radio-tower', onClick: () => openOnlineSession(app) },
+      { type: 'item', label: t('online.present'), icon: 'cast', onClick: () => presentViewToPlayers(activeLeaf.view) },
     ];
     if (presentedScene.current()) {
-      entries.push({ type: 'item', label: 'Stop presenting', icon: 'square', onClick: stopPresenting });
+      entries.push({ type: 'item', label: t('online.stopPresenting'), icon: 'square', onClick: stopPresenting });
     }
 
     if (filePath) {

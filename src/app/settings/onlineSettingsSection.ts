@@ -2,6 +2,7 @@ import { Notice, type Setting, type TextComponent, type ToggleComponent } from '
 import type { SettingsService } from '../services/SettingsService';
 import { DEFAULT_ONLINE_SETTINGS, formatTurnServers, parseTurnServers } from '../online/onlineSettings';
 import type { AtlasSettingSection } from './settingSections';
+import { t } from '../i18n';
 
 function isHttpUrl(text: string): boolean {
   try {
@@ -33,23 +34,23 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
   };
 
   return {
-    heading: 'Online play',
+    heading: t('online.settings.heading'),
     rows: [
       {
-        name: 'Signaling server',
-        desc: 'Helps players find your session; no game data goes through it. The free PeerJS cloud works out of the box. Only used while a session is running.',
+        name: t('online.settings.signaling'),
+        desc: t('online.settings.signalingDesc'),
         aliases: ['peerjs', 'online', 'multiplayer', 'remote'],
         render: (setting) => {
           setting.addDropdown((dropdown) => dropdown
-            .addOption('cloud', 'PeerJS cloud (free)')
-            .addOption('custom', 'My own server')
+            .addOption('cloud', t('online.settings.signalingCloud'))
+            .addOption('custom', t('online.settings.signalingCustom'))
             .setValue(signaling().mode)
             .onChange((value) => setSignaling({ mode: value === 'custom' ? 'custom' : 'cloud' })));
         },
       },
       {
-        name: 'Own server address',
-        desc: 'Host, port and path of your peerjs-server, used when "My own server" is chosen.',
+        name: t('online.settings.ownServer'),
+        desc: t('online.settings.ownServerDesc'),
         render: (setting) => {
           const host = (text: TextComponent): TextComponent => text
             .setPlaceholder('peer.example.org')
@@ -68,19 +69,19 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
             .onChange((value) => setSignaling({ path: value.trim() || '/' }));
           const fields: TextComponent[] = [];
           setting.setClass(WRAP_CLASS).setClass(BELOW_CLASS);
-          for (const [label, build] of [['Host', host], ['Port', port], ['Path', path]] as const) {
+          for (const [label, build] of [[t('online.settings.host'), host], [t('online.settings.port'), port], [t('online.settings.path'), path]] as const) {
             setting.addText((text) => {
               fields.push(build(text));
               text.inputEl.setAttribute('aria-label', label);
-              if (label === 'Host') text.inputEl.addClass('atlas-setting-wrap__wide');
+              if (build === host) text.inputEl.addClass('atlas-setting-wrap__wide');
             });
           }
           return ownServerFields(setting, fields);
         },
       },
       {
-        name: 'Own server key and TLS',
-        desc: 'The key your peerjs-server expects, and whether it uses TLS (https).',
+        name: t('online.settings.keyAndTls'),
+        desc: t('online.settings.keyAndTlsDesc'),
         render: (setting) => {
           const fields: Array<TextComponent | ToggleComponent> = [];
           setting
@@ -90,18 +91,18 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
                 .setPlaceholder(DEFAULT_ONLINE_SETTINGS.signaling.key)
                 .setValue(signaling().key)
                 .onChange((key) => setSignaling({ key: key.trim() || 'peerjs' })));
-              text.inputEl.setAttribute('aria-label', 'Key');
+              text.inputEl.setAttribute('aria-label', t('online.settings.key'));
             })
             .addToggle((toggle) => {
               fields.push(toggle.setValue(signaling().secure).onChange((secure) => setSignaling({ secure })));
-              toggle.toggleEl.setAttribute('aria-label', 'Use TLS');
+              toggle.toggleEl.setAttribute('aria-label', t('online.settings.useTls'));
             });
           return ownServerFields(setting, fields);
         },
       },
       {
-        name: 'Relay (TURN) servers',
-        desc: 'For players whose network blocks direct connections. One per line: turn:host:port username password. Players receive these in the join link.',
+        name: t('online.settings.turn'),
+        desc: t('online.settings.turnDesc'),
         aliases: ['turn', 'relay', 'nat', 'firewall'],
         render: (setting) => {
           setting.setClass(WRAP_CLASS).addTextArea((area) => area
@@ -111,8 +112,8 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         },
       },
       {
-        name: 'Player page',
-        desc: 'The web page players open to join. Change it if you publish the page yourself.',
+        name: t('online.settings.playerPage'),
+        desc: t('online.settings.playerPageDesc'),
         render: (setting) => {
           setting.setClass(WRAP_CLASS).addText((text) => {
             text
@@ -121,14 +122,14 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
             // Once, when the field is left with a changed value, not on every keystroke.
             text.inputEl.addEventListener('change', () => {
               const url = text.inputEl.value.trim();
-              if (url && !isHttpUrl(url)) new Notice("That isn't a web address; the player page was not changed.");
+              if (url && !isHttpUrl(url)) new Notice(t('online.settings.playerPageInvalid'));
             });
           });
         },
       },
       {
-        name: 'Shared note properties',
-        desc: 'Properties that notes you share keep, separated by commas. All other properties are removed before sending; atlas-share always is.',
+        name: t('online.settings.sharedProperties'),
+        desc: t('online.settings.sharedPropertiesDesc'),
         aliases: ['sharing', 'frontmatter', 'atlas-share'],
         render: (setting) => {
           setting.setClass(WRAP_CLASS).addText((text) => text
@@ -140,8 +141,8 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         },
       },
       {
-        name: 'Keep online images on this device',
-        desc: 'When you join a session from Atlas, keep its images outside your vault so the next session loads faster. Switching it off deletes them.',
+        name: t('online.settings.keepImages'),
+        desc: t('online.settings.keepImagesDesc'),
         aliases: ['cache', 'images', 'join', 'online'],
         render: (setting) => {
           setting.addToggle((toggle) => toggle
@@ -150,8 +151,8 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
         },
       },
       {
-        name: 'Log online play events',
-        desc: 'For troubleshooting: writes what Atlas sends to online players, and every change of the presented scene, to the developer console.',
+        name: t('online.settings.logEvents'),
+        desc: t('online.settings.logEventsDesc'),
         aliases: ['debug', 'diagnostics', 'console', 'online'],
         render: (setting) => {
           setting.addToggle((toggle) => toggle
