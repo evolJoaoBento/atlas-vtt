@@ -5,6 +5,12 @@ import { initialRemoteViewState } from '../../src/app/remote-view/remoteViewStat
 import { FakeViewport } from './fakeViewport';
 import { fakeView, loadMap, trackerWith, type FakeView } from './apiFakes';
 
+/** Freezes the fake store's records as Immer leaves them after a draft update. */
+function deepFreezeState(view: FakeView): void {
+  const state = view.atlasStore.getState();
+  for (const value of [state.objects, state.objects.tokens, state.objects.texts, state.objects.drawings, state.objects.fog, state.widgetSettings, state.lighting, state.grid]) if (value) Object.freeze(value);
+}
+
 function setup(views: FakeView[], active: () => FakeView | null = () => null): ReturnType<typeof trackerWith> & { api: ReturnType<typeof viewsApi>; disposers: DisposerSet } {
   const tracked = trackerWith(views, active);
   const disposers = new DisposerSet();
@@ -41,6 +47,8 @@ describe('views', () => {
     const view = fakeView('v1');
     const { api } = setup([view]);
     loadMap(view);
+    // As Immer leaves the records after a draft update, which every edit makes.
+    deepFreezeState(view);
     const state = view.atlasStore.getState();
     const snapshot = api.snapshot('v1')!;
     expect(snapshot.objects.fog).toBe(state.objects.fog);
@@ -51,6 +59,33 @@ describe('views', () => {
     expect(snapshot.grid).toBe(state.grid);
     expect(Object.keys(snapshot.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
     expect(Object.isFrozen(snapshot)).toBe(true);
+  });
+
+  it('C-views-2: records the store has not frozen yet (a map just loaded) reach a listener as frozen copies, the same while they stay', () => {
+    const view = fakeView('v1');
+    const { api } = setup([view]);
+    loadMap(view);
+    const state = view.atlasStore.getState();
+    expect(Object.isFrozen(state.objects.tokens)).toBe(false);
+    const snapshot = api.snapshot('v1')!;
+    for (const value of [snapshot.objects.tokens, snapshot.objects.fog, snapshot.grid, snapshot.widgets.settings, snapshot.initiative, snapshot.lighting, snapshot.mapSize]) {
+      expect(Object.isFrozen(value)).toBe(true);
+    }
+    expect(() => { (snapshot.objects.tokens as Record<string, unknown>).x = 1; }).toThrow();
+    expect(state.objects.tokens).not.toHaveProperty('x');
+    expect(api.snapshot('v1')!.objects.tokens).toBe(snapshot.objects.tokens);
+  });
+
+  it('C-views-4: what list, active and map-loaded describe is frozen, so one extension cannot change it for another', () => {
+    const view = fakeView('v1');
+    const { api, events } = setup([view], () => view);
+    const heard: unknown[] = [];
+    events.on('map-loaded', (info) => heard.push(info));
+    loadMap(view);
+    for (const info of [api.list()[0], api.active(), heard[0]]) {
+      expect(Object.isFrozen(info)).toBe(true);
+      expect(Object.isFrozen((info as { tabs: unknown }).tabs)).toBe(true);
+    }
   });
 
   it('C-views-4: map-loaded fires once per load, map-closed once on close', () => {

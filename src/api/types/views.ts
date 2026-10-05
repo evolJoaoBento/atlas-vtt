@@ -7,6 +7,7 @@ import type {
 
 export type { ViewCamera };
 
+/** A view as `views.list()`, `views.active()` and the `map-loaded` and `map-closed` events describe it; frozen. */
 export interface ViewInfo {
   viewId: ViewId;
   kind: 'map' | 'remote';
@@ -17,7 +18,10 @@ export interface ViewInfo {
   loaded: boolean;
 }
 
-/** The scene in a view's store. Records are the store's frozen data, passed by reference: never mutate them. */
+/**
+ * The scene in a view's store, frozen to its depth: records are the store's frozen data passed by reference, or a
+ * frozen copy of data the store has not frozen yet (right after a map loads).
+ */
 export interface SceneSnapshot {
   readonly viewId: ViewId;
   readonly mapPath: string | null;

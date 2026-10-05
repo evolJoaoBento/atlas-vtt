@@ -52,7 +52,8 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
     },
     camera: (viewId: ViewId): ViewCamera | null => {
       const view = tracker.view(viewId);
-      return view ? viewCamera(view) : null;
+      const camera = view ? viewCamera(view) : null;
+      return camera ? Object.freeze(camera) : null;
     },
     watchCamera: (viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer => {
       const view = tracker.view(viewId);
@@ -60,7 +61,7 @@ export function viewsApi(tracker: ViewTracker, disposers: DisposerSet): ViewsApi
       return ownedByView(tracker, disposers, view, () => watchViewCamera(view, () => {
         if (view.isClosed) return;
         const camera = viewCamera(view);
-        if (camera) callGuarded(listener, camera);
+        if (camera) callGuarded(listener, Object.freeze(camera));
       }));
     },
   });

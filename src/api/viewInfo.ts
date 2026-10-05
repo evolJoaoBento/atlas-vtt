@@ -1,6 +1,7 @@
 import { loadedMapSize } from '../app/services/viewMapSize';
 import type { ViewAtlasState } from '../app/storeFactory';
 import type { TrackedMapView } from './viewTracker';
+import { deepFrozen, frozenStoreValue } from './frozen';
 import type { SceneSnapshot, ViewInfo } from './types/views';
 
 export function isLoaded(state: Pick<ViewAtlasState, 'mapLoaded' | 'isMapLoading'>): boolean {
@@ -12,17 +13,18 @@ export function isRemoteView(view: Pick<TrackedMapView, 'atlasStore'>): boolean 
   return view.atlasStore.getState().remoteView != null;
 }
 
+/** A frozen description of `view`: one object may reach several extensions (`map-loaded`), so none can change it for another. */
 export function viewInfo(view: TrackedMapView): ViewInfo {
   const state = view.atlasStore.getState();
   const { tabs, activeTabId } = view.tabMetaStore.getState();
-  return {
+  return deepFrozen({
     viewId: view.viewId,
     kind: isRemoteView(view) ? 'remote' : 'map',
     activeTabId,
     tabs: tabs.map((tab) => ({ tabId: tab.id, mapPath: tab.filePath, name: tab.displayName })),
     mapPath: state.mapPath,
     loaded: isLoaded(state),
-  };
+  });
 }
 
 /** The store fields a snapshot carries; a change to any of them (by reference) is a new snapshot. */
@@ -34,20 +36,24 @@ export function snapshotSlice(state: ViewAtlasState): readonly unknown[] {
   ];
 }
 
-/** The scene in `view`'s store, by reference: the store's frozen Immer records, never copied. */
+/**
+ * The scene in `view`'s store: the store's frozen Immer records by reference, and a frozen copy of any not frozen yet
+ * (`frozenStoreValue`), so a listener can never change what Atlas saves.
+ */
 export function sceneSnapshot(view: TrackedMapView): SceneSnapshot {
   const state = view.atlasStore.getState();
+  const kept = frozenStoreValue;
   return Object.freeze({
     viewId: view.viewId,
     mapPath: state.mapPath,
     loaded: isLoaded(state),
-    mapSize: loadedMapSize(view),
+    mapSize: Object.freeze(loadedMapSize(view)),
     background: state.background,
-    grid: state.grid,
-    objects: Object.freeze({ tokens: state.objects.tokens, texts: state.objects.texts, drawings: state.objects.drawings, fog: state.objects.fog }),
-    widgets: Object.freeze({ settings: state.widgetSettings, values: state.widgetValues }),
-    initiative: state.initiative,
+    grid: kept(state.grid),
+    objects: Object.freeze({ tokens: kept(state.objects.tokens), texts: kept(state.objects.texts), drawings: kept(state.objects.drawings), fog: kept(state.objects.fog) }),
+    widgets: Object.freeze({ settings: kept(state.widgetSettings), values: kept(state.widgetValues) }),
+    initiative: kept(state.initiative),
     initiativeTrackerOpen: state.initiativeTrackerOpen,
-    lighting: state.lighting,
+    lighting: kept(state.lighting),
   });
 }
