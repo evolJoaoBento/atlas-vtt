@@ -1,7 +1,8 @@
 /**
  * What a remote view shows of its owner's feed: the scene in its store (`RemoteSceneApplier`),
  * the placeholder background while the map image has no URL, the read-only initiative list, and
- * the player's part (`setPlayer`): which tokens move, the measurement, the badges, the bars.
+ * the player's part (`setPlayer`): which tokens move, the measurement, the badges, the bars. A part
+ * equal by value to the one shown keeps its object.
  */
 import type { App } from 'obsidian';
 import type { RemoteSceneInput } from '../../api/types/remoteViews';
@@ -12,7 +13,12 @@ import type { ViewAtlasStore } from '../storeFactory';
 import { RemoteMapBackdrop, type BackdropRenderer } from './RemoteMapBackdrop';
 import { checkedPlayer, checkedScene } from './remoteInput';
 import { RemoteSceneApplier } from './RemoteSceneApplier';
-import { updateRemoteView } from './remoteViewState';
+import { updateRemoteView, type RemoteViewState } from './remoteViewState';
+import { sameValue } from '../utils/sameValue';
+
+/** The parts of the remote view's state that `setPlayer` writes. */
+const PLAYER_PARTS = ['movableTokenIds', 'measurement', 'conditions', 'resources', 'initiativeRules', 'initiativeHealth'] as const;
+type PlayerParts = Pick<RemoteViewState, typeof PLAYER_PARTS[number]>;
 
 /** The owner decided what the player sees before feeding it: show everything that arrives. */
 const SHOW_WHAT_ARRIVES: PlayerSettingsSource = {
@@ -65,14 +71,19 @@ export class RemoteViewScene {
     for (const [tokenId, { value, max }] of Object.entries(state.initiative.health)) {
       Object.defineProperty(initiativeHealth, tokenId, { value: Object.freeze({ current: value, max }), enumerable: true });
     }
-    updateRemoteView(this.host.atlasStore, {
+    const current = this.host.atlasStore.getState().remoteView;
+    if (!current) return;
+    const given: PlayerParts = {
       movableTokenIds: state.movableTokenIds,
       measurement: state.measurement,
       conditions: state.tokenUi.conditions,
       resources: state.tokenUi.resources,
       initiativeRules: state.initiative.rules,
       initiativeHealth: Object.freeze(initiativeHealth),
-    });
+    };
+    // A part equal to the one shown keeps its object, so what reads it (the initiative list, the badges) is not drawn again.
+    const changed = Object.fromEntries(PLAYER_PARTS.filter((part) => !sameValue(current[part], given[part])).map((part) => [part, given[part]]));
+    if (Object.keys(changed).length > 0) updateRemoteView(this.host.atlasStore, changed);
   }
 
   /** The map's size, for Fit map; null without a scene. */

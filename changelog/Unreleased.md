@@ -21,6 +21,7 @@
 - Extension API: a toolbar button can choose per view whether it shows, for example only in the remote views its own extension opened; a hidden button takes no room and is not in More tools
 - Extension API: a remote view's status bar takes up to 3 more buttons beside its action, each telling the extension which was chosen
 - Extension API: a remote view's camera can leave the same margin as Fit map, so an extension's own Fit button frames the map as Shift+1 does
+- Extension API: a remote view redraws only the parts of the player's state that changed, so its initiative list keeps its scroll when the rest is sent again
 
 ## Improved
 

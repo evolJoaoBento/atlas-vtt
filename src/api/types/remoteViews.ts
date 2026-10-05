@@ -75,6 +75,7 @@ export interface RemoteView {
    * `remote:<viewId>`. Null shows an empty, unloaded scene. A record handed again as the same object is not copied again.
    */
   setScene(scene: RemoteSceneInput | null): void;
+  /** Says what the player may do and how their tokens show; a part equal by value to the one shown is kept, so nothing it draws redraws. */
   setPlayer(state: RemotePlayerState): void;
   /**
    * The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus,
