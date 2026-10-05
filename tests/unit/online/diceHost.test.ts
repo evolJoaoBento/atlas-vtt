@@ -181,6 +181,42 @@ describe('DiceHost', () => {
     w.finish();
   });
 
+  it("rolls by the held scene's collection when the GM browses another map before any player has rolled", async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    // The GM's view moves to the dungeon (collection Y): its store now holds that map.
+    w.tabs.getState().setActiveTab(w.dungeon);
+    w.store.setState({ mapPath: 'maps/dungeon.atlasmap' });
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.rulesAsked).toEqual(['maps/tavern.atlasmap']);
+    w.finish();
+  });
+
+  it("rolls by the presented tab's collection when the scene is presented while already held", async () => {
+    const w = toolsWorld();
+    w.tabs.getState().setActiveTab(w.dungeon);
+    w.store.setState({ mapPath: 'maps/dungeon.atlasmap' });
+    w.presented.present(w.view, w.tavern);
+    const a = await w.join('A');
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.rulesAsked).toEqual(['maps/tavern.atlasmap']);
+    w.finish();
+  });
+
+  it('falls back to the default rules, asking for no collection, when the presented tab is gone from the view', async () => {
+    const w = toolsWorld();
+    w.present();
+    const a = await w.join('A');
+    w.store.setState({ mapPath: 'maps/dungeon.atlasmap' });
+    // Make the presented tab unknown without clearing the scene.
+    w.tabs.setState({ tabs: [] });
+    w.presented.current();
+    a.session.sendDiceRoll({ d6: 1 }, 0);
+    expect(w.rulesAsked.every((path) => path === null)).toBe(true);
+    w.finish();
+  });
+
   it('marks a roll mine only for the player who rolled it, live and in the replay', async () => {
     const w = toolsWorld();
     w.present();
