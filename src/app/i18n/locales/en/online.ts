@@ -91,6 +91,8 @@ export const online = {
   'online.scene.title': 'Online scene',
   'online.scene.defaultTableTitle': 'the table',
   'online.scene.condition': 'Condition',
+  'online.scene.resource': 'Resource',
+  'online.scene.downed': 'Downed',
   'online.scene.lostConnection': 'Lost the connection to your GM.',
   'online.scene.noScene': 'Waiting for the GM to show a scene.',
   'online.scene.waiting': 'Waiting for the GM to let you in…',
