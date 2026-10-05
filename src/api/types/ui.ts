@@ -13,12 +13,14 @@ export interface MenuItem {
   /** Lucide name */
   icon?: string;
   onClick?(): void;
+  /** A submenu finds itself again by its label when it is read anew: give the submenus among one menu's items distinct labels. */
   submenu?: MenuItem[];
   checked?: boolean;
   disabled?: boolean;
   /**
    * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
-   * provider again after `ui.invalidate()`, so its checkmarks follow; the items of the menu itself are read when it opens.
+   * provider again after `ui.invalidate()`, so its checkmarks follow. An item in the menu itself also leaves it open, but
+   * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu.
    */
   keepOpen?: boolean;
 }

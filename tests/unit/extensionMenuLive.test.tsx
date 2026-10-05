@@ -55,6 +55,19 @@ describe('extension menu items that stay open', () => {
     expect(checkOf('Bob')).toBe('unchecked');
   });
 
+  it('keeps a submenu inside another submenu live too', () => {
+    const controllers = new Set<string>();
+    const inner = controlledBy(controllers, true);
+    removers.push(viewMenuSlot.add('ext', (ctx) => [{ label: 'Session', submenu: inner(ctx) }]));
+    renderMenu(providedMenuEntries(viewMenuSlot, 'view menu items', CTX), vi.fn());
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Session' }), { key: 'ArrowRight' });
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Controlled by' }), { key: 'ArrowRight' });
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Bob' }));
+    act(() => invalidateSlots());
+    expect(checkOf('Bob')).toBe('checked');
+    expect(checkOf('Anna')).toBe('unchecked');
+  });
+
   it('takes keepOpen only when it is true: anything else closes the menu', () => {
     for (const given of ['yes', 1]) {
       const entries = (() => {

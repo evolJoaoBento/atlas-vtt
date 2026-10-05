@@ -38,7 +38,7 @@ export interface SceneSnapshot {
   readonly widgets: { readonly settings: WidgetSettings; readonly values: WidgetValues };
   readonly initiative: InitiativeState;
   readonly initiativeTrackerOpen: boolean;
-  /** Never sent to players by Atlas Online; read only to decide (with `lighting.playerVisibility`). */
+  /** The GM's lighting settings: an extension should never send them to players, only decide by them (with `lighting.playerVisibility`). */
   readonly lighting: SceneLighting;
 }
 
