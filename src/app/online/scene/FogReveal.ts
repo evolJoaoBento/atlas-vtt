@@ -8,18 +8,21 @@
  * a reveal (erase) clears the fog only in the cells it covers whole, and fogging (paint) takes every
  * cell it touches. Everything outside the map is no proof of anything: only the map is on the grid.
  */
-import { shownTable } from './darknessFog';
+import { anyShownTable, shownTable } from './darknessFog';
 import { FOG_CELL_SIZE, MAX_BRUSH_CELLS, MAX_FOG_CELLS, type FogShape, type WorldBounds } from './FogCoverage';
 import { CLEAR, FOGGED, fillBrush, fillLasso, fillRect, type CellGrid } from './fogRaster';
 import type { MapSize } from './sceneTypes';
 
 /** Whether an item may reach players as far as the fog goes; `bounds` are in the map (`clipToMap`). */
 export interface RevealCheck {
+  /** Every cell the bounds touch is surely revealed: what texts, drawings and pins need, as what is under fog would leak. */
   revealed(bounds: WorldBounds): boolean;
+  /** Some cell the bounds overlap is surely revealed: enough for a token, which the player window draws half under the fog. */
+  partlyRevealed(bounds: WorldBounds): boolean;
 }
 
 /** Nothing is revealed: a map of unknown size. */
-export const CLOSED_REVEAL: RevealCheck = { revealed: () => false };
+export const CLOSED_REVEAL: RevealCheck = { revealed: () => false, partlyRevealed: () => false };
 
 export function revealOf(shapes: readonly FogShape[], map: MapSize): RevealCheck {
   if (!(map.width > 0) || !(map.height > 0)) return CLOSED_REVEAL;
@@ -53,5 +56,6 @@ export function revealOf(shapes: readonly FogShape[], map: MapSize): RevealCheck
   }
   const dark = new Uint8Array(grid.cells.length);
   for (let i = 0; i < dark.length; i++) dark[i] = grid.cells[i] === FOGGED ? 0 : 1;
-  return { revealed: shownTable({ cols, rows, cellSize, map, dark }) };
+  const raster = { cols, rows, cellSize, map, dark };
+  return { revealed: shownTable(raster), partlyRevealed: anyShownTable(raster) };
 }
