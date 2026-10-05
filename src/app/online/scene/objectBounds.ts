@@ -2,7 +2,7 @@
 import { tokenDiameterInCells } from '../../pixi/token-renderer/tokenSizing';
 import { finiteOr, positiveOr, positiveOrNull, textOr, textOrNull } from './coerce';
 import type { WorldBounds } from './FogCoverage';
-import type { PlayerDrawing } from './sceneTypes';
+import type { MapSize, PlayerDrawing } from './sceneTypes';
 
 export const DEFAULT_GRID_SIZE = 70;
 export const DEFAULT_FONT_SIZE = 16;
@@ -76,4 +76,21 @@ export function drawingBounds(drawing: Pick<PlayerDrawing, 'points' | 'width'>):
   }
   const pad = drawing.width;
   return { x: left - pad, y: top - pad, width: right - left + 2 * pad, height: bottom - top + 2 * pad };
+}
+
+/**
+ * The part of `bounds` inside the map, which is all the fog and the darkness can say anything about; null when the
+ * item is hidden outright: a map of unknown size, bounds that are not finite, or an item wholly outside the map
+ * (also one with area that only touches the map's edge from outside; an item with no width or height on the edge is on the map).
+ */
+export function clipToMap(bounds: WorldBounds, map: MapSize): WorldBounds | null {
+  const { width: w, height: h } = map;
+  const right = bounds.x + Math.max(0, bounds.width);
+  const bottom = bounds.y + Math.max(0, bounds.height);
+  if (!(w > 0 && h > 0 && [bounds.x, bounds.y, right, bottom].every(Number.isFinite))) return null;
+  if (right < 0 || bottom < 0 || bounds.x > w || bounds.y > h) return null;
+  if ((bounds.width > 0 && (right <= 0 || bounds.x >= w)) || (bounds.height > 0 && (bottom <= 0 || bounds.y >= h))) return null;
+  const x = Math.max(bounds.x, 0);
+  const y = Math.max(bounds.y, 0);
+  return { x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y };
 }

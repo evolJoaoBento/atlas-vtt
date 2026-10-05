@@ -50,6 +50,46 @@ describe('map payloads', () => {
     expect(parseMapPayload(JSON.parse(JSON.stringify(payload)))).toEqual(payload);
   });
 
+  describe('the fog over the map edge (F-POS)', () => {
+    const withPins = (fog: Record<string, unknown>): SharedMapSource => {
+      const map = migrateMapFile({
+        ...state,
+        objects: {
+          ...state.objects,
+          tokens: { hero: { id: 'hero', kind: 'character', x: 664, y: 350, imagePath: 'art/hero.png', name: 'Hero' } },
+          pins: {
+            edge: { id: 'edge', kind: 'pin', x: 698, y: 698, notePath: 'Notes/Inn.md' },
+            inside: { id: 'inside', kind: 'pin', x: 300, y: 300, notePath: 'Notes/Inn.md' },
+            out: { id: 'out', kind: 'pin', x: 800, y: 300, notePath: 'Notes/Inn.md' },
+          },
+          fog,
+        },
+      });
+      return { map, state: { ...map, objects: { ...map.objects, audios: {} }, widgetSettings: undefined, widgetValues: {}, initiative: null, initiativeTrackerOpen: false } as never, extra: {}, lit: false };
+    };
+    const everything = { f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 0, y: 0, width: 700, height: 700 } };
+    const pinXs = (payload: ReturnType<typeof playerSafePayload>): number[] => (payload?.pins ?? []).map((pin) => pin.x);
+
+    it('sends no pin or token of a map fogged exactly to its size, and no pin outside the map', () => {
+      const payload = playerSafePayload(withPins(everything), 'Inn', context(['Notes/Inn.md']))!;
+      expect(pinXs(payload)).toEqual([]);
+      expect(payload.scene.tokens).toEqual({});
+    });
+
+    it('sends the pins inside the map, the one at the edge too, and not the one outside, when nothing is fogged', () => {
+      const payload = playerSafePayload(withPins({}), 'Inn', context(['Notes/Inn.md']))!;
+      expect(pinXs(payload).sort((a, b) => a - b)).toEqual([300, 698]);
+      expect(Object.keys(payload.scene.tokens)).toEqual(['hero']);
+    });
+
+    it('sends nothing of a map whose image size could not be read', () => {
+      const unread = { ...context(['Notes/Inn.md']), images: { fingerprints: new Map([['maps/inn.png', 'M'.repeat(43)], ['art/hero.png', 'H'.repeat(43)]]), size: { width: 0, height: 0 } } };
+      const payload = playerSafePayload(withPins({}), 'Inn', unread)!;
+      expect(pinXs(payload)).toEqual([]);
+      expect(payload.scene.tokens).toEqual({});
+    });
+  });
+
   it('player-safe: a pin whose note is not ticked is left out (N-4)', () => {
     expect(playerSafePayload(source(), 'Inn', context([]))?.pins).toEqual([]);
   });

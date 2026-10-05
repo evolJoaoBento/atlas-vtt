@@ -83,7 +83,10 @@ function fakeView(state: SceneState): FakeView {
   const tavern = tabs.getState().addTab('maps/tavern.atlasmap', 'Tavern');
   const dungeon = tabs.getState().addTab('maps/dungeon.atlasmap', 'Dungeon');
   tabs.getState().setActiveTab(tavern);
-  const view = { tabMetaStore: tabs, atlasStore: store as unknown as StoreApi<ViewAtlasState>, register: () => {} } as unknown as PresentedView;
+  const view = {
+    tabMetaStore: tabs, atlasStore: store as unknown as StoreApi<ViewAtlasState>, register: () => {},
+    renderer: { getBackgroundSprite: () => ({ width: 2000, height: 5000, destroyed: false }) },
+  } as unknown as PresentedView;
   return { view, store, tabs, tavern, dungeon };
 }
 

@@ -20,7 +20,7 @@ import type { AssetIds } from './AssetRegistry';
 import { finiteOr, finiteOrNull, oneOf, positiveOr, textOr, textOrNull, unitOr } from './coerce';
 import type { FogCoverage } from './FogCoverage';
 import type { LightingFrame } from './LiveLighting';
-import { DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
+import { clipToMap, DEFAULT_GRID_SIZE, tokenBounds } from './objectBounds';
 import type { PlayerViewRules } from './playerViewRules';
 import { projectInitiative, projectWidgets, withCombatantSides } from './projectPanels';
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
@@ -102,27 +102,19 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 }
 
 /**
- * What texts and drawings are checked against. Under lighting the item must be shown per lighting cell: wholly outside
- * the map (or a map of unknown size) it is hidden, and any other item is clipped to the map and sent only when
- * every darkness cell its clipped bounds touch is shown (`Darkness.shown`, which also holds for a zero-area item:
- * the cell under it). The GM's fog and the darkness's rectangles apply on top.
+ * What texts and drawings are checked against, and what is hidden. Every item must be wholly or partly in the map
+ * (`clipToMap`) and surely revealed by the fog over every cell its in-map part touches (`FogCoverage.reveal`). Under
+ * lighting it must also be shown per lighting cell (`LightingFrame.shown`), and clear of what the darkness
+ * rectangles cover.
  */
 function hiddenFrom(context: ProjectionContext, lighting: LightingFrame | null): Pick<FogCoverage, 'isCovered'> {
   const base = context.darkCoverage ?? context.coverage;
-  if (!lighting) return base;
-  const { width: w, height: h } = context.mapSize;
+  const reveal = context.coverage.reveal(context.mapSize);
   return {
     isCovered: (b) => {
-      const right = b.x + Math.max(0, b.width);
-      const bottom = b.y + Math.max(0, b.height);
-      if (!(w > 0 && h > 0 && [b.x, b.y, right, bottom].every(Number.isFinite))) return true;
-      // Wholly outside, also touching the edge from outside (an item with no width or height on the edge is on the map).
-      if (right < 0 || bottom < 0 || b.x > w || b.y > h) return true;
-      if ((b.width > 0 && (right <= 0 || b.x >= w)) || (b.height > 0 && (bottom <= 0 || b.y >= h))) return true;
-      const x = Math.max(b.x, 0);
-      const y = Math.max(b.y, 0);
-      const clipped = { x, y, width: Math.min(right, w) - x, height: Math.min(bottom, h) - y };
-      return base.isCovered(clipped) || !lighting.shown(clipped);
+      const clipped = clipToMap(b, context.mapSize);
+      if (!clipped || !reveal.revealed(clipped)) return true;
+      return lighting !== null && (base.isCovered(clipped) || !lighting.shown(clipped));
     },
   };
 }
@@ -203,8 +195,9 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   const y = finiteOrNull(token.y);
   if (x === null || y === null) return null;
   const size = positiveOr(token.size, 1);
-  // Coverage sees what the GM draws (raw values); the wire gets clamped values.
-  if (context.coverage.isCovered(tokenBounds({ x, y, size }, cellSize))) return null;
+  // The fog sees what the GM draws (raw values); the wire gets clamped values. A token reaches players only where the fog surely leaves the map revealed.
+  const inMap = clipToMap(tokenBounds({ x, y, size }, cellSize), context.mapSize);
+  if (!inMap || !context.coverage.reveal(context.mapSize).revealed(inMap)) return null;
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
   const definitions = context.resources ?? NO_RESOURCES;
