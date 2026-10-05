@@ -201,8 +201,17 @@ function projectToken(token: TokenEntity, context: ProjectionContext, cellSize: 
   // The fog sees what the GM draws (raw values); the wire gets clamped values. Only painted fog hides a token. The player window draws a token half under the fog,
   // so a token is sent when some cell of it inside the map is surely revealed; cells at the map edge or outside it prove nothing.
   if (context.coverage.hasPaintedFog) {
-    const inMap = clipToMap(tokenBounds({ x, y, size }, cellSize), context.mapSize);
-    if (!inMap || !context.coverage.reveal(context.mapSize).partlyRevealed(inMap)) return null;
+    // Both what the GM drew and what players are sent and draw (the clamped position, size and grid size) must have a revealed cell.
+    const wireCell = positiveOr(cellSize, DEFAULT_GRID_SIZE, SCENE_RANGES.cellSize);
+    const reveal = context.coverage.reveal(context.mapSize);
+    const footprints = [
+      tokenBounds({ x, y, size }, cellSize),
+      tokenBounds({ x: finiteOr(x, 0, SCENE_RANGES.coordinate), y: finiteOr(y, 0, SCENE_RANGES.coordinate), size: finiteOr(size, 1, SCENE_RANGES.tokenSize) }, wireCell),
+    ];
+    for (const footprint of footprints) {
+      const inMap = clipToMap(footprint, context.mapSize);
+      if (!inMap || !reveal.partlyRevealed(inMap)) return null;
+    }
   }
   const character = token.kind === 'character' ? token : null;
   const { rules } = context;
