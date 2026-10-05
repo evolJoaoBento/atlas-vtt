@@ -3,7 +3,7 @@ import type { Disposer, ViewId } from './common';
 export interface PresentedSceneInfo {
   /**
    * Names one presentation: the same while it is held and resumed, new for every `present` (and every
-   * presentation the GM starts), even of the same tab. Compare it to tell a new presentation from the one you know.
+   * presentation the GM starts), even of the same tab, and never repeated after Atlas reloads. Compare it to tell a new presentation from the one you know.
    */
   presentationId: string;
   viewId: ViewId; tabId: string; mapPath: string; held: boolean;

@@ -9,7 +9,13 @@ export function bundlesApi(scope: Pick<ExtensionScope, 'id' | 'disposers'>): Bun
       if (!Array.isArray(keys) || keys.some((key) => typeof key !== 'string' || !key.trim())) {
         throw new Error('[Atlas API] stripNoteProperties needs an array of non-empty property names.');
       }
-      return scope.disposers.add(bundleNoteKeys.add(scope.id, keys));
+      // Unloading the extension ends only the live registration; Atlas keeps the keys until the returned disposer is called.
+      const stopLive = scope.disposers.add(bundleNoteKeys.add(scope.id, keys));
+      bundleNoteKeys.remember(scope.id, keys);
+      return (): void => {
+        stopLive();
+        bundleNoteKeys.forget(scope.id, keys);
+      };
     },
   });
 }

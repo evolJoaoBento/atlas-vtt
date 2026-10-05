@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.9.0";
+export declare const API_VERSION = "1.10.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -118,7 +118,12 @@ export declare interface BaseToken {
 }
 
 export declare interface BundlesApi {
-    /** Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share'). */
+    /**
+     * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share').
+     * Atlas remembers them per extension id, so they stay stripped when the extension is not loaded (switched off, or
+     * Atlas starting first). Unloading the extension does not forget them; calling the returned disposer does, and that
+     * is the only thing that does.
+     */
     stripNoteProperties(keys: readonly string[]): Disposer;
 }
 
@@ -754,7 +759,7 @@ export declare interface PresentationTarget {
 export declare interface PresentedSceneInfo {
     /**
      * Names one presentation: the same while it is held and resumed, new for every `present` (and every
-     * presentation the GM starts), even of the same tab. Compare it to tell a new presentation from the one you know.
+     * presentation the GM starts), even of the same tab, and never repeated after Atlas reloads. Compare it to tell a new presentation from the one you know.
      */
     presentationId: string;
     viewId: ViewId;

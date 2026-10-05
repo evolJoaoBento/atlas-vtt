@@ -28,7 +28,7 @@ export interface PresentedView {
 }
 
 export interface PresentedSceneInfo {
-  /** Names this presentation: the same while it is held and resumed, new for every `present`, even of the same tab. */
+  /** Names this presentation: the same while it is held and resumed, new for every `present` (even of the same tab) and never repeated after Atlas reloads. */
   readonly presentationId: string;
   readonly view: PresentedView;
   readonly tabId: string;
@@ -91,8 +91,6 @@ export class PresentedScene {
   private held = false;
   /** Invalidates resume waits that a later tab change made stale. */
   private resumeToken = 0;
-  /** Counts presentations for their ids. */
-  private presentations = 0;
   private stopWatching: (() => void) | null = null;
   /** Stops waiting for the presented tab's scene to load again. */
   private stopResuming: (() => void) | null = null;
@@ -119,7 +117,7 @@ export class PresentedScene {
     this.stopWatching?.();
     this.stopResuming?.();
     const scene: PresentedSceneInfo = {
-      presentationId: `presentation-${++this.presentations}`,
+      presentationId: crypto.randomUUID(),
       view, tabId, store: view.atlasStore,
       mapSize: () => loadedMapSize(view),
       camera: () => viewCamera(view),

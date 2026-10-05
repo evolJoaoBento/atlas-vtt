@@ -20,12 +20,14 @@ vi.mock('../../src/api/atlasViewHooks', () => ({
 
 import type AtlasVTTPlugin from '../../main';
 import { ExtensionApiPublisher } from '../../src/api/ExtensionApiPublisher';
+import { bundleNoteKeys } from '../../src/app/extensions/bundleNoteKeys';
 import { SightFramesByView } from '../../src/api/sightFramesByView';
 import { fakeApp, fakePlugin } from './apiFakes';
 
 function atlas(): { plugin: AtlasVTTPlugin; triggered: ReturnType<typeof fakeApp>['triggered'] } {
   const { app, triggered } = fakeApp();
-  const settingsService = { onChange: (): (() => void) => () => undefined, getLaserPointerSettings: () => ({ color: '#ff0059', size: 16 }), getDiceLook: () => ({ colour: 'card', font: 'default' }), getDiceDisplay: () => 'full', getLocalPlayerViewSettings: () => ({}) };
+  const stored: Record<string, unknown> = {};
+  const settingsService = { getSetting: (key: string): unknown => stored[key] ?? {}, setSetting: (key: string, value: unknown): void => { stored[key] = value; }, onChange: (): (() => void) => () => undefined, getLaserPointerSettings: () => ({ color: '#ff0059', size: 16 }), getDiceLook: () => ({ colour: 'card', font: 'default' }), getDiceDisplay: () => 'full', getLocalPlayerViewSettings: () => ({}) };
   return { plugin: { app, api: undefined, settingsService } as unknown as AtlasVTTPlugin, triggered };
 }
 
@@ -95,6 +97,22 @@ describe('ExtensionApiPublisher', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     publisher.stop();
     expect(sceneListeners.size).toBe(0);
+  });
+
+  it('keeps the note properties extensions ask to strip in the settings, and takes them back from there', async () => {
+    initialize.mockResolvedValue(undefined);
+    const { plugin } = atlas();
+    const publisher = new ExtensionApiPublisher(plugin);
+    await publisher.start();
+    const stop = plugin.api?.connect(fakePlugin('ext')).bundles.stripNoteProperties(['atlas-share']);
+    expect(plugin.settingsService.getSetting('extensionNoteKeys')).toEqual({ ext: ['atlas-share'] });
+    publisher.stop();
+    // Atlas starts again with the extension not loaded
+    await new ExtensionApiPublisher(plugin).start();
+    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(true);
+    stop?.();
+    expect(plugin.settingsService.getSetting('extensionNoteKeys')).toEqual({});
+    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(false);
   });
 
   it('disposes the sight frames of every view on stop', async () => {

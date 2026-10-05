@@ -33,9 +33,10 @@ async function resolveCollection(assets: AssetService, ref: AddInput['collection
   return { id: (await assets.createCollection(ref.name.trim())).id, created: true };
 }
 
-/** `folder/stem.atlasmap`, or `stem (2)`, `stem (3)`, … while a file or a name differing only by case is there. */
-function freeMapPath(app: App, folder: string, name: string): string {
+/** `folder/stem.atlasmap`, or `stem (2)`, `stem (3)`, … while a file, a record of the index or a name differing only by case is there. */
+function freeMapPath(app: App, folder: string, name: string, indexed: ReadonlySet<string>): string {
   const taken = new Set((app.vault.getFolderByPath(folder)?.children ?? []).map((child) => child.name.toLowerCase()));
+  for (const path of indexed) if (path.toLowerCase().startsWith(`${folder.toLowerCase()}/`)) taken.add(path.slice(folder.length + 1).toLowerCase());
   const stem = collectionFolderName(name);
   let file = `${stem}.atlasmap`;
   for (let n = 2; taken.has(file.toLowerCase()); n++) file = `${stem} (${n}).atlasmap`;
@@ -53,7 +54,8 @@ function firstMissingFolder(app: App, folder: string): string | null {
 }
 
 /** Removes what a failed call wrote, last first; a failing cleanup is logged and never hides the error that made it necessary. */
-async function undo(app: App, assets: AssetService, written: readonly string[], folder: string | null, collection: string | null, mapPath: string): Promise<void> {
+async function undo(app: App, assets: AssetService, created: { files: readonly string[]; folder: string | null; collection: string | null; mapPath: string; knownScenes: ReadonlySet<string> }): Promise<void> {
+  const { files: written, folder, collection, mapPath, knownScenes } = created;
   const attempt = async (step: () => Promise<void>): Promise<void> => {
     try {
       await step();
@@ -61,10 +63,13 @@ async function undo(app: App, assets: AssetService, written: readonly string[], 
       console.error('[Atlas API] Could not remove what a failed addToCollection wrote:', error);
     }
   };
-  await attempt(async () => {
-    const scene = (await assets.getAssets(undefined, 'scene')).find((asset) => asset.data?.mapPath === mapPath);
-    if (scene) await assets.deleteAsset(scene.id);
-  });
+  // Only a record this call added: one that was in the index before, even at this path, is not ours to delete.
+  if (mapPath) {
+    await attempt(async () => {
+      const added = (await assets.getAssets(undefined, 'scene')).filter((asset) => !knownScenes.has(asset.id) && asset.data?.mapPath === mapPath);
+      for (const scene of added) await assets.deleteAsset(scene.id);
+    });
+  }
   for (const path of [...written].reverse()) {
     await attempt(async () => {
       const file: TAbstractFile | null = app.vault.getAbstractFileByPath(path);
@@ -92,6 +97,8 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
     }
     const collection = await resolveCollection(assets, input.collection);
     const written: string[] = [];
+    const scenes = await assets.getAssets(undefined, 'scene');
+    const knownScenes = new Set(scenes.map((scene) => scene.id));
     let createdFolder: string | null = null;
     let mapPath = '';
     try {
@@ -113,7 +120,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
         written.push(target);
         await app.vault.createBinary(target, data);
       }
-      mapPath = freeMapPath(app, folder, input.name);
+      mapPath = freeMapPath(app, folder, input.name, new Set(scenes.flatMap((scene) => (scene.data?.mapPath ? [scene.data.mapPath] : []))));
       const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
       const map = mapStrings(input.map, (text) => imagePaths.get(text) ?? text);
       written.push(mapPath);
@@ -121,7 +128,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath } });
       return { sceneId: scene.id, mapPath };
     } catch (error) {
-      await undo(app, assets, written, createdFolder, collection.created ? collection.id : null, mapPath);
+      await undo(app, assets, { files: written, folder: createdFolder, collection: collection.created ? collection.id : null, mapPath, knownScenes });
       throw error;
     }
   });

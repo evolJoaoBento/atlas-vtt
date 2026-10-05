@@ -21,3 +21,12 @@ export function movedLegacySceneData(asset: Asset): Asset | null {
   const { extensions: _previous, ...data } = rest;
   return { ...asset, data: Object.keys(extensions).length > 0 ? { ...data, extensions } : data };
 }
+
+/**
+ * `incoming` (an asset from a bundle, which never carries extension data) with the extension data of `local`, the
+ * record it replaces: an update must not take away what extensions keep on the user's own scene.
+ */
+export function keepingExtensionData(incoming: Asset, local: Asset | undefined): Asset {
+  if (incoming.type !== 'scene' || local?.type !== 'scene' || !local.data?.extensions) return incoming;
+  return { ...incoming, data: { ...incoming.data, extensions: local.data.extensions } };
+}

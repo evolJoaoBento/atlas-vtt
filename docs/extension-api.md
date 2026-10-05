@@ -26,9 +26,12 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.7.0 | shipped in 1.7.0 | `ui` | `ui` | none |
 | 1.8.0 | shipped in 1.8.0 | `scenes`, `bundles` | `scenes`, `bundles` | `scenes-changed` |
 | 1.9.0 | shipped in 1.9.0 | none | none | none |
-| 1.10.0 | planned for 1.10.0 | `remote-view` | `remoteViews` (optional) | none |
+| 1.10.0 | shipped in 1.10.0 | none | none | none |
+| 1.11.0 | planned for 1.11.0 | `remote-view` | `remoteViews` (optional) | none |
 
 Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
+
+Version 1.9.0 adds `presentationId` to a presented scene: the same while the scene is held and resumed, new for every presentation and never repeated after Atlas reloads. Version 1.10.0 makes `bundles.stripNoteProperties` remember its keys per extension id: they stay stripped when the extension is not loaded, and only the returned disposer forgets them, not the extension unloading.
 
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 

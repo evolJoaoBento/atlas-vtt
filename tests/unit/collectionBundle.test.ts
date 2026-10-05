@@ -421,6 +421,30 @@ describe('updating', () => {
     expect(fan.vault.files.get(`${result.backupFolder}/${MAP_PATH}`)).toBe('PLAYED');
   });
 
+  it("keeps the data an extension holds on the user's scene when an update replaces the scene", async () => {
+    const { creator, fan } = await installedV1();
+    const [local] = await fan.assets.getAssets('source', 'scene');
+    await fan.assets.updateAsset(local!.id, { data: { ...local!.data, extensions: { 'some-extension': { item: 'shared' } } } });
+    const [scene] = await creator.assets.getAssets('source', 'scene');
+    await creator.assets.updateAsset(scene!.id, { name: 'Deep Cave' });
+
+    const { review, apply } = await reviewImport(fan, await exportFrom(creator, { kind: 'release', version: 2 }));
+    expect(review).toMatchObject({ relation: 'newer', conflicts: [] });
+    await apply();
+
+    expect(await fan.assets.getAssetById(local!.id)).toMatchObject({ name: 'Deep Cave', data: { mapPath: MAP_PATH, extensions: { 'some-extension': { item: 'shared' } } } });
+  });
+
+  it("does not take an installed scene for edited when an extension keeps data on it, and keeps that data out of its record file", async () => {
+    const { creator, fan } = await installedV1();
+    const [local] = await fan.assets.getAssets('source', 'scene');
+    await fan.assets.updateAsset(local!.id, { data: { ...local!.data, extensions: { 'some-extension': { item: 'shared' } } } });
+    const recordFile = [...fan.vault.files.entries()].find(([path]) => path.endsWith(`${local!.id}.json`));
+    expect(recordFile?.[1]).not.toContain('some-extension');
+    const { review } = await reviewImport(fan, await exportFrom(creator, { kind: 'release', version: 1 }));
+    expect(review).toMatchObject({ relation: 'same', upToDate: true, canRestore: false, counts: { kept: 0 } });
+  });
+
   it('applies a newer release: new, changed and removed assets, with backups of what it replaced', async () => {
     const { creator, fan } = await installedV1();
     const [encounter] = await creator.assets.getAssets('source', 'encounter');

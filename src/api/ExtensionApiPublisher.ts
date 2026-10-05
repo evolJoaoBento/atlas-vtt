@@ -1,4 +1,5 @@
 import type AtlasVTTPlugin from '../../main';
+import { bundleNoteKeys } from '../app/extensions/bundleNoteKeys';
 import { AssetService } from '../app/services/AssetService';
 import { AtlasApiHost } from './AtlasApiHost';
 import { ATLAS_VIEW_HOOKS } from './atlasViewHooks';
@@ -21,6 +22,9 @@ export class ExtensionApiPublisher {
   constructor(private readonly plugin: AtlasVTTPlugin) {}
 
   async start(): Promise<void> {
+    // Note properties extensions asked to keep out of exports stay stripped whether or not those extensions load.
+    const settings = this.plugin.settingsService;
+    bundleNoteKeys.attach({ read: () => settings.getSetting('extensionNoteKeys'), write: (keys) => settings.setSetting('extensionNoteKeys', keys) });
     try {
       await AssetService.getInstance(this.plugin.app).initialize();
     } catch (error) {
@@ -51,6 +55,7 @@ export class ExtensionApiPublisher {
 
   stop(): void {
     this.stopped = true;
+    bundleNoteKeys.detach();
     for (const stopWatch of this.stopWatches.splice(0)) stopWatch();
     this.host?.dispose();
     this.host = null;

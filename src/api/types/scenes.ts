@@ -33,6 +33,11 @@ export interface ScenesApi {
 }
 
 export interface BundlesApi {
-  /** Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share'). */
+  /**
+   * Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share').
+   * Atlas remembers them per extension id, so they stay stripped when the extension is not loaded (switched off, or
+   * Atlas starting first). Unloading the extension does not forget them; calling the returned disposer does, and that
+   * is the only thing that does.
+   */
   stripNoteProperties(keys: readonly string[]): Disposer;
 }

@@ -8,7 +8,7 @@ vi.mock('obsidian', async (importOriginal) => ({ ...(await importOriginal<Record
 import { AtlasView } from '../../src/app/atlas-view';
 import { DisposerSet } from '../../src/api/disposers';
 import { presentationApi } from '../../src/api/presentation';
-import { presentedScene } from '../../src/app/services/PresentedScene';
+import { PresentedScene, presentedScene } from '../../src/app/services/PresentedScene';
 import { activePresentationTarget } from '../../src/app/services/presentationTargets';
 import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
 import { fakeView, loadMap as load, trackerWith, type FakeView } from './apiFakes';
@@ -146,6 +146,19 @@ describe('presentation', () => {
     expect(heard.at(-1)).toEqual(['cleared', second]);
     presentedScene.present(view as never, tabId);
     expect(presentation.current()!.presentationId).not.toBe(second);
+  });
+
+  it('C-pres-3: presentationId is not repeated after a reload', () => {
+    const ids = new Set<string>();
+    // A reload makes a new PresentedScene (a new module instance), whose counter, if it had one, would start again.
+    for (let load = 0; load < 3; load++) {
+      const reloaded = new PresentedScene();
+      const view = fakeView('v1');
+      reloaded.present(view as never, view.tabMetaStore.getState().activeTabId!);
+      ids.add(reloaded.current()!.presentationId);
+    }
+    expect(ids.size).toBe(3);
+    for (const id of ids) expect(id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it('addTarget rejects an argument that is not a target', () => {

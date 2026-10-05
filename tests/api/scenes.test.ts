@@ -158,6 +158,23 @@ describe('scenes', () => {
     expect(vault.folders.has('atlas-vtt/collections/source')).toBe(true);
   });
 
+  it('C-scenes-2: a failed addToCollection removes only the record it added, and never takes a path an index record names', async () => {
+    const { scenes, assets, vault } = await withScene();
+    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [] };
+    const ghostPath = 'atlas-vtt/collections/source/scenes/Cave (2).atlasmap';
+    const ghost = await assets.addAsset({ type: 'scene', name: 'Ghost', collection: 'source', tags: [], data: { mapPath: ghostPath } });
+    const realAdd = assets.addAsset.bind(assets);
+    vi.spyOn(assets, 'addAsset').mockImplementationOnce(async (asset) => { await realAdd(asset); throw new Error('index not saved'); });
+    await expect(scenes.addToCollection(input)).rejects.toThrow('index not saved');
+    expect(await assets.getAssetById(ghost.id)).not.toBeNull();
+    expect((await assets.getAssets('source', 'scene')).map((scene) => scene.name).sort()).toEqual(['Cave', 'Ghost']);
+    expect(vault.files.has(ghostPath)).toBe(false);
+    expect(vault.files.has('atlas-vtt/collections/source/scenes/Cave (3).atlasmap')).toBe(false);
+    vi.spyOn(assets, 'addAsset').mockRejectedValueOnce(new Error('again'));
+    await expect(scenes.addToCollection(input)).rejects.toThrow('again');
+    expect(await assets.getAssetById(ghost.id)).not.toBeNull();
+  });
+
   it('C-scenes-3: readMap returns the migrated map with its size, or null for a missing file', async () => {
     const { scenes, mapPath } = await withScene();
     const map = await scenes.readMap(mapPath);
@@ -222,22 +239,61 @@ describe('scenes-changed', () => {
 });
 
 describe('bundles', () => {
+  let saved: Record<string, string[]> = {};
+  const attach = (): void => bundleNoteKeys.attach({ read: () => saved, write: (keys) => { saved = keys; } });
+  beforeEach(() => { saved = {}; attach(); });
+  const sets: DisposerSet[] = [];
+  const scope = (id: string): { id: string; disposers: DisposerSet } => { const disposers = new DisposerSet(); sets.push(disposers); return { id, disposers }; };
+  afterEach(() => { bundleNoteKeys.detach(); for (const set of sets.splice(0)) set.disposeAll(); });
+
   it('C-bundles-1: stripNoteProperties adds keys until disposed', () => {
-    const disposers = new DisposerSet();
-    const stop = bundlesApi({ id: 'ext', disposers }).stripNoteProperties(['atlas-share']);
+    const stop = bundlesApi(scope('ext')).stripNoteProperties(['atlas-share']);
     expect(bundleNoteKeys.keys().has('atlas-share')).toBe(true);
     stop();
     expect(bundleNoteKeys.keys().has('atlas-share')).toBe(false);
+    expect(saved).toEqual({});
   });
 
-  it('C-bundles-1: keys of an extension go when it disconnects, and bad input is refused', () => {
-    const disposers = new DisposerSet();
-    const bundles = bundlesApi({ id: 'ext', disposers });
+  it('C-bundles-2: a key stays stripped after the extension unloads, also after Atlas restarts, and bad input is refused', () => {
+    const own = scope('ext');
+    const bundles = bundlesApi(own);
     bundles.stripNoteProperties(['Atlas-Share', 'secret']);
-    expect([...bundleNoteKeys.keys()]).toEqual(['atlas-share', 'secret']);
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
     expect(() => bundles.stripNoteProperties([''])).toThrow(/non-empty/);
     expect(() => bundles.stripNoteProperties('atlas-share' as never)).toThrow(/array/);
-    disposers.disposeAll();
+    own.disposers.disposeAll(); // the extension unloads
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
+    expect(saved).toEqual({ ext: ['atlas-share', 'secret'] });
+    // Atlas restarts with the extension not loaded: the settings bring the keys back
+    bundleNoteKeys.detach();
+    attach();
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
+  });
+
+  it('C-bundles-3: an explicit dispose forgets the key, unless another registration of the extension still holds it', () => {
+    const own = scope('ext');
+    const bundles = bundlesApi(own);
+    const first = bundles.stripNoteProperties(['a', 'b']);
+    const second = bundles.stripNoteProperties(['b']);
+    first();
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['b']);
+    expect(saved).toEqual({ ext: ['b'] });
+    second();
     expect(bundleNoteKeys.keys().size).toBe(0);
+    expect(saved).toEqual({});
+  });
+
+  it('C-bundles-3: another extension keeps its own remembered keys', () => {
+    const one = bundlesApi(scope('one'));
+    bundlesApi(scope('two')).stripNoteProperties(['x']);
+    one.stripNoteProperties(['x'])();
+    expect(saved).toEqual({ two: ['x'] });
+    expect(bundleNoteKeys.keys().has('x')).toBe(true);
+  });
+
+  it('reads remembered keys from settings it cannot trust', () => {
+    saved = { good: ['Key', 3, ''], bad: 'nope', empty: [] } as never;
+    attach();
+    expect([...bundleNoteKeys.keys()]).toEqual(['key']);
   });
 });

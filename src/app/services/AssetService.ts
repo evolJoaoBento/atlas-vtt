@@ -20,8 +20,9 @@ import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { Json } from '../../api/types/common';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
-import { movedLegacySceneData } from './legacySceneData';
+import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
 import { SceneChangeWatcher } from './sceneChanges';
+import { sceneMirrorText, stripSceneMirrors } from './sceneMirrors';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { trashVaultItem } from '../utils/trashVaultItem';
 
@@ -371,6 +372,7 @@ export class AssetService {
 
     // Ensure all collections have uid, version, and settings fields
     await this.migrateCollectionFields();
+    if (this.metadata) await stripSceneMirrors(this.app.vault.adapter, Object.values(this.metadata.assets));
     if (this.metadata) this.sceneChanges.check(this.metadata.assets);
   }
 
@@ -415,6 +417,7 @@ export class AssetService {
       this.metadata = stored.metadata;
       await this.migrateTags();
       await this.migrateCollectionFields();
+      await stripSceneMirrors(this.app.vault.adapter, Object.values(this.metadata.assets));
       this.sceneChanges.check(this.metadata.assets);
       return;
     }
@@ -1026,7 +1029,7 @@ export class AssetService {
     if (updatedAsset.type === 'map') {
       fileContent = this.serializeMapAsset(updatedAsset);
     } else if (updatedAsset.type !== 'token' && updatedAsset.type !== 'note' && 'data' in updates) {
-      fileContent = JSON.stringify(updates.data, null, 2) || '{}';
+      fileContent = sceneMirrorText(updatedAsset);
     }
     if (fileContent !== null) {
       const content = fileContent;
@@ -1062,7 +1065,7 @@ export class AssetService {
     const path = this.getAssetPath(asset);
     if (asset.type === 'map') return { path, content: this.serializeMapAsset(asset) };
     if (this.app.vault.getAbstractFileByPath(path)) return null;
-    return { path, content: JSON.stringify(asset.data, null, 2) || '{}' };
+    return { path, content: sceneMirrorText(asset) };
   }
 
   private async writeRecordFile(asset: Asset): Promise<void> {
@@ -1276,7 +1279,7 @@ export class AssetService {
     const current = this.metadata!;
     const assets = { ...current.assets };
     for (const id of remove) delete assets[id];
-    for (const asset of upsert) assets[asset.id] = { ...asset, collection: collectionId };
+    for (const asset of upsert) assets[asset.id] = { ...keepingExtensionData(asset, current.assets[asset.id]), collection: collectionId };
     const collectionAssets = Object.values(assets).filter((asset) => asset.collection === collectionId);
     const recorded: CollectionMetadata = {
       ...collection,
