@@ -18,15 +18,18 @@ export interface PresentationListener {
   cleared?(previous: PresentedSceneInfo): void;
 }
 
+/** An audience besides the player window, such as a second screen an extension drives. */
 export interface PresentationTarget {
+  /** Non-empty; unique among this extension's targets. */
   id: string;
-  /** e.g. "online players" */
+  /** Names the audience in the eye's tooltip, e.g. "the second screen". */
   label: string;
   /** While any target is active, the scene tab's eye presents without opening the player window, its tooltip names the target, a presented scene's eye stops presenting, and right-click offers "Open player window". */
   isActive(): boolean;
 }
 
 export interface PresentationApi {
+  /** The presented scene, also while it is held; null when nothing is presented. A frozen copy. */
   current(): PresentedSceneInfo | null;
   /**
    * Switches `viewId` to `tabId` (default: its active tab), waits for the load, presents. Never throws.
@@ -34,7 +37,14 @@ export interface PresentationApi {
    * as presented but held (`current().held === true`), and `presented(scene, true)` follows if its map later loads.
    */
   present(viewId: ViewId, tabId?: string): Promise<boolean>;
+  /** Stops presenting, as the GM's Stop presenting does; nothing happens when nothing is presented. */
   stop(): void;
+  /** Hears every change of the presented scene; each callback runs guarded, and the listener is dropped when this extension unloads. */
   subscribe(listener: PresentationListener): Disposer;
+  /**
+   * Adds an audience besides the player window. Its `id`, `label` and `isActive` are read once; `isActive` is then
+   * called on `target` itself, guarded. Adding the same object again changes nothing; another target with an `id`
+   * this extension already added, or a malformed one, throws. Removed by the returned disposer or when this extension unloads.
+   */
   addTarget(target: PresentationTarget): Disposer;
 }

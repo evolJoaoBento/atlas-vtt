@@ -1,6 +1,6 @@
 import { presentedScene, type PresentedSceneInfo as InternalScene } from '../app/services/PresentedScene';
 import { presentTabToPlayers, stopPresenting } from '../app/services/presentToPlayers';
-import { addPresentationTarget } from '../app/services/presentationTargets';
+import { addPresentationTarget, presentationTargetSlot, type PresentationTargetEntry } from '../app/services/presentationTargets';
 import type { DisposerSet } from './disposers';
 import { isRemoteView } from './viewInfo';
 import type { ViewTracker } from './viewTracker';
@@ -13,6 +13,8 @@ function info(scene: InternalScene, held: boolean): PresentedSceneInfo {
 }
 
 export function presentationApi(tracker: ViewTracker, disposers: DisposerSet, owner: string): PresentationApi {
+  /** Atlas's entry for each target object added, so adding the same object again changes nothing. */
+  const kept = new WeakMap<object, PresentationTargetEntry>();
   return Object.freeze({
     current: (): PresentedSceneInfo | null => {
       const scene = presentedScene.current();
@@ -41,10 +43,19 @@ export function presentationApi(tracker: ViewTracker, disposers: DisposerSet, ow
       cleared: (previous, wasHeld) => listener.cleared?.(info(previous, wasHeld)),
     })),
     addTarget: (target: PresentationTarget): Disposer => {
-      if (!target || typeof target.id !== 'string' || typeof target.label !== 'string' || typeof target.isActive !== 'function') {
-        throw new Error('[Atlas API] addTarget needs { id: string, label: string, isActive(): boolean }.');
+      const known = target && typeof target === 'object' ? kept.get(target) : undefined;
+      if (known) return disposers.add(addPresentationTarget(known, owner));
+      // Each field read once into Atlas's own entry, so the tab bar never reads the extension's object (a throwing getter).
+      const { id, label, isActive } = (target ?? {}) as Partial<PresentationTarget>;
+      if (typeof id !== 'string' || id === '' || typeof label !== 'string' || typeof isActive !== 'function') {
+        throw new Error('[Atlas API] presentation.addTarget: the target must be { id: non-empty string, label: string, isActive(): boolean }.');
       }
-      return disposers.add(addPresentationTarget(target, owner));
+      if (presentationTargetSlot.list().some((entry) => entry.owner === owner && entry.item.id === id)) {
+        throw new Error(`[Atlas API] presentation.addTarget: "${id}" is already added by this extension.`);
+      }
+      const entry = Object.freeze({ id, label, isActive: (): boolean => isActive.call(target) });
+      kept.set(target, entry);
+      return disposers.add(addPresentationTarget(entry, owner));
     },
   });
 }

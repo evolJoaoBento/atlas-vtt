@@ -11,6 +11,7 @@ import { presentationApi } from '../../src/api/presentation';
 import { PresentedScene, presentedScene } from '../../src/app/services/PresentedScene';
 import { activePresentationTarget } from '../../src/app/services/presentationTargets';
 import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
+import { initialRemoteViewState } from '../../src/app/remote-view/remoteViewState';
 import { fakeView, loadMap as load, trackerWith, type FakeView } from './apiFakes';
 
 function setupWith(view: FakeView): { presentation: ReturnType<typeof presentationApi>; disposers: DisposerSet } {
@@ -163,7 +164,30 @@ describe('presentation', () => {
 
   it('addTarget rejects an argument that is not a target', () => {
     const { presentation } = setupWith(fakeView('v1'));
-    expect(() => presentation.addTarget({ id: 'x', label: 'x' } as never)).toThrow(/addTarget needs/);
-    expect(() => presentation.addTarget(null as never)).toThrow(/addTarget needs/);
+    expect(() => presentation.addTarget({ id: 'x', label: 'x' } as never)).toThrow(/presentation.addTarget: the target must be/);
+    expect(() => presentation.addTarget(null as never)).toThrow(/presentation.addTarget: the target must be/);
+  });
+
+  it('addTarget keeps its own entry: fields read once, a non-empty id once per extension, and the same object twice changes nothing', () => {
+    const { presentation, disposers } = setupWith(fakeView('v1'));
+    let reads = 0;
+    const target = { id: 'room', active: true, isActive(): boolean { return this.active; }, get label(): string { reads++; if (reads > 1) throw new Error('read again'); return 'The room'; } };
+    const stop = presentation.addTarget(target);
+    expect(activePresentationTarget()).toMatchObject({ id: 'room', label: 'The room' });
+    expect(reads).toBe(1);
+    expect(() => presentation.addTarget(target)).not.toThrow();
+    expect(() => presentation.addTarget({ id: 'room', label: 'Other', isActive: () => true })).toThrow(/already added/);
+    expect(() => presentation.addTarget({ id: '', label: 'Empty', isActive: () => true })).toThrow(/non-empty/);
+    target.active = false;
+    expect(activePresentationTarget()).toBeNull();
+    stop();
+    disposers.disposeAll();
+  });
+
+  it('present answers false for a remote view, which shows a scene fed from outside', async () => {
+    const view = fakeView('v1');
+    const { presentation } = setupWith(view);
+    view.atlasStore.setState({ remoteView: initialRemoteViewState() });
+    expect(await presentation.present('v1')).toBe(false);
   });
 });
