@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   FOG_TRUNCATED_NOT_PLAYER_SAFE, fullPayload, playerSafePayload, playerSafeRefusal, type PayloadContext, type SharedMapSource,
 } from '../../../../src/app/online/sharing/model/buildMapPayload';
-import { createProjectionMemo } from '../../../../src/app/online/scene/projectRecords';
+import { createProjectionMemo, fogTruncated } from '../../../../src/app/online/scene/projectRecords';
 import { FogCoverageCache } from '../../../../src/app/online/scene/sceneSources';
 import { SCENE_LIMITS } from '../../../../src/app/online/scene/sceneTypes';
+import { clippedPinText, PIN_TEXT_LIMIT } from '../../../../src/app/online/sharing/model/mapPayload';
+import { offeredNotes } from '../../../../src/app/online/sharing/model/linkedNotes';
 import { migrateMapFile } from '../../../../src/app/services/MapPersistence';
 
 const base = {
@@ -64,6 +66,35 @@ describe('a player-safe share refuses fog it cannot send whole', () => {
     expect(playerSafePayload(sourceWith({ b: wide }), 'Inn', context)).toBeNull();
     // An erasing record that projects to nothing hides nothing.
     expect(playerSafeRefusal(sourceWith({ e: { id: 'e', kind: 'fog', type: 'future-shape', timestamp: 1, isErasing: true } }))).toBeNull();
+  });
+
+  it("does not count a lasso that covers nothing, as Atlas's own stroke draws none (a stray click must not blank play)", () => {
+    const lasso = (points: unknown[]): Record<string, never> => ({ l: { id: 'l', kind: 'fog', type: 'lasso', timestamp: 1, isErasing: false, points } } as never);
+    expect(fogTruncated(lasso([{ x: 1, y: 1 }, { x: 5, y: 5 }]), createProjectionMemo())).toBe(false);
+    expect(fogTruncated(lasso([{ x: 0, y: 0 }, { x: 1, y: 0.5 }, { x: 2, y: 0 }]), createProjectionMemo())).toBe(false);
+    expect(fogTruncated(lasso([{ x: 0, y: 0 }, { x: 50, y: 0.2 }, { x: 100, y: 0 }]), createProjectionMemo())).toBe(false);
+    expect(new FogCoverageCache().get(lasso([{ x: 0, y: 0 }, { x: 50, y: 0.2 }, { x: 100, y: 0 }]), createProjectionMemo()).truncated).toBe(false);
+    // A point that does not read still fails closed.
+    expect(fogTruncated(lasso([{ x: 0, y: 0 }, { x: 'a', y: 1 }, { x: 100, y: 100 }]), createProjectionMemo())).toBe(true);
+  });
+
+  it('clips a long pin icon and label to what a receiver takes, never through a character', () => {
+    expect(clippedPinText('a'.repeat(100))).toBe('a'.repeat(PIN_TEXT_LIMIT));
+    expect(clippedPinText(`${'a'.repeat(63)}\u{1F600}`)).toBe('a'.repeat(63));
+    expect(clippedPinText('short')).toBe('short');
+  });
+
+  it('offers the note of a pin or token whose hidden flag is any truthy value only in a full share', () => {
+    const map = migrateMapFile({
+      ...base,
+      objects: {
+        tokens: { t: { id: 't', kind: 'character', x: 1, y: 1, isHidden: 1, notePath: 'Notes/T.md' } },
+        pins: { p: { id: 'p', kind: 'pin', x: 1, y: 1, gmOnly: 'yes', notePath: 'Notes/P.md' } },
+        fog: {},
+      },
+    });
+    expect(offeredNotes(map, 'player-safe')).toEqual([]);
+    expect(offeredNotes(map, 'full').map((note) => note.path).sort()).toEqual(['Notes/P.md', 'Notes/T.md']);
   });
 
   it('lets live play treat the same fog as truncated', () => {

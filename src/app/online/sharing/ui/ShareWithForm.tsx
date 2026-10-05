@@ -90,6 +90,7 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
           </div>
           {refused && <p className="atlas-share__warning" role="note">{refused}</p>}
           {offered.length > 0 && <h3 className="atlas-share__heading">{t('share.with.linkedNotes')}</h3>}
+          {offered.length > 0 && mode === 'player-safe' && <p className="atlas-share__hint">{t('share.with.tickedNotesWhole')}</p>}
           <ul className="atlas-share__people">
             {offered.map((note) => (
               <li key={note.path} className="atlas-share__note">
