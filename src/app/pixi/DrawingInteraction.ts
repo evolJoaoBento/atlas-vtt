@@ -4,7 +4,7 @@ import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../storeFactory';
 import { beginHistoryTransaction, endHistoryTransaction } from '../stores/history';
 import { hitTestDrawing } from './drawingGeometry';
-import { mapIconLabels } from '../i18n/sharedTexts';
+import { MAP_ICON_LABELS } from './mapIcons';
 import { openContextMenuGlobal, type ContextMenuEntry } from '../react/root/ContextMenuContext';
 import { t } from '../i18n';
 
@@ -144,7 +144,7 @@ export class DrawingInteraction {
         type: 'submenu',
         label: t('drawing.changeIcon'),
         icon: 'shapes',
-        children: Object.entries(mapIconLabels()).map(([icon, label]) => ({
+        children: Object.entries(MAP_ICON_LABELS).map(([icon, label]) => ({
           type: 'item' as const,
           label,
           checked: clicked.icon === icon,
