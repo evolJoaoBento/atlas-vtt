@@ -1,7 +1,7 @@
 /** Receiving: the Shared with me command and buttons, push prompts, and pulled files that follow renames. */
 import { Notice, type App, type Plugin } from 'obsidian';
 import { AssetService } from '../../services/AssetService';
-import { chooseAction, confirmAction } from '../../ui/confirmDialog';
+import { chooseAction, confirmAction, type ChoiceDialogOptions } from '../../ui/confirmDialog';
 import { peopleListNames } from './model/forwardedParts';
 import { MergeHistory, undoLastMerge, type UndoOutcome } from './merge/MergeHistory';
 import { createUpdatePolicy } from './merge/noteUpdate';
@@ -9,7 +9,8 @@ import { askUpdateChoice, openMergePage } from './merge/ui/mergeModals';
 import type { PeopleBook } from './people/PeopleBook';
 import type { PulledItems, PulledRecord } from './receive/PulledItems';
 import { pushPromptListener } from './receive/pushPrompts';
-import { SharedWithMe } from './receive/SharedWithMe';
+import { codeKindsText, type CodeKind } from './receive/executableContent';
+import { SharedWithMe, type PulledCodeChoice } from './receive/SharedWithMe';
 import { showPushPrompt } from './receive/ui/pushPrompt';
 import { openSharedWithMeModal } from './receive/ui/SharedWithMeModal';
 import { setSharedOpener } from './sharedFromView';
@@ -27,6 +28,22 @@ const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => c
   message: [t('share.merge.mapChangedMessage')],
   choices: [{ label: t('share.merge.keepBoth'), value: 'both' as const }, { label: t('share.merge.takeTheirs'), value: 'theirs' as const, style: 'warning' }],
 });
+
+/**
+ * The question for a pulled note that holds code other plugins run. Pull without code is the last button, so it has
+ * focus; Pull as is names the sender, since their code then runs here wherever those plugins are installed.
+ */
+export const pulledCodeDialog = (title: string, personName: string, kinds: readonly CodeKind[]): ChoiceDialogOptions<PulledCodeChoice> => ({
+  title: t('share.code.title', { title }),
+  message: [t('share.code.message', { name: personName, kinds: codeKindsText(kinds) }), t('share.code.advice')],
+  choices: [
+    { label: t('share.code.pullAsIs', { name: personName }), value: 'as-is', style: 'warning' },
+    { label: t('share.code.pullWithout'), value: 'without', style: 'cta' },
+  ],
+});
+
+const confirmCode = (title: string, personName: string, kinds: readonly CodeKind[]): Promise<PulledCodeChoice | null> =>
+  chooseAction(pulledCodeDialog(title, personName, kinds));
 
 const sessionName = (personId: string): string | null =>
   shareSessionStore.getState().people.find((person) => person.personId === personId)?.name ?? null;
@@ -49,7 +66,7 @@ function sharedWithMeFor(app: App, pulled: PulledItems, history: MergeHistory, p
           app, pulled, node: session.node, tableId: session.tableId, policy, replaced, rehomed: (record) => history.clear(record),
           nameOf: (personId) => sessionName(personId) ?? 'Someone',
           nameAt: peopleListNames(people, session.tableId),
-          assets: AssetService.getInstance(app), confirmMapUpdate,
+          assets: AssetService.getInstance(app), confirmMapUpdate, confirmCode,
         }),
       };
     }

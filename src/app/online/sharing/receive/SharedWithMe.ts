@@ -3,7 +3,8 @@
  * marks items new, updated or up to date against what was pulled, and pulls on request.
  * Listing writes nothing; only `pull` (and `pullPushed`, from a push the receiver accepted) do.
  * Every pull passes the version it listed, so the bytes must be what the receiver was shown. A note's
- * forwarded tags are then written with this Atlas's names for those people, before anything is saved.
+ * forwarded tags are then written with this Atlas's names for those people, before anything is saved. A note
+ * holding code other plugins run (`findExecutable`) asks first, on every pull: without the code, as is, or not at all.
  */
 import type { App } from 'obsidian';
 import { localizeForwardedTags } from '../model/forwardedParts';
@@ -11,6 +12,7 @@ import { parseMapPayload } from '../model/mapPayload';
 import type { CatalogueItem } from '../model/SenderCatalogue';
 import type { PushRequest } from '../shareSessionStore';
 import { ShareError, type ShareNode } from '../transport/ShareNode';
+import { findExecutable, withoutCode, type CodeKind } from './executableContent';
 import { pullMap, type MapPullDeps } from './mapPull';
 import { pullNote, type NoteUpdatePolicy, type PullOutcome } from './notePull';
 import type { PulledItems, PulledRecord } from './PulledItems';
@@ -25,6 +27,9 @@ export interface PersonCatalogue {
   personId: string;
   items: ListedItem[];
 }
+
+/** `without`: write the note with its code made inert (`withoutCode`); `as-is`: write it as received. */
+export type PulledCodeChoice = 'without' | 'as-is';
 
 export interface SharedWithMeDeps {
   app: App;
@@ -41,6 +46,8 @@ export interface SharedWithMeDeps {
   nameAt: (personId: string) => string | null;
   assets: MapPullDeps['assets'];
   confirmMapUpdate: (title: string) => Promise<'both' | 'theirs' | null>;
+  /** A pulled note holds `kinds` of code other plugins run: how to write it; null pulls nothing. Asked on every pull. */
+  confirmCode: (title: string, personName: string, kinds: readonly CodeKind[]) => Promise<PulledCodeChoice | null>;
   replaced?: (record: PulledRecord, before: string, after: string) => Promise<void>;
   rehomed?: (record: PulledRecord) => Promise<void>;
 }
@@ -97,8 +104,13 @@ export class SharedWithMe {
     return this.pull(push.from, listed);
   }
 
-  private writeNote(personId: string, personName: string, item: CatalogueItem, received: string): Promise<PullOutcome> {
-    const text = localizeForwardedTags(received, this.deps.tableId, (person) => this.deps.nameAt(person));
+  private async writeNote(personId: string, personName: string, item: CatalogueItem, received: string): Promise<PullOutcome> {
+    const localized = localizeForwardedTags(received, this.deps.tableId, (person) => this.deps.nameAt(person));
+    const kinds = findExecutable(localized);
+    // Asked before any merge question, so a merge works on the text that would be written.
+    const choice = kinds.length > 0 ? await this.deps.confirmCode(item.title, personName, kinds) : 'as-is';
+    if (choice === null) return { kind: 'cancelled' };
+    const text = choice === 'without' ? withoutCode(localized) : localized;
     return pullNote(
       {
         app: this.deps.app, pulled: this.deps.pulled, policy: this.deps.policy,
