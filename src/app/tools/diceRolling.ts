@@ -29,8 +29,9 @@ export interface DiceRollResult {
   crit?: DiceCrit;
   /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
   unlistedDice?: number;
+  /** Atlas's own label for the GM's roller ("Player" in English), stamped on every roll; not who rolled it. */
   player?: string;
-  /** Who rolled it when it was someone other than the GM: their name. */
+  /** Who rolled it when it was someone other than the GM: their name. Atlas shows it in the log and toasts. */
   rolledBy?: string;
   source?: {
     type: 'toolbar' | 'statblock';

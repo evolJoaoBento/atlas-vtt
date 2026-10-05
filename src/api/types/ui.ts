@@ -5,6 +5,7 @@ import type { TokenEntity } from './records';
 export interface ViewContext {
   viewId: ViewId;
   kind: 'map' | 'remote';
+  /** True in a view players look at (a remote view, or the player window); false in the GM's own map views. */
   isPlayerView: boolean;
 }
 
@@ -37,6 +38,7 @@ export interface ToolbarItem {
   /** Lucide name */
   icon: string;
   label: string;
+  /** Shown beside the label in "More tools" only; Atlas binds no hotkey for it. */
   shortcut?: string;
   /**
    * Its place among extensions' items, which sit together after Atlas's dice button: a higher priority sits further
@@ -102,15 +104,25 @@ export interface PanelHandle {
   open(viewId?: ViewId): void;
   /** Closes the panel in `viewId`, or in every view when none is given. */
   close(viewId?: ViewId): void;
+  /** Opens the panel in `viewId` (default the active map view) when it is closed there, else closes it; does nothing for no view. */
   toggle(viewId?: ViewId): void;
+  /** Whether the panel is open in `viewId` (default the active map view); false for no view or once disposed. */
   isOpen(viewId?: ViewId): boolean;
   /** Closes the panel in every view and removes it; calling it again does nothing. */
   dispose(): void;
 }
 
+/**
+ * Every `add*` reads the fields it needs once and keeps its own frozen copy; methods are called on the object given, so
+ * a class instance works. It throws, naming the call and the field, for a malformed item or an id this extension already
+ * registered in that slot. What it adds is removed by the returned disposer or when this extension unloads.
+ */
 export interface UiApi {
+  /** A button in the map's toolbar, after Atlas's dice; `id`, `icon` and `label` must be non-empty and `onClick` a function. */
   addToolbarItem(item: ToolbarItem): Disposer;
+  /** A section of the command palette, after Atlas's own; `id` and `title` must be non-empty and `commands` a function. */
   addPaletteSection(section: PaletteSection): Disposer;
+  /** A tile on the dashboard; `id`, `icon` and `title` must be non-empty, `description` a string and `onClick` a function. */
   addDashboardTile(tile: DashboardTile): Disposer;
   /** The map's "More options" menu. */
   addViewMenuItems(provider: (ctx: ViewContext) => MenuItem[]): Disposer;

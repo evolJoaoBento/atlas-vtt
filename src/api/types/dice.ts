@@ -15,14 +15,15 @@ export interface DiceApi {
   roll(request: DiceRollRequest): DiceRollResult;
   /** Every roll Atlas logs: the dice tray, statblocks, `roll`, `publish`. Listeners receive frozen copies and run guarded. */
   onRolled(listener: (result: DiceRollResult) => void): Disposer;
-  /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
+  /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll of plain data with at most 1,000 dice. */
   publish(result: DiceRollResult): void;
   /**
    * Throws `roll`, a result decided elsewhere, with Atlas's 3D dice in the map view `viewId` (a GM map view or a remote
    * view), seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed. Each roll id is thrown
    * once per view: handing it again throws nothing and answers true. False when nothing is thrown: the view is not open
    * or its map not loaded, its dice display is not showing, the user shows dice as result cards, or `roll` is not a roll
-   * (a die whose value is not a whole number from 1 to its `max` included); show the roll your own way then.
+   * (not plain data, more than 1,000 dice, or a die whose value is not a whole number from 1 to its `max` included); show
+   * the roll your own way then.
    * Where the view cannot draw 3D dice (no WebGL), or the roll does not list all its dice, Atlas shows its result card.
    * It only throws: nothing is logged, `onRolled` hears nothing and the player window shows nothing (`publish` does those).
    * `publish` already throws a roll without `rolledBy` in every open GM map view; use `throw` for a roll you do not

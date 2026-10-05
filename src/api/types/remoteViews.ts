@@ -49,7 +49,9 @@ export interface RemoteStatusAction {
 
 export interface RemoteStatus {
   title: string;
+  /** A short state of the connection, shown after the title, e.g. "Connected"; empty shows none. */
   connection: string;
+  /** The colour of the dot before the title: connected, pending (connecting or waiting) or ended. */
   tone: 'connected' | 'pending' | 'ended';
   message: string | null;
   /** A button that runs `run`, guarded; it comes first when `actions` are given too. */
@@ -69,7 +71,7 @@ export interface RemoteViewsApi {
 
 /**
  * A remote view: read-only, never saved, with no undo history. Every method does nothing once the view closed, and every
- * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*` and `tokens.snapPoint` take its `viewId`;
+ * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*`, `lighting.*`, `tokens.snapPoint` and `dice.throw` take its `viewId`;
  * `views.active()` never returns it, and `tokens.move` and `presentation.present` refuse it.
  */
 export interface RemoteView {
@@ -116,5 +118,6 @@ export interface RemoteView {
   onRoll(listener: (dice: Readonly<Record<string, number>>, modifier: number) => string | null): Disposer;
   /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
   onClose(listener: () => void): Disposer;
+  /** Closes the view's tab and drops every listener; `onClose` listeners run once. Calling it again does nothing. */
   close(): void;
 }

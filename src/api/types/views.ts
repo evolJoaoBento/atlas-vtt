@@ -52,12 +52,15 @@ export interface SceneSnapshot {
 }
 
 export interface ViewsApi {
+  /** Every open map view and remote view, in no set order; `kind` tells them apart. */
   list(): ViewInfo[];
   /** The active Atlas map view; never a remote view. */
   active(): ViewInfo | null;
+  /** The scene in the view's store now; null for a view that is not open. */
   snapshot(viewId: ViewId): SceneSnapshot | null;
   /** Called after each store change that replaced one of the snapshot's fields (by reference). */
   subscribe(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
+  /** The view's visible world area now, frozen; null for a view that is not open, has no viewport yet or has no size. */
   camera(viewId: ViewId): ViewCamera | null;
   /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
   watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;

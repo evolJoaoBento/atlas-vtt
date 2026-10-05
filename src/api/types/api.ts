@@ -15,10 +15,14 @@ import type { ViewInfo, ViewsApi } from './views';
 /** What `connect` needs of the calling plugin: its id, and where to register its own teardown. */
 export type ConnectingPlugin = Pick<Plugin, 'manifest' | 'register'>;
 
-/** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
+/**
+ * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
+ * have settled: loaded, or failed to load. After a failed load the API is still published; `scenes.*` calls then reject.
+ */
 export interface AtlasApi {
   /** Semver of this API, e.g. "1.0.0"; independent of Atlas's own version. */
   readonly version: string;
+  /** Whether the running Atlas has `capability`'s namespace; false for a name it does not know. Check it before using a namespace. */
   has(capability: AtlasCapability): boolean;
   /** Scopes everything to `plugin.manifest.id`; registrations are disposed when either plugin unloads. */
   connect(plugin: ConnectingPlugin): AtlasExtension;
@@ -56,5 +60,10 @@ export interface AtlasExtension {
   readonly bundles: BundlesApi;
   /** Only when `has('remote-view')`. */
   readonly remoteViews?: RemoteViewsApi;
+  /**
+   * Hears an Atlas event. The listener runs guarded (a throw is logged and the other listeners still run) and is dropped
+   * when this extension or Atlas unloads. A listener that is not a function, or an event Atlas does not have, registers
+   * nothing and is logged.
+   */
   on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }

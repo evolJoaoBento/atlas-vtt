@@ -9,10 +9,14 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  */
 export declare const API_VERSION = "1.15.1";
 
-/** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
+/**
+ * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
+ * have settled: loaded, or failed to load. After a failed load the API is still published; `scenes.*` calls then reject.
+ */
 export declare interface AtlasApi {
     /** Semver of this API, e.g. "1.0.0"; independent of Atlas's own version. */
     readonly version: string;
+    /** Whether the running Atlas has `capability`'s namespace; false for a name it does not know. Check it before using a namespace. */
     has(capability: AtlasCapability): boolean;
     /** Scopes everything to `plugin.manifest.id`; registrations are disposed when either plugin unloads. */
     connect(plugin: ConnectingPlugin): AtlasExtension;
@@ -52,6 +56,11 @@ export declare interface AtlasExtension {
     readonly bundles: BundlesApi;
     /** Only when `has('remote-view')`. */
     readonly remoteViews?: RemoteViewsApi;
+    /**
+     * Hears an Atlas event. The listener runs guarded (a throw is logged and the other listeners still run) and is dropped
+     * when this extension or Atlas unloads. A listener that is not a function, or an event Atlas does not have, registers
+     * nothing and is logged.
+     */
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -258,14 +267,15 @@ export declare interface DiceApi {
     roll(request: DiceRollRequest): DiceRollResult;
     /** Every roll Atlas logs: the dice tray, statblocks, `roll`, `publish`. Listeners receive frozen copies and run guarded. */
     onRolled(listener: (result: DiceRollResult) => void): Disposer;
-    /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
+    /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll of plain data with at most 1,000 dice. */
     publish(result: DiceRollResult): void;
     /**
      * Throws `roll`, a result decided elsewhere, with Atlas's 3D dice in the map view `viewId` (a GM map view or a remote
      * view), seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed. Each roll id is thrown
      * once per view: handing it again throws nothing and answers true. False when nothing is thrown: the view is not open
      * or its map not loaded, its dice display is not showing, the user shows dice as result cards, or `roll` is not a roll
-     * (a die whose value is not a whole number from 1 to its `max` included); show the roll your own way then.
+     * (not plain data, more than 1,000 dice, or a die whose value is not a whole number from 1 to its `max` included); show
+     * the roll your own way then.
      * Where the view cannot draw 3D dice (no WebGL), or the roll does not list all its dice, Atlas shows its result card.
      * It only throws: nothing is logged, `onRolled` hears nothing and the player window shows nothing (`publish` does those).
      * `publish` already throws a roll without `rolledBy` in every open GM map view; use `throw` for a roll you do not
@@ -296,8 +306,9 @@ export declare interface DiceRollResult {
     crit?: DiceCrit;
     /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
     unlistedDice?: number;
+    /** Atlas's own label for the GM's roller ("Player" in English), stamped on every roll; not who rolled it. */
     player?: string;
-    /** Who rolled it when it was someone other than the GM: their name. */
+    /** Who rolled it when it was someone other than the GM: their name. Atlas shows it in the log and toasts. */
     rolledBy?: string;
     source?: {
         type: 'toolbar' | 'statblock';
@@ -752,7 +763,9 @@ export declare interface PanelHandle {
     open(viewId?: ViewId): void;
     /** Closes the panel in `viewId`, or in every view when none is given. */
     close(viewId?: ViewId): void;
+    /** Opens the panel in `viewId` (default the active map view) when it is closed there, else closes it; does nothing for no view. */
     toggle(viewId?: ViewId): void;
+    /** Whether the panel is open in `viewId` (default the active map view); false for no view or once disposed. */
     isOpen(viewId?: ViewId): boolean;
     /** Closes the panel in every view and removes it; calling it again does nothing. */
     dispose(): void;
@@ -938,7 +951,9 @@ export declare interface RemoteSceneInput {
 
 export declare interface RemoteStatus {
     title: string;
+    /** A short state of the connection, shown after the title, e.g. "Connected"; empty shows none. */
     connection: string;
+    /** The colour of the dot before the title: connected, pending (connecting or waiting) or ended. */
     tone: 'connected' | 'pending' | 'ended';
     message: string | null;
     /** A button that runs `run`, guarded; it comes first when `actions` are given too. */
@@ -961,7 +976,7 @@ export declare interface RemoteStatusAction {
 
 /**
  * A remote view: read-only, never saved, with no undo history. Every method does nothing once the view closed, and every
- * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*` and `tokens.snapPoint` take its `viewId`;
+ * listener runs guarded and is dropped when the view closes. `views.*`, `lasers.*`, `lighting.*`, `tokens.snapPoint` and `dice.throw` take its `viewId`;
  * `views.active()` never returns it, and `tokens.move` and `presentation.present` refuse it.
  */
 export declare interface RemoteView {
@@ -1011,6 +1026,7 @@ export declare interface RemoteView {
     onRoll(listener: (dice: Readonly<Record<string, number>>, modifier: number) => string | null): Disposer;
     /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
     onClose(listener: () => void): Disposer;
+    /** Closes the view's tab and drops every listener; `onClose` listeners run once. Calling it again does nothing. */
     close(): void;
 }
 
@@ -1173,7 +1189,9 @@ export declare interface SceneRecord {
 }
 
 export declare interface ScenesApi {
+    /** Every scene record in the asset index, as frozen copies; rejects when the index could not load. */
     list(): Promise<SceneRecord[]>;
+    /** The scene whose map file is `mapPath`, as a frozen copy; null when none is, also for a `remote:` path. */
     findByMap(mapPath: string): Promise<SceneRecord | null>;
     /** This extension's data on the scene record (`data.extensions[<extension id>]`); a frozen copy, undefined when unset. */
     getData(sceneId: string): Promise<Json | undefined>;
@@ -1426,6 +1444,7 @@ export declare interface ToolbarItem {
     /** Lucide name */
     icon: string;
     label: string;
+    /** Shown beside the label in "More tools" only; Atlas binds no hotkey for it. */
     shortcut?: string;
     /**
      * Its place among extensions' items, which sit together after Atlas's dice button: a higher priority sits further
@@ -1453,9 +1472,17 @@ export declare interface ToolbarItemContext extends ViewContext {
     ownRemote: boolean;
 }
 
+/**
+ * Every `add*` reads the fields it needs once and keeps its own frozen copy; methods are called on the object given, so
+ * a class instance works. It throws, naming the call and the field, for a malformed item or an id this extension already
+ * registered in that slot. What it adds is removed by the returned disposer or when this extension unloads.
+ */
 export declare interface UiApi {
+    /** A button in the map's toolbar, after Atlas's dice; `id`, `icon` and `label` must be non-empty and `onClick` a function. */
     addToolbarItem(item: ToolbarItem): Disposer;
+    /** A section of the command palette, after Atlas's own; `id` and `title` must be non-empty and `commands` a function. */
     addPaletteSection(section: PaletteSection): Disposer;
+    /** A tile on the dashboard; `id`, `icon` and `title` must be non-empty, `description` a string and `onClick` a function. */
     addDashboardTile(tile: DashboardTile): Disposer;
     /** The map's "More options" menu. */
     addViewMenuItems(provider: (ctx: ViewContext) => MenuItem[]): Disposer;
@@ -1479,6 +1506,7 @@ export declare interface ViewCamera {
 export declare interface ViewContext {
     viewId: ViewId;
     kind: 'map' | 'remote';
+    /** True in a view players look at (a remote view, or the player window); false in the GM's own map views. */
     isPlayerView: boolean;
 }
 
@@ -1501,12 +1529,15 @@ export declare interface ViewInfo {
 }
 
 export declare interface ViewsApi {
+    /** Every open map view and remote view, in no set order; `kind` tells them apart. */
     list(): ViewInfo[];
     /** The active Atlas map view; never a remote view. */
     active(): ViewInfo | null;
+    /** The scene in the view's store now; null for a view that is not open. */
     snapshot(viewId: ViewId): SceneSnapshot | null;
     /** Called after each store change that replaced one of the snapshot's fields (by reference). */
     subscribe(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
+    /** The view's visible world area now, frozen; null for a view that is not open, has no viewport yet or has no size. */
     camera(viewId: ViewId): ViewCamera | null;
     /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
     watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;
