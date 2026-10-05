@@ -146,4 +146,20 @@ describe('scenes.replaceMap', () => {
     await expect(fixture.scenes.replaceMap!(sceneId, { map: emptyMap(), images: [image('new.webp')] })).rejects.toThrow(/open in a map view/);
     expect(new Map(fixture.vault.files)).toEqual(before);
   });
+  it('C-scenes-5: a change to the scene record during the call survives; only the image list is updated', async () => {
+    const fixture = await withScene();
+    const { sceneId } = await added(fixture);
+    const moved = 'atlas-vtt/collections/Shared with me/Moved.atlasmap';
+    const write = vi.mocked(fixture.vault.app.vault.process);
+    const original = write.getMockImplementation()!;
+    write.mockImplementationOnce(async (file, fn) => {
+      const result = await original(file, fn);
+      const scene = (await fixture.assets.getAssetById(sceneId))!;
+      await fixture.assets.updateAsset(sceneId, { data: { ...scene.data, mapPath: moved } });
+      return result;
+    });
+    await fixture.scenes.replaceMap!(sceneId, { map: emptyMap({ background: 'new.webp' }), images: [image('new.webp')] });
+    const scene = (await fixture.assets.getAssetById(sceneId))!;
+    expect(scene.data).toMatchObject({ mapPath: moved, createdBy: 'ext', createdImages: [`${FOLDER}/new.webp`] });
+  });
 });
