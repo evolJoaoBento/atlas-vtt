@@ -10,6 +10,7 @@ import type { InitiativeRules } from '../../../types/initiativeRulesTypes';
 import { ASSET_LIMITS, mimeForPath, sceneAssetIds, type Hasher } from '../../assets/assetIds';
 import type { ImageFiles } from '../../scene/AssetRegistry';
 import { FogCoverage } from '../../scene/FogCoverage';
+import { clipToMap } from '../../scene/objectBounds';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
 import { projectForPlayers, type ProjectedState } from '../../scene/projectForPlayers';
 import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
@@ -117,7 +118,10 @@ export function playerSafePayload(source: SharedMapSource, name: string, context
   });
   // Pins players cannot see (GM-only, under fog) and pins whose note is not ticked are left out.
   const pins: SharedPin[] = Object.values(source.map.objects.pins).flatMap((pin): SharedPin[] => {
-    if (pin.gmOnly || coverage.isCovered({ x: pin.x, y: pin.y, width: 1, height: 1 })) return [];
+    if (pin.gmOnly) return [];
+    // A pin is shown only where the fog surely leaves the map revealed, inside the map.
+    const inMap = clipToMap({ x: pin.x, y: pin.y, width: 1, height: 1 }, context.images.size);
+    if (!inMap || !coverage.reveal(context.images.size).revealed(inMap)) return [];
     const note = context.noteItem(pin.notePath);
     if (!note) return [];
     return [{ x: pin.x, y: pin.y, note, ...(pin.icon ? { icon: pin.icon } : {}), ...(pin.label ? { label: pin.label } : {}), ...(pin.hex ? { hex: true } : {}) }];

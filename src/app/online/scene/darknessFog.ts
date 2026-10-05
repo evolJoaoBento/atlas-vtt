@@ -81,7 +81,7 @@ export function shownByScan(grid: DarknessRaster, bounds: WorldBounds): boolean 
  * The same answer as `shownByScan` in constant time: a summed-area table of the dark cells, built
  * once per darkness, so a lit map with many large texts and drawings costs no scan for each.
  */
-function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
+export function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
   const { cols, rows, dark } = grid;
   const width = cols + 1;
   const sums = new Int32Array(width * (rows + 1));

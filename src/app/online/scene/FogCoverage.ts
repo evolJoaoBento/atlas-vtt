@@ -6,7 +6,8 @@
  * object counts as covered only when no part of it can show.
  */
 import { CLEAR, FOGGED, fillBrush, fillLasso, fillRect, type CellGrid } from './fogRaster';
-import { sortedByOrder, type PlayerFogOp, type ScenePoint } from './sceneTypes';
+import { CLOSED_REVEAL, revealOf, type RevealCheck } from './FogReveal';
+import { sortedByOrder, type MapSize, type PlayerFogOp, type ScenePoint } from './sceneTypes';
 
 export const FOG_CELL_SIZE = 8;
 /** Beyond this many cells the cell size doubles, so a huge fogged area stays cheap. */
@@ -22,7 +23,10 @@ export interface WorldBounds {
 }
 
 export class FogCoverage {
-  static readonly EMPTY: FogCoverage = new FogCoverage(new Uint8Array(0), 0, 0, 0, 0, FOG_CELL_SIZE);
+  static readonly EMPTY: FogCoverage = new FogCoverage(new Uint8Array(0), 0, 0, 0, 0, FOG_CELL_SIZE, []);
+
+  /** The positive check for the map size it was last asked for. */
+  private revealMemo: { width: number; height: number; reveal: RevealCheck } | null = null;
 
   private constructor(
     private readonly cells: Uint8Array,
@@ -31,7 +35,21 @@ export class FogCoverage {
     private readonly originX: number,
     private readonly originY: number,
     readonly cellSize: number,
+    /** The fog operations this was made from (without a lit scene's darkness), for `reveal`. */
+    private readonly fogShapes: readonly FogShape[],
   ) {}
+
+  /**
+   * What the fog surely leaves revealed on a map of `map` size (`FogReveal`): the check every text, drawing, token and pin
+   * must pass to reach players. Closed for a map of unknown size. Worked out once for each map size.
+   */
+  reveal(map: MapSize): RevealCheck {
+    if (!(map.width > 0) || !(map.height > 0)) return CLOSED_REVEAL;
+    if (this.revealMemo?.width !== map.width || this.revealMemo.height !== map.height) {
+      this.revealMemo = { width: map.width, height: map.height, reveal: revealOf(this.fogShapes, map) };
+    }
+    return this.revealMemo.reveal;
+  }
 
   /**
    * From exactly the fog players receive, so what the GM withholds matches what players can see.
@@ -39,12 +57,13 @@ export class FogCoverage {
    */
   static fromPlayerFog(fog: Readonly<Record<string, PlayerFogOp>>, covered: readonly WorldBounds[] = []): FogCoverage {
     const shapes = sortedByOrder(fog, (op) => op.order).map(([, op]) => shapeOfPlayerOp(op));
-    return FogCoverage.fromShapes([...shapes, ...covered.map((rect): FogShape => ({ type: 'rectangle', erase: false, ...rect }))]);
+    return FogCoverage.fromShapes([...shapes, ...covered.map((rect): FogShape => ({ type: 'rectangle', erase: false, ...rect }))], shapes);
   }
 
-  private static fromShapes(shapes: readonly FogShape[]): FogCoverage {
+  private static fromShapes(shapes: readonly FogShape[], fogShapes: readonly FogShape[]): FogCoverage {
     const bounds = paintedBounds(shapes);
-    if (!bounds) return FogCoverage.EMPTY;
+    // Nothing painted: nothing is covered, but the operations still decide what is revealed (an erase after nothing is nothing).
+    if (!bounds) return fogShapes.length === 0 ? FogCoverage.EMPTY : new FogCoverage(new Uint8Array(0), 0, 0, 0, 0, FOG_CELL_SIZE, fogShapes);
     let cellSize = FOG_CELL_SIZE;
     // Huge brushes, paint or erase, coarsen the cells, which bounds the replay time whatever their points do.
     const widest = Math.max(0, ...shapes.map((shape) => (shape.type === 'brush' && Number.isFinite(shape.radius) ? shape.radius : 0)));
@@ -53,7 +72,7 @@ export class FogCoverage {
     const originY = Math.floor(bounds.y / cellSize) * cellSize;
     const cols = Math.ceil((bounds.x + bounds.width - originX) / cellSize) + 1;
     const rows = Math.ceil((bounds.y + bounds.height - originY) / cellSize) + 1;
-    const coverage = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize);
+    const coverage = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize, fogShapes);
     for (const shape of shapes) coverage.apply(shape);
     return coverage;
   }
@@ -82,7 +101,7 @@ export class FogCoverage {
     const originY = Math.floor(top / cellSize) * cellSize;
     const cols = Math.ceil((right - originX) / cellSize) + 1;
     const rows = Math.ceil((bottom - originY) / cellSize) + 1;
-    const result = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize);
+    const result = new FogCoverage(new Uint8Array(cols * rows), cols, rows, originX, originY, cellSize, this.fogShapes);
     if (this.cells.length > 0) result.copyFogged(this);
     for (const rect of painted) fillRect(result.grid, rect.x, rect.y, rect.width, rect.height, FOGGED);
     return result;
@@ -145,7 +164,7 @@ export class FogCoverage {
 }
 
 /** A fog operation reduced to what the raster needs, offsets applied. */
-type FogShape =
+export type FogShape =
   | { type: 'rectangle'; erase: boolean; x: number; y: number; width: number; height: number }
   | { type: 'brush'; erase: boolean; points: ScenePoint[]; radius: number }
   | { type: 'lasso'; erase: boolean; points: ScenePoint[] };

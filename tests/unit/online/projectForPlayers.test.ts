@@ -93,12 +93,14 @@ describe('projectForPlayers', () => {
     expect(projectForPlayers(withTokens({ rock: white }), context()).tokens.rock?.ring).toBe('#ffffff');
   });
 
-  it('drops a token completely under fog and sends one half under it', () => {
+  it('drops a token under fog, also one half under it, and sends one clear of it', () => {
     const coverage = fogOver(0, 0, 500, 500);
     const hiddenByFog = hero({ id: 'a', x: 200, y: 200 });
     const halfUnder = hero({ id: 'b', x: 500, y: 200 });
-    const scene = projectForPlayers(withTokens({ a: hiddenByFog, b: halfUnder }), context({ coverage }));
-    expect(Object.keys(scene.tokens)).toEqual(['b']);
+    const clear = hero({ id: 'c', x: 800, y: 200 });
+    const scene = projectForPlayers(withTokens({ a: hiddenByFog, b: halfUnder, c: clear }), context({ coverage }));
+    // A token reaches players only where the fog surely leaves every cell of it revealed (F-POS): half under is not.
+    expect(Object.keys(scene.tokens)).toEqual(['c']);
   });
 
   it('gives each image one asset id and the map its size', () => {
@@ -276,8 +278,8 @@ describe('projectForPlayers out-of-range numbers', () => {
     const covered = coverageOfFog({
       f: { id: 'f', kind: 'fog', type: 'rectangle', timestamp: 1, isErasing: false, x: 0, y: 0, width: 500, height: 500 } satisfies FogOperation,
     });
-    // Clamped x (1e7) is still far from the fog, and so is the raw x: kept either way.
-    expect(Object.keys(projectForPlayers(withTokens({ far }), context({ coverage: covered })).tokens)).toEqual(['far']);
+    // Far outside the map (raw x and clamped x alike): never sent, whatever the fog.
+    expect(Object.keys(projectForPlayers(withTokens({ far }), context({ coverage: covered })).tokens)).toEqual([]);
   });
 });
 
