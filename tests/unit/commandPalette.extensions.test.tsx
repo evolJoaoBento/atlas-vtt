@@ -112,6 +112,29 @@ describe('Extension sections in the command palette', () => {
     remove();
   });
 
+  it('skips malformed commands, logs them, and keeps the valid ones', () => {
+    const run = vi.fn();
+    const remove = add(section({
+      commands: () => [
+        null, { id: 'nolabel', run }, { label: 'No id', run }, { id: 'norun', label: 'No run' },
+        { id: 'ok', icon: 'x', label: 'Online session', run },
+      ] as never,
+    }));
+    renderPalette();
+    expect(option('Online session')).not.toBeNull();
+    expect(option('No id')).toBeNull();
+    expect(option('No run')).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('malformed'), null);
+    remove();
+  });
+
+  it('shows nothing, without throwing, when commands returns no list', () => {
+    const remove = add(section({ commands: () => 5 as never }));
+    expect(() => renderPalette()).not.toThrow();
+    expect(headers()).not.toContain('Online play');
+    remove();
+  });
+
   it('still closes when a command throws', () => {
     const remove = add(section({ commands: () => [{ id: 'c', icon: 'x', label: 'Online session', run: () => { throw new Error('boom'); } }] }));
     const { onClose } = renderPalette();

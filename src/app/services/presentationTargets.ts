@@ -5,8 +5,12 @@ export interface PresentationTargetEntry { id: string; label: string; isActive()
 /** Audiences besides the player window, one slot of the extension API like the rest of `extensions/slots.ts`. */
 export const presentationTargetSlot = new SlotRegistry<PresentationTargetEntry>();
 
-/** Adds an audience besides the player window for extension `owner`; returns the removal (idempotent). */
+/**
+ * Adds an audience besides the player window for extension `owner`; returns the removal (idempotent).
+ * Adding a target object that is already added changes nothing and returns a removal that does nothing.
+ */
 export function addPresentationTarget(target: PresentationTargetEntry, owner = 'an extension'): () => void {
+  if (presentationTargetSlot.list().some((entry) => entry.item === target)) return () => undefined;
   return presentationTargetSlot.add(owner, target);
 }
 

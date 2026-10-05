@@ -63,7 +63,12 @@ export function uiApi(scope: ExtensionScope, views: ViewTracker): UiApi {
     };
     return Object.freeze({
       open: (viewId?: ViewId): void => { const id = target(viewId); if (id) openPanel(panel, id); },
-      close: (): void => { const id = target(); if (id) closePanel(panel, id); },
+      close: (viewId?: ViewId): void => {
+        if (!alive) return;
+        if (viewId === undefined) { closePanelEverywhere(panel); return; }
+        const id = target(viewId);
+        if (id) closePanel(panel, id);
+      },
       toggle: (viewId?: ViewId): void => {
         const id = target(viewId);
         if (!id) return;

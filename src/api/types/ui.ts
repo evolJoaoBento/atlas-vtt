@@ -78,8 +78,8 @@ export interface PanelSpec {
 export interface PanelHandle {
   /** Opens the panel in `viewId`, default the active map view; does nothing when there is none. */
   open(viewId?: ViewId): void;
-  /** Closes the panel in the active map view. */
-  close(): void;
+  /** Closes the panel in `viewId`, or in every view when none is given. */
+  close(viewId?: ViewId): void;
   toggle(viewId?: ViewId): void;
   isOpen(viewId?: ViewId): boolean;
   /** Closes the panel in every view and removes it; calling it again does nothing. */

@@ -173,6 +173,26 @@ describe('ui panels', () => {
     plugin.unload();
   });
 
+  it('close() closes the panel in every view, and close(viewId) only in that view', () => {
+    const v1 = fakeView('v1');
+    const v2 = fakeView('v2');
+    loadMap(v1);
+    loadMap(v2);
+    const plugin = fakePlugin('ext');
+    const handle = hostWithUi([v1, v2], () => v1).host.api.connect(plugin).ui.addPanel({ id: 'p', title: 'P', mount: () => () => undefined });
+    handle.open('v1');
+    handle.open('v2');
+    handle.close('v2');
+    expect(handle.isOpen('v1')).toBe(true);
+    expect(handle.isOpen('v2')).toBe(false);
+    handle.open('v2');
+    handle.close();
+    expect(handle.isOpen('v1')).toBe(false);
+    expect(handle.isOpen('v2')).toBe(false);
+    expect(panelState.getState().open).toEqual([]);
+    plugin.unload();
+  });
+
   it('does nothing for a view that is not open, or when no map view is active', () => {
     const view = fakeView('v1');
     loadMap(view);

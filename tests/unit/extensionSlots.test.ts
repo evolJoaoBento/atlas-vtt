@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SlotRegistry, safely } from '../../src/app/extensions/SlotRegistry';
 import { invalidateSlots, toolbarSlot } from '../../src/app/extensions/slots';
 import {
-  activePresentationTarget, addPresentationTarget, subscribePresentationTargets,
+  activePresentationTarget, addPresentationTarget, presentationTargetSlot, subscribePresentationTargets,
 } from '../../src/app/services/presentationTargets';
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -63,6 +63,17 @@ describe('safely', () => {
 });
 
 describe('presentation targets on the slot registry', () => {
+  it('adding the same target object twice changes nothing; the first removal removes it', () => {
+    const target = { id: 'on', label: 'On', isActive: () => true };
+    const first = addPresentationTarget(target);
+    const second = addPresentationTarget(target);
+    expect(presentationTargetSlot.list()).toHaveLength(1);
+    second();
+    expect(presentationTargetSlot.list()).toHaveLength(1);
+    first();
+    expect(presentationTargetSlot.list()).toHaveLength(0);
+  });
+
   it('follows the active target, and a target that throws counts as inactive', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const stopBroken = addPresentationTarget({ id: 'broken', label: 'Broken', isActive: () => { throw new Error('boom'); } }, 'ext');
