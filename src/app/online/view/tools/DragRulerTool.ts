@@ -29,10 +29,11 @@ export class DragRulerTool {
   /** `onChange`: a hold added a waypoint, so the ruler must be drawn again. */
   constructor(private readonly onChange: () => void) {}
 
-  begin(origin: ScenePoint, grid: ToolGrid, kind: PointerKind): void {
+  /** `tokenSize`: the dragged token's, so the ruler ends where the GM's drop puts it. */
+  begin(origin: ScenePoint, grid: ToolGrid, kind: PointerKind, tokenSize: number): void {
     this.end();
     this.grid = grid;
-    this.path = new DragRulerPath((point) => grid.snapDrag(point));
+    this.path = new DragRulerPath((point) => grid.snapDrag(point, tokenSize));
     this.path.begin(origin);
     this.touch = kind === 'touch';
   }

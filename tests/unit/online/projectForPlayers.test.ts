@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResourceDefinition } from '../../../src/app/resources/resourceTypes';
+import type { GridState } from '../../../src/app/services/MapPersistence';
 import type { Character, Token } from '../../../src/app/types';
 import type { FogOperation } from '../../../src/app/types/fogTypes';
 import { createDefaultInitiativeState } from '../../../src/app/types/initiativeTypes';
@@ -115,7 +116,7 @@ describe('projectForPlayers', () => {
   it('sends the grid only when it is shown', () => {
     expect(projectForPlayers(gmState(), context()).grid).toEqual({
       type: 'square', size: 70, offsetX: 0, offsetY: 0, color: null, opacity: 0.5,
-      lineType: 'solid', lineWidth: 1, hexNumbers: null, hexNumberOpacity: null,
+      lineType: 'solid', lineWidth: 1, hexNumbers: null, hexNumberOpacity: null, cellNumbers: null, cellNumberOpacity: null,
     });
     expect(projectForPlayers(gmState(), context({ rules: { ...ALL_ON, showGrid: false } })).grid).toBeNull();
     const hidden = gmState({ grid: { enabled: true, visible: false, size: 70, offsetX: 0, offsetY: 0, opacity: 1 } });
@@ -123,8 +124,33 @@ describe('projectForPlayers', () => {
     const off = gmState({ grid: { enabled: false, size: 70, offsetX: 0, offsetY: 0, opacity: 1 } });
     expect(projectForPlayers(off, context()).grid).toBeNull();
     expect(projectForPlayers(hidden, context()).map.cellSize).toBe(70);
-    const hex = gmState({ grid: { enabled: true, type: 'hex-vertical', size: 60, offsetX: 3, offsetY: 4, opacity: 1, hexNumbers: 'column-row' } });
-    expect(projectForPlayers(hex, context()).grid).toMatchObject({ type: 'hex-vertical', size: 60, hexNumbers: 'column-row', hexNumberOpacity: 0.8 });
+    const hex = gmState({ grid: { enabled: true, type: 'hex-vertical', size: 60, offsetX: 3, offsetY: 4, opacity: 1, cellNumbers: 'column-row' } });
+    expect(projectForPlayers(hex, context()).grid).toMatchObject({
+      type: 'hex-vertical', size: 60, cellNumbers: 'column-row', cellNumberOpacity: 0.8, hexNumbers: 'column-row', hexNumberOpacity: 0.8,
+    });
+  });
+
+  it('numbers the cells of every grid, and tells players before Atlas 0.5.1 only what they can read', () => {
+    const grid = (type: GridState['type'], cellNumbers: GridState['cellNumbers']): ProjectedState =>
+      gmState({ grid: { enabled: true, type, size: 60, offsetX: 0, offsetY: 0, opacity: 1, cellNumbers, cellNumberOpacity: 0.4 } });
+    // Older players number hex grids only, and refuse a scene whose format they do not know.
+    expect(projectForPlayers(grid('square', 'letter-number'), context()).grid).toMatchObject({
+      cellNumbers: 'letter-number', cellNumberOpacity: 0.4, hexNumbers: null, hexNumberOpacity: null,
+    });
+    expect(projectForPlayers(grid('square', 'column-row'), context()).grid).toMatchObject({ cellNumbers: 'column-row', hexNumbers: null });
+    expect(projectForPlayers(grid('hex-horizontal', 'letter-number'), context()).grid).toMatchObject({ cellNumbers: 'letter-number', hexNumbers: null });
+    expect(projectForPlayers(grid('hex-horizontal', 'sequential'), context()).grid).toMatchObject({
+      cellNumbers: 'sequential', hexNumbers: 'sequential', hexNumberOpacity: 0.4,
+    });
+    for (const type of ['square', 'hex-vertical'] as const) {
+      for (const format of ['column-row', 'sequential', 'letter-number'] as const) {
+        const sent = projectForPlayers(grid(type, format), context()).grid!;
+        // What an older player validates: `hexNumbers` one of its two formats or null.
+        expect([null, 'column-row', 'sequential']).toContain(sent.hexNumbers);
+        const { fog: _fog, drawings: _drawings, ...body } = projectForPlayers(grid(type, format), context());
+        expect(isPlayerSceneBody(body)).toBe(true);
+      }
+    }
   });
 
   it('lists initiative only for tokens players receive', () => {
@@ -195,8 +221,10 @@ describe('projectForPlayers', () => {
       'visibleToPlayers', 'visible', 'initiativeModifier', 'isDefeated', 'isNPC', 'timestamp', 'offsetX', 'isErasing', 'overriddenMax', 'direction',
       'defeatedWhenSpent', 'field', 'key', 'slot', 'current', 'max',
     ];
-    const keys = keysOf({ ...scene, grid: null, texts: {}, drawings: {} });
+    // The grid and the snap grid are geometry players are meant to have (an offset among it).
+    const keys = keysOf({ ...scene, grid: null, measurement: { ...scene.measurement, snapGrid: null }, texts: {}, drawings: {} });
     for (const key of neverSent) expect(keys.has(key), key).toBe(false);
+    expect(Object.keys(scene.measurement.snapGrid!).sort()).toEqual(['offsetX', 'offsetY', 'size', 'type']);
     expect(scene.initiative?.entries[0]).not.toHaveProperty('stress');
     expect(keysOf(scene.widgets).has('color')).toBe(false);
   });
@@ -233,6 +261,7 @@ describe('projectForPlayers', () => {
     const grid = { ...gmState().grid!, unitType: 'meters' as const, unitDistance: 1.5, measurementType: 'units' as const };
     expect(projectForPlayers(gmState({ grid }), context()).measurement).toEqual({
       mode: 'metric', unitType: 'meters', unitDistance: 1.5, diagonalRule: 'equidistant', rangeBands: [], snapToGrid: true, coneAngle: 90,
+      snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
     });
     expect(projectForPlayers(gmState({ grid: { ...grid, snapToGrid: false } }), context()).measurement.snapToGrid).toBe(false);
     const collectionGrid = {
@@ -241,6 +270,7 @@ describe('projectForPlayers', () => {
     };
     expect(projectForPlayers(gmState({ grid }), context({ collectionGrid })).measurement).toEqual({
       mode: 'abstract', unitType: 'feet', unitDistance: 5, diagonalRule: 'alternating', snapToGrid: true, coneAngle: 90,
+      snapGrid: { type: 'square', size: 70, offsetX: 0, offsetY: 0 },
       rangeBands: [{ name: 'Close', maxSquares: 1 }, { name: 'x'.repeat(128), maxSquares: 1 }],
     });
   });

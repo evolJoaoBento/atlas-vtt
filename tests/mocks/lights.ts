@@ -4,7 +4,7 @@ import type { LightPresetId } from '../../src/app/lighting/lightPresets';
 import type { LightEmission } from '../../src/app/types/lightingTypes';
 
 /** The generic lights as a map on the default 5-foot grid offers them. */
-const ON_MAP = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', unitDistance: 5 }, Infinity);
+const ON_MAP = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', ruleDistance: 5 }, Infinity);
 
 /** The light the generic preset `id` puts down there, as the popover, the lighting tool and Carry light do. */
 export function genericLight(id: LightPresetId): LightEmission {

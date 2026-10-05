@@ -1,5 +1,6 @@
 import { Container, Graphics, Matrix, Texture, type Renderer } from 'pixi.js';
 import { exploredMemoryOn } from '../../../lighting/sceneLightingOptions';
+import type { UnlitGrid } from '../../../grid/gridLightingMark';
 import type { Sight } from '../../../vision/sight';
 import { destroyTree } from '../../utils/destroyTree';
 import { BackBufferHold } from './backBuffer';
@@ -41,6 +42,7 @@ export class LightingEngine {
   /** What is perceived inside magical darkness, kept while sight and footprints stay. */
   private pierce: readonly PierceShape[] = [];
   private scene: EngineScene | null = null;
+  private grid: UnlitGrid | null = null;
   private enabled = false;
   private stopped = false;
   /** The shaders link on the current context. */
@@ -133,6 +135,20 @@ export class LightingEngine {
     this.layer.visible = on;
     this.backBuffer.set(on);
     if (!on) this.dropWorld();
+  }
+
+  /**
+   * The grid the composite draws unlit (`UnlitGrid`), handed over at every render, since the map
+   * may get a new one. It is marked exactly while the composite draws: a grid marked without it
+   * would erase the map under its lines.
+   */
+  setGrid(grid: UnlitGrid | null): void {
+    if (grid !== this.grid) {
+      this.grid?.setMarking(false);
+      this.grid = grid;
+    }
+    grid?.setMarking(this.composite !== null);
+    this.composite?.setGrid(grid?.markColor() ?? null);
   }
 
   animate(now: number): boolean {
@@ -264,6 +280,7 @@ export class LightingEngine {
 
   /** The composite goes with the world, so it never holds the world's destroyed textures. */
   private dropWorld(): void {
+    this.grid?.setMarking(false);
     this.layer.filters = null;
     this.composite?.filter.destroy();
     this.composite = null;

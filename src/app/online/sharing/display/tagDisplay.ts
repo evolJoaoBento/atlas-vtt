@@ -11,6 +11,7 @@
  */
 import type { BlockContext } from '../model/codeContext';
 import { pairTags, scanMarkup, type OpenPart, type PartRule } from '../model/privateTags';
+import { t } from '../../../i18n';
 
 /** The colour of a part: private red, public green, only blue, except orange. */
 export type TagTone = 'private' | 'public' | 'only' | 'except';
@@ -40,12 +41,13 @@ export interface TagDisplay {
   hidden: DisplayRange[];
 }
 
-export const UNREADABLE_TAG_LABEL = 'Unreadable tag';
+export const UNREADABLE_TAG_LABEL = t('share.unreadableTag');
 
 /** "Private", "Public", "Only Ana, Ben", "Except Cara". */
 export function labelOf(rule: PartRule): string {
-  if (!('names' in rule)) return rule.kind === 'private' ? 'Private' : 'Public';
-  return `${rule.kind === 'only' ? 'Only' : 'Except'} ${rule.names.join(', ')}`;
+  if (!('names' in rule)) return t(rule.kind === 'private' ? 'share.private' : 'share.public');
+  // The names as the tag writes them (`[!only|Ana, Ben]`).
+  return t(rule.kind === 'only' ? 'share.only' : 'share.except', { names: rule.names.join(', ') });
 }
 
 function labelFor(part: OpenPart): Omit<TagLabel, 'from' | 'to'> {

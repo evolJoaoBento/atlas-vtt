@@ -7,9 +7,10 @@ import type { SessionPlayer } from '../../../online/GmSession';
 import type { OnlineSessionService } from '../../../online/OnlineSessionService';
 import type { JoinIdentity } from '../../../online/sharing/people/IdentityDesk';
 import {
-  KNOWN_PERSON_MARK, NEW_PERSON_MARK, OBSIDIAN_PLAYER_LABEL, REMOVE_PLAYER_LABEL, linkToLabel, sameNameWarning,
+  KNOWN_PERSON_MARK, NEW_PERSON_MARK, OBSIDIAN_PLAYER_LABEL, linkToLabel, sameNameWarning,
 } from '../../../online/ui/onlineCopy';
 import { usePresentedSceneSummary, useTokenControlVersion } from './useOnlineState';
+import { t } from '../../../i18n';
 
 interface OnlinePlayerListProps {
   players: readonly SessionPlayer[];
@@ -69,8 +70,8 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
   return (
     <>
       {waiting.length > 0 && (
-        <section className="atlas-online-panel__section" aria-label="Waiting to join">
-          <h3 className="atlas-online-panel__heading">Waiting to join</h3>
+        <section className="atlas-online-panel__section" aria-label={t('online.panel.waitingToJoin')}>
+          <h3 className="atlas-online-panel__heading">{t('online.panel.waitingToJoin')}</h3>
           <ul className="atlas-online-panel__players">
             {waiting.map((player) => (
               <li key={player.playerId} className="atlas-online-panel__player" aria-label={player.name}>
@@ -78,8 +79,8 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
                   <span className="atlas-online-panel__name">{player.name}</span>
                   {player.client === 'obsidian' && <ObsidianMark />}
                   <IdentityMark identity={requests[player.playerId] ?? null} />
-                  <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>Allow</Button>
-                  <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>Deny</Button>
+                  <Button variant="default" size="sm" onClick={() => service.allow(player.playerId)}>{t('online.allow')}</Button>
+                  <Button variant="outline" size="sm" onClick={() => service.deny(player.playerId)}>{t('online.deny')}</Button>
                 </div>
                 <SameNameRow identity={requests[player.playerId] ?? null} onLink={(same) => linkTo(service, player.playerId, same)} />
               </li>
@@ -87,10 +88,10 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
           </ul>
         </section>
       )}
-      <section className="atlas-online-panel__section" aria-label="Players">
-        <h3 className="atlas-online-panel__heading">Players</h3>
+      <section className="atlas-online-panel__section" aria-label={t('online.panel.players')}>
+        <h3 className="atlas-online-panel__heading">{t('online.panel.players')}</h3>
         {joined.length === 0 ? (
-          <p className="atlas-online-panel__help">No players yet. Share the link to invite them.</p>
+          <p className="atlas-online-panel__help">{t('online.panel.noPlayers')}</p>
         ) : (
           <ul className="atlas-online-panel__players">
             {joined.map((player) => {
@@ -105,15 +106,15 @@ export function OnlinePlayerList({ players, requests, control, service }: Online
                   <div className="atlas-online-panel__player-row">
                     <span className="atlas-online-panel__name">{player.name}</span>
                     {player.client === 'obsidian' && <ObsidianMark />}
-                    {player.status === 'gone' && <span className="atlas-online-panel__note">Disconnected</span>}
-                    <LabelTooltip label={`${REMOVE_PLAYER_LABEL} ${player.name}`}>
-                      <Button variant="ghost" size="icon" aria-label={`${REMOVE_PLAYER_LABEL} ${player.name}`} onClick={() => service.kick(player.playerId)}>
+                    {player.status === 'gone' && <span className="atlas-online-panel__note">{t('online.panel.disconnected')}</span>}
+                    <LabelTooltip label={t('online.removePlayerNamed', { name: player.name })}>
+                      <Button variant="ghost" size="icon" aria-label={t('online.removePlayerNamed', { name: player.name })} onClick={() => service.kick(player.playerId)}>
                         <X />
                       </Button>
                     </LabelTooltip>
                   </div>
                   {tokens.length > 0 && (
-                    <ul className="atlas-online-panel__chips" aria-label={`Tokens of ${player.name}`}>
+                    <ul className="atlas-online-panel__chips" aria-label={t('online.panel.tokensOf', { name: player.name })}>
                       {tokens.map((token) => <li key={token.id} className="atlas-online-panel__chip">{token.name}</li>)}
                     </ul>
                   )}

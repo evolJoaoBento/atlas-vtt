@@ -20,6 +20,7 @@ import type { StatblockEditApi } from './statblock/statblockEditContext';
 import { isEditableNote, writeStatblockValue } from '../../services/statblockEditing';
 import { useBestiaryRevision } from '../hooks/useBestiaryRevision';
 import { StatblockSkeleton } from './statblock/StatblockSkeleton';
+import { t } from '../../i18n';
 
 interface FantasyStatblockProps {
   /** Vault path of the note backing the Fantasy Statblocks creature */
@@ -206,7 +207,7 @@ export function FantasyStatblock({
   if (!api) {
     return (
       <div className="atlas-statblock-missing-hint">
-        Install and enable the Fantasy Statblocks plugin to preview statblocks.
+        {t('statblock.pluginMissing')}
       </div>
     );
   }

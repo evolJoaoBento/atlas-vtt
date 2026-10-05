@@ -6,6 +6,7 @@
 import type { App } from 'obsidian';
 import { LogIn, type LucideIcon } from 'lucide-react';
 import { openJoinSessionModal } from './JoinSessionModal';
+import { t } from '../../../i18n';
 
 export interface DashboardTile {
   key: string;
@@ -19,8 +20,8 @@ export function joinSessionTile(app: App): DashboardTile {
   return {
     key: 'join',
     icon: LogIn,
-    title: 'Join online session',
-    desc: "Paste a GM's link to play",
+    title: t('online.join.title'),
+    desc: t('online.join.tileDesc'),
     onClick: () => openJoinSessionModal(app),
   };
 }

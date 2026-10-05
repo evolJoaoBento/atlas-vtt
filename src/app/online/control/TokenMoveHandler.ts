@@ -78,7 +78,9 @@ export class TokenMoveHandler implements SessionHandler {
     // The live token, not only the projection: the broadcaster's last tick can predate a hide.
     if (state.objects.tokens[move.tokenId]?.isHidden) return false;
     if (!Number.isFinite(move.x) || !Number.isFinite(move.y)) return false;
-    const { x, y } = snapDroppedToken(state.grid, clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene)));
+    // The live token's size, as the GM's own drag snaps it.
+    const size = state.objects.tokens[move.tokenId]?.size || 1;
+    const { x, y } = snapDroppedToken(state.grid, clampTo({ x: move.x, y: move.y }, sceneWorldBounds(scene)), size);
     runHistoryTransaction(live.store, () => live.store.getState().setTokenPositions([{ id: move.tokenId, x, y }]));
     return true;
   }

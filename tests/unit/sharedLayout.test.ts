@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { MIN_HEX_NUMBER_SCREEN_SIZE } from '../../src/app/grid/hexNumbering';
+import { CellNumberLabels } from '../../src/app/grid/cellNumberLabels';
+import { cellNumberFontSize } from '../../src/app/grid/cellNumbering';
+import { MIN_CELL_NUMBER_SCREEN_SIZE } from '../../src/app/online/view/layers/gridLayer';
+import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 import { SCENE_LAYER_ORDER, SCENE_LAYER_Z } from '../../src/app/pixi/sceneLayerOrder';
 import { DEFAULT_TEXT_PADDING, textBackground, textFontStyle, textFontWeight, textRotation, textScale } from '../../src/app/pixi/textBoxLayout';
 import { badgePositions, badgeSlots, CONDITION_BADGE, fitBadges } from '../../src/app/pixi/token-renderer/conditionBadgeLayout';
@@ -81,9 +84,26 @@ describe('text box layout', () => {
   });
 });
 
-describe('hex numbers', () => {
+describe('cell numbers', () => {
   it('hide below 7 CSS pixels on screen', () => {
-    expect(MIN_HEX_NUMBER_SCREEN_SIZE).toBe(7);
+    expect(MIN_CELL_NUMBER_SCREEN_SIZE).toBe(7);
+  });
+
+  it("hide where Atlas's CellNumberLabels hides them", () => {
+    const restore = stubJsdomGraphics();
+    try {
+      const fontSize = cellNumberFontSize(100);
+      const labels = new CellNumberLabels([{ key: 'a', center: { x: 50, y: 50 }, label: 'A1' }], 100, { x: 0, y: 0 }, { color: 0xffffff, opacity: 1 },
+        { zoom: MIN_CELL_NUMBER_SCREEN_SIZE / fontSize, pixelRatio: 1 });
+      expect(labels.container.visible).toBe(true);
+      labels.setView({ zoom: (MIN_CELL_NUMBER_SCREEN_SIZE - 0.01) / fontSize, pixelRatio: 1 });
+      expect(labels.container.visible).toBe(false);
+      labels.setView({ zoom: MIN_CELL_NUMBER_SCREEN_SIZE / fontSize, pixelRatio: 1 });
+      expect(labels.container.visible).toBe(true);
+      labels.container.destroy({ children: true });
+    } finally {
+      restore();
+    }
   });
 });
 

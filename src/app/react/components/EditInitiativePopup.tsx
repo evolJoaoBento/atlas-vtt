@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { isActiveAtlasLeaf } from '../../utils/activeLeafGuard';
 import type { InitiativeEntry } from '../../types/initiativeTypes';
+import { t } from '../../i18n';
 
 /**
  * Compact popup for editing initiative value
@@ -88,7 +89,7 @@ export function EditInitiativePopup({
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
         />
-        <span className="atlas-initiative-edit-popup__hint">Enter to save · Esc to cancel</span>
+        <span className="atlas-initiative-edit-popup__hint">{t('initiative.editHint')}</span>
       </div>
     </>
   );

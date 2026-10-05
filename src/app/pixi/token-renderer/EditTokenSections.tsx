@@ -2,6 +2,7 @@ import React, { useId } from 'react';
 import { ToggleSwitch } from '../../packages/components/primitives/Toggle';
 import type { ResourceDefinition, ResourceValue } from '../../resources/resourceTypes';
 import { NumberOverrideField } from './NumberOverrideField';
+import { t } from '../../i18n';
 
 interface EditTokenSectionProps {
   title: string;
@@ -56,7 +57,7 @@ export function TokenIdentitySection({ name, onNameChange, showNameplate, onShow
   return (
     <EditTokenSection title="Token">
       <div className="atlas-edit-token__field">
-        <label className="atlas-edit-token__label" htmlFor={nameId}>Name</label>
+        <label className="atlas-edit-token__label" htmlFor={nameId}>{t('editToken.name')}</label>
         <input
           id={nameId}
           ref={nameRef}
@@ -64,17 +65,17 @@ export function TokenIdentitySection({ name, onNameChange, showNameplate, onShow
           className="atlas-input"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder="Token name"
+          placeholder={t('editToken.namePlaceholder')}
         />
       </div>
-      <SwitchRow label="Show nameplate" value={showNameplate} onChange={onShowNameplateChange} />
+      <SwitchRow label={t('editToken.showNameplate')} value={showNameplate} onChange={onShowNameplateChange} />
     </EditTokenSection>
   );
 }
 
 /** What an empty field says: the maximum the linked statblock gives the resource, if any. */
 function defaultPlaceholder(max: number | undefined): string {
-  return max === undefined ? 'None' : `Statblock default: ${max}`;
+  return max === undefined ? t('editToken.none') : t('editToken.statblockDefault', { value: max });
 }
 
 interface TokenResourcesSectionProps {
@@ -90,7 +91,7 @@ interface TokenResourcesSectionProps {
 /** The maximum of each resource, two to a row; a static resource's field is its value. */
 export function TokenResourcesSection({ definitions, values, onChange, defaults }: TokenResourcesSectionProps): React.ReactElement {
   return (
-    <EditTokenSection title="Resources">
+    <EditTokenSection title={t('editToken.resources')}>
       <div className="atlas-edit-token__fields">
         {definitions.map(({ key, name, direction }) => (
           <NumberOverrideField
@@ -99,7 +100,7 @@ export function TokenResourcesSection({ definitions, values, onChange, defaults 
             value={values[key] ?? ''}
             onChange={(value) => onChange(key, value)}
             placeholder={defaultPlaceholder(defaults[key]?.max)}
-            resetLabel="Reset to statblock default"
+            resetLabel={t('editToken.resetStatblock')}
           />
         ))}
       </div>

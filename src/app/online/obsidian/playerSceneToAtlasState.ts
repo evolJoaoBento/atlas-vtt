@@ -3,7 +3,8 @@
  * (`online/coverage.ts`) mark `sent`, rebuilt from what players receive. Pure. The online scene
  * view's `RemoteSceneApplier` writes the result into its store with builders that reuse records.
  */
-import { DEFAULT_HEX_NUMBER_OPACITY } from '../../grid/hexNumbering';
+import { playerCellNumbers } from '../scene/playerCellNumbers';
+import { snapGridOf } from '../scene/snapGrid';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
@@ -78,13 +79,20 @@ function gridUnits(measurement: PlayerMeasurement): Pick<GridState, 'snapToGrid'
   };
 }
 
-/** A grid the GM hides keeps the map's cell size, so tokens keep their size and drops still snap. */
+/**
+ * A grid players do not see stays hidden here but lies where the GM's drop snaps (`snapGridOf`), so
+ * Atlas's drag and its resnap after a grid change put tokens where the GM does. On a map without a grid
+ * it keeps the map's cell size, so tokens keep their size, and nothing snaps.
+ */
 export function atlasGrid(scene: PlayerScene): GridState {
   const units = gridUnits(scene.measurement);
   const grid = scene.grid;
   if (!grid) {
-    return { enabled: true, visible: false, type: 'square', size: scene.map.cellSize, offsetX: 0, offsetY: 0, opacity: 0, ...units };
+    const snap = snapGridOf(scene);
+    const geometry = snap ?? { type: 'square' as const, size: scene.map.cellSize, offsetX: 0, offsetY: 0 };
+    return { enabled: true, visible: false, ...geometry, opacity: 0, ...units, ...(snap ? {} : { snapToGrid: false }) };
   }
+  const numbers = playerCellNumbers(grid);
   return {
     enabled: true,
     visible: true,
@@ -96,9 +104,7 @@ export function atlasGrid(scene: PlayerScene): GridState {
     opacity: grid.opacity,
     lineType: grid.lineType,
     lineWidth: grid.lineWidth,
-    ...(grid.hexNumbers !== null
-      ? { hexNumbers: grid.hexNumbers, hexNumberOpacity: grid.hexNumberOpacity ?? DEFAULT_HEX_NUMBER_OPACITY }
-      : {}),
+    ...(numbers ? { cellNumbers: numbers.format, cellNumberOpacity: numbers.opacity } : {}),
     ...units,
   };
 }

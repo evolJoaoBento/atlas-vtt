@@ -1,3 +1,5 @@
+import { MAP_LAYER_Z } from './mapLayerOrder';
+
 /**
  * The order Atlas stacks a scene's layers in, bottom first. The map and the grid sit
  * at the bottom by child index (the map at 0, the grid just above it); the others by
@@ -10,7 +12,8 @@ export type SceneLayer = typeof SCENE_LAYER_ORDER[number];
 /** `zIndex` in the viewport of the layers placed by it. */
 export const SCENE_LAYER_Z = {
   tokens: 0,
-  texts: 500,
+  /** Upstream's text layer (`MAP_LAYER_Z.text`), so both name one number. */
+  texts: MAP_LAYER_Z.text,
   /** Above tokens and texts, below fog so hidden areas stay hidden. */
   drawings: 900,
   fog: 1000,

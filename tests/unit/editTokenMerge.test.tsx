@@ -15,7 +15,7 @@ import { AMMO, HP } from '../mocks/resourceFixtures';
 
 const darkvision = senseWithRole(GENERIC_SENSES, 'darkvision');
 const tremorsense = senseWithRole(GENERIC_SENSES, 'tremorsense');
-const onMap = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', unitDistance: 5 }, Infinity);
+const onMap = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', ruleDistance: 5 }, Infinity);
 const torch = emissionOf(onMap.find((preset) => preset.id === 'torch')!);
 
 afterEach(() => {

@@ -1,7 +1,7 @@
 import type { GridState } from '../services/MapPersistence';
 import type { GridOptions } from './GridSystem';
 import { parseGridColor } from './gridContrastColor';
-import { hexNumberStyleOfGrid } from './hexNumbering';
+import { cellNumberStyleOfGrid } from './cellNumbering';
 
 /** The store keeps the grid colour as a CSS hex string and its alpha as `opacity`; the GridSystem wants a number and `alpha`. */
 export function toGridOptions(grid: GridState): GridOptions {
@@ -17,6 +17,6 @@ export function toGridOptions(grid: GridState): GridOptions {
     ...(grid.lineWidth !== undefined ? { lineWidth: grid.lineWidth } : {}),
     ...(grid.scale !== undefined ? { scale: grid.scale } : {}),
     ...(grid.mapScale !== undefined ? { mapScale: grid.mapScale } : {}),
-    hexNumbers: hexNumberStyleOfGrid(grid),
+    cellNumbers: cellNumberStyleOfGrid(grid),
   };
 }

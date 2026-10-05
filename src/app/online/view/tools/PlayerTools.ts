@@ -181,8 +181,8 @@ export class PlayerTools implements TokenGrab {
     if (this.current !== 'move' && !this.connected) return false;
     if (this.current === 'move') {
       if (!this.options.moves.grab(point)) return false;
-      const origin = this.options.moves.dragged()?.origin;
-      if (origin) this.ruler.begin(origin, grid, kind);
+      const dragged = this.options.moves.dragged();
+      if (dragged) this.ruler.begin(dragged.origin, grid, kind, this.tokenSize(dragged.tokenId));
     } else if (this.current === 'measure') {
       this.measure.begin(this.options.toWorld(point), grid);
     } else {
@@ -236,6 +236,12 @@ export class PlayerTools implements TokenGrab {
     this.endGesture();
     this.laser.dispose();
     this.lasers.clear();
+  }
+
+  /** A token's size in cells, as the scene sends it; 1 for one it does not hold. */
+  private tokenSize(tokenId: string): number {
+    const tokens = this.scene?.tokens;
+    return (tokens && Object.hasOwn(tokens, tokenId) ? tokens[tokenId]?.size : undefined) || 1;
   }
 
   private selfColor(): string {

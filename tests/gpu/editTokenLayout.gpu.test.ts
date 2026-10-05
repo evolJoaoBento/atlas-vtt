@@ -22,7 +22,7 @@ const THEME = `
   button, input { corner-shape: var(--corner-shape); font: inherit; }
   button { height: 30px; }
 `;
-const TORCH = emissionOf(lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', unitDistance: 5 }, Infinity).find((preset) => preset.id === 'torch')!);
+const TORCH = emissionOf(lightPresetsOnMap(GENERIC_LIGHT_PRESETS, { unitType: 'feet', ruleDistance: 5 }, Infinity).find((preset) => preset.id === 'torch')!);
 /** A character with two resources and vision: an ordinary token of a party. */
 const MIRABEL: Character = {
   id: 't', kind: 'character', name: 'Mirabel', imagePath: 'm.png', x: 0, y: 0,

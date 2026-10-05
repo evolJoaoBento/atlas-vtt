@@ -2,11 +2,12 @@
 import { strayEndProblem } from '../model/noteFilter';
 import type { PartProblems } from '../model/privateParts';
 import { END_TAG } from '../model/privateTags';
+import { t } from '../../../i18n';
 
 const MAX_UNREADABLE_WARNINGS = 3;
-export const OLD_CALLOUTS_WARNING = 'This note still uses the old > [!private] callouts; they are kept back. Use Mark as private on the selection instead.';
-export const TAG_IN_CODE_WARNING = 'A share tag inside code or a link is not used; the rest of the note is kept back.';
-export const UNCLOSED_COMMENT_WARNING = 'A %% comment is never closed before the next tag (a %% in code counts too), so everything after it is hidden from everyone.';
+export const OLD_CALLOUTS_WARNING = t('share.warn.oldCallouts');
+export const TAG_IN_CODE_WARNING = t('share.warn.tagInCode');
+export const UNCLOSED_COMMENT_WARNING = t('share.warn.unclosedComment');
 
 export function partWarnings(problems: PartProblems): string[] {
   const { strayText } = problems;
@@ -14,11 +15,11 @@ export function partWarnings(problems: PartProblems): string[] {
     ...(problems.tagInCodeOrLink ? [TAG_IN_CODE_WARNING] : []),
     ...(strayText?.oldCallout ? [OLD_CALLOUTS_WARNING] : []),
     ...(strayText && !strayText.oldCallout
-      ? [`"${strayText.text}" reads like a part tag but is not one, so everything from there on is hidden from everyone. Use Share part on the selection to mark parts.`]
+      ? [t('share.warn.stray', { text: strayText.text })]
       : []),
     ...[...new Set(problems.malformed)].slice(0, MAX_UNREADABLE_WARNINGS)
-      .map((start) => `Could not read the private part tag "${start}". What it marks is hidden from everyone.`),
-    ...(problems.unclosed ? [`A private part tag is never closed with ${END_TAG}, so everything after it is hidden from everyone.`] : []),
+      .map((start) => t('share.warn.malformed', { tag: start })),
+    ...(problems.unclosed ? [t('share.warn.unclosed', { tag: END_TAG })] : []),
     ...(problems.unclosedComment ? [UNCLOSED_COMMENT_WARNING] : []),
   ];
 }

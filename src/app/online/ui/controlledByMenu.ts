@@ -8,9 +8,10 @@ import type { ContextMenuEntry } from '../../react/root/ContextMenuContext';
 import type { TokenControl } from '../control/TokenControl';
 import type { SessionPlayer } from '../GmSession';
 import { onlineSessionStore } from '../onlineSessionStore';
+import { t } from '../../i18n';
 
-export const CONTROLLED_BY_LABEL = 'Controlled by';
-export const NO_PLAYERS_LABEL = 'No players connected';
+export const CONTROLLED_BY_LABEL = t('online.controlledBy');
+export const NO_PLAYERS_LABEL = t('online.noPlayersConnected');
 
 /** The submenu for `tokenId`; null while no session is hosted. */
 export function controlledBySubmenu(tokenId: string): ContextMenuEntry | null {

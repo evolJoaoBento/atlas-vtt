@@ -6,9 +6,10 @@ import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../../ui/nativeModal';
 import { dismissPush, shareSessionStore } from '../../shareSessionStore';
 import type { SharedWithMe } from '../SharedWithMe';
 import { SharedWithMeList } from './SharedWithMeList';
+import { t } from '../../../../i18n';
 
-export const SHARED_WITH_ME_LABEL = 'Shared with me';
-export const NO_SHARE_SESSION_TEXT = 'Join or host an online session to see what people share with you.';
+export const SHARED_WITH_ME_LABEL = t('share.received.title');
+export const NO_SHARE_SESSION_TEXT = t('share.received.noSession');
 
 function Live({ service, onPulled, onProblem }: { service: SharedWithMe; onPulled: (path: string) => void; onProblem: (text: string) => void }): React.ReactElement {
   const people = useStore(shareSessionStore, (state) => state.people);
@@ -27,7 +28,7 @@ class SharedWithMeModal extends Modal {
   onOpen(): void {
     this.setTitle(SHARED_WITH_ME_LABEL);
     this.root = createRoot(this.contentEl);
-    this.root.render(<Live service={this.service} onPulled={(path) => new Notice(`Pulled into ${path}`)} onProblem={(text) => new Notice(text)} />);
+    this.root.render(<Live service={this.service} onPulled={(path) => new Notice(t('share.received.pulledInto', { path }))} onProblem={(text) => new Notice(text)} />);
   }
 
   onClose(): void {

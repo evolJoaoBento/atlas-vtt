@@ -6,6 +6,7 @@ import { shareSessionStore } from '../../../online/sharing/shareSessionStore';
 import { SHARED_WITH_ME_BUTTON } from '../../../online/ui/onlineCopy';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { useAtlasStore } from '../../ViewStoreContext';
+import { t } from '../../../i18n';
 
 /** The online scene's slim status bar: the GM's session, the connection, a refusal, and Reconnect. */
 export function OnlineSceneBar(): React.ReactElement | null {
@@ -28,7 +29,7 @@ export function OnlineSceneBar(): React.ReactElement | null {
       )}
       {status.reconnect && (
         <Button variant="default" size="sm" className="atlas-online-scene-bar__action" onClick={() => view?.onlineControls()?.reconnect()}>
-          Reconnect
+          {t('online.scene.reconnect')}
         </Button>
       )}
     </div>

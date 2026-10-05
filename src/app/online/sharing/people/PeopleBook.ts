@@ -10,9 +10,10 @@ import { JsonDataFile, SHARING_DATA_DIR } from '../dataFile';
 import { nameKey, uniqueName } from './peopleNames';
 import { isCalled, MAX_PLACEHOLDERS, placeholderKey, placeholderKeys, placeholderOfKey, type Placeholder } from './placeholderTypes';
 import { keyOf, parsePeopleData, type PeopleData, type Person } from './peopleTypes';
+import { t } from '../../../i18n';
 
 export const PEOPLE_FILE = `${SHARING_DATA_DIR}/people.json`;
-const NAME_PROBLEM = 'Enter a name of up to 40 characters.';
+const NAME_PROBLEM = t('people.nameProblem');
 /** A change of only `lastSeen` is saved this long after the last one; any other change is saved at once. */
 const LAST_SEEN_SAVE_DELAY_MS = 10_000;
 /** Meeting someone again within this time leaves their last-seen time alone. */
@@ -124,7 +125,7 @@ export class PeopleBook {
       return null;
     }
     if (this.nameTaken(nameKey(cleaned), person)) {
-      return `Someone in your people list is already called ${cleaned}.`;
+      return t('people.nameTaken', { name: cleaned });
     }
     this.replace(person, { name: cleaned, formerNames: [...person.formerNames.filter((former) => nameKey(former) !== nameKey(cleaned)), person.name] });
     return null;
@@ -134,7 +135,7 @@ export class PeopleBook {
   merge(fromKey: string, intoKey: string): string | null {
     const from = this.byKey(fromKey);
     const into = this.byKey(intoKey);
-    if (!from || !into || from === into) return 'Pick another person.';
+    if (!from || !into || from === into) return t('people.pickAnother');
     const people = this.people.filter((person) => person !== from);
     const merged: Person = {
       ...into,
@@ -182,8 +183,8 @@ export class PeopleBook {
   addPlaceholder(name: string): string | null {
     const cleaned = normalizePlayerName(name);
     if (!cleaned) return NAME_PROBLEM;
-    if (this.nameTaken(nameKey(cleaned))) return `Someone in your people list is already called ${cleaned}.`;
-    if (this.placeholderList.length >= MAX_PLACEHOLDERS) return `You can add up to ${MAX_PLACEHOLDERS} people by name.`;
+    if (this.nameTaken(nameKey(cleaned))) return t('people.nameTaken', { name: cleaned });
+    if (this.placeholderList.length >= MAX_PLACEHOLDERS) return t('people.tooMany', { max: String(MAX_PLACEHOLDERS) });
     this.placeholderList = [...this.placeholderList, { id: randomId(), name: cleaned, formerNames: [] }];
     this.changed(true);
     return null;
@@ -196,7 +197,7 @@ export class PeopleBook {
     if (!placeholder) return null;
     if (!cleaned) return NAME_PROBLEM;
     const same = nameKey(cleaned) === nameKey(placeholder.name);
-    if (!same && this.nameTaken(nameKey(cleaned), undefined, placeholder)) return `Someone in your people list is already called ${cleaned}.`;
+    if (!same && this.nameTaken(nameKey(cleaned), undefined, placeholder)) return t('people.nameTaken', { name: cleaned });
     const formerNames = same ? placeholder.formerNames : [...placeholder.formerNames.filter((former) => nameKey(former) !== nameKey(cleaned)), placeholder.name];
     this.placeholderList = this.placeholderList.map((other) => (other === placeholder ? { ...placeholder, name: cleaned, formerNames } : other));
     this.changed(true);
@@ -233,7 +234,7 @@ export class PeopleBook {
   linkPlaceholder(key: string, placeholderId: string): string | null {
     const person = this.byKey(key);
     const placeholder = this.placeholderById(placeholderId);
-    if (!person || !placeholder) return 'Pick another person.';
+    if (!person || !placeholder) return t('people.pickAnother');
     const formerNames = [...new Set([...placeholder.formerNames, person.name, ...person.formerNames])].filter((name) => nameKey(name) !== nameKey(placeholder.name));
     const linked: Person = { ...person, name: placeholder.name, formerNames, aliases: [...new Set([...person.aliases, ...placeholderKeys(placeholder)])] };
     this.people = this.people.map((other) => (other === person ? linked : other));

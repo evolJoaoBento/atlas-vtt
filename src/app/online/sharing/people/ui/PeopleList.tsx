@@ -8,8 +8,9 @@ import type { Placeholder } from '../placeholderTypes';
 import { AddPersonForm } from './AddPersonForm';
 import { NOT_MET_TEXT } from './peopleCopy';
 import { PlaceholderRow } from './PlaceholderRow';
+import { t } from '../../../../i18n';
 
-export const NO_PEOPLE_TEXT = 'Nobody yet. People are added when you let them into your session or join someone else’s.';
+export const NO_PEOPLE_TEXT = t('people.none');
 
 interface PeopleListProps {
   people: Pick<PeopleBook, 'list' | 'placeholders' | 'rename' | 'merge' | 'remove' | 'subscribe' | 'addPlaceholder' | 'renamePlaceholder' | 'removePlaceholder' | 'linkPlaceholder'>;
@@ -20,13 +21,13 @@ interface PeopleListProps {
 
 /** The heading of a table's group: yours, or the GM's name at theirs. */
 function tableTitle(tableId: string, people: readonly Person[], ownTableId: string | null): string {
-  if (tableId === ownTableId) return 'Your table';
+  if (tableId === ownTableId) return t('people.yourTable');
   const gm = people.find((person) => person.tableId === tableId && person.personId === GM_PERSON_ID);
-  return gm ? `${gm.name}’s table` : 'Another table';
+  return gm ? t('people.gmTable', { name: gm.name }) : t('people.anotherTable');
 }
 
 function lastSeenText(time: number): string {
-  return time > 0 ? `Last seen ${new Date(time).toLocaleDateString()}` : 'Not seen yet';
+  return time > 0 ? t('people.lastSeen', { date: new Date(time).toLocaleDateString() }) : t('people.notSeen');
 }
 
 const PLACEHOLDER_PREFIX = 'placeholder:';
@@ -52,14 +53,14 @@ function PersonRow({ person, others, notMet, people, confirmRemove }: {
         <input
           className="atlas-people__name"
           value={name}
-          aria-label={`Name of ${person.name}`}
+          aria-label={t('people.nameOf', { name: person.name })}
           onChange={(event) => setName(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => { if (event.key === 'Enter') commit(); }}
         />
         <select
           className="atlas-people__link dropdown"
-          aria-label={`Link ${person.name} to`}
+          aria-label={t('people.linkTo', { name: person.name })}
           value=""
           onChange={(event) => {
             const { value } = event.target;
@@ -67,7 +68,7 @@ function PersonRow({ person, others, notMet, people, confirmRemove }: {
             else if (value) setProblem(people.merge(keyOf(person), value));
           }}
         >
-          <option value="">Link to…</option>
+          <option value="">{t('people.linkToMenu')}</option>
           {others.map((other) => <option key={keyOf(other)} value={keyOf(other)}>{other.name}</option>)}
           {notMet.length > 0 && (
             <optgroup label={NOT_MET_TEXT}>
@@ -75,9 +76,9 @@ function PersonRow({ person, others, notMet, people, confirmRemove }: {
             </optgroup>
           )}
         </select>
-        <LabelTooltip label={`Remove ${person.name}`}>
+        <LabelTooltip label={t('people.remove', { name: person.name })}>
           <Button
-            variant="ghost" size="icon" aria-label={`Remove ${person.name}`}
+            variant="ghost" size="icon" aria-label={t('people.remove', { name: person.name })}
             onClick={() => { void confirmRemove(person).then((yes) => { if (yes) people.remove(keyOf(person)); }); }}
           >
             <X />

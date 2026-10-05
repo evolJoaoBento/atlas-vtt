@@ -4,6 +4,7 @@ import { INCOMPLETE_LINK_TEXT, NAME_PROBLEM_TEXT } from '../page/pageScreen';
 import type { SceneCamera } from '../scene/sceneCamera';
 import type { PlayerScene } from '../scene/sceneTypes';
 import type { DiceLogEntry, PlayerLaser } from '../tools/toolMessages';
+import { t } from '../../i18n';
 
 /** What the Online scene view takes from the joined session. */
 export interface OnlineSceneSink {
@@ -28,6 +29,6 @@ export type JoinProblem = 'link' | 'name' | 'hosting' | 'joined';
 export const JOIN_PROBLEM_TEXT: Record<JoinProblem, string> = {
   link: INCOMPLETE_LINK_TEXT,
   name: NAME_PROBLEM_TEXT,
-  hosting: 'Stop hosting your online session before joining another.',
-  joined: 'You are already in an online session. Close its tab to leave it first.',
+  hosting: t('online.join.hosting'),
+  joined: t('online.join.joined'),
 };

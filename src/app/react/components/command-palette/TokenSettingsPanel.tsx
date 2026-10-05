@@ -7,12 +7,13 @@ import { slottedResources } from '../../../resources/resourceSlots';
 import { toggleHidden } from '../../../resources/sceneVisibility';
 import { shapeOf } from '../../../resources/visibleResources';
 import { DEFAULT_TOKEN_SETTINGS } from '../../../storeFactory';
+import { t } from '../../../i18n';
 
 type TokenToggleKey = 'showNameplates' | 'showInstanceBadges';
 
 const TOGGLES: ReadonlyArray<{ key: TokenToggleKey; label: string; hint?: string }> = [
-  { key: 'showNameplates', label: 'Show nameplates' },
-  { key: 'showInstanceBadges', label: 'Show instance badges', hint: 'Numbers tokens that share an image' },
+  { key: 'showNameplates', label: t('tokens.showNameplates') },
+  { key: 'showInstanceBadges', label: t('tokens.showBadges'), hint: t('tokens.showBadgesHint') },
 ];
 
 interface TokenSettingsPanelProps {

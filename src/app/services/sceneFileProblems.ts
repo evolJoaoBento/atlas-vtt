@@ -1,4 +1,5 @@
 import { Notice, type App, type TFile } from 'obsidian';
+import { t } from '../i18n';
 
 /** Why an existing scene file cannot be loaded, in the words the GM reads. */
 export const SCENE_FILE_PROBLEM = {
@@ -30,7 +31,7 @@ export async function preserveDamagedSceneFile(app: App, file: TFile, error: Sce
   const backupPath = `${file.path}.${Date.now()}.bak`;
   try {
     await app.vault.copy(file, backupPath);
-    new Notice(`Atlas VTT could not read ${file.name} (${reason}). A copy was kept at ${backupPath}.`, 0);
+    new Notice(t('map.readFailed', { file: file.name, reason, backup: backupPath }), 0);
   } catch (copyError) {
     console.error(`[AtlasStorage] Could not back up ${file.path}:`, copyError);
   }

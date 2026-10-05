@@ -4,14 +4,24 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { renderEntries, type ContextMenuEntry } from '../components/context-menu/AtlasContextMenu';
 import { useAtlasStore } from '../ViewStoreContext';
 import { LabelTooltip } from '../../packages/components/primitives/tooltip';
+import { t } from '../../i18n';
 
 // Re-export the entry type so consumers only import from this file
 export type { ContextMenuEntry } from '../components/context-menu/AtlasContextMenu';
 
 // ── Context + hook ──────────────────────────────────────────────────────────
 
+export interface ContextMenuOptions {
+  /**
+   * Where focus goes when the menu closes and nothing else took it (a menu
+   * opened from the keyboard, closed with Escape): the menu's own trigger is
+   * a point and cannot hold focus.
+   */
+  returnFocus?: HTMLElement | null;
+}
+
 interface ContextMenuController {
-  open: (entries: ContextMenuEntry[], position: { x: number; y: number }) => void;
+  open: (entries: ContextMenuEntry[], position: { x: number; y: number }, options?: ContextMenuOptions) => void;
   close: () => void;
 }
 
@@ -47,15 +57,27 @@ export function closeContextMenuGlobal(): void {
 interface MenuState {
   entries: ContextMenuEntry[];
   position: { x: number; y: number };
+  returnFocus: HTMLElement | null;
+}
+
+/** Focuses `element` where the menu left focus nowhere (on the body): a choice that moved focus keeps it there. */
+function returnFocusTo(element: HTMLElement | null, event: Event): void {
+  if (!element) return;
+  event.preventDefault();
+  const active = element.ownerDocument.activeElement;
+  if (element.isConnected && (!active || active === element.ownerDocument.body)) element.focus();
 }
 
 export const ContextMenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [menuState, setMenuState] = useState<MenuState | null>(null);
+  // The body of the document the provider renders in: a map in a popout opens its menus there.
+  const [body, setBody] = useState<HTMLElement | null>(null);
+  const anchor = useCallback((node: HTMLSpanElement | null): void => setBody(node?.ownerDocument.body ?? null), []);
 
   const close = useCallback((): void => setMenuState(null), []);
 
-  const open = useCallback((entries: ContextMenuEntry[], position: { x: number; y: number }): void => {
-    setMenuState({ entries, position });
+  const open = useCallback((entries: ContextMenuEntry[], position: { x: number; y: number }, options?: ContextMenuOptions): void => {
+    setMenuState({ entries, position, returnFocus: options?.returnFocus ?? null });
   }, []);
 
   useEffect(() => {
@@ -71,7 +93,8 @@ export const ContextMenuProvider: React.FC<{ children: React.ReactNode }> = ({ c
   return (
     <ContextMenuCtx.Provider value={{ open, close }}>
       {children}
-      {createPortal(
+      <span ref={anchor} hidden />
+      {body && createPortal(
         <DropdownMenu.Root
           open={!!menuState}
           onOpenChange={(isOpen) => { if (!isOpen) close(); }}
@@ -91,7 +114,7 @@ export const ContextMenuProvider: React.FC<{ children: React.ReactNode }> = ({ c
           </DropdownMenu.Trigger>
 
           {menuState && (
-            <DropdownMenu.Portal>
+            <DropdownMenu.Portal container={body}>
               <DropdownMenu.Content
                 className="atlas-ctx-menu"
                 side="bottom"
@@ -100,13 +123,14 @@ export const ContextMenuProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 avoidCollisions
                 collisionPadding={8}
                 onContextMenu={(e) => e.preventDefault()}
+                onCloseAutoFocus={(e) => returnFocusTo(menuState.returnFocus, e)}
               >
                 {renderEntries(menuState.entries, close)}
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           )}
         </DropdownMenu.Root>,
-        document.body,
+        body,
       )}
     </ContextMenuCtx.Provider>
   );
@@ -120,18 +144,18 @@ export function RingColorGrid({ tokenId, closeMenu }: { tokenId: string; closeMe
   // Theme colours are read from Obsidian's hex variables; colours Obsidian does
   // not define fall back to fixed values.
   const colors: Array<{ name: string; cssVar?: string; fallback: string }> = [
-    { name: 'Blue', cssVar: '--color-blue', fallback: '#086ddd' },
-    { name: 'Orange', cssVar: '--color-orange', fallback: '#ec7500' },
-    { name: 'Red', cssVar: '--color-red', fallback: '#e93147' },
-    { name: 'Yellow', cssVar: '--color-yellow', fallback: '#e0ac00' },
-    { name: 'Brown', fallback: '#a97142' },
-    { name: 'Purple', cssVar: '--color-purple', fallback: '#7852ee' },
-    { name: 'Lime', fallback: '#72ff5b' },
-    { name: 'Green', cssVar: '--color-green', fallback: '#08b94e' },
-    { name: 'Pink', cssVar: '--color-pink', fallback: '#d53984' },
-    { name: 'Cyan', cssVar: '--color-cyan', fallback: '#00bfbc' },
-    { name: 'Gray', fallback: '#ababab' },
-    { name: 'White', fallback: '#ffffff' },
+    { name: t('menu.ring.blue'), cssVar: '--color-blue', fallback: '#086ddd' },
+    { name: t('menu.ring.orange'), cssVar: '--color-orange', fallback: '#ec7500' },
+    { name: t('menu.ring.red'), cssVar: '--color-red', fallback: '#e93147' },
+    { name: t('menu.ring.yellow'), cssVar: '--color-yellow', fallback: '#e0ac00' },
+    { name: t('menu.ring.brown'), fallback: '#a97142' },
+    { name: t('menu.ring.purple'), cssVar: '--color-purple', fallback: '#7852ee' },
+    { name: t('menu.ring.lime'), fallback: '#72ff5b' },
+    { name: t('menu.ring.green'), cssVar: '--color-green', fallback: '#08b94e' },
+    { name: t('menu.ring.pink'), cssVar: '--color-pink', fallback: '#d53984' },
+    { name: t('menu.ring.cyan'), cssVar: '--color-cyan', fallback: '#00bfbc' },
+    { name: t('menu.ring.gray'), fallback: '#ababab' },
+    { name: t('menu.ring.white'), fallback: '#ffffff' },
   ];
 
   const resolveHex = (cssVar: string | undefined, fallback: string): string => {
@@ -150,7 +174,7 @@ export function RingColorGrid({ tokenId, closeMenu }: { tokenId: string; closeMe
       {colors.map((c) => {
         const hex = resolveHex(c.cssVar, c.fallback);
         return (
-          <LabelTooltip key={c.name} label={`Ring colour ${c.name}`}>
+          <LabelTooltip key={c.name} label={t('menu.ringColour', { name: c.name })}>
             <button
               type="button"
               className="atlas-ring-swatch"
@@ -160,7 +184,7 @@ export function RingColorGrid({ tokenId, closeMenu }: { tokenId: string; closeMe
           </LabelTooltip>
         );
       })}
-      <LabelTooltip label="Clear ring">
+      <LabelTooltip label={t('menu.clearRing')}>
         <button
           type="button"
           className="atlas-ring-swatch atlas-none"

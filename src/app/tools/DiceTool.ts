@@ -3,6 +3,7 @@ import { DEFAULT_DICE_RULES } from '../gameSystems/diceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
 import { hasDiceTerm } from './diceFormula';
 import { DICE_ROLLED_EVENT, DICE_TYPES, rollFormula, type DiceRollResult } from './diceRolling';
+import { t } from '../i18n';
 
 export type { DiceRollResult } from './diceRolling';
 
@@ -57,7 +58,9 @@ export class DiceTool {
   private parseAndRoll(formula: string): DiceRollResult {
     const rules = this.getDiceRules();
     const complete = hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll);
-    return rollFormula(complete, Math.random, Date.now(), rules);
+    // The shared roll builder has no Obsidian imports (the join page uses it), so the GM's
+    // own roll takes the translated name here.
+    return { ...rollFormula(complete, Math.random, Date.now(), rules), player: t('dice.player') };
   }
 
   public clearHistory(): void {

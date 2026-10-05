@@ -2,12 +2,13 @@ import { App, Modal, Notice, setIcon } from 'obsidian';
 import { ATLAS_NATIVE_MODAL_CLASSES } from '../../ui/nativeModal';
 import { OnlineSessionService } from '../OnlineSessionService';
 import { onlineSessionStore, type OnlineSessionState } from '../onlineSessionStore';
+import { t } from '../../i18n';
 
 const STATUS_TEXT: Record<OnlineSessionState['status'], string> = {
-  idle: 'Not hosting. Start a session to get a link your players can open in a browser.',
-  starting: 'Starting…',
-  hosting: 'Hosting. Share the link; you approve each player who joins.',
-  error: 'Could not start the session.',
+  idle: t('online.modal.idle'),
+  starting: t('online.modal.starting'),
+  hosting: t('online.modal.hosting'),
+  error: t('online.modal.error'),
 };
 
 /** Start or stop the online session, share its link, and manage players. */
@@ -20,7 +21,7 @@ export class OnlineSessionModal extends Modal {
   }
 
   onOpen(): void {
-    this.titleEl.setText('Online session');
+    this.titleEl.setText(t('online.sessionLabel'));
     this.render(onlineSessionStore.getState());
     this.unsubscribe = onlineSessionStore.subscribe((state) => this.render(state));
   }
@@ -38,10 +39,10 @@ export class OnlineSessionModal extends Modal {
 
     if (state.status === 'hosting' && state.joinUrl) {
       const row = el.createDiv({ cls: 'atlas-online-modal__link' });
-      row.createEl('input', { type: 'text', attr: { readonly: 'true', value: state.joinUrl, 'aria-label': 'Join link' } });
-      const copy = row.createEl('button', { text: 'Copy link' });
+      row.createEl('input', { type: 'text', attr: { readonly: 'true', value: state.joinUrl, 'aria-label': t('online.joinLink') } });
+      const copy = row.createEl('button', { text: t('online.copyLink') });
       const url = state.joinUrl;
-      copy.addEventListener('click', () => { void navigator.clipboard.writeText(url).then(() => new Notice('Join link copied')); });
+      copy.addEventListener('click', () => { void navigator.clipboard.writeText(url).then(() => new Notice(t('online.linkCopied'))); });
     }
 
     const players = state.players;
@@ -52,21 +53,21 @@ export class OnlineSessionModal extends Modal {
         const dot = item.createSpan({ cls: 'atlas-online-modal__dot' });
         setIcon(dot, player.status === 'pending' ? 'hourglass' : 'circle');
         item.createSpan({ cls: 'atlas-online-modal__name' }).setText(player.name);
-        item.createSpan({ cls: 'atlas-online-modal__state', text: player.status === 'pending' ? 'wants to join' : player.status === 'gone' ? 'disconnected' : 'connected' });
+        item.createSpan({ cls: 'atlas-online-modal__state', text: player.status === 'pending' ? t('online.modal.wantsToJoin') : player.status === 'gone' ? t('online.modal.disconnected') : t('online.modal.connected') });
         if (player.status === 'pending') {
-          item.createEl('button', { cls: 'mod-cta', text: 'Allow' }).addEventListener('click', () => this.service.allow(player.playerId));
-          item.createEl('button', { text: 'Deny' }).addEventListener('click', () => this.service.deny(player.playerId));
+          item.createEl('button', { cls: 'mod-cta', text: t('online.allow') }).addEventListener('click', () => this.service.allow(player.playerId));
+          item.createEl('button', { text: t('online.deny') }).addEventListener('click', () => this.service.deny(player.playerId));
         } else {
-          item.createEl('button', { text: 'Remove' }).addEventListener('click', () => this.service.kick(player.playerId));
+          item.createEl('button', { text: t('common.remove') }).addEventListener('click', () => this.service.kick(player.playerId));
         }
       }
     }
 
     const footer = el.createDiv({ cls: 'atlas-online-modal__footer' });
     if (state.status === 'hosting') {
-      footer.createEl('button', { cls: 'mod-warning', text: 'Stop session' }).addEventListener('click', () => this.service.stop());
+      footer.createEl('button', { cls: 'mod-warning', text: t('online.modal.stopSession') }).addEventListener('click', () => this.service.stop());
     } else {
-      const start = footer.createEl('button', { cls: 'mod-cta', text: state.status === 'error' ? 'Try again' : 'Start session' });
+      const start = footer.createEl('button', { cls: 'mod-cta', text: state.status === 'error' ? t('online.modal.tryAgain') : t('online.modal.startSession') });
       start.disabled = state.status === 'starting';
       start.addEventListener('click', () => void this.service.start());
     }

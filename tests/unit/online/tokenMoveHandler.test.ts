@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MOVES_PER_SECOND, MoveRateLimit } from '../../../src/app/online/control/TokenMoveHandler';
 import { createHexLayout, nearestHexCenter } from '../../../src/app/grid/hexGeometry';
 import { decodeControl, encodeControl, type ControlMessage } from '../../../src/app/online/protocol';
-import { moveWorld, partyState, type MoveWorld } from './tokenMoveFixtures';
+import { snapTokenCenter } from '../../../src/app/grid/gridPlacement';
+import { moveWorld, partyState, partyTokens, type MoveWorld } from './tokenMoveFixtures';
 
 async function withHero(w: MoveWorld) {
   w.present();
@@ -160,6 +161,25 @@ describe('token moves on the GM side', () => {
     (await withHero(w3)).move('hero', 300, 150);
     expect(w3.token('hero')).toMatchObject({ x: 315, y: 175 });
     w3.finish();
+  });
+
+  it("snaps a Large or Gargantuan token where cells meet, as the GM's drag does, by the live token's size", async () => {
+    const tokens = partyTokens();
+    tokens.hero = { ...tokens.hero!, size: 1.5 };
+    const square = moveWorld({ state: partyState(tokens) });
+    (await withHero(square)).move('hero', 300, 150);
+    // The intersection nearest the drop: a 2×2 footprint covers four whole cells.
+    expect(square.token('hero')).toMatchObject({ x: 280, y: 140 });
+    square.finish();
+
+    const hex = partyState({ ...partyTokens(), hero: { ...partyTokens().hero!, size: 2.5 } } as never);
+    hex.grid = { ...hex.grid!, type: 'hex-vertical' };
+    const w = moveWorld({ state: hex });
+    (await withHero(w)).move('hero', 300, 150);
+    const layout = createHexLayout('hex-vertical', 70, 0, 0);
+    expect(w.token('hero')).toMatchObject(snapTokenCenter({ x: 300, y: 150 }, 2.5, 'hex-vertical', 70, (point) => nearestHexCenter(layout, point)));
+    expect(w.token('hero')).not.toMatchObject(nearestHexCenter(layout, { x: 300, y: 150 }));
+    w.finish();
   });
 
   it(`ignores more than ${MOVES_PER_SECOND} moves a second from one player, without answering them`, async () => {

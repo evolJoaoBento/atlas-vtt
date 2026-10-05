@@ -9,6 +9,7 @@ import { Viewport } from 'pixi-viewport';
 import type { TextElement } from '../types';
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
+import { MAP_LAYER_Z } from './mapLayerOrder';
 
 /** Resting look of a resize handle: a dark pill with a faint outlined inset. */
 function drawIdleHandleBackground(bg: Graphics): void {
@@ -41,6 +42,7 @@ export class TextResizeUI {
     // Create container for UI elements
     this.container = new Container();
     this.container.label = 'textResizeUI';
+    this.container.zIndex = MAP_LAYER_Z.textHandles;
     this.container.visible = false;
     this.viewport.addChild(this.container);
     

@@ -1,6 +1,7 @@
 import { FileView, WorkspaceLeaf, TFile, normalizePath, ViewStateResult, Notice } from "obsidian";
 import type { OnlineSceneControls } from './online/obsidian/remoteScene';
 import { ServiceManager } from './services/ServiceManager';
+import { SceneOpenHistory } from './services/sceneOpenHistory';
 import { createViewAtlasStore, ViewAtlasStore } from './storeFactory';
 import { getHistoryStore, runUntracked, type HistoryState } from './stores/history';
 import { withoutExploredEdits } from './stores/exploredEditHistory';
@@ -8,7 +9,10 @@ import { createTabMetaStore, type TabMetaStore } from './stores/tabMetaStore';
 import type { SceneTab } from './types/sceneTabTypes';
 import type AtlasVTTPlugin from '../../main';
 import { claimWorkspaceLeafFocus } from './utils/activeLeafGuard';
+import { t } from './i18n';
 import { isScenePath } from './utils/sceneFiles';
+import { runInBackground } from './utils/backgroundTask';
+import { restoreLinkedSnapshot } from './links/openAtlasLink';
 
 export const ATLAS_VIEW_TYPE = "atlas-vtt";
 
@@ -164,6 +168,18 @@ export class AtlasView extends FileView {
     }
   }
 
+  /**
+   * Obsidian passes the `#` part of a link that opened this view here: a link
+   * to one of the scene's snapshots offers to restore it once the scene is open.
+   */
+  setEphemeralState(state: unknown): void {
+    super.setEphemeralState(state);
+    const subpath = isRecord(state) && typeof state.subpath === 'string' ? state.subpath : null;
+    const mapPath = this.file?.path;
+    if (!subpath || !mapPath) return;
+    runInBackground(restoreLinkedSnapshot(this.app, mapPath, subpath), `Opening a link to a snapshot of ${mapPath}`, t('snapshots.restoreFailed'));
+  }
+
   getState(): AtlasViewState {
     const { tabs, activeTabId } = this.tabMetaStore.getState();
 
@@ -239,7 +255,7 @@ export class AtlasView extends FileView {
     try {
       // Show loading overlay immediately if we have a file to load
       if (this.file instanceof TFile) {
-        this.store.getState().setMapLoading(true, 0, 'Initializing...');
+        this.store.getState().setMapLoading(true, 0, t('view.initializing'));
       }
 
 
@@ -379,7 +395,7 @@ export class AtlasView extends FileView {
     // Resolve the TFile from the tab's filePath
     const abstractFile = this.app.vault.getAbstractFileByPath(normalizePath(tab.filePath));
     if (!(abstractFile instanceof TFile)) {
-      new Notice(`Scene file not found: ${tab.filePath}`);
+      new Notice(t('view.sceneNotFound', { path: tab.filePath }));
       this.tabMetaStore.getState().removeTab(tabId);
       return;
     }
@@ -399,6 +415,7 @@ export class AtlasView extends FileView {
     if (loaded) {
       this.restoreTemporalState(tabId);
       this.restoreViewportState(tabId);
+      this.rememberOpened(abstractFile);
     } else if (request === this.sceneRequests) {
       this.showLoadedTab();
     }
@@ -572,7 +589,6 @@ export class AtlasView extends FileView {
     if (!file) return;
 
     const request = ++this.sceneRequests;
-    await this.flushPendingSaves();
     // Only a loaded scene has a camera to keep
     const tabId = this.loadedTabId();
     if (tabId) this.saveViewportState(tabId);
@@ -581,6 +597,10 @@ export class AtlasView extends FileView {
     // running is stopped as well: finishing meanwhile, it would mark the store as loaded
     // with the content from before and queue that for saving.
     this._serviceManager.getMapService().suspendForRewrite();
+    // What is pending reaches the file before the rewrite, including what the unloading scene
+    // saved on its way out (the explored memory): flushed later, by the load, it would land on
+    // the rewritten file and put the old scene back.
+    await this.flushPendingSaves();
     try {
       await rewrite(file);
     } catch (error) {
@@ -620,7 +640,10 @@ export class AtlasView extends FileView {
       // File is already a tab
       if (tabState.activeTabId === existingTab.id) {
         this.sceneRequests++;
-        if (await this.performSceneLoad(file)) this.tabMetaStore.getState().markTabLoaded(existingTab.id);
+        if (await this.performSceneLoad(file)) {
+          this.tabMetaStore.getState().markTabLoaded(existingTab.id);
+          this.rememberOpened(file);
+        }
       } else {
         await this.switchToTab(existingTab.id);
       }
@@ -638,8 +661,10 @@ export class AtlasView extends FileView {
       this.file = file;
 
       // Perform the scene load (single store — loadMap handles clear + rehydrate)
-      if (await this.performSceneLoad(file)) this.tabMetaStore.getState().markTabLoaded(tabId);
-      else if (request === this.sceneRequests) this.showLoadedTab();
+      if (await this.performSceneLoad(file)) {
+        this.tabMetaStore.getState().markTabLoaded(tabId);
+        this.rememberOpened(file);
+      } else if (request === this.sceneRequests) this.showLoadedTab();
     }
 
     // Tell Obsidian the view state changed so workspace.json is updated
@@ -654,7 +679,7 @@ export class AtlasView extends FileView {
   private async performSceneLoad(file: TFile): Promise<boolean> {
     // The renderer still shows the previous scene; its pending thumbnail is taken now or never
     this._serviceManager.flushSceneThumbnail();
-    this.store.getState().setMapLoading(true, 0, 'Preparing...');
+    this.store.getState().setMapLoading(true, 0, t('view.preparing'));
     this.currentMapFilePath = file.path;
 
     const rendererService = this._serviceManager.getRendererService();
@@ -666,6 +691,12 @@ export class AtlasView extends FileView {
 
     const mapService = this._serviceManager.getMapService();
     return (await mapService.loadMapFromFile(rendererService, file)) !== null;
+  }
+
+  /** Remembers the scene the GM opened, for the dashboard's "Continue your adventure". Never fails the load. */
+  private rememberOpened(file: TFile): void {
+    const remember = async (): Promise<void> => SceneOpenHistory.forApp(this.app).recordOpened(file.path);
+    runInBackground(remember(), 'Remembering the opened scene');
   }
 
   // --- Persistence Helpers ---
@@ -843,7 +874,7 @@ export class AtlasView extends FileView {
   getDisplayText(): string {
     // Display the map name if available
     const mapFilePath = this._serviceManager.getMapService().getCurrentMapFilePath();
-    return mapFilePath ? `Atlas: ${mapFilePath.split('/').pop()}` : "Atlas Canvas";
+    return mapFilePath ? `Atlas: ${mapFilePath.split('/').pop()}` : t('view.canvas');
   }
 
   getIcon(): string {

@@ -5,9 +5,10 @@ import { LabelledCheck } from '../../ui/LabelledCheck';
 import { pullAcceptedPush } from '../pushPrompts';
 import { pullFailedText, shareErrorText } from '../shareErrors';
 import type { ItemState, ListedItem, SharedWithMe } from '../SharedWithMe';
+import { t } from '../../../../i18n';
 
-export const NOTHING_SHARED_TEXT = 'Nothing is shared with you yet.';
-const STATE_TEXT: Record<ItemState, string> = { new: 'New', updated: 'Updated', current: 'Up to date' };
+export const NOTHING_SHARED_TEXT = t('share.received.nothing');
+const STATE_TEXT: Record<ItemState, string> = { new: t('share.received.new'), updated: t('share.received.updated'), current: t('share.received.current') };
 
 type Service = Pick<SharedWithMe, 'refresh' | 'pull' | 'pullPushed'>;
 
@@ -34,17 +35,17 @@ function ItemRow({ item, onPull, titles }: { item: ListedItem; onPull: (linked: 
     <li className="atlas-shared__item">
       <div className="atlas-shared__row">
         <span className="atlas-shared__title">{item.title}</span>
-        {item.kind === 'map' && <span className="atlas-shared__kind">{item.mode === 'full' ? 'Map, full' : 'Map'}</span>}
+        {item.kind === 'map' && <span className="atlas-shared__kind">{item.mode === 'full' ? t('share.received.mapFull') : t('share.received.map')}</span>}
         <span className={`atlas-shared__state atlas-shared__state--${item.state}`}>{STATE_TEXT[item.state]}</span>
         <Button variant={item.state === 'current' ? 'outline' : 'default'} size="sm" disabled={busy} onClick={pull}>
-          {item.state === 'updated' ? 'Pull update' : 'Pull'}
+          {item.state === 'updated' ? t('share.received.pullUpdate') : t('share.received.pull')}
         </Button>
       </div>
       {item.kind === 'map' && (item.linked ?? []).length > 0 && (
-        <ul className="atlas-shared__linked" aria-label={`Linked notes of ${item.title}`}>
+        <ul className="atlas-shared__linked" aria-label={t('share.received.linkedNotesOf', { title: item.title })}>
           {(item.linked ?? []).map((id) => (
             <li key={id}>
-              <LabelledCheck label={`Also pull ${titles.get(id) ?? 'a linked note'}`} checked={linked.includes(id)} onChange={() => toggle(id)} />
+              <LabelledCheck label={titles.has(id) ? t('share.received.alsoPull', { title: titles.get(id) ?? '' }) : t('share.received.alsoPullLinked')} checked={linked.includes(id)} onChange={() => toggle(id)} />
             </li>
           ))}
         </ul>
@@ -66,7 +67,7 @@ function PersonSection({ person, service, onPulled }: { person: SessionPerson; s
     <section className="atlas-shared__person" aria-label={person.name}>
       <h3 className="atlas-shared__heading">{person.name}</h3>
       {problem && <p className="atlas-shared__problem" role="alert">{problem}</p>}
-      {items === null && !problem && <p className="atlas-shared__help">Asking {person.name}…</p>}
+      {items === null && !problem && <p className="atlas-shared__help">{t('share.received.asking', { name: person.name })}</p>}
       {items?.length === 0 && <p className="atlas-shared__help">{NOTHING_SHARED_TEXT}</p>}
       <ul className="atlas-shared__items">
         {items?.map((item) => (
@@ -83,27 +84,27 @@ function PersonSection({ person, service, onPulled }: { person: SessionPerson; s
 
 /** Push requests first, then everyone in the session with what they share. */
 export function SharedWithMeList({ service, people, pushes, dismissPush, onPulled, onProblem }: ListProps): React.ReactElement {
-  const nameOf = (personId: string): string => people.find((person) => person.personId === personId)?.name ?? 'Someone';
+  const nameOf = (personId: string): string => people.find((person) => person.personId === personId)?.name ?? t('share.someone');
   return (
     <div className="atlas-shared">
       {pushes.length > 0 && (
-        <section className="atlas-shared__person" aria-label="Asked to pull">
-          <h3 className="atlas-shared__heading">Asked to pull</h3>
+        <section className="atlas-shared__person" aria-label={t('share.received.askedToPull')}>
+          <h3 className="atlas-shared__heading">{t('share.received.askedToPull')}</h3>
           <ul className="atlas-shared__items">
             {pushes.map((push) => (
               <li key={`${push.from}/${push.item}`} className="atlas-shared__row">
-                <span className="atlas-shared__title">{`${nameOf(push.from)} asks you to pull ${push.title}.`}</span>
+                <span className="atlas-shared__title">{t('share.received.asksToPull', { name: nameOf(push.from), title: push.title })}</span>
                 <Button variant="default" size="sm" onClick={() => {
                   dismissPush(push);
                   pullAcceptedPush(service, push, { pulled: onPulled, failed: onProblem });
-                }}>Pull</Button>
-                <Button variant="outline" size="sm" onClick={() => dismissPush(push)}>Not now</Button>
+                }}>{t('share.received.pull')}</Button>
+                <Button variant="outline" size="sm" onClick={() => dismissPush(push)}>{t('share.received.notNow')}</Button>
               </li>
             ))}
           </ul>
         </section>
       )}
-      {people.length === 0 && <p className="atlas-shared__help">Nobody else in this session shares with Atlas in Obsidian.</p>}
+      {people.length === 0 && <p className="atlas-shared__help">{t('share.received.nobodyShares')}</p>}
       {people.map((person) => <PersonSection key={person.personId} person={person} service={service} onPulled={onPulled} />)}
     </div>
   );

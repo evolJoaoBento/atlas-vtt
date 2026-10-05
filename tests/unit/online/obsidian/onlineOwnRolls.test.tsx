@@ -11,6 +11,13 @@ import type { ViewAtlasState } from '../../../../src/app/storeFactory';
 import { DICE_ROLLED_EVENT, type DiceRollResult } from '../../../../src/app/tools/diceRolling';
 import { createInMemoryApp } from '../../../mocks/inMemoryVault';
 
+// jsdom has no WebGL; these cases are about which rolls are thrown, not about the device.
+const { webgl } = vi.hoisted(() => ({ webgl: { on: true } }));
+vi.mock('../../../../src/app/dice3d/stagePool', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../src/app/dice3d/stagePool')>(),
+  canShowDice: (): boolean => webgl.on,
+}));
+
 const roll = (id: string, overrides: Partial<DiceRollResult> = {}): DiceRollResult => ({
   id, timestamp: 0, formula: '1d20+2', rolls: [{ die: 'd20', value: 13, max: 20 }], modifiers: 2, total: 15, crit: null, rolledBy: 'Anna',
   ...overrides,
@@ -34,7 +41,7 @@ function setup(display: 'card' | 'fast' | 'full', ownRoll: DiceRollResult | null
 
 describe("the online scene's own rolls", () => {
   beforeEach(() => { vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null); });
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => { vi.restoreAllMocks(); webgl.on = true; });
 
   it("throws the player's own roll as dice with their display setting", () => {
     const { container, throwRoll } = setup('full');
@@ -54,6 +61,14 @@ describe("the online scene's own rolls", () => {
     clipped.throwRoll(roll('r2', { unlistedDice: 30 }));
     expect(clipped.container.querySelector('.atlas-dice-roll')).toBeNull();
     expect(clipped.container.querySelector('.atlas-dice-toast')).not.toBeNull();
+  });
+
+  it('shows it as a result card where the window cannot show 3D dice (no WebGL, a lost context)', () => {
+    webgl.on = false;
+    const { container, throwRoll } = setup('full');
+    throwRoll(roll('r1'));
+    expect(container.querySelector('.atlas-dice-roll')).toBeNull();
+    expect(container.querySelector('.atlas-dice-toast')?.textContent).toContain('15');
   });
 
   it('throws a roll once, and none that was in the store before it mounted', () => {

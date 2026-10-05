@@ -5,14 +5,14 @@ import { AssetService } from '../../src/app/services/AssetService';
 import { SystemPresetService } from '../../src/app/services/SystemPresetService';
 import { deleteSystemPreset } from '../../src/app/services/systemPresetDeletion';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
-import { memorySettings } from '../mocks/memorySettings';
+import { memoryPresets } from '../mocks/memoryPresets';
 
 afterEach(() => vi.restoreAllMocks());
 
 it('deletes the preset and leaves the collections that used it without a game system', async () => {
   const { app } = createInMemoryApp();
   app.workspace = { getLeavesOfType: () => [] } as any;
-  const presets = new SystemPresetService(memorySettings());
+  const presets = new SystemPresetService(memoryPresets());
   const homebrew = presets.create('Homebrew', structuredClone(BUILT_IN_SYSTEM_PRESETS[0]!.rules));
   const updateCollectionSettings = vi.fn(async () => undefined);
   vi.spyOn(AssetService, 'getInstance').mockReturnValue({

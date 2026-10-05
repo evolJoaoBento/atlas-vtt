@@ -1,5 +1,4 @@
 import React from 'react';
-import tokenRingImageUrl from '../../../assets/token-ring.webp';
 import { RevealImage } from '../primitives/RevealImage';
 import { Skeleton } from '../primitives/Skeleton';
 import './token-portrait.scss';
@@ -29,10 +28,7 @@ function Art({ src, alt, lazy, reveal, pending }: Pick<TokenPortraitProps, 'src'
 
 /** Circular token art framed by the same ring image the canvas draws. */
 export function TokenPortrait({ src, alt, ringColor, showRing = true, className, style, lazy, reveal, pending }: TokenPortraitProps): React.JSX.Element {
-  const ringStyle = {
-    '--atlas-token-ring-image': `url("${tokenRingImageUrl}")`,
-    ...(ringColor ? { '--atlas-token-ring-color': ringColor } : {}),
-  } as React.CSSProperties;
+  const ringStyle = ringColor ? ({ '--atlas-token-ring-color': ringColor } as React.CSSProperties) : undefined;
 
   return (
     <div className={`atlas-token-portrait ${showRing ? '' : 'atlas-token-portrait--unframed'} ${className ?? ''}`} style={style}>

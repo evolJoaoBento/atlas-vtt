@@ -20,7 +20,7 @@ function setup(): ReturnType<typeof createViewAtlasStore> {
 }
 
 // The lights as a map on a 5-foot grid offers them.
-const FEET = { unitType: 'feet', unitDistance: 5 } as const;
+const FEET = { unitType: 'feet', ruleDistance: 5 } as const;
 const dnd5e = lightPresetsOnMap(BUILT_IN_SYSTEM_PRESETS.find((preset) => preset.name === 'D&D 5e')!.rules.lightPresets!, FEET, Infinity);
 const GENERIC = lightPresetsOnMap(GENERIC_LIGHT_PRESETS, FEET, Infinity);
 const generic = (name: string) => GENERIC.find((preset) => preset.name === name)!;

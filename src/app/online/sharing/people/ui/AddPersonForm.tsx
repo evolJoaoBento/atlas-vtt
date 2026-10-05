@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '../../../../packages/components/primitives/button';
 import type { PeopleBook } from '../PeopleBook';
+import { t } from '../../../../i18n';
 
-export const ADD_PERSON_HINT = 'Add someone by name before you meet them, to prepare notes and shares. They reach nothing until you link them to the person who joins.';
+export const ADD_PERSON_HINT = t('people.addHint');
 
 /** A name field and Add: the person is kept as someone not met yet. A taken or invalid name is explained, never changed. */
 export function AddPersonForm({ people }: { people: Pick<PeopleBook, 'addPlaceholder'> }): React.ReactElement {
@@ -20,12 +21,12 @@ export function AddPersonForm({ people }: { people: Pick<PeopleBook, 'addPlaceho
         <input
           className="atlas-people__name"
           value={name}
-          placeholder="Add a person by name"
-          aria-label="Name of the person to add"
+          placeholder={t('people.addPlaceholder')}
+          aria-label={t('people.addLabel')}
           onChange={(event) => { setName(event.target.value); setProblem(null); }}
           onKeyDown={(event) => { if (event.key === 'Enter') add(); }}
         />
-        <Button variant="default" onClick={add} disabled={!name.trim()}>Add</Button>
+        <Button variant="default" onClick={add} disabled={!name.trim()}>{t('people.add')}</Button>
       </div>
       <span className="atlas-people__hint">{ADD_PERSON_HINT}</span>
       {problem && <span className="atlas-people__problem" role="alert">{problem}</span>}

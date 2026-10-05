@@ -13,8 +13,9 @@ import type { PeopleBook } from './people/PeopleBook';
 import { NO_SHARE_SESSION_TEXT } from './receive/ui/SharedWithMeModal';
 import { shareable } from './registerShareCommands';
 import { shareSessionStore, type SessionPerson } from './shareSessionStore';
+import { t } from '../../i18n';
 
-export const NOTE_NOT_SHARED_TEXT = 'Share this note with them first, then ask them to pull it.';
+export const NOTE_NOT_SHARED_TEXT = t('share.ask.noteNotShared');
 
 interface PushableItem {
   item: string;
@@ -52,7 +53,7 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
       return;
     }
     if (present.length === 0) {
-      new Notice('Nobody else in this session shares with Atlas in Obsidian.');
+      new Notice(t('share.received.nobodyShares'));
       return;
     }
     const refused = file.extension === 'md'
@@ -70,18 +71,18 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
     }
     const item = await itemOf(file);
     if (!item) {
-      new Notice('Share this map first, then ask someone to pull it.');
+      new Notice(t('share.ask.mapNotShared'));
       return;
     }
     const person = await chooseAction({
-      title: `Ask to pull ${file.basename}`,
-      message: ['They get a prompt with Pull and Not now. They can pull it only if it is shared with them.'],
+      title: t('share.ask.title', { name: file.basename }),
+      message: [t('share.ask.message')],
       choices: choices.map((candidate) => ({ label: candidate.name, value: candidate.personId })),
     });
     if (person) session.node.push(person, item.item, item.kind, file.basename);
   };
   plugin.addCommand({
-    id: 'ask-to-pull', name: 'Ask to pull…',
+    id: 'ask-to-pull', name: t('share.command.askToPull'),
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
       if (!shareable(file) || !shareSessionStore.getState().session) return false;
@@ -91,6 +92,6 @@ export function registerAskToPull(plugin: Plugin, items: Pick<ShareItems, 'idFor
   });
   plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
     if (!shareable(file) || !shareSessionStore.getState().session) return;
-    menu.addItem((item) => item.setTitle('Ask to pull…').setIcon('send').onClick(() => { void askToPull(file); }));
+    menu.addItem((item) => item.setTitle(t('share.command.askToPull')).setIcon('send').onClick(() => { void askToPull(file); }));
   }));
 }

@@ -11,13 +11,13 @@ import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { LightPresetDefinition } from '../types/lightPresetTypes';
 import type { SystemPreset } from '../types/systemPresetTypes';
 import { AssetService } from './AssetService';
-import { SettingsService } from './SettingsService';
 import { SystemPresetService } from './SystemPresetService';
+import { SystemPresetFiles } from './systemPresets/SystemPresetFiles';
 
-/** The game system presets of the vault: the built-in ones, and the user's once the settings are loaded. */
+/** The game system presets of the vault: the built-in ones, and the user's once their files are open. */
 export function systemPresetsOf(app: App): readonly SystemPreset[] {
-  const settings = SettingsService.forApp(app);
-  return settings ? new SystemPresetService(settings).list() : BUILT_IN_SYSTEM_PRESETS;
+  const files = SystemPresetFiles.forApp(app);
+  return files ? new SystemPresetService(files).list() : BUILT_IN_SYSTEM_PRESETS;
 }
 
 /** The settings of the collection that holds the map; null for a map outside every collection. */

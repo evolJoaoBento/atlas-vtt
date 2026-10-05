@@ -8,6 +8,7 @@ import { CloseButton } from '../../packages/components/primitives/CloseButton';
 import { Button } from '../../packages/components/primitives/button';
 import { TooltipProvider } from '../../packages/components/primitives/tooltip';
 import { AssetService } from '../../services/AssetService';
+import { mapMeasurementSettings } from '../../services/mapMeasurementSettings';
 import type { SenseRules } from '../../creatures/tokenSensesResolver';
 import { mapLightPresets } from '../../services/mapCollectionRules';
 import { mapSenseRules } from '../../services/mapSenseRules';
@@ -25,6 +26,7 @@ import { unitScaleOf } from '../../lighting/lightingUnits';
 import { maxLightRange } from '../../lighting/lightRanges';
 import { lightForm, lightFromForm, visionForm, visionFromForm, type LightForm, type VisionForm } from '../../lighting/tokenLighting';
 import { numberText } from '../../utils/numberInput';
+import { t } from '../../i18n';
 
 interface EditTokenValues {
   name: string;
@@ -105,7 +107,7 @@ function EditTokenModalInner({ initial, definitions, resourceDefaults, lighting,
     <div className="atlas-modal-overlay" onClick={onClose}>
       <div className="atlas-modal atlas-edit-token-modal" onClick={(e) => e.stopPropagation()}>
         <div className="atlas-modal-header">
-          <h3>Edit Token</h3>
+          <h3>{t('editToken.title')}</h3>
           <CloseButton onClick={onClose} />
         </div>
 
@@ -130,8 +132,8 @@ function EditTokenModalInner({ initial, definitions, resourceDefaults, lighting,
         </div>
 
         <div className="atlas-modal-footer">
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button variant="default" size="sm" onClick={handleSave}>Save</Button>
+          <Button variant="outline" size="sm" onClick={onClose}>{t('common.cancel')}</Button>
+          <Button variant="default" size="sm" onClick={handleSave}>{t('common.save')}</Button>
         </div>
       </div>
     </div>
@@ -148,7 +150,7 @@ function takesEnter(target: EventTarget | null): boolean {
 
 /** What the token's map and its collection say about vision and light. */
 function lightingContext(state: ViewAtlasState, app: App, rules: SenseRules): TokenLightingContext {
-  const { unitType, unitDistance } = rules.unit;
+  const { unitType, unitDistance } = mapMeasurementSettings(AssetService.getInstance(app), state);
   return {
     unit: unitLabelFor(unitType),
     unitDistance,

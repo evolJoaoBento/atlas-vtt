@@ -1,4 +1,3 @@
-import tokenRingImageUrl from '../../../assets/token-ring.webp';
 import './token-portrait.scss';
 
 interface TokenPortraitElementOptions {
@@ -19,7 +18,6 @@ export function createTokenPortrait(parent: HTMLElement, { src, alt, showRing, r
     .createEl('img', { attr: { src, alt, draggable: 'false', decoding: 'async' } });
   if (showRing) {
     const ring = portrait.createDiv({ cls: 'atlas-token-ring' });
-    ring.style.setProperty('--atlas-token-ring-image', `url("${tokenRingImageUrl}")`);
     if (ringColor) ring.style.setProperty('--atlas-token-ring-color', ringColor);
   }
   return portrait;

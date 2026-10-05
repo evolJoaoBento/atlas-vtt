@@ -68,7 +68,7 @@ const DEFINITIONS: readonly ResourceDefinition[] = [
 ];
 const GM_GRID: GridState = {
   enabled: true, visible: true, snapToGrid: false, type: 'hex-vertical', size: 70, offsetX: 5, offsetY: 7, color: '#222222',
-  opacity: 0.4, lineType: 'dashed', lineWidth: 2, hexNumbers: 'column-row', hexNumberOpacity: 0.6,
+  opacity: 0.4, lineType: 'dashed', lineWidth: 2, cellNumbers: 'letter-number', cellNumberOpacity: 0.6,
   unitType: 'meters', unitDistance: 1.5, measurementType: 'units', scale: 1, mapScale: 1, autoDetect: false,
 };
 const COLLECTION: CollectionGridDefaults = {
@@ -87,7 +87,7 @@ interface Variant {
   sides?: 'players' | 'opponents';
 }
 interface Trip { back: RemoteSceneParts; sent: PlayerScene }
-interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip; renamedHp: Trip; staticHp: Trip; sidesFight: Trip }
+interface Trips { full: Trip; noCollection: Trip; disabledGrid: Trip; hiddenGrid: Trip; closedTracker: Trip; renamedHp: Trip; staticHp: Trip; sidesFight: Trip; sceneDistance: Trip }
 type Check = (trips: Trips) => void;
 type Checks<K extends PropertyKey> = { readonly [P in K]?: Check };
 
@@ -129,6 +129,8 @@ const TRIPS: Trips = {
   renamedHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, key: 'health' } : definition)) }),
   staticHp: trip({ definitions: DEFINITIONS.map((definition) => (definition.key === 'hp' ? { ...definition, direction: 'static' as const } : definition)) }),
   sidesFight: trip({ sides: 'players' }),
+  // A scene measuring at its own distance per cell, in a collection that measures distances.
+  sceneDistance: trip({ collection: { ...COLLECTION, measurementMode: 'metric' }, grid: { ...GM_GRID, unitDistanceOverride: 3 } }),
 };
 
 const tokenOf = (t: Trip, id: string): Record<string, unknown> => t.back.state.objects.tokens[id] as unknown as Record<string, unknown>;
@@ -262,8 +264,9 @@ const GRID_CHECKS: Checks<keyof GridState> = {
   opacity: (t) => expect(gridOf(t.full)?.opacity).toBe(0.4),
   lineType: (t) => expect(gridOf(t.full)?.lineType).toBe('dashed'),
   lineWidth: (t) => expect(gridOf(t.full)?.lineWidth).toBe(2),
-  hexNumbers: (t) => expect(gridOf(t.full)?.hexNumbers).toBe('column-row'),
-  hexNumberOpacity: (t) => expect(gridOf(t.full)?.hexNumberOpacity).toBe(0.6),
+  // A format players before Atlas 0.5.1 do not know, on a hex grid: only `cellNumbers` carries it.
+  cellNumbers: (t) => expect(gridOf(t.full)?.cellNumbers).toBe('letter-number'),
+  cellNumberOpacity: (t) => expect(gridOf(t.full)?.cellNumberOpacity).toBe(0.6),
   snapToGrid: (t) => expect(gridOf(t.full)?.snapToGrid).toBe(false),
   // Without a collection, the map's grid decides the measurement.
   unitType: (t) => {
@@ -272,6 +275,7 @@ const GRID_CHECKS: Checks<keyof GridState> = {
   },
   unitDistance: (t) => expect(t.noCollection.back.measurement.unitDistance).toBe(1.5),
   measurementType: (t) => expect(t.noCollection.back.measurement.mode).toBe('metric'),
+  unitDistanceOverride: (t) => expect(t.sceneDistance.back.measurement.unitDistance).toBe(3),
 };
 
 const MEASUREMENT_CHECKS: Checks<keyof CollectionGridDefaults> = {

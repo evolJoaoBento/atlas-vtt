@@ -1,4 +1,5 @@
 import type { ResourceDefinition, ResourceHolder, ResourceValue } from './resourceTypes';
+import { t } from '../i18n';
 
 export function clampValue(value: ResourceValue): ResourceValue {
   const max = Math.max(0, value.max);
@@ -77,5 +78,5 @@ const FIRST_BARS: readonly string[] = ['hp', 'stress'];
 /** The Reset entry of a token's menu: worded as it always was where the collection has no resource beyond those two bars. */
 export function resetLabel(definitions: readonly ResourceDefinition[]): string {
   const onlyFirstBars = definitions.every(({ key }) => FIRST_BARS.includes(key));
-  return onlyFirstBars ? 'Reset (Full HP, Clear Status)' : 'Reset (Restore Resources, Clear Status)';
+  return onlyFirstBars ? t('token.reset') : 'Reset (Restore Resources, Clear Status)';
 }

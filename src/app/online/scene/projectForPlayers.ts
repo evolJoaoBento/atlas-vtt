@@ -5,9 +5,11 @@
  * GM's records, never spread, so anything this code does not name, including
  * fields a later Atlas adds, is left out.
  */
+import { formationGridFromOptions } from '../../encounters/encounterFormation';
 import { DEFAULT_INITIATIVE_RULES } from '../../gameSystems/initiativeRules';
 import { DEFAULT_CONE_ANGLE, isValidConeAngle, resolveMeasurementSettings } from '../../grid/measurementFormat';
-import { DEFAULT_HEX_NUMBER_OPACITY, isHexNumberFormat } from '../../grid/hexNumbering';
+import { DEFAULT_CELL_NUMBER_OPACITY, isCellNumberFormat } from '../../grid/cellNumbering';
+import { isHexGridType } from '../../grid/hexGeometry';
 import type { GridState } from '../../services/MapPersistence';
 import type { ViewAtlasState } from '../../storeFactory';
 import type { Character, TokenEntity } from '../../types';
@@ -24,8 +26,8 @@ import { projectInitiative, projectWidgets, withCombatantSides } from './project
 import { projectDrawings, projectFog, projectRecord, projectTexts, type ProjectionMemo } from './projectRecords';
 import { isDowned, projectBars } from './projectResources';
 import {
-  PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
-  type MapSize, type PlayerCondition, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
+  PLAYER_DIAGONAL_RULES, PLAYER_GRID_LINES, PLAYER_GRID_TYPES, PLAYER_HEX_NUMBERS, PLAYER_MEASUREMENT_MODES, PLAYER_UNIT_TYPES, SCENE_LIMITS, SCENE_RANGES,
+  type MapSize, type PlayerCondition, type PlayerSnapGrid, type PlayerGrid, type PlayerMap, type PlayerMeasurement, type PlayerScene, type PlayerToken,
 } from './sceneTypes';
 
 export type ProjectedState = Pick<
@@ -131,9 +133,13 @@ function projectMap(background: string | null, cellSize: number, context: Projec
 
 function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid | null {
   if (!rules.showGrid || !grid || grid.enabled === false || grid.visible === false) return null;
-  const hexNumbers = isHexNumberFormat(grid.hexNumbers) ? grid.hexNumbers : null;
+  const type = oneOf(PLAYER_GRID_TYPES, grid.type, 'square');
+  const cellNumbers = isCellNumberFormat(grid.cellNumbers) ? grid.cellNumbers : null;
+  const cellNumberOpacity = cellNumbers ? unitOr(grid.cellNumberOpacity, DEFAULT_CELL_NUMBER_OPACITY) : null;
+  // A player before Atlas 0.5.1 numbers hex grids only, and refuses a format it does not know.
+  const hexNumbers = isHexGridType(type) ? PLAYER_HEX_NUMBERS.find((format) => format === cellNumbers) ?? null : null;
   return {
-    type: oneOf(PLAYER_GRID_TYPES, grid.type, 'square'),
+    type,
     size: positiveOr(grid.size, DEFAULT_GRID_SIZE, SCENE_RANGES.gridSize),
     offsetX: finiteOr(grid.offsetX, 0, SCENE_RANGES.coordinate),
     offsetY: finiteOr(grid.offsetY, 0, SCENE_RANGES.coordinate),
@@ -142,7 +148,9 @@ function projectGrid(grid: GridState | null, rules: PlayerViewRules): PlayerGrid
     lineType: oneOf(PLAYER_GRID_LINES, grid.lineType, 'solid'),
     lineWidth: positiveOr(grid.lineWidth, 1, SCENE_RANGES.stroke),
     hexNumbers,
-    hexNumberOpacity: hexNumbers ? unitOr(grid.hexNumberOpacity, DEFAULT_HEX_NUMBER_OPACITY) : null,
+    hexNumberOpacity: hexNumbers ? cellNumberOpacity : null,
+    cellNumbers,
+    cellNumberOpacity,
   };
 }
 
@@ -160,10 +168,26 @@ function projectMeasurement(collection: CollectionGridDefaults | null, grid: Gri
     diagonalRule: oneOf(PLAYER_DIAGONAL_RULES, settings.diagonalRule, 'equidistant'),
     snapToGrid: grid?.snapToGrid ?? true,
     coneAngle: isValidConeAngle(cone) ? cone : DEFAULT_CONE_ANGLE,
+    snapGrid: projectSnapGrid(grid),
     rangeBands: bands.slice(0, SCENE_LIMITS.rangeBands).map((band) => {
       const { name, maxSquares } = (typeof band === 'object' && band !== null ? band : {}) as { name?: unknown; maxSquares?: unknown };
       return { name: textOr(name, '', SCENE_LIMITS.idLength), maxSquares: finiteOr(maxSquares, 1, SCENE_RANGES.rangeBand) };
     }),
+  };
+}
+
+/**
+ * The grid a player's drop lands on (`snapDroppedToken`): the GM's grid, also hidden or switched off, as
+ * its geometry alone; null where the GM snaps nothing (no grid state, or no usable cell size).
+ */
+function projectSnapGrid(grid: GridState | null): PlayerSnapGrid | null {
+  const snapped = formationGridFromOptions(grid ? { ...grid, enabled: true } : null);
+  if (!snapped) return null;
+  return {
+    type: snapped.type,
+    size: positiveOr(snapped.size, DEFAULT_GRID_SIZE, SCENE_RANGES.gridSize),
+    offsetX: finiteOr(snapped.offsetX, 0, SCENE_RANGES.coordinate),
+    offsetY: finiteOr(snapped.offsetY, 0, SCENE_RANGES.coordinate),
   };
 }
 

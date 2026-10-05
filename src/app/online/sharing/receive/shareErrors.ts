@@ -1,16 +1,17 @@
 import { ShareError } from '../transport/ShareNode';
+import { t } from '../../../i18n';
 
 const TEXT: Record<ShareError['reason'], string> = {
-  'not-shared': 'That is not shared with you any more.',
-  busy: 'They are sending a lot right now. Try again in a moment.',
-  'too-large': 'That item is too large to share.',
-  gone: 'They are not in the session any more.',
-  failed: 'The item arrived damaged. Try again.',
-  timeout: 'They did not answer. Try again.',
+  'not-shared': t('share.error.notShared'),
+  busy: t('share.error.busy'),
+  'too-large': t('share.error.tooLarge'),
+  gone: t('share.error.gone'),
+  failed: t('share.error.failed'),
+  timeout: t('share.error.timeout'),
 };
 
 export function shareErrorText(error: unknown): string {
-  return error instanceof ShareError ? TEXT[error.reason] : 'Could not pull that item.';
+  return error instanceof ShareError ? TEXT[error.reason] : t('share.error.generic');
 }
 
 /** What a failed pull tells the receiver; the error itself goes to the console, where its cause can be read. */

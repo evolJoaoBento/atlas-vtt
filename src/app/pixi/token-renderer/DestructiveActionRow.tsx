@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { setIcon } from 'obsidian';
 import type { StoreApi } from 'zustand';
 import type { ViewAtlasState } from '../../storeFactory';
+import { t } from '../../i18n';
 
 interface DestructiveActionRowProps {
   tokenId: string;
@@ -39,7 +40,7 @@ export function DestructiveActionRow({ tokenId, store, canKill, definitions, onC
           }}
         >
           <IconSpan name="skull" />
-          <span>Kill</span>
+          <span>{t('token.kill')}</span>
         </div>
       )}
       <div
@@ -53,7 +54,7 @@ export function DestructiveActionRow({ tokenId, store, canKill, definitions, onC
         }}
       >
         <IconSpan name="trash" />
-        <span>Delete</span>
+        <span>{t('common.delete')}</span>
       </div>
     </div>
   );

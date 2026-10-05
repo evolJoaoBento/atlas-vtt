@@ -9,6 +9,7 @@ import { ONLINE_SCENE_VIEW_TYPE } from './src/app/online/obsidian/onlineSceneTab
 import { OnlineSceneView } from './src/app/online/obsidian/OnlineSceneView';
 import { DashboardView, DASHBOARD_VIEW_TYPE } from './src/app/dashboard-view';
 import { initializeAtlasStorage } from './src/app/atlasStorageInit';
+import { t } from './src/app/i18n';
 import { CreatureIndex } from './src/app/creatures/CreatureIndex';
 import { disposeImageProcessing } from './src/app/imageProcessing/imageProcessing';
 import { registerLootQueryView } from './src/app/loot/lootQueryView';
@@ -38,15 +39,20 @@ import { navigationSettingsSection } from './src/app/settings/navigationSettings
 import { onlineSettingsSection } from './src/app/settings/onlineSettingsSection';
 import { diceSettingsSection } from './src/app/settings/diceSettingsSection';
 import { registerDiceLookSync } from './src/app/plugin/diceLookSync';
+import { registerDiceStageRelease } from './src/app/plugin/diceStageRelease';
 import { supportSettingsSection } from './src/app/settings/supportSettingsSection';
 import { registerAtlasLeafSync } from './src/app/plugin/atlasLeaves';
 import { EXTENSION_ATLASMAP } from './src/app/utils/sceneFiles';
 import { registerColorSwatchIcons } from './src/app/plugin/colorSwatchIcons';
 import { HeaderAutocompleteSuggest } from './src/app/plugin/HeaderAutocompleteSuggest';
+import { registerAtlasLinks } from './src/app/links/registerAtlasLinks';
 import { registerCommands } from './src/app/plugin/registerCommands';
 import { registerPlayerWindowReloadCleanup } from './src/app/plugin/playerWindowReload';
 import { registerReturnToAtlasOnClose } from './src/app/plugin/returnToAtlasOnClose';
 import { runStartupMigration } from './src/app/plugin/startupMigration';
+import { migrateLegacySnapshots } from './src/app/snapshots/legacySnapshotMigration';
+import { migrateSettingsToPluginData } from './src/app/plugin/settingsMigration';
+import { SystemPresetFiles } from './src/app/services/systemPresets/SystemPresetFiles';
 import { registerStatusBarVisibility } from './src/app/plugin/statusBarVisibility';
 import { registerVaultSync } from './src/app/plugin/vaultSync';
 import { ChangelogService } from './src/app/changelog/ChangelogService';
@@ -72,7 +78,7 @@ export default class AtlasVTTPlugin extends Plugin {
     const errorLog = new AtlasErrorLog();
     this.register(errorLog.attach());
     const issueReporter = new IssueReporter(this.app, this.manifest, errorLog);
-    this.addCommand({ id: 'report-issue', name: 'Report an issue…', callback: () => issueReporter.open() });
+    this.addCommand({ id: 'report-issue', name: t('command.reportIssue'), callback: () => issueReporter.open() });
 
     // Capture this before migrations/services can create Atlas's storage folder.
     const existingInstallation = this.app.vault.adapter.exists('atlas-vtt');
@@ -80,9 +86,16 @@ export default class AtlasVTTPlugin extends Plugin {
       await initializeAtlasStorage(this.app);
       await runStartupMigration(this.app);
     });
+    // The user's game system presets are vault files; reading them needs no migration.
+    const presetFiles = SystemPresetFiles.open(this.app);
+    // Settings carried over even when the data file migration failed, so they are not lost to the defaults.
+    const settingsReady = storageReady.catch(() => undefined).then(async () => {
+      await presetFiles.load();
+      await migrateSettingsToPluginData(this.app, this, presetFiles);
+    }).catch((error: unknown) => console.error('[Atlas] Carrying the settings over into the plugin data failed:', error));
     // Created before the views so every restored tab shares it; it reads the
-    // settings file only once the migration has put it in place.
-    this.settingsService = new SettingsService(this.app, storageReady);
+    // plugin's data only once the migration has put the settings there.
+    this.settingsService = new SettingsService(this.app, settingsReady, this);
     // Before the views: a restored Online scene tab looks for it when it opens.
     const onlineJoins = new OnlineJoinService(this.app, this.settingsService, this.manifest.version);
     this.register(() => onlineJoins.dispose());
@@ -90,6 +103,7 @@ export default class AtlasVTTPlugin extends Plugin {
     // Before the views: a restored map may start Atlas's first check of the vault,
     // whose folder renames reach map files only through these vault events.
     registerVaultSync(this);
+    registerDiceStageRelease(this);
     // Views first, so workspace restore can resolve persisted Atlas tabs
     // before the slower startup path finishes.
     this.registerAtlasViews();
@@ -106,7 +120,7 @@ export default class AtlasVTTPlugin extends Plugin {
       releaseBuild: __ATLAS_RELEASE_BUILD__,
     });
     this.changelogService = changelogService;
-    this.addCommand({ id: 'view-changelog', name: 'View changelog', callback: () => changelogService.open() });
+    this.addCommand({ id: 'view-changelog', name: t('command.viewChangelog'), callback: () => changelogService.open() });
 
     this.globalAssetManager = new GlobalAssetManagerService(this.app);
     this.imageDisplayService = new ImageDisplayService(this.app);
@@ -121,6 +135,7 @@ export default class AtlasVTTPlugin extends Plugin {
       supportSettingsSection(issueReporter),
     ]));
     this.registerEditorSuggest(new HeaderAutocompleteSuggest(this.app));
+    registerAtlasLinks(this);
     registerAtlasLeafSync(this);
     registerReturnToAtlasOnClose(this);
     registerPlayerWindowReloadCleanup(this);
@@ -136,6 +151,7 @@ export default class AtlasVTTPlugin extends Plugin {
       this.changelogService?.showUpdates();
       runInBackground(addStarterTokens(this.app, AssetService.getInstance(this.app), this.settingsService), 'Adding the starter tokens');
       runInBackground(this.carryOverTokenBars(), 'Carrying over the token bar settings');
+      runInBackground(migrateLegacySnapshots(this.app, AssetService.getInstance(this.app)), 'Moving scene snapshots into their collections');
     });
   }
 
@@ -152,15 +168,21 @@ export default class AtlasVTTPlugin extends Plugin {
     await migratePlayerResourceVisibility(this.settingsService, assets);
   }
 
+  /** Obsidian calls this when `data.json` changed on disk, e.g. a sync brought another device's settings. */
+  async onExternalSettingsChange(): Promise<void> {
+    await this.settingsService?.reload();
+  }
+
   onunload(): void {
     this.changelogService?.destroy();
     void this.settingsService?.saveSettingsNow();
+    SystemPresetFiles.release(this.app);
     this.widgetSyncService?.destroy();
     this.widgetSyncService = undefined;
 
     this.imageDisplayService?.destroy();
     PlayerLootDisplay.get().dispose();
-    LootHistoryStore.flush(this.app);
+    LootHistoryStore.release(this.app);
     presentedScene.clear();
     PlayerWindowService.getInstance()?.destroy(false);
     this.globalAssetManager?.close();

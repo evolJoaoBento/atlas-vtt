@@ -10,6 +10,7 @@ import { SEES_ALL, type AmbientLight, type AmbientZone, type LightReach, type Si
 import type { SightRules } from '../../vision/sightRules';
 import type { MapBounds } from '../../vision/visibility';
 import type { HideableLayer } from '../playerSafeFrame';
+import type { UnlitGrid } from '../../grid/gridLightingMark';
 import { requestRender } from '../RenderScheduler';
 import { awaitGpu, contextLost } from './engine/gpu';
 import { LightingEngine } from './engine/LightingEngine';
@@ -36,6 +37,8 @@ export interface LightingRendererDeps {
   bounds: () => MapBounds | null;
   /** The map image, covering world `[0, width] × [0, height]`; bounce reads its colours. */
   albedo: () => Texture | null;
+  /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
+  grid?: () => UnlitGrid | null;
   /** The senses and conditions of the map's collection; the generic ones without it. */
   rules?: () => SightRules;
   /** The device-local record of attempts to light this map; without one every attempt is made. */
@@ -292,6 +295,7 @@ export class LightingRenderer implements SceneLightingView {
     const { viewport } = this.deps;
     const worldToScreen = new Matrix(viewport.scale.x, 0, 0, viewport.scale.y, viewport.x, viewport.y);
     this.engine.setView(worldToScreen.invert(), viewport.scale.x);
+    this.engine.setGrid(this.deps.grid?.() ?? null);
     if (this.attemptState === 'begun' && this.engine.hasWorld()) this.attemptState = 'drawn';
   }
 

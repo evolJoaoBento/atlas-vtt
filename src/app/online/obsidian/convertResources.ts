@@ -11,6 +11,7 @@ import type { ResourceDefinition, ResourceValue } from '../../resources/resource
 import { BAR_SLOTS } from '../../resources/resourceTypes';
 import { setOwn } from '../scene/sceneDiff';
 import type { PlayerInitiative, PlayerResource, PlayerToken } from '../scene/sceneTypes';
+import { t } from '../../i18n';
 
 /** A bar's share, as the stand-in value's `current` out of this. */
 export const SHARE_SCALE = 100;
@@ -29,7 +30,7 @@ function barDefinition(bar: PlayerResource, slot: number): ResourceDefinition {
   // A spent bar is a draining one at 0 or a filling one at its maximum; Atlas darkens it, and its colour is the warning red
   const fills = bar.spent && bar.share >= 1;
   return {
-    key: `${BAR_KEY}${slot}`, name: 'Resource', field: '', direction: fills ? 'fills' : 'drains', color: bar.color,
+    key: `${BAR_KEY}${slot}`, name: t('online.scene.resource'), field: '', direction: fills ? 'fills' : 'drains', color: bar.color,
     visibleToPlayers: true, slot, ...(bar.spent ? { defeatedWhenSpent: true } : {}),
   };
 }
@@ -53,7 +54,7 @@ export function atlasBars(token: PlayerToken): AtlasBars | null {
   // In no socket of its own and listed in `hiddenResources`: only `isDefeated` reads it. At 1 out of 1 it is
   // not spent, so a token that is healed has it too and Atlas eases the grey out
   definitions.push({
-    key: DOWNED_KEY, name: 'Downed', field: '', direction: 'drains', color: DOWNED_COLOR, defeatedWhenSpent: true, visibleToPlayers: false,
+    key: DOWNED_KEY, name: t('online.scene.downed'), field: '', direction: 'drains', color: DOWNED_COLOR, defeatedWhenSpent: true, visibleToPlayers: false,
   });
   values[DOWNED_KEY] = { current: token.downed === true ? 0 : 1, max: 1 };
   return { values, definitions };

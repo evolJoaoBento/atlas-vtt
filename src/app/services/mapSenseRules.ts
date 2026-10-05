@@ -9,21 +9,21 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { SystemPreset } from '../types/systemPresetTypes';
 import type { AssetService } from './AssetService';
-import { SettingsService } from './SettingsService';
+import { SystemPresetFiles } from './systemPresets/SystemPresetFiles';
 
 type MapCollections = Pick<AssetService, 'getCollectionForMap' | 'getCollectionSettings'>;
 type MapState = Pick<ViewAtlasState, 'mapPath' | 'grid'>;
 
 /**
- * The user's presets as last stored, validated once: Atlas stores a new list on every change, so
- * a list seen before holds the same presets, and their senses keep their identity for callers
- * that compare by reference.
+ * The user's presets as last stored, validated once: the preset files hand out a new list on every
+ * change, so a list seen before holds the same presets, and their senses keep their identity for
+ * callers that compare by reference.
  */
 const validated = new WeakMap<object, readonly SystemPreset[]>();
 
 function userPresets(app: App): readonly SystemPreset[] {
-  const stored: unknown = SettingsService.forApp(app)?.getSetting('systemPresets');
-  if (!Array.isArray(stored)) return [];
+  const stored = SystemPresetFiles.forApp(app)?.entries();
+  if (!stored) return [];
   const known = validated.get(stored);
   if (known) return known;
   const presets = parseUserPresets(stored);
@@ -56,7 +56,7 @@ export function mapSenseRules(app: App, assetService: MapCollections, state: Map
 /**
  * The rules of the map a view shows, for `tokenSensesResolver`: read anew on every call, with a
  * subscription to what can change them, the settings of the map's collection and the user's
- * presets (any change of Atlas' settings; the resolver tells whether the rules differ).
+ * presets (any change of a preset file; the resolver tells whether the rules differ).
  */
 export function mapSenseRulesSource(app: App, assetService: MapCollections, state: () => MapState): Required<SenseRulesSource> {
   return {
@@ -66,10 +66,10 @@ export function mapSenseRulesSource(app: App, assetService: MapCollections, stat
         const { mapPath } = state();
         if (mapPath && assetService.getCollectionForMap(mapPath) === collectionId) listener();
       });
-      const stopSettings = SettingsService.forApp(app)?.onChange(() => listener());
+      const stopPresets = SystemPresetFiles.forApp(app)?.onChange(() => listener());
       return () => {
         app.workspace.offref(ref);
-        stopSettings?.();
+        stopPresets?.();
       };
     },
   };

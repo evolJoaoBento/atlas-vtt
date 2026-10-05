@@ -19,6 +19,7 @@ import { useMapResources } from '../../resources/useMapResources';
 import { findCreatureForNotePath } from '../../services/FantasyStatblocksService';
 import { resolveStatblockNote } from '../../services/statblockNoteSource';
 import { runInBackground } from '../../utils/backgroundTask';
+import { t } from '../../i18n';
 
 interface DMScreenProps {
   isOpen: boolean;
@@ -464,7 +465,7 @@ export default function DMScreen({ isOpen, onClose }: DMScreenProps) {
           {/* Left side - Statblocks (50% height) */}
           <div className="atlas-dm-statblocks-section">
             {loading ? (
-              <div className="atlas-dm-loading">Loading statblocks...</div>
+              <div className="atlas-dm-loading">{t('dashboard.loading')}</div>
             ) : (
               <div className="atlas-dm-statblocks-grid">
                 {statblocks.size > 0 && (
@@ -499,23 +500,23 @@ export default function DMScreen({ isOpen, onClose }: DMScreenProps) {
             <div className="atlas-linked-note-header">
               <FileText className="atlas-linked-note-header-icon" />
               <div className="atlas-linked-note-header-text">
-                <h3>{linkedNoteName ?? 'Link a note to this map'}</h3>
-                <p>{linkedNotePath ?? 'Pick a note to keep beside the map'}</p>
+                <h3>{linkedNoteName ?? t('dashboard.linkNote')}</h3>
+                <p>{linkedNotePath ?? t('dashboard.pickNote')}</p>
               </div>
               {linkedNotePath && (
                 <div className="atlas-linked-note-actions">
-                  <LabelTooltip label="Open note in new tab">
+                  <LabelTooltip label={t('dashboard.openNote')}>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       className="atlas-linked-note-action"
-                      onClick={() => runInBackground(app.workspace.openLinkText('', linkedNotePath, true), `Opening ${linkedNotePath}`, 'Could not open the note')}
+                      onClick={() => runInBackground(app.workspace.openLinkText('', linkedNotePath, true), `Opening ${linkedNotePath}`, t('loot.openFailed'))}
                     >
                       <ExternalLink />
                     </Button>
                   </LabelTooltip>
-                  <LabelTooltip label="Link a different note">
+                  <LabelTooltip label={t('dashboard.linkOther')}>
                     <Button
                       type="button"
                       variant="ghost"

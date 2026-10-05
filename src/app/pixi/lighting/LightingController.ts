@@ -1,6 +1,7 @@
 import type { EventEmitter } from 'events';
 import type { App } from 'obsidian';
 import type { Application, Texture } from 'pixi.js';
+import type { UnlitGrid } from '../../grid/gridLightingMark';
 import type { Viewport } from 'pixi-viewport';
 import type { MeasurementSettings } from '../../grid/measurementFormat';
 import { AssetService } from '../../services/AssetService';
@@ -46,6 +47,8 @@ export interface LightingControllerDeps {
   bounds: () => MapBounds | null;
   /** The map image, for the colours light bounces off. */
   albedo: () => Texture | null;
+  /** The grid the composite draws unlit, while there is one (`UnlitGrid`). */
+  grid?: () => UnlitGrid | null;
   /** How each token perceives; unset, by its own vision and its linked statblock (`tokenSensesResolver`). */
   senses?: TokenSensesResolver;
   /** What the players see may have changed: sight was worked out anew, or lighting came or went (`playerLighting`). */
@@ -100,7 +103,7 @@ export class LightingController {
       onActiveChange: () => this.session.sync(), onFull: showZonesFullNotice, announce: showExploredTravelNotice,
     });
     this.renderer = createSceneLighting({
-      viewport, app, store, obsApp, measurement, bounds: deps.bounds, albedo: deps.albedo,
+      viewport, app, store, obsApp, measurement, bounds: deps.bounds, albedo: deps.albedo, ...(deps.grid && { grid: deps.grid }),
       rules: () => this.sightRules(),
       onSightChange: () => this.onSightChange(),
       exploredWatcher: this.modes.memory,
@@ -220,6 +223,7 @@ export class LightingController {
     return {
       store: this.deps.store,
       walls: this.editor.walls,
+      doors: this.editor.doors,
       wallRenderer: this.editor.renderer,
       lightAt: (x, y) => this.lightMarkers.hitTest(x, y),
     };

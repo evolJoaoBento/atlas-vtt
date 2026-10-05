@@ -12,12 +12,13 @@ import { ATLAS_NATIVE_MODAL_CLASSES } from '../../../ui/nativeModal';
 import { LabelledCheck } from '../ui/LabelledCheck';
 import { NOT_MET_EXCEPT_TEXT, NOT_MET_TEXT } from '../people/ui/peopleCopy';
 import type { PartPeopleChoice } from './partPeople';
+import { t } from '../../../i18n';
 
 export type PartPeopleKind = 'only' | 'except';
 
 const TITLES: Record<PartPeopleKind, string> = {
-  only: 'Share selection only with',
-  except: 'Share selection with everyone except',
+  only: t('share.part.onlyTitle'),
+  except: t('share.part.exceptTitle'),
 };
 
 interface PartPeopleFormProps {
@@ -33,8 +34,8 @@ export function PartPeopleForm({ choice, kind, onApply, onCancel }: PartPeopleFo
   return (
     <div className="atlas-share">
       <section className="atlas-share__section">
-        <h3 className="atlas-share__heading">{choice.inSession ? 'People in this session' : 'Not in a session: your people list'}</h3>
-        {choice.people.length === 0 && <p className="atlas-share__hint">Nobody yet. Add people by name in People…, or they are added when you share a session with them.</p>}
+        <h3 className="atlas-share__heading">{choice.inSession ? t('share.part.inSession') : t('share.part.peopleList')}</h3>
+        {choice.people.length === 0 && <p className="atlas-share__hint">{t('share.part.nobody')}</p>}
         <ul className="atlas-share__people">
           {choice.people.map(({ name, problem, notMet }) => (
             <li key={name}>
@@ -55,8 +56,8 @@ export function PartPeopleForm({ choice, kind, onApply, onCancel }: PartPeopleFo
         </ul>
       </section>
       <div className="modal-button-container">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button variant="default" disabled={ticked.length === 0} onClick={() => onApply(choice.people.filter((person) => person.problem === undefined && ticked.includes(person.name)).map((person) => person.name))}>Apply</Button>
+        <Button variant="outline" onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button variant="default" disabled={ticked.length === 0} onClick={() => onApply(choice.people.filter((person) => person.problem === undefined && ticked.includes(person.name)).map((person) => person.name))}>{t('common.apply')}</Button>
       </div>
     </div>
   );

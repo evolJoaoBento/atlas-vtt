@@ -7,7 +7,7 @@ import { playerLightingLayers } from '../playerLightingLayers';
 import { SIZE } from './rendererHarness';
 import { createScene, engineLayer, litScene, type SavedScene, type Scene } from './sceneLightingHarness';
 
-vi.mock('obsidian', () => ({ Notice: class {} }));
+vi.mock('obsidian', () => ({ Notice: class {}, getLanguage: () => 'en' }));
 
 const CRYPT = 'maps/crypt.atlasmap';
 /** A scene in daylight whose token at (60, 60) sees 70 px around it. */

@@ -10,7 +10,7 @@ class HttpReports(unittest.TestCase):
     def setUp(self):
         self.server = Server(("127.0.0.1", 0), Handler)
         self.server.reporter = Mock()
-        self.server.reporter.submit.return_value = dict(number=42, url="https://github.com/ByteMirror/atlas-vtt/issues/42")
+        self.server.reporter.submit.return_value = dict(number=42, url="https://github.com/atlas-vtt/atlas-vtt/issues/42")
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.url = f"http://127.0.0.1:{self.server.server_port}"

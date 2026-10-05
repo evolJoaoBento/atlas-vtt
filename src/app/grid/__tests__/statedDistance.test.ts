@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { readDistance, toGameUnits, type GameUnit } from '../statedDistance';
 
-const FEET: GameUnit = { unitType: 'feet', unitDistance: 5 };
-const METRES: GameUnit = { unitType: 'meters', unitDistance: 1.5 };
-const YARDS: GameUnit = { unitType: 'yards', unitDistance: 2 };
-const SQUARES: GameUnit = { unitType: 'units', unitDistance: 1 };
+const FEET: GameUnit = { unitType: 'feet', ruleDistance: 5 };
+const METRES: GameUnit = { unitType: 'meters', ruleDistance: 1.5 };
+const YARDS: GameUnit = { unitType: 'yards', ruleDistance: 2 };
+const SQUARES: GameUnit = { unitType: 'units', ruleDistance: 1 };
 
 function read(text: string): [number, string | null] | null {
   const distance = readDistance(text);
@@ -60,7 +60,7 @@ describe('readDistance', () => {
 describe('toGameUnits', () => {
   it('keeps a distance stated in the collection\'s own unit, whatever its squares span', () => {
     expect(toGameUnits({ value: 60, unit: 'feet' }, FEET)).toBe(60);
-    expect(toGameUnits({ value: 60, unit: 'feet' }, { unitType: 'feet', unitDistance: 10 })).toBe(60);
+    expect(toGameUnits({ value: 60, unit: 'feet' }, { unitType: 'feet', ruleDistance: 10 })).toBe(60);
     expect(toGameUnits({ value: 18, unit: 'meters' }, METRES)).toBe(18);
   });
 
@@ -87,17 +87,17 @@ describe('toGameUnits', () => {
   it('counts squares by what a grid cell spans in the collection', () => {
     expect(toGameUnits({ value: 12, unit: 'squares' }, FEET)).toBe(60);
     expect(toGameUnits({ value: 12, unit: 'squares' }, METRES)).toBe(18);
-    expect(toGameUnits({ value: 6, unit: 'squares' }, { unitType: 'feet', unitDistance: 10 })).toBe(60);
+    expect(toGameUnits({ value: 6, unit: 'squares' }, { unitType: 'feet', ruleDistance: 10 })).toBe(60);
     expect(toGameUnits({ value: 12, unit: 'squares' }, SQUARES)).toBe(12);
   });
 
   it('reads a real distance as 5-foot squares where the collection counts in units of its own', () => {
     expect(toGameUnits({ value: 60, unit: 'feet' }, SQUARES)).toBe(12);
     expect(toGameUnits({ value: 18, unit: 'meters' }, SQUARES)).toBe(12);
-    expect(toGameUnits({ value: 60, unit: 'feet' }, { unitType: 'custom', unitDistance: 2 })).toBe(24);
+    expect(toGameUnits({ value: 60, unit: 'feet' }, { unitType: 'custom', ruleDistance: 2 })).toBe(24);
   });
 
   it('falls back to 5 game units a cell where the collection\'s cell spans nothing', () => {
-    expect(toGameUnits({ value: 12, unit: 'squares' }, { unitType: 'feet', unitDistance: 0 })).toBe(60);
+    expect(toGameUnits({ value: 12, unit: 'squares' }, { unitType: 'feet', ruleDistance: 0 })).toBe(60);
   });
 });

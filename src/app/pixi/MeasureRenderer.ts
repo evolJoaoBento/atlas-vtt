@@ -10,6 +10,7 @@ import type { StoreApi } from 'zustand';
 import { isHandled } from './utils/handledEvents';
 import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
 import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './measureGeometry';
+import { MAP_LAYER_Z } from './mapLayerOrder';
 
 interface PersistentMeasurement {
   graphics: Graphics;
@@ -61,14 +62,17 @@ export class MeasureRenderer {
     this.measureGraphics = new Graphics();
     this.measureGraphics.eventMode = 'none';
     this.measureGraphics.interactiveChildren = false;
+    this.measureGraphics.zIndex = MAP_LAYER_Z.measure;
     this.viewport.addChild(this.measureGraphics);
     
     // Create graphics for text pill background
     this.measurePill = new Graphics();
     this.measurePill.eventMode = 'none';
+    this.measurePill.zIndex = MAP_LAYER_Z.measure;
     this.viewport.addChild(this.measurePill);
     
     this.measureText = createMeasureLabelText();
+    this.measureText.zIndex = MAP_LAYER_Z.measure;
     this.viewport.addChild(this.measureText);
     
     // Setup viewport scale listener
@@ -363,10 +367,10 @@ export class MeasureRenderer {
     drawMeasureLabel(persistPill, persistText, this.labelAnchor(this.startPoint, this.endPoint), this.viewport.scale.x);
     persistText.visible = true;
     
-    // Add to viewport
-    this.viewport.addChild(persistGraphics);
-    this.viewport.addChild(persistPill);
-    this.viewport.addChild(persistText);
+    for (const part of [persistGraphics, persistPill, persistText]) {
+      part.zIndex = MAP_LAYER_Z.measure;
+      this.viewport.addChild(part);
+    }
     
     // Store the persistent measurement
     this.persistentMeasurements.push({

@@ -24,15 +24,16 @@ import { trustedSections, type SectionTrust } from '../model/sectionTrust';
 import { partError, partWarnings } from './partWarnings';
 import { unlinkedExceptWarning, unlinkedMapWarnings } from './unlinkedWarnings';
 import { ShareWithForm, type ShareFormResult, type ShareRow } from './ShareWithForm';
+import { formatList, t } from '../../../i18n';
 
-export const SHARE_DIALOG_TITLE = 'Share with';
+export const SHARE_DIALOG_TITLE = t('share.with.title');
 const FULL_CONFIRM = {
-  title: 'Share the full map?',
-  message: ['A full share sends everything on this map, as a co-GM would see it: hidden tokens, GM-only pins, walls and lights.'],
-  confirmLabel: 'Share full map',
+  title: t('share.with.fullTitle'),
+  message: [t('share.with.fullMessage')],
+  confirmLabel: t('share.with.fullConfirm'),
 };
-export const REMOVED_PERSON_LABEL = 'Removed or unknown person';
-export const PART_HINT = 'To keep part of this note back, select it and right-click: Share part.';
+export const REMOVED_PERSON_LABEL = t('share.with.removedPerson');
+export const PART_HINT = t('share.with.partHint');
 
 export interface ShareWithDeps {
   people: PeopleBook;
@@ -55,7 +56,7 @@ class ShareWithModal extends Modal {
   }
 
   onOpen(): void {
-    this.setTitle(`${SHARE_DIALOG_TITLE} · ${this.file.basename}`);
+    this.setTitle(t('share.with.titleFile', { name: this.file.basename }));
     this.root = createRoot(this.contentEl);
     void this.render();
   }
@@ -83,8 +84,8 @@ class ShareWithModal extends Modal {
     const unknown = [...new Set([...unknownInRule, ...unknownNamesIn(text, this.deps.people)])].sort();
     const problems = partProblemsInNote(text, trustedSections(this.app, this.deps.sections, this.file, text));
     const warnings = [
-      ...(unreadableRule ? [`An entry in the ${SHARE_PROPERTY} property could not be read, so this note is private. Save to write it again.`] : []),
-      ...(unknown.length ? [`Not in your people list: ${unknown.join(', ')}.`] : []),
+      ...(unreadableRule ? [t('share.with.unreadableProperty', { property: SHARE_PROPERTY })] : []),
+      ...(unknown.length ? [t('share.with.unknownNames', { names: formatList(unknown) })] : []),
       ...unlinkedExceptNames(text, this.deps.people).map((name) => unlinkedExceptWarning(name)),
       ...partWarnings(problems),
     ];
@@ -127,7 +128,7 @@ class ShareWithModal extends Modal {
     const value = formatShareRule({ everyone: result.everyone, people: result.people.map(nameFor), except: result.except.map(nameFor) });
     const readBack = await writeNoteShare(this.app, this.file, value);
     const expected = parseShareRule(value);
-    if (JSON.stringify(readBack) !== JSON.stringify(expected)) new Notice(`The note's ${SHARE_PROPERTY} property now reads differently; check it.`);
+    if (JSON.stringify(readBack) !== JSON.stringify(expected)) new Notice(t('share.with.readsDifferently', { property: SHARE_PROPERTY }));
     this.close();
   }
 
@@ -135,7 +136,7 @@ class ShareWithModal extends Modal {
     const scene = (await this.deps.assets.getAssets(undefined, 'scene')).find((candidate) => candidate.data?.mapPath === this.file.path);
     const source = scene ? await readSharedMap((path) => this.app.vault.adapter.read(path), this.file.path) : null;
     if (!scene || !source) {
-      new Notice('This map has no scene in a collection, so it cannot be shared.');
+      new Notice(t('share.with.noScene'));
       this.close();
       return;
     }

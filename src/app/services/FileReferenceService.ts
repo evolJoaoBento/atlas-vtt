@@ -5,6 +5,7 @@ import { normalizeImagePath } from '../utils/pathUtils';
 import { mapThumbnailPath } from '../utils/dataFileMigration';
 import { movedPathOf, rewriteMapReferences, type MovedPath, type PathMove } from './renamedPaths';
 import { SceneSnapshotService } from '../snapshots/SceneSnapshotService';
+import { allSnapshotFiles, hiddenSnapshotFiles } from '../snapshots/sceneSnapshotFolders';
 import { STATBLOCK_IMAGE_KEYS } from './statblockImageKeys';
 
 /**
@@ -159,13 +160,10 @@ export class FileReferenceService {
       } catch (error) {
         console.error(`[FileReferenceService] Error updating map ${mapFile.path}:`, error);
       }
-      // Scene snapshots hold the same map state, so they follow renamed files too.
-      try {
-        if (await snapshots.rewriteFiles(mapFile.path, rewriteMap)) anyChanged = true;
-      } catch (error) {
-        console.error(`[FileReferenceService] Error updating snapshots of ${mapFile.path}:`, error);
-      }
     }
+    // Scene snapshots hold the same map state, so they follow renamed files too.
+    const snapshotFiles = [...allSnapshotFiles(this.app), ...await hiddenSnapshotFiles(this.app, mapFiles.map((file) => file.path))];
+    if (await snapshots.rewriteFiles(snapshotFiles, rewriteMap)) anyChanged = true;
 
     return anyChanged;
   }

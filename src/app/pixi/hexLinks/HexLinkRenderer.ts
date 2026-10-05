@@ -6,12 +6,14 @@ import type { ViewAtlasState, ViewAtlasStore } from '../../storeFactory';
 import { axialToPixel, hexCellExtent, hexVertices, pixelToAxial } from '../../grid/hexGeometry';
 import type { AxialCoord, HexLayout, Point } from '../../grid/hexGeometry';
 import { hexLayoutOfGrid, hexLinkAt, isShownAsHex, linkedHexOf } from '../../grid/hexLinks';
-import { axialKey, hexLabelsByCoord, numberHexes } from '../../grid/hexNumbering';
-import type { MapRect } from '../../grid/hexNumbering';
+import { axialKey, hexLattice } from '../../grid/hexLattice';
+import { cellLabelsByKey, numberCells } from '../../grid/cellNumbering';
+import type { MapRect } from '../../grid/cellNumbering';
 import { noteLinkTitle } from '../../utils/pathUtils';
 import { cssColorToHexNumber, getObsidianAccentColor } from '../utils/colorUtils';
 import { destroyTree } from '../utils/destroyTree';
 import { createHexLinkChip } from './hexLinkChip';
+import { MAP_LAYER_Z } from '../mapLayerOrder';
 
 const HOVER_FILL_ALPHA = 0.28;
 const PRESSED_FILL_ALPHA = 0.45;
@@ -41,7 +43,7 @@ export interface HexLinkRendererOptions {
  * pin (drawn by `PinRenderer`). DM-only, like pins.
  */
 export class HexLinkRenderer {
-  readonly container = new Container({ label: 'hex-links', eventMode: 'none', interactiveChildren: false });
+  readonly container = new Container({ label: 'hex-links', zIndex: MAP_LAYER_Z.hexLinks, eventMode: 'none', interactiveChildren: false });
   private readonly highlightGraphics = new Graphics();
   private chip: Container | null = null;
   private highlight: Highlight | null = null;
@@ -119,10 +121,10 @@ export class HexLinkRenderer {
     const layout = this.layout();
     const map = this.options.getMapRect();
     if (!layout || !map) return undefined;
-    const format = this.state.grid?.hexNumbers ?? 'column-row';
+    const format = this.state.grid?.cellNumbers ?? 'column-row';
     const key = JSON.stringify([layout, map, format]);
     if (this.numbering?.key !== key) {
-      this.numbering = { key, labels: hexLabelsByCoord(numberHexes(layout, map, format)) };
+      this.numbering = { key, labels: cellLabelsByKey(numberCells(hexLattice(layout), map, format)) };
     }
     return this.numbering.labels.get(axialKey(hex));
   }

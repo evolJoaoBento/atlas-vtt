@@ -4,17 +4,17 @@
  * rolls. Its own chunk, loaded with the first roll the page throws (`OwnRollThrows`), so the page
  * opens as fast as without it. The Obsidian globals the dice use are installed first.
  *
- * The page holds at most two WebGL contexts (`PAGE_STAGES`): the stage on screen and one spare, so
- * a roll that replaces the one showing finds a stage made. Atlas's `warmStages` builds four (a
- * stack of rolls, panels fading out); one panel at a time needs no more, and a phone's GPU memory
- * is better spent elsewhere.
+ * The page holds at most two stages (`PAGE_STAGES`): the one on screen and one spare, so a roll
+ * that replaces the one showing finds a stage made. Both draw through the page's one WebGL context
+ * (`DiceGpu`). Atlas's `warmStages` builds four (a stack of rolls, panels fading out); one panel at
+ * a time needs no more, and a phone's GPU memory is better spent elsewhere.
  */
 import './obsidianShim.mts';
 import { stagePixelRatio, type DiceRenderer } from '../../src/app/dice3d/DiceRenderer';
 import { DIE_BODIES } from '../../src/app/dice3d/diceScene';
 import { loadDiceArtwork } from '../../src/app/dice3d/dieArtwork';
 import { makeDie } from '../../src/app/dice3d/dieMotion';
-import { borrowStage, returnStage } from '../../src/app/dice3d/stagePool';
+import { borrowStage, canShowDice, returnStage } from '../../src/app/dice3d/stagePool';
 import type { DiceThrowModule } from '../../src/app/online/page/ownRollThrows';
 import { ThrowPanel, type PageThrow } from './throwPanel.mts';
 
@@ -53,8 +53,12 @@ function prepareSpare(): void {
   }));
 }
 
-/** Throws `roll` into `container`; false without WebGL, so the page shows the result card instead. */
+/**
+ * Throws `roll` into `container`; false without WebGL, or while the page's context is lost (a stage
+ * would stay blank, white on some systems), so the page shows the result card instead.
+ */
 function throwRoll(container: HTMLElement, roll: PageThrow): boolean {
+  if (!canShowDice(document)) return false;
   const lease = borrowStage(document);
   if (!lease.renderer) {
     returnStage(lease);

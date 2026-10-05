@@ -9,9 +9,10 @@ import { setOwn } from '../scene/sceneDiff';
 import { atlasBars } from './convertResources';
 import type { PlayerCondition, PlayerToken, ScenePoint } from '../scene/sceneTypes';
 import { NEUTRAL_BADGE_COLOR } from '../view/layers/tokenUiDrawing';
+import { t } from '../../i18n';
 
 /** The name of every condition players see: they receive ids and values only. */
-export const REMOTE_CONDITION_NAME = 'Condition';
+export const REMOTE_CONDITION_NAME = t('online.scene.condition');
 
 function conditionFields(conditions: readonly PlayerCondition[]): Partial<Pick<BaseToken, 'conditions' | 'conditionValues'>> {
   if (conditions.length === 0) return {};

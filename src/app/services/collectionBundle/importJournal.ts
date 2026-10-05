@@ -21,7 +21,7 @@ function timestamp(date: Date): string {
  * Writes and removes vault files for an import so that it can be undone: every
  * file it replaces or deletes is first copied to a hidden backup folder, and
  * `rollback` restores those copies and removes the files it created. Files in
- * hidden folders (scene snapshots) are handled through the adapter.
+ * hidden folders (snapshots earlier versions installed) are handled through the adapter.
  */
 export class ImportJournal {
   private readonly entries: JournalEntry[] = [];

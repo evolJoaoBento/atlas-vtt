@@ -99,6 +99,25 @@ describe('live lighting of a presentation', () => {
     expect(live.frame({ exploredMask: null, lighting: { ...LIT, enabled: false } }, MAP)).toBeNull();
   });
 
+  // A view that lights its scenes now reads the settings before it makes its renderer (upstream #239),
+  // and a view rebuilt in place (a restored context, a reload) has none for a moment either.
+  it('stays closed while the view has no renderer yet, opens once its lighting is there, and closes again when it goes', () => {
+    const source = lightingSource(undefined);
+    const live = new LiveLighting(source.info as PresentedSceneInfo, () => {});
+    const at = (now: number) => live.frame({ exploredMask: null, lighting: LIT }, MAP, now)!;
+    expect(at(0).seen('hero')).toBe(false);
+    expect(at(0).darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    source.current = playerLightingOf(walled(), MAP);
+    const open = at(10);
+    expect(open.seen('hero')).toBe(true);
+    expect(open.seen('goblin')).toBe(false);
+    expect(open.darkness.covered).not.toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    source.current = undefined;
+    expect(at(20).seen('hero')).toBe(false);
+    expect(at(20).darkness.covered).toEqual([{ x: 0, y: 0, width: MAP.width, height: MAP.height }]);
+    live.dispose();
+  });
+
   it('watches the view once it can be watched, though it had no renderer at first', () => {
     const source = lightingSource(playerLightingOf(walled(), MAP));
     let watchable = false;
@@ -318,6 +337,56 @@ describe('the broadcaster with dynamic lighting', () => {
     broadcaster.start();
     presented.present(view, tab);
     expect(broadcaster.currentProjection()?.tokens).toEqual({});
+    broadcaster.stop();
+  });
+
+  it('fails closed while a scene snapshot is restored in place, until the view has the restored scene\'s sight', async () => {
+    // Upstream's snapshot restore (AtlasView.reloadActiveScene): the map unloads (its sight is no longer the
+    // scene's), the file is rewritten and the scene loads again from it, with the lighting on throughout.
+    const withOrc = (x: number): Scene => {
+      const base = walled();
+      return { ...base, objects: { ...base.objects, tokens: { ...base.objects.tokens, orc: character('orc', x, 400) } } };
+    };
+    const before = withOrc(300);
+    const lighting = lightingSource(playerLightingOf(before, MAP));
+    const { store, broadcaster } = presentLit(before, lighting);
+    const restart = vi.spyOn(LiveLighting.prototype, 'restart');
+    const players = (): PlayerScene => broadcaster.currentProjection()!;
+    const darkAt = (point: { x: number; y: number }): boolean => {
+      const op = players().fog[DARKNESS_FOG_ID];
+      return insideByNonzero(op?.type === 'lasso' ? op.points : [], point);
+    };
+    expect(Object.keys(players().tokens).sort()).toEqual(['hero', 'orc']);
+
+    // The snapshot has the orc behind the wall. The view's sight still describes the scene before the restore.
+    const restored = withOrc(800);
+    const stale = playerLightingOf(before, MAP)!;
+    store.setState({ mapLoaded: false } as Partial<ViewAtlasState>);
+    store.setState({ isMapLoading: true } as Partial<ViewAtlasState>);
+    lighting.current = { ...stale, ready: false };
+    store.setState({ objects: restored.objects, exploredMask: null } as Partial<ViewAtlasState>);
+    store.setState({ isMapLoading: false, mapLoaded: true } as Partial<ViewAtlasState>);
+    await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
+    // Nothing worked out for the scene before stands in, and nothing is seen: no token, the whole map dark.
+    expect(restart).toHaveBeenCalled();
+    expect(players().tokens).toEqual({});
+    expect(darkAt({ x: 140, y: 400 })).toBe(true);
+    expect(darkAt({ x: 800, y: 400 })).toBe(true);
+
+    // A view without its lighting meanwhile (no renderer yet) shows nothing either.
+    lighting.current = undefined;
+    lighting.changed();
+    await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
+    expect(players().tokens).toEqual({});
+
+    // Once the view works the restored scene's sight out, players get what it shows: the orc stays hidden.
+    lighting.current = playerLightingOf(restored, MAP);
+    lighting.changed();
+    await vi.advanceTimersByTimeAsync(SCENE_TICK_MS);
+    expect(Object.keys(players().tokens)).toEqual(['hero']);
+    expect(darkAt({ x: 140, y: 400 })).toBe(false);
+    expect(darkAt({ x: 800, y: 400 })).toBe(true);
+    restart.mockRestore();
     broadcaster.stop();
   });
 

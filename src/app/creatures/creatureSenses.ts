@@ -47,7 +47,7 @@ const readings = new WeakMap<SensedCreature, Reading[]>();
 
 function readBy(reading: Reading, definitions: readonly SenseDefinition[], unit: GameUnit): boolean {
   return reading.unit.unitType === unit.unitType
-    && reading.unit.unitDistance === unit.unitDistance
+    && reading.unit.ruleDistance === unit.ruleDistance
     && (reading.definitions === definitions || sameSenses(reading.definitions, definitions));
 }
 
@@ -64,7 +64,7 @@ export function creatureSenses(creature: SensedCreature | null | undefined, defi
   if (reading) return reading.parsed;
   const text = sensesTextOf(creature.fields);
   const parsed = text === null ? NO_SENSES : deepFreeze(parseSenses(text, definitions, unit));
-  const unitRead = { unitType: unit.unitType, unitDistance: unit.unitDistance };
+  const unitRead = { unitType: unit.unitType, ruleDistance: unit.ruleDistance };
   readings.set(creature, [{ definitions, unit: unitRead, parsed }, ...known].slice(0, MAX_READINGS));
   return parsed;
 }

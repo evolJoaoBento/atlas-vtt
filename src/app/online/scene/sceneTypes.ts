@@ -27,8 +27,12 @@ export const PLAYER_GRID_TYPES = ['square', 'hex-horizontal', 'hex-vertical'] as
 export type PlayerGridType = typeof PLAYER_GRID_TYPES[number];
 export const PLAYER_GRID_LINES = ['solid', 'dashed', 'dotted'] as const;
 export type PlayerGridLine = typeof PLAYER_GRID_LINES[number];
+/** The formats a player before Atlas 0.5.1 reads, and only on hex grids (`PlayerGrid.hexNumbers`). */
 export const PLAYER_HEX_NUMBERS = ['column-row', 'sequential'] as const;
 export type PlayerHexNumbers = typeof PLAYER_HEX_NUMBERS[number];
+/** Every format Atlas numbers cells in, as `CellNumberFormat`: the projection and `playerCellNumbers` assign one to the other, so the compiler keeps them equal. */
+export const PLAYER_CELL_NUMBERS = ['column-row', 'sequential', 'letter-number'] as const;
+export type PlayerCellNumbers = typeof PLAYER_CELL_NUMBERS[number];
 
 export interface PlayerGrid {
   type: PlayerGridType;
@@ -39,8 +43,15 @@ export interface PlayerGrid {
   opacity: number;
   lineType: PlayerGridLine;
   lineWidth: number;
+  /**
+   * The cell numbers as a player before Atlas 0.5.1 reads them: on a hex grid in a format it
+   * knows, else null. Newer players read `cellNumbers`.
+   */
   hexNumbers: PlayerHexNumbers | null;
   hexNumberOpacity: number | null;
+  /** How the player window numbers the cells, on any grid; absent from a GM before Atlas 0.5.1, which sent `hexNumbers` only. */
+  cellNumbers?: PlayerCellNumbers | null;
+  cellNumberOpacity?: number | null;
 }
 
 /** The HP and stress bars of a GM before Atlas 0.5, still validated and never read: bars are `PlayerResource` now. */
@@ -197,6 +208,14 @@ export interface PlayerRangeBand {
   maxSquares: number;
 }
 
+/** Where the GM's drop snaps tokens: the grid's geometry only, nothing it draws. */
+export interface PlayerSnapGrid {
+  type: PlayerGridType;
+  size: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 /** The GM's measurement settings (Atlas's `MeasurementSettings`), so the page labels distances as Atlas does. */
 export interface PlayerMeasurement {
   mode: typeof PLAYER_MEASUREMENT_MODES[number];
@@ -209,6 +228,12 @@ export interface PlayerMeasurement {
   snapToGrid: boolean;
   /** The full opening of a cone measurement in degrees, as the GM's measure tool opens it (the game system's). */
   coneAngle: number;
+  /**
+   * The grid the GM snaps a dropped token to, also while players see no grid (hidden, switched off, or
+   * kept from players), so drags snap where the GM's check puts them; null where the GM's map has no
+   * grid, so nothing snaps. Absent from a GM before Atlas 0.5.1-beta.5.
+   */
+  snapGrid?: PlayerSnapGrid | null;
 }
 
 /** Atlas's cone of a collection without a cone angle (`DEFAULT_CONE_ANGLE`; a test keeps them equal), here since this file imports nothing. */

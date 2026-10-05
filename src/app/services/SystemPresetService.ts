@@ -1,19 +1,30 @@
 import { BUILT_IN_SYSTEM_PRESETS } from '../gameSystems/builtInPresets';
 import { parseUserPreset, parseUserPresets } from '../gameSystems/presetValidation';
 import type { SystemPreset, SystemRules } from '../types/systemPresetTypes';
-import type { SettingsService } from './SettingsService';
+import type { StoredPreset } from './systemPresets/presetFiles';
+import { t } from '../i18n';
 
-type StoredPreset = Record<string, unknown>;
+/** Where the user's presets are kept: one vault file each (`SystemPresetFiles`), or memory in tests. */
+export interface PresetStorage {
+  /** The presets as stored, unvalidated; the same array while nothing changed. */
+  entries(): readonly StoredPreset[];
+  create(entry: StoredPreset): void;
+  /** Changes the stored preset `id` with `change`, which gets the preset as stored. */
+  update(id: string, change: (stored: StoredPreset) => StoredPreset): void;
+  remove(id: string): void;
+  /** Calls `listener` after every change, also one that arrived from another device. */
+  onChange(listener: () => void): () => void;
+}
 
 /**
  * The game system presets of this vault: the built-in ones plus those the user
- * saved, which live in Atlas' settings file and can be applied to any collection.
+ * saved, which live in vault files and can be applied to any collection.
  *
  * Edits change only the fields they own, so data a newer Atlas added to a
  * stored preset survives an older one editing it.
  */
 export class SystemPresetService {
-  constructor(private readonly settings: Pick<SettingsService, 'getSetting' | 'setSetting' | 'onChange'>) {}
+  constructor(private readonly storage: PresetStorage) {}
 
   /** Built-in presets first, then the user's in alphabetical order. */
   list(): SystemPreset[] {
@@ -24,15 +35,15 @@ export class SystemPresetService {
   /** Why `name` cannot name a preset, or null when it can. `exceptId` is the preset being renamed. */
   nameError(name: string, exceptId?: string): string | null {
     const key = name.trim().toLowerCase();
-    if (!key) return 'Enter a name';
+    if (!key) return t('names.enter');
     const taken = this.list().some((preset) => preset.id !== exceptId && preset.name.toLowerCase() === key);
-    return taken ? 'A preset with this name already exists' : null;
+    return taken ? t('names.presetTaken') : null;
   }
 
   create(name: string, rules: SystemRules): SystemPreset {
     this.assertName(name);
     const preset: SystemPreset = { id: crypto.randomUUID(), name: name.trim(), builtIn: false, rules: structuredClone(rules) };
-    this.write([...this.stored(), preset]);
+    this.storage.create({ ...preset });
     return preset;
   }
 
@@ -55,37 +66,31 @@ export class SystemPresetService {
 
   /** Collections set from the preset keep their rules. */
   delete(id: string): void {
-    this.write(this.stored().filter((stored) => !isEditable(stored, id)));
+    if (this.stored().some((entry) => isEditable(entry, id))) this.storage.remove(id);
   }
 
-  /** Calls `listener` whenever Atlas' settings change, which includes the presets. */
+  /** Calls `listener` whenever a preset is saved, renamed or deleted, here or on another device. */
   onChange(listener: () => void): () => void {
-    return this.settings.onChange(() => listener());
+    return this.storage.onChange(listener);
   }
 
-  private stored(): unknown[] {
-    const stored = this.settings.getSetting('systemPresets');
-    return Array.isArray(stored) ? stored : [];
+  private stored(): readonly StoredPreset[] {
+    return this.storage.entries();
   }
 
   private modify(id: string, change: (stored: StoredPreset) => StoredPreset): void {
-    const stored = this.stored();
-    if (!stored.some((entry) => isEditable(entry, id))) throw new Error(`No editable preset with id ${id}`);
-    this.write(stored.map((entry) => (isEditable(entry, id) ? change(entry) : entry)));
+    if (!this.stored().some((entry) => isEditable(entry, id))) throw new Error(`No editable preset with id ${id}`);
+    this.storage.update(id, change);
   }
 
   private assertName(name: string, exceptId?: string): void {
     const error = this.nameError(name, exceptId);
     if (error) throw new Error(error);
   }
-
-  private write(stored: unknown[]): void {
-    this.settings.setSetting('systemPresets', stored);
-  }
 }
 
-function asRecord(value: unknown): StoredPreset {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as StoredPreset) : {};
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
 /** Whether `entry` is the usable user preset `id`. */

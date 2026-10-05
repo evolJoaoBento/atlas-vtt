@@ -148,6 +148,7 @@ export const FOG_FIELD_COVERAGE: CoverageTable<KeysOfUnion<FogOperation>> = {
 export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   enabled: SENT,
   visible: SENT,
+  // In the grid players see, and in `measurement.snapGrid` also while they see none: the GM's drop snaps to it.
   type: SENT,
   size: SENT,
   offsetX: SENT,
@@ -156,8 +157,9 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   opacity: SENT,
   lineType: SENT,
   lineWidth: SENT,
-  hexNumbers: SENT,
-  hexNumberOpacity: SENT,
+  // As `cellNumbers`, and as `hexNumbers` on hex grids for players before Atlas 0.5.1.
+  cellNumbers: SENT,
+  cellNumberOpacity: SENT,
   // Sent in the measurement, so the page's drag ruler snaps as the GM's tokens do.
   snapToGrid: SENT,
   scale: gmOnly('used while aligning the grid to the map'),
@@ -167,6 +169,8 @@ export const GRID_FIELD_COVERAGE: CoverageTable<keyof GridState> = {
   unitType: SENT,
   unitDistance: SENT,
   measurementType: SENT,
+  // A scene's own distance per cell: players get the measurement's `unitDistance` it gives.
+  unitDistanceOverride: SENT,
 };
 
 /** The store fields the projection reads (`sliceOf` in `sceneSources.ts` watches them, and those of `LIGHTING_STATE_COVERAGE`). */

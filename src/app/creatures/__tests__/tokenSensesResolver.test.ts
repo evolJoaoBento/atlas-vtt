@@ -7,7 +7,7 @@ import { tokenSensesResolver, type CreatureSource, type SenseRules } from '../to
 
 const DND = BUILT_IN_SENSES['builtin:dnd5e']!;
 const PATHFINDER = BUILT_IN_SENSES['builtin:pathfinder2e']!;
-const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', unitDistance: 5 } };
+const FEET: SenseRules = { definitions: DND, unit: { unitType: 'feet', ruleDistance: 5 } };
 
 const GOBLIN = 'Bestiary/Goblin.md';
 const ORC = 'Bestiary/Orc.md';
@@ -99,7 +99,7 @@ describe('tokenSensesResolver', () => {
     let rules = FEET;
     const resolver = tokenSensesResolver(index, { get: () => rules });
     expect(named(resolver.sensesOf(token(GOBLIN)))).toEqual([['Darkvision', 60]]);
-    rules = { definitions: PATHFINDER, unit: { unitType: 'meters', unitDistance: 1.5 } };
+    rules = { definitions: PATHFINDER, unit: { unitType: 'meters', ruleDistance: 1.5 } };
     expect(named(resolver.sensesOf(token(GOBLIN)), PATHFINDER)).toEqual([['Darkvision', 18], ['Scent', 9]]);
   });
 
@@ -209,9 +209,9 @@ describe('tokenSensesResolver on changing rules', () => {
 
     rules.change({ definitions: PATHFINDER, unit: FEET.unit });
     expect(sight).toHaveBeenCalledTimes(1);
-    rules.change({ definitions: PATHFINDER, unit: { unitType: 'meters', unitDistance: 1.5 } });
+    rules.change({ definitions: PATHFINDER, unit: { unitType: 'meters', ruleDistance: 1.5 } });
     expect(sight).toHaveBeenCalledTimes(2);
-    rules.change({ definitions: PATHFINDER, unit: { unitType: 'meters', unitDistance: 2 } });
+    rules.change({ definitions: PATHFINDER, unit: { unitType: 'meters', ruleDistance: 2 } });
     expect(sight).toHaveBeenCalledTimes(3);
   });
 

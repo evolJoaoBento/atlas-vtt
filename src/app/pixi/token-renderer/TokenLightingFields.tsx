@@ -8,6 +8,7 @@ import { numberText } from '../../utils/numberInput';
 import { LightEmissionFields } from '../lighting/LightEmissionFields';
 import { EditTokenSection, SwitchRow } from './EditTokenSections';
 import { NumberOverrideField } from './NumberOverrideField';
+import { t } from '../../i18n';
 
 /** What the map and its collection say about vision and light, for the token being edited. */
 export interface TokenLightingContext {
@@ -47,7 +48,7 @@ interface TokenVisionSectionProps {
 export function TokenVisionSection({ vision, onChange, context }: TokenVisionSectionProps): React.ReactElement {
   const { unit, inherited } = context;
   return (
-    <EditTokenSection title="Vision">
+    <EditTokenSection title={t('vision.toggle')}>
       <SwitchRow
         label="Vision (party member)"
         hint="The players see the map through this token. The token itself is always visible to them."
@@ -94,7 +95,7 @@ interface TokenLightSectionProps {
 /** The Edit Token dialog's section for the light the token carries, with the light popover's fields while it carries one. */
 export function TokenLightSection({ light, onChange, context }: TokenLightSectionProps): React.ReactElement {
   return (
-    <EditTokenSection title="Carried light">
+    <EditTokenSection title={t('vision.carriedLight')}>
       <SwitchRow
         label="Carries a light"
         hint="A torch or a lantern: its light moves with the token."

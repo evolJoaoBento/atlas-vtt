@@ -64,7 +64,7 @@ const DRAWING: DrawingStroke = {
 };
 const GRID: GridState = {
   enabled: true, visible: true, type: 'hex-vertical', size: 70, offsetX: 0, offsetY: 0, color: '#000000', opacity: 0.5,
-  lineType: 'solid', lineWidth: 1, hexNumbers: 'column-row', hexNumberOpacity: 0.8, snapToGrid: true, scale: 1, mapScale: 1,
+  lineType: 'solid', lineWidth: 1, cellNumbers: 'column-row', cellNumberOpacity: 0.8, snapToGrid: true, scale: 1, mapScale: 1,
   unitType: 'feet', unitDistance: 5, measurementType: 'units', autoDetect: false,
 };
 const COUNTER = { id: 'w1', type: 'counter', label: 'Torches', icon: 'flame', visible: true, visibleToPlayers: true, value: 1, order: 0 } as AnyWidget;
@@ -203,10 +203,11 @@ describe('coverage of grid and scene fields', () => {
     const variants: Variants<keyof GridState, GridState> = {
       enabled: set({ enabled: false }), visible: set({ visible: false }), type: set({ type: 'square' }), size: set({ size: 80 }),
       offsetX: set({ offsetX: 5 }), offsetY: set({ offsetY: 5 }), color: set({ color: '#ff0000' }), opacity: set({ opacity: 0.3 }),
-      lineType: set({ lineType: 'dashed' }), lineWidth: set({ lineWidth: 3 }), hexNumbers: set({ hexNumbers: 'sequential' }),
-      hexNumberOpacity: set({ hexNumberOpacity: 0.2 }), snapToGrid: set({ snapToGrid: false }), scale: set({ scale: 2 }),
+      lineType: set({ lineType: 'dashed' }), lineWidth: set({ lineWidth: 3 }), cellNumbers: set({ cellNumbers: 'letter-number' }),
+      cellNumberOpacity: set({ cellNumberOpacity: 0.2 }), snapToGrid: set({ snapToGrid: false }), scale: set({ scale: 2 }),
       mapScale: set({ mapScale: 2 }), unitType: set({ unitType: 'meters' }), unitDistance: set({ unitDistance: 10 }),
       measurementType: set({ measurementType: 'abstract' }), autoDetect: set({ autoDetect: true }),
+      unitDistanceOverride: set({ unitDistanceOverride: 10 }),
     };
     expectCoverage(GRID_FIELD_COVERAGE, variants, GRID, (grid) => project(sceneState({ grid })));
   });
