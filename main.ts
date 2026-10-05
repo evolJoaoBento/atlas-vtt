@@ -23,6 +23,7 @@ import { OnlineJoinService } from './src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from './src/app/online/OnlineSessionService';
 import { moveTableKeyToDevice, ownOldTableKey, tableKeyStore } from './src/app/online/sharing/identity/tableKey';
 import { obsidianLocalStore } from './src/app/online/sharing/identity/deviceKeys';
+import { confirmNewTableKey } from './src/app/online/ui/newTableKey';
 import { registerOnline } from './src/app/online/registerOnline';
 import { PeopleBook } from './src/app/online/sharing/people/PeopleBook';
 import { ShareItems } from './src/app/online/sharing/model/ShareItems';
@@ -137,7 +138,7 @@ export default class AtlasVTTPlugin extends Plugin {
       navigationSettingsSection(this.settingsService),
       diceSettingsSection(this.settingsService),
       hotkeySettingsSection(this.settingsService),
-      onlineSettingsSection(this.settingsService),
+      onlineSettingsSection(this.settingsService, () => void confirmNewTableKey(onlineSessions)),
       onboardingSettingsSection(this.settingsService),
       changelogSettingsSection(this.settingsService, changelogService, this.manifest.version),
       supportSettingsSection(issueReporter),

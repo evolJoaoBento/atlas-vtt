@@ -44,6 +44,17 @@ export async function ensureTableIdentity(store: TableKeyStore, crypto: Identity
   return { id, keys };
 }
 
+/**
+ * Replaces this device's table key with a new one: for a key that reached someone else (a synced
+ * or backed-up vault). Rejects, keeping the old key, when the new one cannot be kept on this device.
+ */
+export async function renewTableIdentity(store: TableKeyStore, crypto: IdentityCrypto): Promise<TableIdentity> {
+  const keys = await crypto.generate();
+  const id = await crypto.keyId(keys.publicKey);
+  if (!store.set({ id, publicKey: keys.publicKey, privateKey: keys.privateKey })) throw new Error('The new table key could not be kept on this device');
+  return { id, keys };
+}
+
 export interface SyncedTableSettings {
   getOnlineSettings(): Pick<OnlineSettings, 'table'>;
   setOnlineSettings(settings: Pick<OnlineSettings, 'table'>): void;

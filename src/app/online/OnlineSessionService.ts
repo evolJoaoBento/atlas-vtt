@@ -19,7 +19,7 @@ import { peerServerOptions } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
-import { ensureTableIdentity, tableKeyStore } from './sharing/identity/tableKey';
+import { ensureTableIdentity, renewTableIdentity, tableKeyStore, type TableKeyStore } from './sharing/identity/tableKey';
 import { obsidianLocalStore } from './sharing/identity/deviceKeys';
 import { AssetServer } from './assets/AssetServer';
 import { vaultImageFiles } from './assets/vaultImageFiles';
@@ -73,8 +73,10 @@ interface Deps {
   diceFeed?: DiceFeed;
   /** The dice rules of a map's collection; Atlas's asset index unless a test passes its own. */
   diceRules?: (mapPath: string | null) => DiceRules;
-  /** The GM's table key; made in the settings on first use unless a test passes its own (or none). */
+  /** The GM's table key; made on this device on first use unless a test passes its own (or none). */
   table?: () => Promise<TableIdentity | null>;
+  /** Where this device keeps its table key; Obsidian's local storage unless a test passes its own. */
+  tableKeys?: TableKeyStore;
   identityCrypto?: IdentityCrypto;
 }
 
@@ -115,6 +117,7 @@ export class OnlineSessionService {
   private readonly initiativeRules: (mapPath: string | null) => InitiativeRules;
   private readonly watchResources: (listener: () => void) => () => void;
   private readonly loadTable: () => Promise<TableIdentity | null>;
+  private readonly tableKeys: TableKeyStore;
   private readonly identityCrypto: IdentityCrypto;
   private currentTable: HostedTable | null = null;
   private currentHostId: string | null = null;
@@ -138,8 +141,8 @@ export class OnlineSessionService {
     this.watchResources = deps.watchResources ?? ((listener) => watchCollectionResources(app, listener));
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
     // The table key stays on this device, never in the synced settings.
-    const tableKeys = tableKeyStore(obsidianLocalStore(app));
-    this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(tableKeys, this.identityCrypto));
+    this.tableKeys = deps.tableKeys ?? tableKeyStore(obsidianLocalStore(app));
+    this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.tableKeys, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
   }
 
@@ -275,6 +278,17 @@ export class OnlineSessionService {
     onlineSessionStore.setState({
       status: 'hosting', peerId: host.id, joinUrl, error: linkWorks ? null : RELAY_TOO_LONG, tokenControl: tokenControlHost.control,
     });
+  }
+
+  /**
+   * Gives this device a new table key, stopping a hosted session first: every player must be let in
+   * again. The key stays on this device; no copy is left in the synced settings. Resolves the new table id.
+   */
+  async renewTableKey(): Promise<string> {
+    if (this.current || onlineSessionStore.getState().status === 'starting') this.stop();
+    const table = await renewTableIdentity(this.tableKeys, this.identityCrypto);
+    if (this.settings.getOnlineSettings().table !== null) this.settings.setOnlineSettings({ table: null });
+    return table.id;
   }
 
   stop(): void {

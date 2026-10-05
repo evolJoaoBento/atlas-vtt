@@ -138,4 +138,13 @@ export const online = {
   'online.settings.keepImagesDesc': 'When you join a session from Atlas, keep its images outside your vault so the next session loads faster. Switching it off deletes them.',
   'online.settings.logEvents': 'Log online play events',
   'online.settings.logEventsDesc': 'For troubleshooting: writes what Atlas sends to online players, and every change of the presented scene, to the developer console.',
+  'online.tableKey.command': 'New table key',
+  'online.tableKey.settingDesc': 'Makes this device host a new table. Choose it if your vault or its backups reached someone else. Every player must be let in again.',
+  'online.tableKey.button': 'New table key…',
+  'online.tableKey.title': 'Make a new table key?',
+  'online.tableKey.message': 'Your players know your table by its key. With a new one, every player must be let in again, and Atlas players must link or share with you anew.',
+  'online.tableKey.hosting': 'The session you are hosting stops first.',
+  'online.tableKey.confirm': 'Make a new key',
+  'online.tableKey.done': 'This device now hosts a new table. Let your players in again when they join.',
+  'online.tableKey.failed': 'Could not make a new table key: {reason}',
 } as const satisfies Record<string, Message>;

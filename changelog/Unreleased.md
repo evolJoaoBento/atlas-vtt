@@ -52,3 +52,4 @@
 - A share tag written inside code, math or a link (where Obsidian shows it as text) is not used: the rest of the note is kept back, and **Share with…** says so.
 - Online play's settings now live with Atlas' other settings in the plugin's settings and sync with them.
 - Your table's key now stays on this device; a second device hosts its own table, as before.
+- If your vault or its backups reached someone else, choose New table key.
