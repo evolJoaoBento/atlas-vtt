@@ -43,10 +43,22 @@ export interface Frames {
   cancel(handle: number): void;
 }
 
-export const ANIMATION_FRAMES: Frames = {
-  request: (draw) => window.requestAnimationFrame(() => draw()),
-  cancel: (handle) => window.cancelAnimationFrame(handle),
-};
+/**
+ * Animation frames of the window `windowOf` names when a frame is asked for: a view moved into a popout animates on
+ * that window's clock. The follower has one frame at a time, so it is cancelled on the window that gave it.
+ */
+export function framesIn(windowOf: () => Window): Frames {
+  let requestedIn: Window = window;
+  return {
+    request: (draw) => {
+      requestedIn = windowOf();
+      return requestedIn.requestAnimationFrame(() => draw());
+    },
+    cancel: (handle) => requestedIn.cancelAnimationFrame(handle),
+  };
+}
+
+export const ANIMATION_FRAMES: Frames = framesIn(() => window);
 
 interface Pose { centerX: number; centerY: number; zoom: number }
 /** What the camera keeps showing through resizes: a world area, or the whole map. */

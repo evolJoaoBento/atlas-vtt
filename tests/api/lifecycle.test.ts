@@ -106,6 +106,17 @@ describe('connect', () => {
     expect(h.listenerCount()).toBe(0);
   });
 
+  it('a plugin object that connects again after its unload registers its teardown again', () => {
+    const { host: h } = host();
+    const plugin = fakePlugin('ext');
+    h.api.connect(plugin).on('unload', () => undefined);
+    plugin.unload();
+    h.api.connect(plugin).on('unload', () => undefined);
+    expect(h.listenerCount()).toBe(1);
+    plugin.unload();
+    expect(h.listenerCount()).toBe(0);
+  });
+
   it('an old plugin object unloading does not tear down a newer one with the same id', () => {
     const { host: h } = host();
     const oldPlugin = fakePlugin('ext');

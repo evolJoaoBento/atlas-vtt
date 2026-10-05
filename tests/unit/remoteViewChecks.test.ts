@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_ROLL_DICE } from '../../src/api/diceRollCheck';
 import { ListenerSet } from '../../src/app/remote-view/listeners';
+import { framesIn } from '../../src/app/remote-view/ViewportFollower';
 import { ROLL_NOT_SENT } from '../../src/app/remote-view/remoteControls';
 import { REMOTE_LOG_ENTRIES, RemoteViewDice } from '../../src/app/remote-view/RemoteViewDice';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
@@ -79,5 +80,23 @@ describe("what a remote view's dice take", () => {
     expect(remote.roll({ d6: 1 }, 0)).toBeNull();
     expect(sent).toHaveBeenCalledOnce();
     vi.restoreAllMocks();
+  });
+});
+
+describe("a remote view's camera frames", () => {
+  it('come from the window the view is in when asked, and are cancelled there', () => {
+    const fakeWindow = (): Window => ({ requestAnimationFrame: vi.fn(() => 7), cancelAnimationFrame: vi.fn() }) as unknown as Window;
+    const main = fakeWindow();
+    const popout = fakeWindow();
+    let current = main;
+    const frames = framesIn(() => current);
+    frames.request(() => undefined);
+    current = popout;
+    frames.request(() => undefined);
+    frames.cancel(7);
+    expect(main.requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(popout.requestAnimationFrame).toHaveBeenCalledOnce();
+    expect(popout.cancelAnimationFrame).toHaveBeenCalledWith(7);
+    expect(main.cancelAnimationFrame).not.toHaveBeenCalled();
   });
 });

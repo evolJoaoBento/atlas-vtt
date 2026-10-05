@@ -10,7 +10,7 @@ import type { ViewCamera } from '../services/presentedCamera';
 import type { ViewAtlasStore } from '../storeFactory';
 import { cancelLostDrag, mayDragInRemoteView, REMOTE_DRAG_CANCEL, REMOTE_TOKEN_DROPPED, type RemoteDrop } from './remoteDrag';
 import { callGuarded, ListenerSet } from './listeners';
-import { ViewportFollower, type FollowViewport } from './ViewportFollower';
+import { framesIn, ViewportFollower, type FollowViewport } from './ViewportFollower';
 
 export interface RemoteMotionHost {
   readonly atlasStore: ViewAtlasStore;
@@ -20,6 +20,8 @@ export interface RemoteMotionHost {
   mapSize(): { width: number; height: number } | null;
   /** Writes the scene again, so a token whose drag ended stands where the scene has it. */
   refreshScene(): void;
+  /** The window the view is in now (a popout's own), for the camera's animation frames. */
+  readonly windowOf?: () => Window;
 }
 
 function followViewport(viewport: Viewport): FollowViewport {
@@ -47,6 +49,7 @@ export class RemoteViewMotion {
       viewport: followViewport(host.viewport),
       mapSize: () => host.mapSize(),
       onMoved: (byUser) => { for (const listener of this.cameraMoves.list()) callGuarded('camera', listener, byUser); },
+      ...(host.windowOf ? { frames: framesIn(host.windowOf) } : {}),
     }) : null;
     host.eventBus.on(REMOTE_TOKEN_DROPPED, this.onDrop);
     host.eventBus.on('background-sprite-updated', this.onBackgroundMoved);

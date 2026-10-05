@@ -88,6 +88,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
       atlasStore: remote.atlasStore,
       eventBus: remote.serviceManager.getEventBus(), viewport: remote.serviceManager.getRendererService().getViewport(),
       mapSize: () => scene.mapSize(), refreshScene: () => scene.refresh(),
+      windowOf: () => remote.containerEl.ownerDocument.defaultView ?? window,
     });
     const motion = this.motion;
     const dice = new RemoteViewDice(remote.atlasStore, this.maxDice);

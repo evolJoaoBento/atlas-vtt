@@ -82,6 +82,8 @@ export class AtlasApiHost {
   /** The extension plugin unloaded: dispose its current connection, unless a newer plugin object took the id. */
   private release(id: string, plugin: ConnectingPlugin): void {
     const entry = this.connected.get(id);
+    // Its register() callbacks have run: a later connect with the same object registers again.
+    this.registered.delete(plugin);
     if (entry?.plugin !== plugin) return;
     entry.disposers.disposeAll();
     this.connected.delete(id);
