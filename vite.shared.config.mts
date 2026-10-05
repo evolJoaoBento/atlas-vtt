@@ -9,7 +9,7 @@ export default defineConfig({
     sourcemap: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
     lib: {
-      entry: { grid: 'src/shared/grid.ts', draw: 'src/shared/draw.ts', rules: 'src/shared/rules.ts', dice3d: 'src/shared/dice3d.ts' },
+      entry: { grid: 'src/shared/grid.ts', draw: 'src/shared/draw.ts', rules: 'src/shared/rules.ts', dice3d: 'src/shared/dice3d.ts', diceDisplay: 'src/shared/diceDisplay.ts' },
       formats: ['es'],
       fileName: (_format, entry) => `${entry}.js`,
     },

@@ -2,9 +2,9 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const ENTRIES = ['grid', 'draw', 'rules', 'dice3d'] as const;
-/** The only packages an entry may import: dice3d renders with three; the rest import relative modules only. */
-const ALLOWED_PACKAGES: Record<(typeof ENTRIES)[number], readonly string[]> = { grid: [], draw: [], rules: [], dice3d: ['three'] };
+const ENTRIES = ['grid', 'draw', 'rules', 'dice3d', 'diceDisplay'] as const;
+/** The only packages an entry may import: dice3d renders with three; the rest, diceDisplay included, import relative modules only. */
+const ALLOWED_PACKAGES: Record<(typeof ENTRIES)[number], readonly string[]> = { grid: [], draw: [], rules: [], dice3d: ['three'], diceDisplay: [] };
 const IMPORT = /(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\sfrom\s+)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g;
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts'];
 
