@@ -19,7 +19,7 @@ import { peerServerOptions } from './onlineSettings';
 import { normalizePlayerName } from './protocol';
 import { webIdentityCrypto, type IdentityCrypto, type TableIdentity } from './sharing/identity/identityCrypto';
 import { hostedTable, tableReissuer, type HostedTable } from './sharing/identity/reissue';
-import { ensureTableIdentity, renewTableIdentity, tableKeyStore, type TableKeyStore } from './sharing/identity/tableKey';
+import { ensureTableIdentity, renewTableIdentity, stripTableKeyCopies, tableKeyStore, type PluginData, type TableKeyStore } from './sharing/identity/tableKey';
 import { obsidianLocalStore } from './sharing/identity/deviceKeys';
 import { AssetServer } from './assets/AssetServer';
 import { vaultImageFiles } from './assets/vaultImageFiles';
@@ -77,6 +77,8 @@ interface Deps {
   table?: () => Promise<TableIdentity | null>;
   /** Where this device keeps its table key; Obsidian's local storage unless a test passes its own. */
   tableKeys?: TableKeyStore;
+  /** The plugin's synced data, where New table key makes sure no copy of a key is left. */
+  pluginData?: PluginData;
   identityCrypto?: IdentityCrypto;
 }
 
@@ -118,6 +120,7 @@ export class OnlineSessionService {
   private readonly watchResources: (listener: () => void) => () => void;
   private readonly loadTable: () => Promise<TableIdentity | null>;
   private readonly tableKeys: TableKeyStore;
+  private readonly pluginData: PluginData | null;
   private readonly identityCrypto: IdentityCrypto;
   private currentTable: HostedTable | null = null;
   private currentHostId: string | null = null;
@@ -142,6 +145,7 @@ export class OnlineSessionService {
     this.identityCrypto = deps.identityCrypto ?? webIdentityCrypto;
     // The table key stays on this device, never in the synced settings.
     this.tableKeys = deps.tableKeys ?? tableKeyStore(obsidianLocalStore(app));
+    this.pluginData = deps.pluginData ?? null;
     this.loadTable = deps.table ?? ((): Promise<TableIdentity | null> => ensureTableIdentity(this.tableKeys, this.identityCrypto));
     OnlineSessionService.instances.set(app, this);
   }
@@ -282,12 +286,13 @@ export class OnlineSessionService {
 
   /**
    * Gives this device a new table key, stopping a hosted session first: every player must be let in
-   * again. The key stays on this device; no copy is left in the synced settings. Resolves the new table id.
+   * again. The key stays on this device; the old one is taken out of every vault file. Resolves the new table id.
    */
   async renewTableKey(): Promise<string> {
     if (this.current || onlineSessionStore.getState().status === 'starting') this.stop();
     const table = await renewTableIdentity(this.tableKeys, this.identityCrypto);
-    if (this.settings.getOnlineSettings().table !== null) this.settings.setOnlineSettings({ table: null });
+    // Only now that the new key is kept: no file of the vault keeps the old one, so no device can take it back.
+    await stripTableKeyCopies(this.app, this.pluginData);
     return table.id;
   }
 

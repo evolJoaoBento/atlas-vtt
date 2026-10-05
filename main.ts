@@ -21,7 +21,7 @@ import { PlayerWindowService } from './src/app/services/PlayerWindowService';
 import { presentedScene } from './src/app/services/PresentedScene';
 import { OnlineJoinService } from './src/app/online/obsidian/OnlineJoinService';
 import { OnlineSessionService } from './src/app/online/OnlineSessionService';
-import { moveTableKeyToDevice, ownOldTableKey, tableKeyStore } from './src/app/online/sharing/identity/tableKey';
+import { moveTableKeyOnStart, tableKeyStore, withoutSyncedTableKey } from './src/app/online/sharing/identity/tableKey';
 import { obsidianLocalStore } from './src/app/online/sharing/identity/deviceKeys';
 import { confirmNewTableKey } from './src/app/online/ui/newTableKey';
 import { registerOnline } from './src/app/online/registerOnline';
@@ -94,11 +94,13 @@ export default class AtlasVTTPlugin extends Plugin {
     // Settings carried over even when the data file migration failed, so they are not lost to the defaults.
     const settingsReady = storageReady.catch(() => undefined).then(async () => {
       await presetFiles.load();
-      await migrateSettingsToPluginData(this.app, this, presetFiles);
+      // The old settings carry online play's table key, which must never reach the synced plugin data.
+      await migrateSettingsToPluginData(this.app, withoutSyncedTableKey(this), presetFiles);
     }).catch((error: unknown) => console.error('[Atlas] Carrying the settings over into the plugin data failed:', error));
     // Created before the views so every restored tab shares it; it reads the
     // plugin's data only once the migration has put the settings there.
-    this.settingsService = new SettingsService(this.app, settingsReady, this);
+    // Never with the table key: saves leave it out, and a copy another device left is not read back in.
+    this.settingsService = new SettingsService(this.app, settingsReady, withoutSyncedTableKey(this));
     // Before the views: a restored Online scene tab looks for it when it opens.
     const onlineJoins = new OnlineJoinService(this.app, this.settingsService, this.manifest.version);
     this.register(() => onlineJoins.dispose());
@@ -115,11 +117,11 @@ export default class AtlasVTTPlugin extends Plugin {
     await this.settingsService.initialize();
     // Before anything hosts: the table key leaves the synced settings for this device's local storage.
     try {
-      moveTableKeyToDevice(this.settingsService, tableKeyStore(obsidianLocalStore(this.app)), await ownOldTableKey(this.app));
+      await moveTableKeyOnStart(this.app, tableKeyStore(obsidianLocalStore(this.app)), this);
     } catch (error) {
       console.error('[Atlas online] Could not move the table key to this device:', error);
     }
-    const onlineSessions = new OnlineSessionService(this.app, this.settingsService);
+    const onlineSessions = new OnlineSessionService(this.app, this.settingsService, { pluginData: this });
     registerOnline(this, onlineSessions);
     registerSharing(this, { joins: onlineJoins, people: PeopleBook.forApp(this.app), items: ShareItems.forApp(this.app), pulled: PulledItems.forApp(this.app), settings: this.settingsService, sessions: onlineSessions });
     registerDiceLookSync(this, this.settingsService);

@@ -13,6 +13,8 @@ import { shareSessionStore } from './shareSessionStore';
 import { openPeopleModal } from './people/ui/PeopleModal';
 import { openShareWithModal } from './ui/ShareWithModal';
 import { t } from '../../i18n';
+import { obsidianLocalStore } from './identity/deviceKeys';
+import { tableKeyStore } from './identity/tableKey';
 
 export interface ShareCommandServices {
   people: PeopleBook;
@@ -28,14 +30,16 @@ export const shareable = (file: TAbstractFile | null): file is TFile =>
 
 /** Registers the sending commands; returns the catalogue of what this Atlas shares, which sessions answer from. */
 export function registerShareCommands(plugin: Plugin, { people, items, settings, sections }: ShareCommandServices): SenderCatalogue {
+  // This device's table (its key stays on the device): the GM is the person of their own table.
+  const tableKeys = tableKeyStore(obsidianLocalStore(plugin.app));
   plugin.addCommand({
     id: 'people', name: t('share.command.people'),
-    callback: () => openPeopleModal(plugin.app, settings.getOnlineSettings().table?.id ?? null),
+    callback: () => openPeopleModal(plugin.app, tableKeys.get()?.id ?? null),
   });
   void items.ready();
   const catalogue = new SenderCatalogue(obsidianCatalogueSources(plugin.app, settings, sections), items, people);
   const selfAt = (tableId: string): string | undefined => {
-    if (settings.getOnlineSettings().table?.id === tableId) return GM_PERSON_ID;
+    if (tableKeys.get()?.id === tableId) return GM_PERSON_ID;
     const session = shareSessionStore.getState().session;
     return session?.tableId === tableId ? session.self : undefined;
   };
