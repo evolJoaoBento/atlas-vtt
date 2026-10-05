@@ -147,6 +147,37 @@ describe('ui registration', () => {
   });
 });
 
+describe('ui items an extension builds its own way', () => {
+  it('keeps the methods of a class instance and their this, and reads each field once', () => {
+    const plugin = fakePlugin('ext');
+    const ui = hostWithUi().host.api.connect(plugin).ui;
+    const ctx = { viewId: 'v1', kind: 'map' as const, isPlayerView: false };
+    class Button {
+      readonly id = 't';
+      readonly icon = 'x';
+      readonly label = 'T';
+      clicks = 0;
+      onClick(): void { this.clicks++; }
+      isActive(): boolean { return this.clicks > 0; }
+    }
+    const button = new Button();
+    ui.addToolbarItem(button);
+    const registered = toolbarSlot.list()[0]!.item;
+    registered.onClick(ctx);
+    expect(button.clicks).toBe(1);
+    expect(registered.isActive?.(ctx)).toBe(true);
+    let reads = 0;
+    const tile = { id: 'd', icon: 'x', description: '', onClick: (): void => undefined, get title(): string { reads++; return reads === 1 ? 'Tile' : ''; } };
+    ui.addDashboardTile(tile);
+    expect(reads).toBe(1);
+    expect(dashboardSlot.list()[0]!.item.title).toBe('Tile');
+    const section = { id: 'p', title: 'P', items: [{ id: 'c', icon: 'x', label: 'C', run: (): void => undefined }], commands(): typeof this.items { return this.items; } };
+    ui.addPaletteSection(section);
+    expect(paletteSlot.list()[0]!.item.commands(ctx)).toHaveLength(1);
+    plugin.unload();
+  });
+});
+
 describe('ui panels', () => {
   function withView(): { ui: AtlasExtension['ui']; plugin: FakePlugin; view: FakeView } {
     const view = fakeView('v1');

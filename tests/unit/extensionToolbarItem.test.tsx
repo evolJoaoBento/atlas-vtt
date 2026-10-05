@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_EXTENSION_PRIORITY, extensionToolbarItem, withExtensionToolbarItems } from '../../src/app/extensions/extensionToolbarItems';
+import { byPriority, DEFAULT_EXTENSION_PRIORITY, extensionToolbarItem, withExtensionToolbarItems } from '../../src/app/extensions/extensionToolbarItems';
 import type { ToolbarItem, ViewContext } from '../../src/api/types/ui';
 
 const ctx: ViewContext = { viewId: 'v1', kind: 'map', isPlayerView: false };
@@ -53,5 +53,12 @@ describe('withExtensionToolbarItems', () => {
 
   it("leaves Atlas's controls as they are without extension items", () => {
     expect(ids(withExtensionToolbarItems(['move', 'dice'].map(item), []))).toEqual(['move', 'dice']);
+  });
+});
+
+describe('byPriority', () => {
+  it('puts a higher priority first, unset counting as the default, and keeps registration order between equals', () => {
+    const items = [entry({ id: 'low', priority: 10 }), entry({ id: 'plain' }), entry({ id: 'high', priority: 90 }), entry({ id: 'also', priority: DEFAULT_EXTENSION_PRIORITY })];
+    expect(byPriority(items).map(({ item }) => item.id)).toEqual(['high', 'plain', 'also', 'low']);
   });
 });

@@ -108,10 +108,14 @@ export function useExtensionToolbarItems(
   if (!viewId || isActualPlayerView) return [];
   const ctx = viewContextOf({ viewId }, store);
   if (ctx.isPlayerView && ctx.kind !== 'remote') return [];
+  return byPriority(entries.filter((entry) => (entry.item.views ?? ['map']).includes(ctx.kind) && isVisibleIn(entry, ctx)))
+    .map((entry) => extensionToolbarItem(entry, ctx));
+}
+
+/** `entries` with the highest priority first (`DEFAULT_EXTENSION_PRIORITY` when unset); registration order breaks ties. */
+export function byPriority(entries: ReadonlyArray<SlotEntry<ToolbarItem>>): Array<SlotEntry<ToolbarItem>> {
   return entries
-    .filter((entry) => (entry.item.views ?? ['map']).includes(ctx.kind) && isVisibleIn(entry, ctx))
     .map((entry, index) => ({ entry, index, priority: priorityOf(entry) }))
-    // Highest priority first; registration order breaks ties.
     .sort((a, b) => b.priority - a.priority || a.index - b.index)
-    .map(({ entry }) => extensionToolbarItem(entry, ctx));
+    .map(({ entry }) => entry);
 }

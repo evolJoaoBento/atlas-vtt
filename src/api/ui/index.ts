@@ -16,10 +16,17 @@ function isText(value: unknown): value is string {
   return typeof value === 'string' && value !== '';
 }
 
-/** Throws, naming the call and the field, unless every field of `spec` has its kind. A programmer error, like `lasers.show`'s. */
-function check(call: string, spec: unknown, fields: Record<string, 'text' | 'string' | 'function'>, optional: Record<string, 'text' | 'function' | 'number'> = {}): void {
+type Kinds<K extends string> = Record<string, K>;
+
+/**
+ * The fields of `spec` that `fields` and `optional` name, each read once (through its prototype too, so a class
+ * instance works), checked: throws, naming the call and the field, unless every one has its kind. A programmer error,
+ * like `lasers.show`'s. Atlas keeps what this returns, never `spec`, so a getter cannot change a field after the check.
+ */
+function checked(call: string, spec: unknown, fields: Kinds<'text' | 'string' | 'function'>, optional: Kinds<'text' | 'function' | 'number' | 'list'> = {}): Record<string, unknown> {
   if (typeof spec !== 'object' || spec === null) throw new Error(`[Atlas API] ${call} needs an object.`);
-  const record = spec as Record<string, unknown>;
+  const record: Record<string, unknown> = {};
+  for (const field of [...Object.keys(fields), ...Object.keys(optional)]) record[field] = (spec as Record<string, unknown>)[field];
   for (const [field, kind] of Object.entries(fields)) {
     const value = record[field];
     const ok = kind === 'function' ? typeof value === 'function' : kind === 'string' ? typeof value === 'string' : isText(value);
@@ -28,9 +35,24 @@ function check(call: string, spec: unknown, fields: Record<string, 'text' | 'str
   for (const [field, kind] of Object.entries(optional)) {
     const value = record[field];
     if (value === undefined) continue;
+    if (kind === 'list') continue;
     const ok = kind === 'function' ? typeof value === 'function' : kind === 'number' ? typeof value === 'number' && Number.isFinite(value) : isText(value);
     if (!ok) throw new Error(`[Atlas API] ${call}: "${field}" must be ${kind === 'function' ? 'a function' : kind === 'number' ? 'a number' : 'a non-empty string'} when given.`);
   }
+  return record;
+}
+
+/**
+ * The data fields of a checked spec, and each method as a function that calls it on the extension's own object, so a
+ * class instance keeps its prototype methods and a method keeps its `this`. A method left out stays out.
+ */
+function kept<T>(original: unknown, record: Record<string, unknown>): T {
+  const item: Record<string, unknown> = {};
+  for (const [field, value] of Object.entries(record)) {
+    if (value === undefined) continue;
+    item[field] = typeof value === 'function' ? (...args: unknown[]): unknown => (value as (...given: unknown[]) => unknown).apply(original, args) : value;
+  }
+  return Object.freeze(item) as T;
 }
 
 /** One id per extension and slot: ids become React keys and the toolbar's fit keys. */
@@ -45,9 +67,8 @@ export function uiApi(scope: ExtensionScope, views: ViewTracker): UiApi {
   const register = <T>(slot: SlotRegistry<T>, item: T): Disposer => scope.disposers.add(slot.add(scope.id, item));
 
   function addPanel(spec: PanelSpec): PanelHandle {
-    check('ui.addPanel', spec, { id: 'text', title: 'text', mount: 'function' });
-    assertNew('ui.addPanel', panelSlot, scope.id, spec.id);
-    const panel: PanelSpec = Object.freeze({ id: spec.id, title: spec.title, mount: (container: HTMLElement, ctx: ViewContext): Disposer => spec.mount(container, ctx) });
+    const panel = kept<PanelSpec>(spec, checked('ui.addPanel', spec, { id: 'text', title: 'text', mount: 'function' }));
+    assertNew('ui.addPanel', panelSlot, scope.id, panel.id);
     let alive = true;
     const remove = panelSlot.add(scope.id, panel);
     // Disposing closes the panel in every view, then removes it; unloading the extension does the same.
@@ -81,25 +102,27 @@ export function uiApi(scope: ExtensionScope, views: ViewTracker): UiApi {
   }
 
   return Object.freeze({
-    addToolbarItem: (item: ToolbarItem): Disposer => {
-      check('ui.addToolbarItem', item, { id: 'text', icon: 'text', label: 'text', onClick: 'function' },
-        { shortcut: 'text', priority: 'number', isVisible: 'function', isActive: 'function', badge: 'function' });
-      const kinds: unknown = item.views;
-      if (kinds !== undefined && !(Array.isArray(kinds) && (kinds as unknown[]).every((kind) => typeof kind === 'string' && VIEW_KINDS.includes(kind)))) {
+    addToolbarItem: (given: ToolbarItem): Disposer => {
+      const record = checked('ui.addToolbarItem', given, { id: 'text', icon: 'text', label: 'text', onClick: 'function' },
+        { shortcut: 'text', priority: 'number', views: 'list', isVisible: 'function', isActive: 'function', badge: 'function' });
+      // Copied before it is checked, so the list Atlas keeps is the one it checked.
+      const kinds: unknown = Array.isArray(record.views) ? Object.freeze([...(record.views as unknown[])]) : record.views;
+      if (kinds !== undefined && !(Array.isArray(kinds) && kinds.every((kind) => typeof kind === 'string' && VIEW_KINDS.includes(kind)))) {
         throw new Error('[Atlas API] ui.addToolbarItem: "views" must list \'map\' and \'remote\'.');
       }
+      const item = kept<ToolbarItem>(given, { ...record, views: kinds });
       assertNew('ui.addToolbarItem', toolbarSlot, scope.id, item.id);
-      return register(toolbarSlot, Object.freeze({ ...item, ...(item.views ? { views: Object.freeze([...item.views]) } : {}) }));
+      return register(toolbarSlot, item);
     },
-    addPaletteSection: (section: PaletteSection): Disposer => {
-      check('ui.addPaletteSection', section, { id: 'text', title: 'text', commands: 'function' });
+    addPaletteSection: (given: PaletteSection): Disposer => {
+      const section = kept<PaletteSection>(given, checked('ui.addPaletteSection', given, { id: 'text', title: 'text', commands: 'function' }));
       assertNew('ui.addPaletteSection', paletteSlot, scope.id, section.id);
-      return register(paletteSlot, Object.freeze({ ...section }));
+      return register(paletteSlot, section);
     },
-    addDashboardTile: (tile: DashboardTile): Disposer => {
-      check('ui.addDashboardTile', tile, { id: 'text', icon: 'text', title: 'text', description: 'string', onClick: 'function' });
+    addDashboardTile: (given: DashboardTile): Disposer => {
+      const tile = kept<DashboardTile>(given, checked('ui.addDashboardTile', given, { id: 'text', icon: 'text', title: 'text', description: 'string', onClick: 'function' }));
       assertNew('ui.addDashboardTile', dashboardSlot, scope.id, tile.id);
-      return register(dashboardSlot, Object.freeze({ ...tile }));
+      return register(dashboardSlot, tile);
     },
     addViewMenuItems: (provider: (ctx: ViewContext) => MenuItem[]): Disposer => {
       if (typeof provider !== 'function') throw new Error('[Atlas API] ui.addViewMenuItems needs a function.');
