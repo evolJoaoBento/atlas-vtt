@@ -7,6 +7,7 @@
 import { peopleListNames, writableName } from '../model/forwardedParts';
 import type { PeopleBook } from '../people/PeopleBook';
 import type { ShareSessionState } from '../shareSessionStore';
+import { t } from '../../../i18n';
 
 export interface PartPerson {
   name: string;
@@ -22,8 +23,8 @@ export interface PartPeopleChoice {
   inSession: boolean;
 }
 
-export const NOT_IN_PEOPLE_LIST = 'Not in your people list yet, so a tag cannot name them. Try again in a moment.';
-export const UNWRITABLE_NAME_HINT = 'This name has a character a tag cannot hold (, | [ ] %). Rename them in People… to pick them.';
+export const NOT_IN_PEOPLE_LIST = t('share.part.notInPeopleList');
+export const UNWRITABLE_NAME_HINT = t('share.part.unwritableName');
 
 function entry(name: string | null, shownAs: string): PartPerson {
   if (name === null) return { name: shownAs, problem: NOT_IN_PEOPLE_LIST };

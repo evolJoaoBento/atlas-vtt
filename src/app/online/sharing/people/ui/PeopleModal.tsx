@@ -6,6 +6,7 @@ import { confirmAction } from '../../../../ui/confirmDialog';
 import { PEOPLE_LABEL } from '../../../ui/onlineCopy';
 import { PeopleBook } from '../PeopleBook';
 import { PeopleList } from './PeopleList';
+import { t } from '../../../../i18n';
 
 /** The People dialog: Atlas's native modal with the people list. */
 export class PeopleModal extends Modal {
@@ -25,11 +26,11 @@ export class PeopleModal extends Modal {
           people={this.people}
           ownTableId={this.ownTableId}
           confirmRemove={(who) => confirmAction({
-            title: `Remove ${who.name}?`,
+            title: t('people.removeTitle', { name: who.name }),
             message: [who.placeholder
-              ? 'Notes and shares that name them reach nobody, and nobody else can take the name.'
-              : 'They join as new next time, and what you share with them by name stops reaching them.'],
-            confirmLabel: 'Remove', destructive: true,
+              ? t('people.removePlaceholderMessage')
+              : t('people.removePersonMessage')],
+            confirmLabel: t('common.remove'), destructive: true,
           })}
         />,
       );

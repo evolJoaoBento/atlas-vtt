@@ -80,6 +80,8 @@ import { wall } from './wall';
 import { sceneLight } from './sceneLight';
 import { vision } from './vision';
 import { online } from './online';
+import { share } from './share';
+import { people } from './people';
 
 /** English, the source language: every key exists here, and other languages translate a subset of it. */
 export const en = {
@@ -167,4 +169,6 @@ export const en = {
   ...sceneLight,
   ...vision,
   ...online,
+  ...share,
+  ...people,
 } as const;

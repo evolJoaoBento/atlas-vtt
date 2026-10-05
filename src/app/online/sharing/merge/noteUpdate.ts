@@ -10,6 +10,7 @@ import { toLf, usesCrlf, withEnding } from '../receive/lineEndings';
 import { partsSurvive } from '../model/privateTags';
 import { diff3Checked, type MergeChunk } from './diff3';
 import { mergedText } from './mergeResult';
+import { t } from '../../../i18n';
 
 export interface AskResult {
   choice: UpdateChoice;
@@ -40,7 +41,7 @@ export interface UpdatePolicyDeps {
   warn?(message: string): void;
 }
 
-export const TAGS_LOST_WARNING = 'The merged note lost part of a part tag (%%[!only|…]%% or %%[!end]%%), so text meant for fewer people may be shared on. Check the tags in the note.';
+export const TAGS_LOST_WARNING = t('share.merge.tagsLost');
 
 export function createUpdatePolicy(deps: UpdatePolicyDeps): NoteUpdatePolicy {
   /** The result for a choice. Merges run on LF text and are written back in the receiver's line ending. */

@@ -14,17 +14,18 @@ import { showPushPrompt } from './receive/ui/pushPrompt';
 import { openSharedWithMeModal } from './receive/ui/SharedWithMeModal';
 import { setSharedOpener } from './sharedFromView';
 import { shareSessionStore, type ShareSession } from './shareSessionStore';
+import { t } from '../../i18n';
 
 const UNDO_NOTICE: Record<UndoOutcome, string> = {
-  undone: 'Merge undone.',
-  declined: 'Undo cancelled.',
-  nothing: 'There is no merge to undo for this note.',
+  undone: t('share.merge.undone'),
+  declined: t('share.merge.undoDeclined'),
+  nothing: t('share.merge.nothingToUndo'),
 };
 
 const confirmMapUpdate = (title: string): Promise<'both' | 'theirs' | null> => chooseAction({
-  title: `${title} changed here and was shared again`,
-  message: ['Keep both saves the new version as a second scene. Take theirs replaces your copy.'],
-  choices: [{ label: 'Keep both', value: 'both' as const }, { label: 'Take theirs', value: 'theirs' as const, style: 'warning' }],
+  title: t('share.merge.mapChanged', { title }),
+  message: [t('share.merge.mapChangedMessage')],
+  choices: [{ label: t('share.merge.keepBoth'), value: 'both' as const }, { label: t('share.merge.takeTheirs'), value: 'theirs' as const, style: 'warning' }],
 });
 
 const sessionName = (personId: string): string | null =>
@@ -62,32 +63,32 @@ export function registerReceiving(plugin: Plugin, pulled: PulledItems, people: P
   const history = new MergeHistory(plugin.app.vault.adapter);
   const sharedWithMe = sharedWithMeFor(plugin.app, pulled, history, people);
   const open = (app: App): void => openSharedWithMeModal(app, sharedWithMe());
-  plugin.addCommand({ id: 'shared-with-me', name: 'Shared with me…', callback: () => open(plugin.app) });
+  plugin.addCommand({ id: 'shared-with-me', name: t('share.command.sharedWithMe'), callback: () => open(plugin.app) });
   plugin.addCommand({
-    id: 'undo-shared-merge', name: 'Undo last merge',
+    id: 'undo-shared-merge', name: t('share.command.undoMerge'),
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
       const record = file ? pulled.byPath(file.path) : null;
       if (!record || record.kind !== 'note') return false;
       if (!checking) {
         void undoLastMerge(plugin.app, history, record, () => confirmAction({
-          title: 'Undo the last merge?',
-          message: ['This note changed after that merge. Undoing replaces it with the text from before the merge.'],
-          confirmLabel: 'Undo', destructive: true,
+          title: t('share.merge.undoTitle'),
+          message: [t('share.merge.undoMessage')],
+          confirmLabel: t('share.merge.undo'), destructive: true,
         })).then((outcome) => new Notice(UNDO_NOTICE[outcome]));
       }
       return true;
     },
   });
   plugin.addCommand({
-    id: 'forget-shared-choice', name: 'Forget remembered choice',
+    id: 'forget-shared-choice', name: t('share.command.forgetChoice'),
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
       const record = file ? pulled.byPath(file.path) : null;
       if (!record || record.kind !== 'note' || (record.choice === undefined && record.silent === undefined)) return false;
       if (!checking) {
         pulled.forgetChoice(record.key);
-        new Notice('Forgot the remembered choice. The next update of this note asks again.');
+        new Notice(t('share.merge.forgot'));
       }
       return true;
     },

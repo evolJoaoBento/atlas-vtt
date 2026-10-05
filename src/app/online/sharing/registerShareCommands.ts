@@ -12,6 +12,7 @@ import { GM_PERSON_ID } from './people/peopleTypes';
 import { shareSessionStore } from './shareSessionStore';
 import { openPeopleModal } from './people/ui/PeopleModal';
 import { openShareWithModal } from './ui/ShareWithModal';
+import { t } from '../../i18n';
 
 export interface ShareCommandServices {
   people: PeopleBook;
@@ -28,7 +29,7 @@ export const shareable = (file: TAbstractFile | null): file is TFile =>
 /** Registers the sending commands; returns the catalogue of what this Atlas shares, which sessions answer from. */
 export function registerShareCommands(plugin: Plugin, { people, items, settings, sections }: ShareCommandServices): SenderCatalogue {
   plugin.addCommand({
-    id: 'people', name: 'People…',
+    id: 'people', name: t('share.command.people'),
     callback: () => openPeopleModal(plugin.app, settings.getOnlineSettings().table?.id ?? null),
   });
   void items.ready();
@@ -40,7 +41,7 @@ export function registerShareCommands(plugin: Plugin, { people, items, settings,
   };
   const share = (file: TFile): void => openShareWithModal(plugin.app, file, { people, catalogue, assets: AssetService.getInstance(plugin.app), selfAt, sections });
   plugin.addCommand({
-    id: 'share-with', name: 'Share with…',
+    id: 'share-with', name: t('share.command.shareWith'),
     checkCallback: (checking) => {
       const file = plugin.app.workspace.getActiveFile();
       if (!shareable(file)) return false;
@@ -50,7 +51,7 @@ export function registerShareCommands(plugin: Plugin, { people, items, settings,
   });
   plugin.registerEvent(plugin.app.workspace.on('file-menu', (menu, file) => {
     if (!shareable(file)) return;
-    menu.addItem((item) => item.setTitle('Share with…').setIcon('share-2').onClick(() => share(file)));
+    menu.addItem((item) => item.setTitle(t('share.command.shareWith')).setIcon('share-2').onClick(() => share(file)));
   }));
   // Note item ids and ticked map notes follow the vault, so a renamed note keeps its updates and its place on a map, and no path is ever sent.
   const assets = AssetService.getInstance(plugin.app);

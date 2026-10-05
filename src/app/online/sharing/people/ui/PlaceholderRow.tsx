@@ -5,6 +5,7 @@ import { LabelTooltip } from '../../../../packages/components/primitives/tooltip
 import type { PeopleBook } from '../PeopleBook';
 import type { Placeholder } from '../placeholderTypes';
 import { NOT_MET_TEXT } from './peopleCopy';
+import { t } from '../../../../i18n';
 
 interface PlaceholderRowProps {
   placeholder: Placeholder;
@@ -32,14 +33,14 @@ export function PlaceholderRow({ placeholder, people, confirmRemove }: Placehold
         <input
           className="atlas-people__name"
           value={name}
-          aria-label={`Name of ${placeholder.name}`}
+          aria-label={t('people.nameOf', { name: placeholder.name })}
           onChange={(event) => setName(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => { if (event.key === 'Enter') commit(); }}
         />
-        <LabelTooltip label={`Remove ${placeholder.name}`}>
+        <LabelTooltip label={t('people.remove', { name: placeholder.name })}>
           <Button
-            variant="ghost" size="icon" aria-label={`Remove ${placeholder.name}`}
+            variant="ghost" size="icon" aria-label={t('people.remove', { name: placeholder.name })}
             onClick={() => { void confirmRemove({ name: placeholder.name, placeholder: true }).then((yes) => { if (yes) people.removePlaceholder(placeholder.name); }); }}
           >
             <X />

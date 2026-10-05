@@ -53,7 +53,7 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
     }
     const roll = rollOfResult(result);
     if (!roll) {
-      new Notice("Can't roll that again.");
+      new Notice(t('online.roll.cannotRepeat'));
       return;
     }
     const problem = sendOnlineRoll(view?.onlineControls() ?? null, roll.dice, roll.modifier);

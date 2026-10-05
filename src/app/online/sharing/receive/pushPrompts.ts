@@ -7,6 +7,7 @@ import { dismissPush, type PushRequest, type ShareSessionState } from '../shareS
 import type { PullOutcome } from './notePull';
 import { pullFailedText } from './shareErrors';
 import type { SharedWithMe } from './SharedWithMe';
+import { t } from '../../../i18n';
 
 export interface PushPromptDeps {
   show(push: PushRequest, personName: string, answer: (pull: boolean) => void): { hide(): void };
@@ -34,12 +35,12 @@ export type PushPromptListener = ((state: ShareSessionState) => void) & { dispos
 /** A listener for `shareSessionStore`: prompts for new pushes, takes the prompt of a dismissed one down. */
 export function pushPromptListener(deps: PushPromptDeps): PushPromptListener {
   const prompts = new Map<string, { hide(): void }>();
-  const report = { pulled: (path: string): void => deps.notify(`Pulled into ${path}`), failed: (text: string): void => deps.notify(text) };
+  const report = { pulled: (path: string): void => deps.notify(t('share.received.pulledInto', { path })), failed: (text: string): void => deps.notify(text) };
   const listener = (state: ShareSessionState): void => {
     for (const push of state.pushes) {
       const key = keyOf(push);
       if (prompts.has(key)) continue;
-      const name = state.people.find((person) => person.personId === push.from)?.name ?? 'Someone';
+      const name = state.people.find((person) => person.personId === push.from)?.name ?? t('share.someone');
       prompts.set(key, deps.show(push, name, (pull) => {
         dismissPush(push.from, push.item);
         if (pull) pullAcceptedPush(deps.service(), push, report);

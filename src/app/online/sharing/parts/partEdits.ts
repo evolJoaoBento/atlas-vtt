@@ -8,6 +8,7 @@
  * before it and opened again after it, so nothing outside the selection is shared by accident.
  */
 import { END_TAG, openTag, pairTags, scanMarkup, scanTags, type OpenPart, type PartRule, type PartTag } from '../model/privateTags';
+import { t } from '../../../i18n';
 
 export interface TextEdit {
   from: number;
@@ -150,7 +151,7 @@ function removals(text: string, tags: readonly PartTag[]): Removal[] {
 const openAt = (parts: readonly OpenPart[], at: number): OpenPart[] =>
   parts.filter((part) => part.tag.end <= at && (part.close === null || part.close.start >= at));
 
-export const UNCLOSED_BEFORE_SELECTION = 'A part that starts before the selection is never closed, so the selection cannot be shared on its own. Close that part with Share part first.';
+export const UNCLOSED_BEFORE_SELECTION = t('share.part.unclosedBefore');
 
 /**
  * Shares `[from, to)` with everyone the note is shared with (see the module comment); null when nothing

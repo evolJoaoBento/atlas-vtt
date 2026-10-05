@@ -21,6 +21,7 @@ import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
 import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
+import { t } from '../../../i18n';
 
 /** A saved map: its file's map data, the state the projection reads, and the scene settings a full share carries. */
 export interface SharedMapSource {
@@ -35,7 +36,7 @@ export interface SharedMapSource {
  * Why a lit map is never shared player-safe: what its players see is decided by sight and light,
  * which a share does not work out yet, so it would hold tokens and pins no player token sees.
  */
-export const LIT_MAP_NOT_PLAYER_SAFE = 'This map has dynamic lighting on, so it cannot be shared player-safe yet: the share would hold tokens and pins that no player token sees. Share it Full (as a co-GM sees it), or switch its lighting off first.';
+export const LIT_MAP_NOT_PLAYER_SAFE = t('share.with.litMap');
 
 export interface MapImages {
   /** Vault path → fingerprint, for the background and token images that could be hashed. */

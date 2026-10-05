@@ -10,6 +10,7 @@ import { shareSessionStore } from '../shareSessionStore';
 import { shareWithEveryone, wrapSelection, type PartEdit } from './partEdits';
 import { partPeopleFrom } from './partPeople';
 import { openPartPeopleModal, type PartPeopleKind } from './PartPeopleModal';
+import { t } from '../../../i18n';
 
 interface PartAction {
   id: string;
@@ -19,7 +20,7 @@ interface PartAction {
   run(editor: Editor): void;
 }
 
-const NOTE_CHANGED = 'The note changed meanwhile, so nothing was marked. Select the text again.';
+const NOTE_CHANGED = t('share.part.noteChanged');
 
 function selectionOffsets(editor: Editor): { from: number; to: number } {
   const anchor = editor.posToOffset(editor.getCursor('from'));
@@ -57,11 +58,11 @@ function pickAndWrap(plugin: Plugin, people: PeopleBook, editor: Editor, kind: P
 
 function actions(plugin: Plugin, people: PeopleBook): PartAction[] {
   return [
-    { id: 'part-private', command: 'Mark selection as private', menu: 'Share part: Private', icon: 'eye-off', run: (editor) => wrap(editor, { kind: 'private' }) },
-    { id: 'part-only', command: 'Share selection only with…', menu: 'Share part: Only…', icon: 'user-check', run: (editor) => pickAndWrap(plugin, people, editor, 'only') },
-    { id: 'part-except', command: 'Share selection with everyone except…', menu: 'Share part: Except…', icon: 'user-x', run: (editor) => pickAndWrap(plugin, people, editor, 'except') },
+    { id: 'part-private', command: t('share.part.commandPrivate'), menu: t('share.part.menuPrivate'), icon: 'eye-off', run: (editor) => wrap(editor, { kind: 'private' }) },
+    { id: 'part-only', command: t('share.part.commandOnly'), menu: t('share.part.menuOnly'), icon: 'user-check', run: (editor) => pickAndWrap(plugin, people, editor, 'only') },
+    { id: 'part-except', command: t('share.part.commandExcept'), menu: t('share.part.menuExcept'), icon: 'user-x', run: (editor) => pickAndWrap(plugin, people, editor, 'except') },
     {
-      id: 'part-everyone', command: 'Share selection with everyone', menu: 'Share part: Everyone', icon: 'users',
+      id: 'part-everyone', command: t('share.part.commandEveryone'), menu: t('share.part.menuEveryone'), icon: 'users',
       run: (editor) => {
         const { from, to } = selectionOffsets(editor);
         apply(editor, shareWithEveryone(editor.getValue(), from, to));

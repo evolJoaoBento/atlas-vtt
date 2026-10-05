@@ -14,6 +14,7 @@ import { blocksFrom, textBlocksOf, type NoteSection, type TextBlock } from './no
 import { bodyLinesFor, partNamesIn, partProblemsIn, type PartMarks, type PartProblems } from './privateParts';
 import { END_TAG } from './privateTags';
 import { parseShareRule, SHARE_PROPERTY, unknownRuleNames } from './shareRule';
+import { t } from '../../../i18n';
 
 export interface NoteFilterContext {
   recipient: Recipient;
@@ -98,4 +99,4 @@ export function strayEndLineIn(source: string, sections: readonly NoteSection[] 
 }
 
 export const strayEndProblem = (line: number): string =>
-  `This note is not shared: the ${END_TAG} on line ${line} closes no part, so its start tag may have been deleted. Fix or remove it to share the note again.`;
+  t('share.strayEnd', { tag: END_TAG, line: String(line) });

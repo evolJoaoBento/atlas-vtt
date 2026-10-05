@@ -109,6 +109,7 @@ export const online = {
   'online.roll.sessionEnded': 'The session has ended. Join again to roll.',
   'online.roll.notAttached': "This tab isn't showing the session. Close it and join again.",
   'online.roll.diceCount': 'Roll 1 to {max} dice.',
+  'online.roll.cannotRepeat': "Can't roll that again.",
 
   'online.settings.heading': 'Online play',
   'online.settings.signaling': 'Signaling server',

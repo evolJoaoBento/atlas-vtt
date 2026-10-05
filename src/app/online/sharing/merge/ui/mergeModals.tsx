@@ -8,6 +8,7 @@ import type { UpdateContext } from '../../receive/notePull';
 import type { AskResult, MergeAnswer, MergeRequest } from '../noteUpdate';
 import { MergeView } from './MergeView';
 import { UpdateChoiceForm } from './UpdateChoiceForm';
+import { t } from '../../../../i18n';
 
 class AnswerModal<T> extends Modal {
   private root: Root | null = null;
@@ -40,9 +41,9 @@ class AnswerModal<T> extends Modal {
     if (this.asking) return;
     this.asking = true;
     void confirmAction({
-      title: 'Close without saving?',
-      message: ['You edited the result. Closing now discards your edits and changes nothing in the note.'],
-      confirmLabel: 'Close', destructive: true,
+      title: t('share.merge.closeTitle'),
+      message: [t('share.merge.closeMessage')],
+      confirmLabel: t('common.close'), destructive: true,
     }).then((yes) => {
       this.asking = false;
       if (yes) super.close();
@@ -59,14 +60,14 @@ class AnswerModal<T> extends Modal {
 
 export function askUpdateChoice(app: App, context: UpdateContext): Promise<AskResult | null> {
   return new Promise((resolve) => {
-    new AnswerModal<AskResult>(app, 'Shared note changed', 'atlas-merge-choice-modal',
+    new AnswerModal<AskResult>(app, t('share.merge.choiceTitle'), 'atlas-merge-choice-modal',
       (answer) => <UpdateChoiceForm title={context.title} personName={context.personName} onAnswer={answer} />, resolve).open();
   });
 }
 
 export function openMergePage(app: App, request: MergeRequest): Promise<MergeAnswer | null> {
   return new Promise((resolve) => {
-    new AnswerModal<MergeAnswer>(app, `Merge · ${request.context.title}`, 'atlas-merge-modal',
+    new AnswerModal<MergeAnswer>(app, t('share.merge.pageTitle', { title: request.context.title }), 'atlas-merge-modal',
       (answer, setDirty) => (
         <MergeView onEdited={setDirty} chunks={request.chunks} preview={request.preview} conflictDefault={request.conflictDefault}
           onSave={answer} onCancel={() => answer(null)} />

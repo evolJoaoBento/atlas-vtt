@@ -4,6 +4,7 @@ import type { MapShareMode } from '../model/mapShare';
 import { TaggedText } from '../display/TaggedText';
 import { NOT_MET_TEXT } from '../people/ui/peopleCopy';
 import { LabelledCheck } from './LabelledCheck';
+import { t } from '../../../i18n';
 
 /** A person to tick: a known person by key, or a name the note uses that the list does not know (`name:<name>`). */
 export interface ShareRow {
@@ -45,7 +46,7 @@ interface ShareWithFormProps {
 }
 
 const toggled = (list: readonly string[], key: string): string[] => (list.includes(key) ? list.filter((item) => item !== key) : [...list, key]);
-const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': 'Player-safe', full: 'Full' };
+const MODE_LABELS: Record<MapShareMode, string> = { 'player-safe': t('share.with.playerSafe'), full: t('share.with.full') };
 
 export function ShareWithForm({ rows, initial, map, preview, hint, error, warnings, onSave, onCancel }: ShareWithFormProps): React.ReactElement {
   const [everyone, setEveryone] = useState(initial.everyone);
@@ -66,12 +67,12 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
     <div className="atlas-share">
       {error && <p className="atlas-share__error" role="alert">{error}</p>}
       <section className="atlas-share__section">
-        <LabelledCheck label="Everyone in my sessions" checked={everyone} onChange={() => setEveryone(!everyone)} />
+        <LabelledCheck label={t('share.with.everyone')} checked={everyone} onChange={() => setEveryone(!everyone)} />
         <ul className="atlas-share__people">
           {(everyone ? rows.filter((row) => row.known || except.includes(row.key)) : rows).map((row) => (
             <li key={row.key} className="atlas-share__person">
               {everyone
-                ? <LabelledCheck label={`Except ${row.name}`} checked={except.includes(row.key)} onChange={() => setExcept(toggled(except, row.key))} />
+                ? <LabelledCheck label={t('share.with.exceptName', { name: row.name })} checked={except.includes(row.key)} onChange={() => setExcept(toggled(except, row.key))} />
                 : <LabelledCheck label={row.name} checked={people.includes(row.key)} onChange={() => setPeople(toggled(people, row.key))} />}
               {row.placeholder && <span className="atlas-share__not-met">{NOT_MET_TEXT}</span>}
             </li>
@@ -80,20 +81,20 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
         {warnings.map((warning) => <p key={warning} className="atlas-share__warning" role="note">{warning}</p>)}
       </section>
       {map && (
-        <section className="atlas-share__section" aria-label="Map">
-          <div className="atlas-share__modes" role="radiogroup" aria-label="What to share">
+        <section className="atlas-share__section" aria-label={t('share.with.map')}>
+          <div className="atlas-share__modes" role="radiogroup" aria-label={t('share.with.whatToShare')}>
             {(['player-safe', 'full'] as const).map((value) => (
               <LabelledCheck key={value} radio="atlas-share-mode" label={MODE_LABELS[value]} checked={mode === value}
                 disabled={value === 'player-safe' && Boolean(refused)} onChange={() => setMode(value)} />
             ))}
           </div>
           {refused && <p className="atlas-share__warning" role="note">{refused}</p>}
-          {offered.length > 0 && <h3 className="atlas-share__heading">Linked notes</h3>}
+          {offered.length > 0 && <h3 className="atlas-share__heading">{t('share.with.linkedNotes')}</h3>}
           <ul className="atlas-share__people">
             {offered.map((note) => (
               <li key={note.path} className="atlas-share__note">
                 <LabelledCheck label={note.label} checked={notes.includes(note.path)} disabled={note.private} onChange={() => setNotes(toggled(notes, note.path))} />
-                {note.private && <span className="atlas-share__private">Private</span>}
+                {note.private && <span className="atlas-share__private">{t('share.private')}</span>}
               </li>
             ))}
           </ul>
@@ -102,11 +103,11 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
       {preview && (
         <section className="atlas-share__section">
           <label className="atlas-share__preview-label">
-            <span>Preview as</span>
-            <select className="dropdown" aria-label="Preview as" defaultValue=""
+            <span>{t('share.with.previewAs')}</span>
+            <select className="dropdown" aria-label={t('share.with.previewAs')} defaultValue=""
               onChange={(event) => { const key = event.target.value; if (key) void preview(key).then(setPreviewText); }}>
-              <option value="" disabled>Pick a person</option>
-              {known.map((row) => <option key={row.key} value={row.key}>{row.placeholder ? `${row.name} (${NOT_MET_TEXT.toLowerCase()})` : row.name}</option>)}
+              <option value="" disabled>{t('share.with.pickPerson')}</option>
+              {known.map((row) => <option key={row.key} value={row.key}>{row.placeholder ? t('share.with.notMetName', { name: row.name }) : row.name}</option>)}
             </select>
           </label>
           {previewText !== null && <pre className="atlas-share__preview"><TaggedText text={previewText} /></pre>}
@@ -114,8 +115,8 @@ export function ShareWithForm({ rows, initial, map, preview, hint, error, warnin
         </section>
       )}
       <div className="modal-button-container">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button variant="default" onClick={save}>Save</Button>
+        <Button variant="outline" onClick={onCancel}>{t('common.cancel')}</Button>
+        <Button variant="default" onClick={save}>{t('common.save')}</Button>
       </div>
     </div>
   );

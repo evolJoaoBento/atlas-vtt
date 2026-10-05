@@ -6,6 +6,7 @@
 import type { NameResolver } from '../model/audience';
 import { parseShareRule } from '../model/shareRule';
 import type { TagTone } from './tagDisplay';
+import { formatList, t } from '../../../i18n';
 
 /** `not-met`: a name added before meeting them. `unrecognised`: an entry Atlas cannot read, or a name it does not know. */
 export type ShareEntryStatus = 'ok' | 'not-met' | 'unrecognised';
@@ -30,22 +31,22 @@ export interface SharePropertyView {
   summary: string;
 }
 
-export const UNRECOGNISED_LABEL = 'Not recognised';
-export const NOT_MET = 'not met yet';
+export const UNRECOGNISED_LABEL = t('share.notRecognised');
+export const NOT_MET = t('share.notMet');
 
 const known = (name: string, people: NameResolver, every: boolean): boolean =>
   (every && people.allByName ? people.allByName(name).length : people.byName(name) ? 1 : 0) > 0;
 
 function nameLabel(kind: 'only' | 'except', name: string, people: NameResolver): ShareEntryLabel {
-  const text = `${kind === 'only' ? 'Only' : 'Except'} ${name}`;
+  const text = t(kind === 'only' ? 'share.only' : 'share.except', { names: name });
   if (known(name, people, kind === 'except')) return { tone: kind, text, status: 'ok', reason: null };
   if (people.isPlaceholder?.(name)) {
     const reason = kind === 'only'
-      ? `${name} is ${NOT_MET}: they get the note once you meet them.`
-      : `${name} is ${NOT_MET}: the note is shared with nobody until you meet them.`;
-    return { tone: kind, text: `${text} (${NOT_MET})`, status: 'not-met', reason };
+      ? t('share.reason.onlyNotMet', { name })
+      : t('share.reason.exceptNotMet', { name });
+    return { tone: kind, text: t(kind === 'only' ? 'share.onlyNotMet' : 'share.exceptNotMet', { name }), status: 'not-met', reason };
   }
-  const reason = kind === 'only' ? `Not in your people list: ${name}.` : `Not in your people list: ${name}, so the note is shared with nobody.`;
+  const reason = t(kind === 'only' ? 'share.reason.onlyUnknown' : 'share.reason.exceptUnknown', { name });
   return { tone: 'private', text, status: 'unrecognised', reason };
 }
 
@@ -53,30 +54,30 @@ function nameLabel(kind: 'only' | 'except', name: string, people: NameResolver):
 export function shareItemLabels(item: unknown, people: NameResolver): ShareEntryLabel[] {
   const rule = parseShareRule(item);
   if (rule.unreadable) {
-    return [{ tone: 'private', text: UNRECOGNISED_LABEL, status: 'unrecognised', reason: 'Atlas cannot read this entry, so the note is shared with nobody.' }];
+    return [{ tone: 'private', text: UNRECOGNISED_LABEL, status: 'unrecognised', reason: t('share.reason.unreadable') }];
   }
   return [
-    ...(rule.private ? [{ tone: 'private' as const, text: 'Private', status: 'ok' as const, reason: null }] : []),
-    ...(rule.public ? [{ tone: 'public' as const, text: 'Public', status: 'ok' as const, reason: null }] : []),
+    ...(rule.private ? [{ tone: 'private' as const, text: t('share.private'), status: 'ok' as const, reason: null }] : []),
+    ...(rule.public ? [{ tone: 'public' as const, text: t('share.public'), status: 'ok' as const, reason: null }] : []),
     ...rule.only.map((name) => nameLabel('only', name, people)),
     ...rule.except.map((name) => nameLabel('except', name, people)),
   ];
 }
 
-const listed = (names: readonly string[]): string => names.join(', ');
+const listed = (names: readonly string[]): string => formatList(names);
 
 /** Who the whole value reaches, in the order `ruleReaches` decides it. */
 export function shareSummary(value: unknown, people: NameResolver): string {
   const rule = parseShareRule(value);
-  if (rule.unreadable) return 'Shared with: nobody, an entry could not be read';
-  if (rule.private) return 'Shared with: nobody (private)';
+  if (rule.unreadable) return t('share.summary.unreadable');
+  if (rule.private) return t('share.summary.private');
   const blocking = rule.except.filter((name) => !known(name, people, true));
-  if (blocking.length > 0) return `Shared with: nobody until ${listed(blocking)} ${blocking.length === 1 ? 'is' : 'are'} in your people list`;
-  if (rule.public) return rule.except.length > 0 ? `Shared with: everyone except ${listed(rule.except)}` : 'Shared with: everyone in your sessions';
+  if (blocking.length > 0) return t('share.summary.blocked', { count: blocking.length, names: listed(blocking) });
+  if (rule.public) return rule.except.length > 0 ? t('share.summary.everyoneExcept', { names: listed(rule.except) }) : t('share.summary.everyone');
   const excepted = (name: string): boolean => rule.except.some((other) => other.toLowerCase() === name.toLowerCase());
   const reached = rule.only.filter((name) => known(name, people, false) && !excepted(name));
-  if (reached.length > 0) return `Shared with: ${listed(reached)}`;
-  return rule.except.length > 0 && rule.only.length === 0 ? 'Shared with: nobody (add public to share with everyone except them)' : 'Shared with: nobody';
+  if (reached.length > 0) return t('share.summary.people', { names: listed(reached) });
+  return rule.except.length > 0 && rule.only.length === 0 ? t('share.summary.nobodyAddPublic') : t('share.summary.nobody');
 }
 
 /** The property's entries with their labels, and its summary. */
