@@ -45,7 +45,7 @@ function isRoll(value: unknown): value is DiceRollResult {
     && Array.isArray(roll.rolls) && typeof roll.total === 'number' && typeof roll.timestamp === 'number';
 }
 
-/** The most `actions` a status may have besides its `action`, so the status bar keeps them on one row. */
+/** The most buttons a status may have, `action` and `actions` together, so the status bar keeps them on one row. */
 export const REMOTE_STATUS_ACTIONS = 3;
 
 const text = (value: unknown): value is string => typeof value === 'string';
@@ -57,11 +57,11 @@ function isAction(value: unknown): value is RemoteStatusAction {
 }
 
 /** The owner's `actions`, checked and copied (frozen), each telling `choose` its id; throws for a malformed list. */
-function checkedActions(actions: unknown, choose: (id: string) => void): readonly ShownStatusAction[] {
-  const valid = Array.isArray(actions) && actions.length <= REMOTE_STATUS_ACTIONS && actions.every(isAction)
+function checkedActions(actions: unknown, room: number, choose: (id: string) => void): readonly ShownStatusAction[] {
+  const valid = Array.isArray(actions) && actions.length <= room && actions.every(isAction)
     && new Set(actions.map((action) => action.id)).size === actions.length;
   if (!valid) {
-    throw new Error(`RemoteView.setStatus: "actions" must list at most ${REMOTE_STATUS_ACTIONS} { id, label, icon? } with distinct ids and non-empty text.`);
+    throw new Error(`RemoteView.setStatus: "actions" must list { id, label, icon? } with distinct ids and non-empty text, at most ${REMOTE_STATUS_ACTIONS} buttons with "action" (${room} left).`);
   }
   return Object.freeze(actions.map(({ id, label, icon }) => Object.freeze({
     id, label, ...(icon !== undefined ? { icon } : {}), run: (): void => { choose(id); },
@@ -75,7 +75,7 @@ function checkedStatus(status: unknown, choose: (id: string) => void): ShownStat
   const valid = text(given.title) && text(given.connection) && tones.includes(given.tone) && (given.message === null || text(given.message))
     && (action === undefined || (text(action.label) && typeof action.run === 'function'));
   if (!valid) throw new Error('RemoteView.setStatus: the status must be a RemoteStatus.');
-  const actions = given.actions === undefined ? undefined : checkedActions(given.actions, choose);
+  const actions = given.actions === undefined ? undefined : checkedActions(given.actions, REMOTE_STATUS_ACTIONS - (action ? 1 : 0), choose);
   const run = action?.run.bind(action);
   return Object.freeze({
     title: given.title, connection: given.connection, tone: given.tone as RemoteStatus['tone'], message: given.message,

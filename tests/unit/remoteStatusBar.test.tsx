@@ -81,6 +81,9 @@ describe("the remote view's status bar", () => {
     const status = (actions: unknown): unknown => ({ title: 'x', connection: 'y', tone: 'pending', message: null, actions });
     const a = (id: string, extra: object = {}): object => ({ id, label: id, ...extra });
     expect(() => dice.setStatus(status([a('1'), a('2'), a('3')]) as never)).not.toThrow();
+    const withAction = (actions: unknown): unknown => ({ ...(status(actions) as object), action: { label: 'Reconnect', run: () => undefined } });
+    expect(() => dice.setStatus(withAction([a('1'), a('2')]) as never)).not.toThrow();
+    expect(() => dice.setStatus(withAction([a('1'), a('2'), a('3')]) as never)).toThrow(/"actions".*3 buttons/);
     for (const bad of [[a('1'), a('2'), a('3'), a('4')], [a('1'), a('1')], [{ id: '1', label: '' }], [{ id: '', label: 'L' }], [a('1', { icon: '' })], [a('1', { icon: 3 })], 'a', [null]]) {
       expect(() => dice.setStatus(status(bad) as never)).toThrow(/"actions"/);
     }

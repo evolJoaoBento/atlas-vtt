@@ -1,10 +1,12 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/app/atlas-view', async () => import('./fakeAtlasView'));
 
 import { tokensApi } from '../../src/api/tokens';
+import { useExtensionToolbarItems } from '../../src/app/extensions/extensionToolbarItems';
+import type { ViewAtlasStore } from '../../src/app/storeFactory';
 import { REMOTE_DRAG_CANCEL, REMOTE_TOKEN_DROPPED } from '../../src/app/remote-view/remoteDrag';
 import { fitRemoteMap, remoteTrayRoll } from '../../src/app/remote-view/remoteControls';
 import { REMOTE_MAX_DICE } from '../../src/app/remote-view/RemoteViewDice';
@@ -63,6 +65,23 @@ describe('remoteViews', () => {
     expect(closed).toHaveBeenCalledTimes(1);
     expect(workspace.leavesOf('atlas-vtt-remote')).toHaveLength(0);
     expect(views.list()).toEqual([]);
+  });
+
+  it("tells a toolbar item's isVisible ownRemote only in the remote view its own extension opened", async () => {
+    const { host, plugin, workspace } = await remoteHostHarness();
+    const own = host.api.connect(plugin);
+    const other = host.api.connect(fakePlugin('ext-other'));
+    const asked: Array<[string, boolean]> = [];
+    const item = (id: string) => ({ id, icon: 'map', label: id, views: ['remote'] as Array<'remote'>, onClick: () => undefined,
+      isVisible: (ctx: { ownRemote: boolean }): boolean => { asked.push([id, ctx.ownRemote]); return ctx.ownRemote; } });
+    own.ui.addToolbarItem(item('own'));
+    other.ui.addToolbarItem(item('other'));
+    const view = await own.remoteViews!.open({ title: 'X' });
+    const leaf = workspace.leavesOf('atlas-vtt-remote')[0]!;
+    const { result } = renderHook(() => useExtensionToolbarItems(view.viewId, (leaf.view as { atlasStore: ViewAtlasStore }).atlasStore, false));
+    expect(result.current.map(({ id }) => id)).toEqual(['ext:ext:own']);
+    expect(asked.slice(-2)).toEqual([['own', true], ['other', false]]);
+    host.dispose();
   });
 
   it('C-remote-2: unloading the extension or Atlas closes its remote views', async () => {
@@ -263,14 +282,14 @@ describe('remoteViews', () => {
     view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null });
     expect(store.getState().remoteView?.status.connection).toBe('Connected');
     const statusAction = vi.fn();
-    view.onStatusAction(statusAction);
+    view.onStatusAction!(statusAction);
     view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null, actions: [{ id: 'shared', label: 'Shared with me' }] });
     store.getState().remoteView?.status.actions?.[0]?.run();
     expect(statusAction).toHaveBeenCalledExactlyOnceWith('shared');
     view.close();
     store.getState().remoteView?.status.actions?.[0]?.run();
     expect(statusAction).toHaveBeenCalledOnce();
-    expect(() => view.onStatusAction(vi.fn())()).not.toThrow();
+    expect(() => view.onStatusAction!(vi.fn())()).not.toThrow();
     expect(() => view.throwRoll({ ...entry, id: 'r2' })).not.toThrow();
   });
 });

@@ -8,6 +8,8 @@
 
 $remote-status-bar-inset: $spacing-s;
 $remote-status-dot-size: 8px;
+// A button's label truncates past this, so a narrow tab still shows every button.
+$remote-status-action-max-width: 160px;
 
 .atlas-remote-status-bar {
   @include atlas-elevated-surface;
@@ -20,6 +22,8 @@ $remote-status-dot-size: 8px;
   gap: $spacing-s;
   // Uniform padding equal to the gap.
   padding: $remote-status-bar-inset;
+  // Nothing draws outside the capsule, however narrow the tab.
+  overflow: hidden;
   pointer-events: auto;
   color: var(--text-normal);
   font-size: $font-ui-small;
@@ -52,13 +56,21 @@ $remote-status-dot-size: 8px;
   color: var(--text-muted);
 }
 
-// The buttons keep their labels whole; the message gives way first.
+// The message gives way first; a button's label then truncates past its width, and its icon stays.
 .atlas-remote-status-bar__action {
   flex-shrink: 0;
+  min-width: 0;
+  max-width: $remote-status-action-max-width;
+}
+
+.atlas-remote-status-bar__action-label {
+  @include atlas-truncate;
+  min-width: 0;
 }
 
 .atlas-remote-status-bar__action-icon {
   display: inline-flex;
+  flex-shrink: 0;
 
   svg {
     width: $icon-s;

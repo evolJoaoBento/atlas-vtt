@@ -2,7 +2,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** Whether two values are the same data: primitives, arrays and plain objects, compared in depth. */
+/**
+ * Whether two values are the same data: primitives, arrays and plain objects, compared in depth. For plain data only: any two
+ * other objects with the same own keys count as the same (a Map, a Set or a Date has none).
+ */
 export function sameValue(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
   if (Array.isArray(a) || Array.isArray(b)) {

@@ -5,6 +5,7 @@
  * names the fields it saves; `merge` never takes this one from a file).
  */
 import type { StoreApi } from 'zustand';
+import { frozenCopy } from '../../api/frozen';
 import type { RemoteStatus, RemoteStatusAction } from '../../api/types/remoteViews';
 import { resolveMeasurementSettings, type MeasurementSettings } from '../grid/measurementFormat';
 import type { ResourceDefinition, ResourceValue } from '../resources/resourceTypes';
@@ -45,8 +46,9 @@ export interface RemoteViewState {
   ownRoll: DiceRollResult | null;
 }
 
+/** The state before the owner feeds anything; its parts are frozen, like every part the owner's feed writes. */
 export function initialRemoteViewState(): RemoteViewState {
-  return {
+  return { ...frozenCopy<RemoteViewState>({
     movableTokenIds: [],
     measurement: resolveMeasurementSettings(undefined, null),
     conditions: [],
@@ -57,7 +59,7 @@ export function initialRemoteViewState(): RemoteViewState {
     diceLog: [],
     maxDice: 100,
     ownRoll: null,
-  };
+  }) };
 }
 
 /** Changes part of a remote store's `remoteView`; does nothing to a normal view's store. */

@@ -17,13 +17,13 @@ export function RemoteStatusBar(): React.ReactElement | null {
       {status.message && <span className="atlas-remote-status-bar__message">{status.message}</span>}
       {action && (
         <Button variant="default" size="sm" className="atlas-remote-status-bar__action" onClick={() => action.run()}>
-          {action.label}
+          <span className="atlas-remote-status-bar__action-label">{action.label}</span>
         </Button>
       )}
       {actions.map((choice) => (
         <Button key={choice.id} variant="default" size="sm" className="atlas-remote-status-bar__action" onClick={() => choice.run()}>
           {choice.icon && <ObsidianIcon name={choice.icon} className="atlas-remote-status-bar__action-icon" />}
-          {choice.label}
+          <span className="atlas-remote-status-bar__action-label">{choice.label}</span>
         </Button>
       ))}
     </div>

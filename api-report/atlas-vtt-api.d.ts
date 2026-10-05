@@ -936,7 +936,7 @@ export declare interface RemoteStatus {
         label: string;
         run(): void;
     };
-    /** At most 3 more buttons, after `action`; a choice is told to `onStatusAction` by its id. */
+    /** More buttons after `action`, at most 3 buttons in all with it; a choice is told to `onStatusAction` by its id. */
     actions?: readonly RemoteStatusAction[];
 }
 
@@ -965,18 +965,19 @@ export declare interface RemoteView {
     setPlayer(state: RemotePlayerState): void;
     /**
      * The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus,
-     * also for more than 3 `actions`, an id given twice, an empty label, or an icon that is not a name.
+     * also for more than 3 buttons in all (`action` and `actions`), and for an entry of `actions` with an empty id, label or icon,
+     * or an id given twice.
      */
     setStatus(status: RemoteStatus): void;
     /** The player chose one of the status's `actions`: its id. Not called for `action`, which runs its own `run`. */
-    onStatusAction(listener: (id: string) => void): Disposer;
+    onStatusAction?(listener: (id: string) => void): Disposer;
     /** The shared log shown in this view's dice log (the first 100 entries, copied); Clear is hidden, Roll again calls `onRoll`. */
     setDiceLog(entries: readonly DiceRollResult[]): void;
     /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
     throwRoll(result: DiceRollResult): void;
     /**
      * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
-     * resizes until the player moves the camera. `padded` leaves the margin Atlas's own Fit map leaves around the map (16 screen
+     * resizes until the player moves the camera. `padded` leaves the margin the remote view's Fit map (Shift+1) leaves around the map (16 screen
      * pixels), for a Fit button of your own. Throws when `camera` is not finite numbers with a size above 0.
      */
     setCamera(camera: ViewCamera, options?: {
