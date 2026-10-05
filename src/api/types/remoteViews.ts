@@ -76,7 +76,7 @@ export interface RemoteView {
   /** The player moved the camera (`byUser`), or Fit map ran; lets the extension stop following the GM. */
   onCameraMoved(listener: (byUser: boolean) => void): Disposer;
   /**
-   * The dice tray (at most 100 dice) or Roll again; return null once sent, or why not (shown in the tray, or as a notice for
+   * The dice tray, at most the view's `maxDice` (100 by default), or Roll again; return null once sent, or why not (shown in the tray, or as a notice for
    * Roll again). Listeners are asked in the order they were added until one returns null; a roll is sent by one listener at
    * most. With no listener, or when none sent it, the first reason given shows ("The roll could not be sent." for a listener
    * that throws or for none). The tray never rolls locally in a remote view.

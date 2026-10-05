@@ -29,7 +29,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.10.0 | shipped in 1.10.0 | none | none | none |
 | 1.11.0 | shipped in 1.11.0 | none | `bundles.forgetNoteProperties` | none |
 | 1.12.0 | shipped in 1.12.0 | `remote-view` | `remoteViews` (optional) | none |
-| 1.13.0 | shipped in 1.13.0 | none | none | none |
+| 1.13.0 | shipped in 1.13.0 | none | `dice.throw` (optional) | none |
 
 Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
 
@@ -57,7 +57,7 @@ Rows marked planned are not in the running Atlas yet. The report in `api-report/
 - **Player.** `setPlayer(state)` says which tokens the player may drag, the measurement of the ruler and the measure tool, the definitions of the condition badges and of each token's bars (decided per token: a definition with `visibleToPlayers: false` draws no bar on that token but still downs it), and the initiative list's rules and HP bars.
 - **Moves.** The player drags a movable token with Atlas's drag and ruler, one at a time. `onTokenDrop` reports the drop at the point it snaps to in the view's grid; the token goes back until the next `setScene` moves it. `cancelDrag()` ends a drag in progress, and a new scene or player state ends a drag whose token left the scene or may no longer move.
 - **Camera.** `setCamera(camera, { animate })` shows a world area as large as fits the view and keeps showing it through resizes. `onCameraMoved(true)` fires when the player pans or zooms, and `onCameraMoved(false)` when Fit map (Shift+1) fits the map. Following someone stays the extension's decision: add Follow and Fit buttons as toolbar items with `views: ['remote']`.
-- **Dice.** The dice tray (up to 100 dice) and the dice log's Roll again go to `onRoll` listeners and never roll locally. Listeners are asked in the order they were added until one returns null (sent); otherwise the tray shows the first reason returned. `setDiceLog(entries)` is the log the view's dice log shows, without Clear. `throwRoll(result)` throws one of the player's own rolls once per id with their dice look, or shows a result card where WebGL is unavailable.
+- **Dice.** The dice tray, at most the view's `maxDice` (100 by default), and the dice log's Roll again go to `onRoll` listeners and never roll locally. Listeners are asked in the order they were added until one returns null (sent); otherwise the tray shows the first reason returned. `setDiceLog(entries)` is the log the view's dice log shows, without Clear. `throwRoll(result)` throws one of the player's own rolls once per id with their dice look, or shows a result card where WebGL is unavailable.
 - **Status.** `setStatus(status)` fills the status bar at the start of the top row; its optional action is a button.
 - **Other groups.** `views.*` and `lasers.*` take the remote view's id. `views.active()` never returns it, `tokens.move` answers `not-loaded` and `presentation.present` answers false for it, as do Atlas's own Present commands.
 - **Lighting.** `lighting.playerVisibility` and `lighting.watch` answer for a remote id from the remote view's own store, which has no lighting: pending until a scene is shown, then unlit, so everything in it is what that player sees. A lit scene's darkness is the owner's to send, as fog.
