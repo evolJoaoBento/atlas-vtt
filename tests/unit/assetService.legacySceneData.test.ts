@@ -29,7 +29,7 @@ const dataOf = async (service: AssetService, id: string): Promise<unknown> => ((
 
 beforeEach(() => { AssetService.resetInstance(); });
 
-it('moves a map share a fork of Atlas left into its extension's data when the index loads, and keeps the index free of it', async () => {
+it('moves a map share a fork of Atlas left into the data of its extension when the index loads, and keeps the index free of it', async () => {
   const vault = seeded([
     scene('moved', { mapPath: 'a.atlasmap', sharing: { item: 'x' } }),
     scene('newer', { mapPath: 'b.atlasmap', sharing: { item: 'old' }, extensions: { 'atlas-vtt-connect': { item: 'new' } } }),

@@ -4,7 +4,7 @@ import { LEGACY_SHARING_EXTENSION_ID, movedLegacySceneData } from '../../src/app
 import { sceneAsset } from '../mocks/sceneAsset';
 
 describe('movedLegacySceneData', () => {
-  it('moves a data.sharing a fork of Atlas left into its extension's data once, and keeps newer extension data', () => {
+  it('moves a data.sharing a fork of Atlas left into the data of its extension once, and keeps newer extension data', () => {
     expect(movedLegacySceneData(sceneAsset({ data: { mapPath: 'm', sharing: { a: 1 } } as never }))?.data)
       .toEqual({ mapPath: 'm', extensions: { 'atlas-vtt-connect': { a: 1 } } });
     expect(movedLegacySceneData(sceneAsset({ data: { mapPath: 'm', sharing: { a: 1 }, extensions: { 'atlas-vtt-connect': { b: 2 } } } as never }))?.data)
