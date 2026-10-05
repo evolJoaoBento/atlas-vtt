@@ -2,6 +2,7 @@
  * What a remote view's own UI asks of its handle, by view id: who opened it, Fit map (through the
  * view's camera) and a roll from the dice tray or the dice log (to the owner's `onRoll` listeners).
  */
+import { toolbarSlot } from '../extensions/slots';
 import { t } from '../i18n';
 
 export interface RemoteControls {
@@ -14,10 +15,18 @@ export interface RemoteControls {
 
 const controls = new Map<string, RemoteControls>();
 
-/** Registers the controls of the remote view `viewId`; returns the removal. */
+/**
+ * Registers the controls of the remote view `viewId`; returns the removal. Both ask the toolbar to read its items again: the
+ * view's toolbar is drawn before its owner is known, and `ToolbarItem.isVisible` reads the owner (`ownRemote`).
+ */
 export function registerRemoteControls(viewId: string, entry: RemoteControls): () => void {
   controls.set(viewId, entry);
-  return () => { if (controls.get(viewId) === entry) controls.delete(viewId); };
+  toolbarSlot.invalidate();
+  return () => {
+    if (controls.get(viewId) !== entry) return;
+    controls.delete(viewId);
+    toolbarSlot.invalidate();
+  };
 }
 
 /** The controls of the remote view `viewId`; null for any other view. */

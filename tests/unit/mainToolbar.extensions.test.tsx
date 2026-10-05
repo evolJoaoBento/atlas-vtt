@@ -248,6 +248,20 @@ describe('MainToolbar with extension items', () => {
       closeOther();
     });
 
+    it('asks again once the remote view it is drawn in finds its owner, and when the owner lets it go', () => {
+      storeState.isPlayerView = true;
+      storeState.remoteView = {};
+      render(<MainToolbar viewId="view-1" />);
+      const remove = add(item({ views: ['remote'], isVisible: (ctx) => ctx.ownRemote }));
+      expect(button()).toBeNull();
+      let close = (): void => undefined;
+      act(() => { close = registerRemoteControls('view-1', { owner: 'ext', fitMap: () => undefined, roll: () => null }); });
+      expect(button()).not.toBeNull();
+      act(() => { close(); });
+      expect(button()).toBeNull();
+      remove();
+    });
+
     it('hides an item whose predicate throws, and logs the failure once', () => {
       const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<MainToolbar viewId="view-1" />);
