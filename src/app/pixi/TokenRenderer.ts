@@ -203,6 +203,8 @@ export class TokenRenderer {
       isPlayerView
     );
     
+    this.interactionController.viewId = this.viewId;
+
     // Set up interaction controller callbacks
     this.interactionController.setTokenSpriteProvider((tokenId: string) => this.tokenSprites[tokenId] || null);
     this.interactionController.setUIPositionUpdater((tokenId: string, x: number, y: number) => 

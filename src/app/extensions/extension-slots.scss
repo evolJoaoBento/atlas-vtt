@@ -1,5 +1,5 @@
-// Marks on a toolbar button an extension added: a dot, or a count. Imported inside the
-// `.atlas-vtt-plugin` scope of styles/main.scss.
+// What extensions add to Atlas's UI: marks on a toolbar button (a dot, or a count) and a dashboard tile's icon.
+// Imported inside the `.atlas-vtt-plugin` scope of styles/main.scss.
 
 @use '../../../styles/tokens' as *;
 @use '../../../styles/mixins' as *;
@@ -46,4 +46,16 @@ $ext-badge-size: 16px;
 
 .atlas-ext-tool__hidden-text {
   @include atlas-visually-hidden;
+}
+
+// A dashboard tile's icon, the size of the glyphs of Atlas's own tiles.
+$ext-tile-icon-size: 18px;
+
+.atlas-ext-tile-icon {
+  display: inline-flex;
+
+  svg {
+    width: $ext-tile-icon-size;
+    height: $ext-tile-icon-size;
+  }
 }
