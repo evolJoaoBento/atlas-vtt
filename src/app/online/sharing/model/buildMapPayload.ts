@@ -17,7 +17,7 @@ import { FogCoverage, type WorldBounds } from '../../scene/FogCoverage';
 import { clipToMap } from '../../scene/objectBounds';
 import type { PlayerViewRules } from '../../scene/playerViewRules';
 import { projectForPlayers, type ProjectedState } from '../../scene/projectForPlayers';
-import { createProjectionMemo, projectFog } from '../../scene/projectRecords';
+import { createProjectionMemo, fogTruncated, projectFog, type ProjectionMemo } from '../../scene/projectRecords';
 import { setOwn } from '../../scene/sceneDiff';
 import type { MapSize } from '../../scene/sceneTypes';
 import { IMAGE_REF_PREFIX, MAP_PAYLOAD_FORMAT, NOTE_REF_PREFIX, type FullMapPayload, type PlayerSafeMapPayload, type SharedPin } from './mapPayload';
@@ -37,6 +37,12 @@ export interface SharedMapSource {
  * which a share does not work out yet, so it would hold tokens and pins no player token sees.
  */
 export const LIT_MAP_NOT_PLAYER_SAFE = t('share.with.litMap');
+
+/**
+ * As live play's `FOG_TRUNCATED_NOTICE`: the map has more fog than players can be sent, or fog the share cannot
+ * carry (`fogTruncated`), so what it hides cannot be proven hidden.
+ */
+export const FOG_TRUNCATED_NOT_PLAYER_SAFE = t('share.with.fogTruncated');
 
 export interface MapImages {
   /** Vault path → fingerprint, for the background and token images that could be hashed. */
@@ -133,10 +139,19 @@ export function pinFootprint(pin: NotePin, layout: HexLayout | null): WorldBound
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** Null for a lit map (`LIT_MAP_NOT_PLAYER_SAFE`): a player-safe share of it is refused. */
+/**
+ * Why a map cannot be shared player-safe, null when it can: it is lit, or its fog cannot be sent whole. The share
+ * dialog, the catalogue and the payload all ask this, so they refuse the same maps.
+ */
+export function playerSafeRefusal(source: SharedMapSource, memo: ProjectionMemo = createProjectionMemo()): string | null {
+  if (source.lit) return LIT_MAP_NOT_PLAYER_SAFE;
+  return fogTruncated(source.map.objects.fog, memo) ? FOG_TRUNCATED_NOT_PLAYER_SAFE : null;
+}
+
+/** Null for a map `playerSafeRefusal` refuses: a player-safe share of it is never built. */
 export function playerSafePayload(source: SharedMapSource, name: string, context: PayloadContext): PlayerSafeMapPayload | null {
-  if (source.lit) return null;
   const memo = createProjectionMemo();
+  if (playerSafeRefusal(source, memo) !== null) return null;
   const coverage = FogCoverage.fromPlayerFog(projectFog(source.map.objects.fog, memo));
   const scene = projectForPlayers(source.state, {
     sceneId: SHARED_SCENE_ID, rules: context.rules, coverage, memo, mapSize: context.images.size,

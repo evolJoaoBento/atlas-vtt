@@ -51,6 +51,7 @@ Things to know about sharing:
 - `%% comments %%` are removed everywhere in a note, including inside code. A `%%` that is never closed hides the rest of the note.
 - Text Atlas cannot read as a private part, or an `atlas-share` entry, is kept back, not shared: the share dialog warns you, and a note whose rule cannot be read counts as private. A name after `except` that is not in your people list hides that part from everyone.
 - Maps are replaced, never merged: pulling a map again replaces the copy you received, and if you changed that copy you choose **Keep both** or **Take theirs**.
+- A map with more fog than online players can be sent (over 10,000 fog strokes, or fog Atlas cannot read) cannot be shared player-safe; share it Full or repaint its fog with fewer strokes.
 - A player-safe map leaves out pins under fog of war and pins whose note you did not tick, as well as GM-only pins and hidden tokens. A map with dynamic lighting on cannot be shared player-safe yet; Atlas says so instead of sharing it.
 - Sharing never travels in collection bundles: exporting or importing a collection drops a map's sharing, and a note's `atlas-share` property.
 - While one person is connected from two devices, requests made from the older device go unanswered until it times out; use the newer one.

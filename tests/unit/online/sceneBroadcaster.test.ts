@@ -626,7 +626,7 @@ describe('SceneBroadcaster', () => {
     expect(sceneTypes(raw.received)).toEqual(['scene-snapshot']);
   });
 
-  it('does not hide a token under fog that is not sent (coverage follows what players receive)', async () => {
+  it('clears players for fog it cannot send (a refused id proves nothing hidden), telling the GM once', async () => {
     const h = setup();
     const longId = 'x'.repeat(200);
     const fog: Record<string, FogOperation> = {
@@ -634,8 +634,8 @@ describe('SceneBroadcaster', () => {
     };
     const { view, tavern } = fakeView(sceneState({ hero: character('hero', 140) }, fog));
     h.presented.present(view, tavern);
-    expect(h.broadcaster.currentProjection()?.tokens.hero).toBeDefined();
-    expect(h.notices).toEqual([]);
+    expect(h.broadcaster.currentProjection()).toBeNull();
+    expect(h.notices).toEqual([FOG_TRUNCATED_NOTICE]);
   });
 
   describe('fog with more operations than can be sent', () => {

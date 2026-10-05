@@ -154,4 +154,5 @@ export const share = {
   'share.merge.forgot': 'Forgot the remembered choice. The next update of this note asks again.',
   'share.merge.mapChanged': '{title} changed here and was shared again',
   'share.merge.mapChangedMessage': 'Keep both saves the new version as a second scene. Take theirs replaces your copy.',
+  'share.with.fogTruncated': 'This map has too much fog to share player-safe: the share could hold what the fog hides. Share it Full (as a co-GM sees it), or clear and repaint its fog with fewer strokes.',
 } as const satisfies Record<string, Message>;

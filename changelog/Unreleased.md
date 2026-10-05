@@ -37,6 +37,7 @@
 
 ## Fixed
 
+- A map with more fog than online players can be sent (over 10,000 fog strokes, or fog Atlas cannot read) can no longer be shared player-safe: before, tokens, texts, drawings and pins under the fog past that limit were sent. Share it Full or repaint its fog with fewer strokes. Live play now also clears the scene for fog it cannot read, as it already did for too much fog.
 - Online players' rolls always follow the dice rules of the collection of the scene they are on. While you held the scene and looked at a map from another collection, a roll before anyone had rolled used that other collection's rules; a roll with no known scene uses Atlas's default rules.
 - Rolling from the dice tray in the Online scene tab no longer fails with "Couldn't send the roll" while the tab shows you connected. When a roll cannot go, the tray and the dice log now say why: the GM has not let you in yet, Atlas is reconnecting, the connection was lost, or the session ended.
 - Settings → Online play: the own server's host, port and path sit on their own row under the setting's name, so its description no longer wraps one word per line, and other rows with wide fields move them below the text in a narrow window. The own server fields are shown disabled while **PeerJS cloud (free)** is chosen.
