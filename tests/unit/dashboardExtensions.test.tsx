@@ -18,7 +18,7 @@ function renderDashboard(): HTMLElement {
 }
 
 const tile = (overrides: Partial<DashboardTile> = {}): DashboardTile => ({
-  id: 'join', icon: 'users', title: 'Join session', description: 'Play at another table', onClick: vi.fn(), ...overrides,
+  id: 'join', icon: 'users', title: 'Open board', description: 'Open the board', onClick: vi.fn(), ...overrides,
 });
 
 function add(dashboardTile: DashboardTile): () => void {
@@ -48,8 +48,8 @@ describe('Extension tiles on the dashboard', () => {
     const container = renderDashboard();
     const remove = add(tile());
     await act(async () => { await Promise.resolve(); });
-    expect(cards(container)).toEqual(['Create Scene', 'Asset Manager', 'Join session']);
-    expect(screen.getByText('Play at another table')).toBeTruthy();
+    expect(cards(container)).toEqual(['Create Scene', 'Asset Manager', 'Open board']);
+    expect(screen.getByText('Open the board')).toBeTruthy();
     remove();
   });
 
@@ -59,7 +59,7 @@ describe('Extension tiles on the dashboard', () => {
     const removeFirst = add(tile({ onClick }));
     const removeSecond = add(tile({ id: 'bad', title: 'Bad tile', onClick: () => { throw new Error('boom'); } }));
     await act(async () => { await Promise.resolve(); });
-    fireEvent.click(screen.getByText('Join session'));
+    fireEvent.click(screen.getByText('Open board'));
     expect(onClick).toHaveBeenCalledOnce();
     expect(() => fireEvent.click(screen.getByText('Bad tile'))).not.toThrow();
     removeFirst();

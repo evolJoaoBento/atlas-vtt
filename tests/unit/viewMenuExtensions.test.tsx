@@ -48,9 +48,9 @@ describe('Extension items in the view\'s More options menu', () => {
   });
 
   it('adds a provider\'s items after Atlas\'s layout items, told the view', () => {
-    const provider = vi.fn((): MenuItem[] => [{ label: 'Online session', icon: 'radio-tower', onClick: vi.fn() }]);
+    const provider = vi.fn((): MenuItem[] => [{ label: 'Quick notes', icon: 'radio-tower', onClick: vi.fn() }]);
     const remove = provide(provider);
-    expect(labels(openMenu())).toEqual(['Split right', 'Split down', 'Move to new window', 'Online session', 'Close']);
+    expect(labels(openMenu())).toEqual(['Split right', 'Split down', 'Move to new window', 'Quick notes', 'Close']);
     expect(provider).toHaveBeenCalledWith({ viewId: 'view-1', kind: 'map', isPlayerView: false });
     remove();
   });
@@ -84,8 +84,8 @@ describe('Extension items in the view\'s More options menu', () => {
   });
 
   it('is read at click time: an item removed before the next click is gone', () => {
-    const remove = provide(() => [{ label: 'Online session' }]);
+    const remove = provide(() => [{ label: 'Quick notes' }]);
     remove();
-    expect(labels(openMenu())).not.toContain('Online session');
+    expect(labels(openMenu())).not.toContain('Quick notes');
   });
 });

@@ -1,7 +1,7 @@
 /**
- * Online players' lasers in an Atlas view, drawn like the GM's own (`LaserBeam`, or
- * `CanvasLaserBeam` without a GPU) at the default size, and fading the same way. `LaserRelay`
- * shows them through the view's `LaserHub`. The ticker runs only while a laser is on screen.
+ * Other people's lasers in an Atlas view, drawn like the GM's own (`LaserBeam`, or
+ * `CanvasLaserBeam` without a GPU) at the default size, and fading the same way. An extension
+ * shows them through the view's `LaserHub` (`lasers.show`). The ticker runs only while a laser is on screen.
  */
 import { Container, type Ticker } from 'pixi.js';
 import { DEFAULT_LASER_POINTER_SETTINGS } from '../../tools/laserPointerSettings';

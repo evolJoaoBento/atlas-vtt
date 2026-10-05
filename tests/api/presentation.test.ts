@@ -60,8 +60,8 @@ describe('presentation', () => {
 
   it('C-pres-2: addTarget makes a target active for the eye; its disposer removes it', () => {
     const { presentation } = setupWith(fakeView('v1'));
-    const stop = presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
-    expect(activePresentationTarget()?.label).toBe('online players');
+    const stop = presentation.addTarget({ id: 'screen', label: 'the second screen', isActive: () => true });
+    expect(activePresentationTarget()?.label).toBe('the second screen');
     stop();
     stop();
     expect(activePresentationTarget()).toBeNull();
@@ -83,7 +83,7 @@ describe('presentation', () => {
     const { presentation, disposers } = setupWith(fakeView('v1'));
     const listener = vi.fn();
     presentation.subscribe({ cleared: listener });
-    presentation.addTarget({ id: 'online', label: 'online players', isActive: () => true });
+    presentation.addTarget({ id: 'screen', label: 'the second screen', isActive: () => true });
     disposers.disposeAll();
     expect(activePresentationTarget()).toBeNull();
     const view = fakeView('v2');

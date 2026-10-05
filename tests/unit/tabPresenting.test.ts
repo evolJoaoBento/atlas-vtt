@@ -28,8 +28,8 @@ describe('the eye button', () => {
     expect(openContextMenuGlobal).not.toHaveBeenCalled();
   });
 
-  it('presents to online players only while a target is active, with the player window in its menu', () => {
-    const stop = addPresentationTarget({ id: 't', label: 'online players', isActive: () => true });
+  it('presents to the second screen only while a target is active, with the player window in its menu', () => {
+    const stop = addPresentationTarget({ id: 't', label: 'the second screen', isActive: () => true });
     presentTab(app, view, 't1');
     expect(presentTabToPlayers).toHaveBeenCalledWith(view, 't1');
     expect(presentTabInPlayerWindow).not.toHaveBeenCalled();
@@ -46,7 +46,7 @@ describe('the eye button', () => {
   });
 
   it('the eye opens the player window again once the last target is removed', () => {
-    const stop = addPresentationTarget({ id: 't', label: 'online players', isActive: () => true });
+    const stop = addPresentationTarget({ id: 't', label: 'the second screen', isActive: () => true });
     stop();
     expect(activePresentationTarget()).toBeNull();
     presentTab(app, view, 't1');

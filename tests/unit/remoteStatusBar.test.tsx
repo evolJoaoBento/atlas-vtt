@@ -28,17 +28,17 @@ describe("the remote view's status bar", () => {
     const { dice, view } = setup();
     const run = vi.fn(() => { throw new Error('boom'); });
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    act(() => dice.setStatus({ title: 'The table', connection: 'Disconnected', tone: 'ended', message: 'The GM left.', action: { label: 'Reconnect', run } }));
+    act(() => dice.setStatus({ title: 'The table', connection: 'Disconnected', tone: 'ended', message: 'The GM left.', action: { label: 'Retry', run } }));
     const bar = view.container.querySelector('.atlas-remote-status-bar');
     expect(bar?.textContent).toContain('The table');
     expect(bar?.textContent).toContain('Disconnected');
     expect(bar?.textContent).toContain('The GM left.');
     expect(view.container.querySelector('.atlas-remote-status-bar__dot--ended')).not.toBeNull();
-    fireEvent.click(screen.getByText('Reconnect'));
+    fireEvent.click(screen.getByText('Retry'));
     expect(run).toHaveBeenCalledOnce();
     expect(error).toHaveBeenCalled();
     act(() => dice.setStatus({ title: 'The table', connection: 'Connected', tone: 'connected', message: null }));
-    expect(screen.queryByText('Reconnect')).toBeNull();
+    expect(screen.queryByText('Retry')).toBeNull();
   });
 
   it('shows the single action first, then the actions, each telling onStatusAction its id, guarded', () => {
@@ -49,15 +49,15 @@ describe("the remote view's status bar", () => {
     dice.statusActions.add(() => { throw new Error('boom'); });
     dice.statusActions.add(heard);
     act(() => dice.setStatus({
-      title: '', connection: '', tone: 'pending', message: null, action: { label: 'Reconnect', run },
-      actions: [{ id: 'shared', label: 'Shared with me', icon: 'inbox' }, { id: 'leave', label: 'Leave' }],
+      title: '', connection: '', tone: 'pending', message: null, action: { label: 'Retry', run },
+      actions: [{ id: 'shared', label: 'Library', icon: 'inbox' }, { id: 'leave', label: 'Leave' }],
     }));
     const labels = Array.from(view.container.querySelectorAll('.atlas-remote-status-bar__action')).map((button) => button.textContent);
-    expect(labels).toEqual(['Reconnect', 'Shared with me', 'Leave']);
+    expect(labels).toEqual(['Retry', 'Library', 'Leave']);
     expect(view.container.querySelectorAll('.atlas-remote-status-bar__action-icon')).toHaveLength(1);
-    fireEvent.click(screen.getByText('Shared with me'));
+    fireEvent.click(screen.getByText('Library'));
     expect(heard).toHaveBeenCalledExactlyOnceWith('shared');
-    fireEvent.click(screen.getByText('Reconnect'));
+    fireEvent.click(screen.getByText('Retry'));
     expect(run).toHaveBeenCalledOnce();
     expect(heard).toHaveBeenCalledOnce();
     dice.dispose();
@@ -81,7 +81,7 @@ describe("the remote view's status bar", () => {
     const status = (actions: unknown): unknown => ({ title: 'x', connection: 'y', tone: 'pending', message: null, actions });
     const a = (id: string, extra: object = {}): object => ({ id, label: id, ...extra });
     expect(() => dice.setStatus(status([a('1'), a('2'), a('3')]) as never)).not.toThrow();
-    const withAction = (actions: unknown): unknown => ({ ...(status(actions) as object), action: { label: 'Reconnect', run: () => undefined } });
+    const withAction = (actions: unknown): unknown => ({ ...(status(actions) as object), action: { label: 'Retry', run: () => undefined } });
     expect(() => dice.setStatus(withAction([a('1'), a('2')]) as never)).not.toThrow();
     expect(() => dice.setStatus(withAction([a('1'), a('2'), a('3')]) as never)).toThrow(/"actions".*3 buttons/);
     for (const bad of [[a('1'), a('2'), a('3'), a('4')], [a('1'), a('1')], [{ id: '1', label: '' }], [{ id: '', label: 'L' }], [a('1', { icon: '' })], [a('1', { icon: 3 })], 'a', [null]]) {

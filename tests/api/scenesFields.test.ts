@@ -8,7 +8,7 @@ import { DEFAULT_TOKEN_SETTINGS } from '../../src/app/storeFactory';
 import { emptyMap, MAP_PATH, PNG, withScene, type Fixture } from './scenesFixture';
 
 const FIELDS = ['pins', 'walls', 'lights', 'lightZones', 'camera', 'tokenSettings', 'initiativeTrackerOpen'] as const;
-const FOLDER = 'atlas-vtt/collections/Shared with me/Cave';
+const FOLDER = 'atlas-vtt/collections/Imported/Cave';
 
 /** Writes Cave's file again at `path` with `change` applied to its state, and reads it back. */
 async function variant(fixture: Fixture, path: string, change: (state: Record<string, unknown>) => void): Promise<SavedMap> {
@@ -32,7 +32,7 @@ describe('the optional fields of a saved map', () => {
         lightZones: { z1: { id: 'z1', kind: 'light-zone', polygon: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 9 }], ambient: 0.4 } },
       });
     });
-    const { mapPath } = await fixture.scenes.addToCollection({ collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: rich, images: [] });
+    const { mapPath } = await fixture.scenes.addToCollection({ collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: rich, images: [] });
     const copy = (await fixture.scenes.readMap(mapPath))!;
     expect(pick(copy)).toEqual(pick(rich));
     expect(copy.lightZones).toHaveProperty('z1');
@@ -53,10 +53,10 @@ describe('the optional fields of a saved map', () => {
       { lightZones: 'none' },
     ];
     for (const fields of bad) {
-      const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap(fields as never), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
+      const input = { collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap(fields as never), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
       await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\]/);
       expect(await fixture.vault.app.vault.adapter.exists(FOLDER)).toBe(false);
-      expect((await fixture.assets.getCollections()).map((collection) => collection.id)).not.toContain('Shared with me');
+      expect((await fixture.assets.getCollections()).map((collection) => collection.id)).not.toContain('Imported');
       expect((await fixture.assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
     }
   });
@@ -67,12 +67,12 @@ describe('the optional fields of a saved map', () => {
     // PNG() is 320 x 200: a size of 0.1 gives 3,200 cells along its width.
     const bad = [{ ...grid, size: -1 }, { ...grid, size: Number.NaN }, { ...grid, size: 0.1 }, { ...grid, type: 'triangle' }, { ...grid, lineType: 'wavy' }, { ...grid, offsetY: Infinity }];
     for (const value of bad) {
-      const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: value as never }), images: [{ path: 'bg.png', data: PNG() }] };
+      const input = { collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: value as never }), images: [{ path: 'bg.png', data: PNG() }] };
       await expect(fixture.scenes.addToCollection(input)).rejects.toThrow(/\[Atlas API\] The map's .*grid/);
       expect(await fixture.vault.app.vault.adapter.exists(FOLDER)).toBe(false);
       expect((await fixture.assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
     }
-    const fine = { collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: { ...grid, size: 4 } }), images: [{ path: 'bg.png', data: PNG() }] };
+    const fine = { collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.png', grid: { ...grid, size: 4 } }), images: [{ path: 'bg.png', data: PNG() }] };
     await expect(fixture.scenes.addToCollection(fine)).resolves.toMatchObject({ mapPath: expect.any(String) });
   });
 
@@ -80,7 +80,7 @@ describe('the optional fields of a saved map', () => {
     const fixture = await withScene();
     const pins = { p: { id: 'p', kind: 'pin' as const, x: 0, y: 0, notePath: 'bg.webp' } };
     const { mapPath } = await fixture.scenes.addToCollection({
-      collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.webp', pins }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }],
+      collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.webp', pins }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }],
     });
     const map = (await fixture.scenes.readMap(mapPath))!;
     expect(map.background).toBe(`${FOLDER}/bg.webp`);
@@ -90,7 +90,7 @@ describe('the optional fields of a saved map', () => {
   it('C-scenes-2: a map without the optional fields writes the same file as before them', async () => {
     const fixture = await withScene();
     const { mapPath } = await fixture.scenes.addToCollection({
-      collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }],
+      collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER, map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }],
     });
     expect(await fixture.vault.app.vault.adapter.read(mapPath)).toBe(savedMapText(emptyMap({ background: `${FOLDER}/bg.webp` }), mapPath, 'Cave'));
   });

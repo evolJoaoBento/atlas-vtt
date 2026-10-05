@@ -29,7 +29,7 @@ function register(panel: PanelSpec): { panel: PanelSpec; remove: () => void } {
 const open = (panel: PanelSpec, viewId = 'view-1'): void => { act(() => { openPanel(panel, viewId); }); };
 
 function spec(overrides: Partial<PanelSpec> = {}): PanelSpec {
-  return { id: 'online', title: 'Online session', mount: vi.fn(() => vi.fn()), ...overrides };
+  return { id: 'notes', title: 'Quick notes', mount: vi.fn(() => vi.fn()), ...overrides };
 }
 
 // jsdom runs no animation frames to completion: the panel leaves at once.
@@ -69,9 +69,9 @@ describe('Extension panels', () => {
     const body = container.querySelector('.atlas-extension-panel__body');
     expect(vi.mocked(panel.mount).mock.calls[0]?.[0]).toBe(body);
     expect(vi.mocked(panel.mount).mock.calls[0]?.[1]).toEqual({ viewId: 'view-1', kind: 'map', isPlayerView: false });
-    expect(screen.getByRole('region', { name: 'Online session' })).toBeTruthy();
-    expect(container.querySelector('.atlas-extension-panel__header')?.textContent).toContain('Online session');
-    expect(screen.getByRole('button', { name: 'Close Online session' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Quick notes' })).toBeTruthy();
+    expect(container.querySelector('.atlas-extension-panel__header')?.textContent).toContain('Quick notes');
+    expect(screen.getByRole('button', { name: 'Close Quick notes' })).toBeTruthy();
     remove();
   });
 
@@ -103,7 +103,7 @@ describe('Extension panels', () => {
     const { panel, remove } = register(spec({ mount: () => dispose }));
     renderPanels();
     open(panel);
-    fireEvent.click(screen.getByRole('button', { name: 'Close Online session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close Quick notes' }));
     expect(isPanelOpen(panel, 'view-1')).toBe(false);
     expect(dispose).toHaveBeenCalledOnce();
     await waitFor(() => expect(screen.queryByRole('region')).toBeNull());

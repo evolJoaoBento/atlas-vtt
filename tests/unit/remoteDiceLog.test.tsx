@@ -77,7 +77,7 @@ describe("a remote view's dice log", () => {
     expect(second).toHaveBeenCalledWith({ d20: 1 }, 2);
     expect(third).not.toHaveBeenCalled();
     expect(dice.roll({ d6: 101 }, 0)).toBe(rollDiceCount(100));
-    // An owner's own limit: Connect sends at most 20 dice.
+    // An owner's own limit: an extension may offer fewer dice, here 20.
     const twenty = new RemoteViewDice(store, 20);
     twenty.rolls.add(() => null);
     expect(twenty.roll({ d6: 21 }, 0)).toBe('Roll 1 to 20 dice.');

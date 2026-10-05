@@ -62,12 +62,12 @@ describe('note properties an extension keeps out of bundles', () => {
   const decode = (buffer: ArrayBuffer): string => new TextDecoder().decode(buffer);
   const pack = (file: BundleFile, text: string, rewrites = new Map<string, string>()): string => decode(rewriteContent(file, toBuffer(text), rewrites));
   let stop: () => void = () => undefined;
-  const register = (): void => { stop = bundleNoteKeys.add('test', ['atlas-share']); };
+  const register = (): void => { stop = bundleNoteKeys.add('test', ['ext-share']); };
   afterEach(() => stop());
 
   it('is applied to every note role and path, with or without moved paths, and never to other files', () => {
     register();
-    const note = '---\natlas-share: [Ana]\ntitle: T\n---\nText';
+    const note = '---\next-share: [Ana]\ntitle: T\n---\nText';
     for (const role of ['linked-note', 'statblock-note', 'loot-item'] as const) {
       const file = { vaultPath: `Notes/${role}.md`, role } as BundleFile;
       expect(mayRewrite(file, new Map())).toBe(true);
@@ -82,28 +82,28 @@ describe('note properties an extension keeps out of bundles', () => {
 
   it('is not even read when no extension registered a key', () => {
     expect(mayRewrite({ vaultPath: 'Notes/a.md', role: 'linked-note' } as BundleFile, new Map())).toBe(false);
-    const note = toBuffer('---\natlas-share: [Ana]\n---\n');
+    const note = toBuffer('---\next-share: [Ana]\n---\n');
     expect(rewriteContent({ vaultPath: 'Notes/a.md', role: 'linked-note' } as BundleFile, note, new Map())).toBe(note);
   });
 
   it("still relinks a statblock note's artwork, from the text without the property", () => {
     register();
     const file = { vaultPath: 'B/g.md', role: 'statblock-note', statblockImage: { key: 'image', path: 'B/g.png' } } as BundleFile;
-    expect(pack(file, '---\natlas-share: public\nimage: B/g.png\n---\n', new Map([['B/g.png', 'C/g.png']]))).toBe('---\nimage: "C/g.png"\n---\n');
+    expect(pack(file, '---\next-share: public\nimage: B/g.png\n---\n', new Map([['B/g.png', 'C/g.png']]))).toBe('---\nimage: "C/g.png"\n---\n');
   });
 
   it("is not applied when a scene moves to another collection: the user's own notes keep their property", () => {
     register();
     const file = { vaultPath: 'B/g.md', role: 'statblock-note', statblockImage: { key: 'image', path: 'B/g.png' } } as BundleFile;
-    const note = '---\natlas-share: public\nimage: B/g.png\n---\n';
-    expect(rewriteText(file, note, new Map([['B/g.png', 'C/g.png']]))).toBe('---\natlas-share: public\nimage: "C/g.png"\n---\n');
+    const note = '---\next-share: public\nimage: B/g.png\n---\n';
+    expect(rewriteText(file, note, new Map([['B/g.png', 'C/g.png']]))).toBe('---\next-share: public\nimage: "C/g.png"\n---\n');
     expect(refersToFiles({ vaultPath: 'Notes/a.md', role: 'linked-note' } as BundleFile)).toBe(false);
   });
 
   it('withoutNoteKeys leaves other files alone and isNote tells notes by extension', () => {
-    const keys = new Set(['atlas-share']);
-    expect(withoutNoteKeys({ vaultPath: 'a.json' }, '---\natlas-share: x\n---\n', keys)).toBe('---\natlas-share: x\n---\n');
-    expect(withoutNoteKeys({ vaultPath: 'A.MD' }, '---\natlas-share: x\n---\n', keys)).toBe('---\n---\n');
+    const keys = new Set(['ext-share']);
+    expect(withoutNoteKeys({ vaultPath: 'a.json' }, '---\next-share: x\n---\n', keys)).toBe('---\next-share: x\n---\n');
+    expect(withoutNoteKeys({ vaultPath: 'A.MD' }, '---\next-share: x\n---\n', keys)).toBe('---\n---\n');
     expect(isNote({ vaultPath: 'x/y.md' })).toBe(true);
     expect(isNote({ vaultPath: 'x/y.png' })).toBe(false);
   });

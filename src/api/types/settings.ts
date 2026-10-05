@@ -5,7 +5,7 @@ export interface AtlasSettingsView {
   diceLook: { colour: string; font: string };
   /** Atlas's own `DiceDisplay`. */
   diceDisplay: 'card' | 'fast' | 'full';
-  /** The four `localPlayerView` rules online players follow, as the player window does (`PLAYER_VIEW_RULE_KEYS`). */
+  /** The four `localPlayerView` rules a view an extension shows to players follows, as the player window does (`PLAYER_VIEW_RULE_KEYS`). */
   playerView: { showGrid: boolean; showTokenNameplates: boolean; showWidgets: boolean; showInitiative: boolean };
 }
 

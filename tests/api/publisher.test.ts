@@ -104,15 +104,15 @@ describe('ExtensionApiPublisher', () => {
     const { plugin } = atlas();
     const publisher = new ExtensionApiPublisher(plugin);
     await publisher.start();
-    const stop = plugin.api?.connect(fakePlugin('ext')).bundles.stripNoteProperties(['atlas-share']);
-    expect(plugin.settingsService.getSetting('extensionNoteKeys')).toEqual({ ext: ['atlas-share'] });
+    const stop = plugin.api?.connect(fakePlugin('ext')).bundles.stripNoteProperties(['ext-share']);
+    expect(plugin.settingsService.getSetting('extensionNoteKeys')).toEqual({ ext: ['ext-share'] });
     publisher.stop();
     // Atlas starts again with the extension not loaded
     await new ExtensionApiPublisher(plugin).start();
-    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(true);
+    expect(bundleNoteKeys.keys().has('ext-share')).toBe(true);
     stop?.();
     expect(plugin.settingsService.getSetting('extensionNoteKeys')).toEqual({});
-    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(false);
+    expect(bundleNoteKeys.keys().has('ext-share')).toBe(false);
   });
 
   it('disposes the sight frames of every view on stop', async () => {

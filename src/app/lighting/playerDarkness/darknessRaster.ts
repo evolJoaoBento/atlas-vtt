@@ -25,7 +25,7 @@ import type { Polygon } from '../../vision/visibility';
 import type { MapSize } from '../../services/viewMapSize';
 import { insideSpans } from './spans';
 
-/** The smallest darkness cell, in world pixels: the online fog's cell. */
+/** The smallest darkness cell, in world pixels. */
 export const DARKNESS_MIN_CELL = 8;
 /** By default the map's long side holds at most this many cells; the cells double in size until it does. */
 export const MAX_DARKNESS_CELLS_PER_SIDE = 384;

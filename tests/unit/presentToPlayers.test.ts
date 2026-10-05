@@ -72,7 +72,7 @@ describe('Present to players', () => {
 
   it('presents without the player window while a target is active, and says players see it', async () => {
     playerWindowStore.setState({ isOpen: false });
-    const stop = addPresentationTarget({ id: 't', label: 'online players', isActive: () => true });
+    const stop = addPresentationTarget({ id: 't', label: 'the second screen', isActive: () => true });
     const { view, tabId } = fakeView();
     await presentViewToPlayers(view);
     stop();

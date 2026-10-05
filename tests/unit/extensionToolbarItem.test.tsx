@@ -4,7 +4,7 @@ import type { ToolbarItem, ViewContext } from '../../src/api/types/ui';
 
 const ctx: ViewContext = { viewId: 'v1', kind: 'map', isPlayerView: false };
 const entry = (item: Partial<ToolbarItem> = {}): Parameters<typeof extensionToolbarItem>[0] => ({
-  owner: 'ext', item: { id: 'x', icon: 'network', label: 'Online session', onClick: vi.fn(), ...item },
+  owner: 'ext', item: { id: 'x', icon: 'network', label: 'Quick notes', onClick: vi.fn(), ...item },
 });
 
 describe('extensionToolbarItem', () => {
@@ -26,7 +26,7 @@ describe('extensionToolbarItem', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const onClick = vi.fn();
     const { menuEntry } = extensionToolbarItem(entry({ onClick, shortcut: 'Ctrl+O' }), ctx);
-    expect(menuEntry).toMatchObject({ label: 'Online session', shortcut: 'Ctrl+O', isActive: false });
+    expect(menuEntry).toMatchObject({ label: 'Quick notes', shortcut: 'Ctrl+O', isActive: false });
     menuEntry.onSelect();
     expect(onClick).toHaveBeenCalledWith(ctx);
     const throwing = extensionToolbarItem(entry({ onClick: () => { throw new Error('boom'); } }), ctx).menuEntry;

@@ -57,10 +57,10 @@ describe('settings', () => {
 describe('storage', () => {
   it("C-storage-1: folder() is the extension's dot folder, created on first call and idempotent", async () => {
     const { app } = createInMemoryApp();
-    const storage = storageApi(app, 'atlas-vtt-connect');
-    expect(await storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect');
-    expect(await app.vault.adapter.exists('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect')).toBe(true);
-    expect(await storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/atlas-vtt-connect');
+    const storage = storageApi(app, 'my-extension');
+    expect(await storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/my-extension');
+    expect(await app.vault.adapter.exists('atlas-vtt/.atlas-data/extensions/my-extension')).toBe(true);
+    expect(await storage.folder()).toBe('atlas-vtt/.atlas-data/extensions/my-extension');
   });
 
   it('C-storage-2: an id outside kebab-case rejects in folder(), not when the storage is built', async () => {

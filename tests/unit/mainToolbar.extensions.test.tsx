@@ -64,7 +64,7 @@ import { registerRemoteControls } from '../../src/app/remote-view/remoteControls
 import type { ToolbarItem } from '../../src/api/types/ui';
 
 const item = (overrides: Partial<ToolbarItem> = {}): ToolbarItem => ({
-  id: 'x', icon: 'network', label: 'Online session', priority: 60, onClick: vi.fn(), ...overrides,
+  id: 'x', icon: 'network', label: 'Quick notes', priority: 60, onClick: vi.fn(), ...overrides,
 });
 
 /** Registers `toolbarItem` inside act; the returned function removes it. */
@@ -87,7 +87,7 @@ describe('MainToolbar with extension items', () => {
     expect(toolbarSlot.list()).toHaveLength(0);
   });
 
-  const button = (): HTMLElement | null => screen.queryByRole('button', { name: 'Online session' });
+  const button = (): HTMLElement | null => screen.queryByRole('button', { name: 'Quick notes' });
 
   it('shows a registered item with its label and no title attribute, and removes it with its disposer', () => {
     render(<MainToolbar viewId="view-1" />);

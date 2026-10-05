@@ -79,18 +79,18 @@ describe('notes with a byte order mark', () => {
   const bytes = (buffer: ArrayBuffer): number[] => [...new Uint8Array(buffer)];
   let stop: () => void = () => undefined;
 
-  beforeAll(() => { stop = bundleNoteKeys.add('test', ['atlas-share']); });
+  beforeAll(() => { stop = bundleNoteKeys.add('test', ['ext-share']); });
   afterAll(() => stop());
 
   it('keep the mark when a registered property is stripped, and read back the same text', () => {
-    const out = rewriteContent(note, encode('\uFEFF---\r\natlas-share: public\r\ntitle: x\r\n---\r\nBody'), new Map());
+    const out = rewriteContent(note, encode('\uFEFF---\r\next-share: public\r\ntitle: x\r\n---\r\nBody'), new Map());
     expect(bytes(out).slice(0, 3)).toEqual([0xef, 0xbb, 0xbf]);
     expect(bytes(out).slice(3, 6)).not.toEqual([0xef, 0xbb, 0xbf]);
     expect(decode(out)).toBe('---\r\ntitle: x\r\n---\r\nBody');
   });
 
   it('are not given one when the note had none', () => {
-    const out = rewriteContent(note, encode('---\natlas-share: public\n---\n'), new Map());
+    const out = rewriteContent(note, encode('---\next-share: public\n---\n'), new Map());
     expect(bytes(out).slice(0, 3)).toEqual([...new TextEncoder().encode('---')]);
   });
 

@@ -8,7 +8,7 @@ import { assetFilePath } from '../../src/app/services/vault-sync/assetFiles';
 import { fakeView, trackerWith } from './apiFakes';
 import { emptyMap, MAP_PATH, withScene, type Fixture } from './scenesFixture';
 
-const FOLDER = 'atlas-vtt/collections/Shared with me/Cave';
+const FOLDER = 'atlas-vtt/collections/Imported/Cave';
 const image = (path: string, text = path): { path: string; data: ArrayBuffer } => ({ path, data: new TextEncoder().encode(text).buffer });
 const withToken = (imagePath: string, fields: Partial<SavedMapInput> = {}): SavedMapInput => emptyMap({
   ...fields, objects: { tokens: { t1: { kind: 'token', id: 't1', x: 0, y: 0, imagePath } }, texts: {}, drawings: {}, fog: {} },
@@ -17,7 +17,7 @@ const withToken = (imagePath: string, fields: Partial<SavedMapInput> = {}): Save
 /** A scene this extension added: background bg.webp, one token drawn with tok.png. */
 async function added(fixture: Fixture): Promise<{ sceneId: string; mapPath: string }> {
   return fixture.scenes.addToCollection({
-    collection: { name: 'Shared with me' }, name: 'Cave', folder: FOLDER,
+    collection: { name: 'Imported' }, name: 'Cave', folder: FOLDER,
     map: withToken('tok.png', { background: 'bg.webp' }), images: [image('bg.webp', 'old bg'), image('tok.png', 'old token')],
   });
 }
@@ -32,7 +32,7 @@ describe('scenes.replaceMap', () => {
     const fixture = await withScene();
     const { sceneId, mapPath } = await added(fixture);
     // Another asset still draws the old token image: it stays.
-    await fixture.assets.addTokenAsset({ name: 'Goblin', imagePath: `${FOLDER}/tok.png`, collection: 'Shared with me', tags: [] });
+    await fixture.assets.addTokenAsset({ name: 'Goblin', imagePath: `${FOLDER}/tok.png`, collection: 'Imported', tags: [] });
     const pins = { p: { id: 'p', kind: 'pin' as const, x: 1, y: 2, notePath: 'Notes/Cave.md' } };
     const result = await fixture.scenes.replaceMap!(sceneId, { map: emptyMap({ background: 'bg.webp', pins, camera: { x: 3, y: 4, scale: 2 } }), images: [image('bg.webp', 'new bg')] });
     expect(result).toEqual({ sceneId, mapPath });
@@ -43,7 +43,7 @@ describe('scenes.replaceMap', () => {
     expect(map.objects.tokens).toEqual({});
     expect(files(fixture)).toEqual([`${FOLDER}/Cave.atlasmap`, `${FOLDER}/bg (2).webp`, `${FOLDER}/tok.png`]);
     expect(fixture.vault.files.get(`${FOLDER}/bg (2).webp`)).toBe('new bg');
-    expect(await fixture.assets.getAssetById(sceneId)).toMatchObject({ name: 'Cave', collection: 'Shared with me', data: { mapPath } });
+    expect(await fixture.assets.getAssetById(sceneId)).toMatchObject({ name: 'Cave', collection: 'Imported', data: { mapPath } });
   });
 
   it('C-scenes-5: keeps who added a scene in the index only, never in its record file or its extension data', async () => {
@@ -175,7 +175,7 @@ describe('scenes.replaceMap', () => {
   it('C-scenes-5: a change to the scene record during the call survives; only the image list is updated', async () => {
     const fixture = await withScene();
     const { sceneId } = await added(fixture);
-    const moved = 'atlas-vtt/collections/Shared with me/Moved.atlasmap';
+    const moved = 'atlas-vtt/collections/Imported/Moved.atlasmap';
     const write = vi.mocked(fixture.vault.app.vault.process);
     const original = write.getMockImplementation()!;
     write.mockImplementationOnce(async (file, fn) => {

@@ -41,8 +41,8 @@ describe('remoteViews', () => {
     const harness = await remoteHarness();
     const { api, views, workspace, files } = harness;
     const before = JSON.stringify([...files].sort());
-    const first = await api.open({ title: 'Online scene', icon: 'network', reuse: true });
-    const again = await api.open({ title: 'Online scene', reuse: true });
+    const first = await api.open({ title: 'Remote scene', icon: 'network', reuse: true });
+    const again = await api.open({ title: 'Remote scene', reuse: true });
     expect(again.viewId).toBe(first.viewId);
     expect(workspace.leavesOf('atlas-vtt-remote')).toHaveLength(1);
     expect(workspace.revealed.length).toBeGreaterThanOrEqual(2);
@@ -289,7 +289,7 @@ describe('remoteViews', () => {
     expect(store.getState().remoteView?.status.connection).toBe('Connected');
     const statusAction = vi.fn();
     view.onStatusAction!(statusAction);
-    view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null, actions: [{ id: 'shared', label: 'Shared with me' }] });
+    view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null, actions: [{ id: 'shared', label: 'Library' }] });
     store.getState().remoteView?.status.actions?.[0]?.run();
     expect(statusAction).toHaveBeenCalledExactlyOnceWith('shared');
     view.close();

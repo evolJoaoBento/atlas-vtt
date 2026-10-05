@@ -1,5 +1,5 @@
 /**
- * The remote view tab's own rules, the fork's regression cases (its view's tests) on Atlas's view:
+ * The remote view tab's own rules, as regression cases on Atlas's view:
  * never a navigation target, a tab nothing opened closes itself, a tab closed before it opened
  * makes `open()` reject and tells nobody, and it never loads or saves a file.
  */

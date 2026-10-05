@@ -55,13 +55,13 @@ describe('scenes', () => {
     const { scenes, vault } = await withScene();
     const { app } = vault;
     const assets = AssetService.getInstance(app);
-    const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: 'atlas-vtt/collections/Shared with me/Cave', map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
+    const input = { collection: { name: 'Imported' }, name: 'Cave', folder: 'atlas-vtt/collections/Imported/Cave', map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
     vi.spyOn(assets, 'addAsset').mockRejectedValueOnce(new Error('index full'));
     await expect(scenes.addToCollection(input)).rejects.toThrow('index full');
-    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me/Cave/bg.webp')).toBe(false);
-    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me/Cave/Cave.atlasmap')).toBe(false);
-    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me')).toBe(false);
-    expect((await assets.getCollections()).map((collection) => collection.id)).not.toContain('Shared with me');
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Imported/Cave/bg.webp')).toBe(false);
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Imported/Cave/Cave.atlasmap')).toBe(false);
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Imported')).toBe(false);
+    expect((await assets.getCollections()).map((collection) => collection.id)).not.toContain('Imported');
     expect((await assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
 
     // Writes are slowed so that overlapping calls would show: at most one runs at a time, and the first finishes before the second starts.
@@ -83,9 +83,9 @@ describe('scenes', () => {
     expect(a.sceneId).not.toBe(b.sceneId);
     expect(most).toBe(1);
     expect(log.findLastIndex((path) => path.includes('/Cave/'))).toBeLessThan(log.findIndex((path) => path.includes('/Cave 2/')));
-    expect((await assets.getCollections()).filter((collection) => collection.id === 'Shared with me')).toHaveLength(1);
+    expect((await assets.getCollections()).filter((collection) => collection.id === 'Imported')).toHaveLength(1);
     expect(JSON.parse(await app.vault.adapter.read(a.mapPath)).state).toMatchObject({ mapPath: a.mapPath, background: `${input.folder}/bg.webp` });
-    expect(await assets.getAssetById(a.sceneId)).toMatchObject({ collection: 'Shared with me', data: { mapPath: a.mapPath } });
+    expect(await assets.getAssetById(a.sceneId)).toMatchObject({ collection: 'Imported', data: { mapPath: a.mapPath } });
   });
 
   it('C-scenes-2: addToCollection refuses paths that leave the folder, and writes nothing', async () => {
@@ -241,27 +241,27 @@ describe('bundles', () => {
   afterEach(() => { bundleNoteKeys.detach(); for (const set of sets.splice(0)) set.disposeAll(); });
 
   it('C-bundles-1: stripNoteProperties adds keys until disposed', () => {
-    const stop = bundlesApi(scope('ext')).stripNoteProperties(['atlas-share']);
-    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(true);
+    const stop = bundlesApi(scope('ext')).stripNoteProperties(['ext-share']);
+    expect(bundleNoteKeys.keys().has('ext-share')).toBe(true);
     stop();
-    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(false);
+    expect(bundleNoteKeys.keys().has('ext-share')).toBe(false);
     expect(saved).toEqual({});
   });
 
   it('C-bundles-2: a key stays stripped after the extension unloads, also after Atlas restarts, and bad input is refused', () => {
     const own = scope('ext');
     const bundles = bundlesApi(own);
-    bundles.stripNoteProperties(['Atlas-Share', 'secret']);
-    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
+    bundles.stripNoteProperties(['Ext-Share', 'secret']);
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['ext-share', 'secret']);
     expect(() => bundles.stripNoteProperties([''])).toThrow(/non-empty/);
-    expect(() => bundles.stripNoteProperties('atlas-share' as never)).toThrow(/array/);
+    expect(() => bundles.stripNoteProperties('ext-share' as never)).toThrow(/array/);
     own.disposers.disposeAll(); // the extension unloads
-    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
-    expect(saved).toEqual({ ext: ['atlas-share', 'secret'] });
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['ext-share', 'secret']);
+    expect(saved).toEqual({ ext: ['ext-share', 'secret'] });
     // Atlas restarts with the extension not loaded: the settings bring the keys back
     bundleNoteKeys.detach();
     attach();
-    expect([...bundleNoteKeys.keys()].sort()).toEqual(['atlas-share', 'secret']);
+    expect([...bundleNoteKeys.keys()].sort()).toEqual(['ext-share', 'secret']);
   });
 
   it('C-bundles-3: a disposer called twice forgets nothing a later call remembered, and the caller changing its array changes nothing', () => {

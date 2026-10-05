@@ -234,11 +234,11 @@ describe('exporting', () => {
   });
 
   it("strips a registered note property from the bundle, installs without it and leaves the sender's note alone", async () => {
-    const stop = bundleNoteKeys.add('test', ['atlas-share']);
+    const stop = bundleNoteKeys.add('test', ['ext-share']);
     try {
       const creator = await creatorVault();
-      const lore = '---\natlas-share: [Ana]\nstatus: draft\n---\n# Door\nLocked.';
-      const goblin = '---\nstatblock: true\natlas-share: public\nimage: "[[goblin.png]]"\n---\nA goblin.';
+      const lore = '---\next-share: [Ana]\nstatus: draft\n---\n# Door\nLocked.';
+      const goblin = '---\nstatblock: true\next-share: public\nimage: "[[goblin.png]]"\n---\nA goblin.';
       await pinNote(creator, 'Lore/Cave.md#Door', lore);
       creator.vault.files.set(NOTE_PATH, goblin);
       const blob = await exportFrom(creator);
@@ -259,7 +259,7 @@ describe('exporting', () => {
       const fan = await emptyVault();
       await importInto(fan, blob);
       expect(fan.vault.files.get('atlas-vtt/collections/source/notes/Lore/Cave.md')).toBe('---\nstatus: draft\n---\n# Door\nLocked.');
-      expect([...fan.vault.files.values()].some((text) => text.includes('atlas-share'))).toBe(false);
+      expect([...fan.vault.files.values()].some((text) => text.includes('ext-share'))).toBe(false);
     } finally {
       stop();
     }

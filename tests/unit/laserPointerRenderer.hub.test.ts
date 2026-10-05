@@ -17,7 +17,7 @@ function harness(): { self: Record<string, unknown>; events: LocalLaserEvent[] }
   return { self, events };
 }
 
-describe("LaserPointerRenderer and online play", () => {
+describe("LaserPointerRenderer and the view's laser hub", () => {
   it("tells the view's hub each point of the GM's laser and when it is let go", () => {
     const { self, events } = harness();
     proto.addTrailPoint!.call(self, 10, 20);

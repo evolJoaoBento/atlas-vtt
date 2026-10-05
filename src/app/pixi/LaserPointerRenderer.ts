@@ -65,7 +65,7 @@ export class LaserPointerRenderer {
     store: ViewAtlasStore,
     canvasEl: HTMLCanvasElement,
     readSettings: () => LaserPointerSettings,
-    // The view's lasers for online play: each point of the GM's laser, and its lift.
+    // The view's lasers, which extensions hear: each point of the GM's laser, and its lift.
     hub: LaserHub | null = null,
   ) {
     this.viewport = viewport;
@@ -121,7 +121,7 @@ export class LaserPointerRenderer {
     this.onCanvasLeave = (): void => {
       this.lastPointerScreen = null;
       this.pointer = null;
-      // Online players must not see a laser held where nobody points any more.
+      // Nobody who follows the laser may see it held where nobody points any more.
       if (this.isPointing) this.liftLaser();
       this.redraw();
     };
@@ -249,7 +249,7 @@ export class LaserPointerRenderer {
     this.redraw();
   }
 
-  /** The GM let the laser go: online players see it fade. */
+  /** The GM let the laser go: whoever follows it sees it fade. */
   private liftLaser(): void {
     this.hub?.emitLocal({ kind: 'lift' });
   }

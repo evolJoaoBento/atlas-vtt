@@ -52,7 +52,7 @@ it('marks the tab presented to players, whether or not the player window is open
 });
 
 it("turns the presented tab's eye into a hide button that stops presenting while a target is active", () => {
-  const stop = addPresentationTarget({ id: 't', label: 'online players', isActive: () => true });
+  const stop = addPresentationTarget({ id: 't', label: 'the second screen', isActive: () => true });
   const tabMetaStore = createTabMetaStore();
   const tavern = tabMetaStore.getState().addTab('Tavern.atlasmap', 'Tavern');
   tabMetaStore.getState().setActiveTab(tavern);
