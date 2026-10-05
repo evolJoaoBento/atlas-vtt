@@ -21,7 +21,7 @@ export interface Darkness {
   covered: readonly WorldBounds[];
   /**
    * A positive check: true only when every darkness cell the part of `bounds` inside the map touches
-   * (its edges included) is proven shown. Anything else is not: a cell dark, a cell not on the raster,
+   * (its edges included) is shown per lighting cell (8·2^k px, each sampled at its centre). Anything else is not: a cell dark, a cell not on the raster,
    * bounds that are not finite or lie wholly outside the map. A text or drawing is sent only when this holds,
    * where `covered` only names what is surely dark, and misses the last strip of a map whose size is
    * not a multiple of the fog coverage's cells.
@@ -43,29 +43,58 @@ export function darknessOf(raster: DarknessRaster): Darkness {
       continue;
     }
     const op: PlayerFogOp = { type: 'lasso', erase: false, order: DARKNESS_ORDER, points };
-    return { fog: { [DARKNESS_FOG_ID]: op }, covered: rectangles(grid), shown: (bounds) => shownOn(grid, bounds) };
+    return { fog: { [DARKNESS_FOG_ID]: op }, covered: rectangles(grid), shown: shownTable(grid) };
   }
 }
 
-/** Whether every cell of `grid` that the part of `bounds` inside the map touches is shown (not dark); fail-closed. */
-function shownOn({ cols, rows, cellSize, map, dark }: DarknessRaster, bounds: WorldBounds): boolean {
+/** The cells of `grid` the part of `bounds` inside the map touches, edges included; null when there are none or the bounds are unusable. */
+function touchedCells({ cols, rows, cellSize, map }: DarknessRaster, bounds: WorldBounds): { c0: number; c1: number; r0: number; r1: number } | null {
   const right = bounds.x + Math.max(0, bounds.width);
   const bottom = bounds.y + Math.max(0, bounds.height);
-  if (![bounds.x, bounds.y, right, bottom].every(Number.isFinite)) return false;
-  if (right < 0 || bottom < 0 || bounds.x > map.width || bounds.y > map.height) return false;
+  if (![bounds.x, bounds.y, right, bottom].every(Number.isFinite)) return null;
+  if (right < 0 || bottom < 0 || bounds.x > map.width || bounds.y > map.height) return null;
   const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
   // An edge on a cell boundary touches the next cell as well: that cell counts.
   const c0 = Math.floor(clamp(bounds.x, map.width) / cellSize);
   const c1 = Math.min(cols - 1, Math.floor(clamp(right, map.width) / cellSize));
   const r0 = Math.floor(clamp(bounds.y, map.height) / cellSize);
   const r1 = Math.min(rows - 1, Math.floor(clamp(bottom, map.height) / cellSize));
-  if (c0 > c1 || r0 > r1) return false;
-  for (let row = r0; row <= r1; row++) {
-    for (let col = c0; col <= c1; col++) {
-      if (dark[row * cols + col] !== 0) return false;
+  return c0 > c1 || r0 > r1 ? null : { c0, c1, r0, r1 };
+}
+
+/** Whether every cell of `grid` that the part of `bounds` inside the map touches is shown (not dark); fail-closed. Scans the cells. */
+export function shownByScan(grid: DarknessRaster, bounds: WorldBounds): boolean {
+  const cells = touchedCells(grid, bounds);
+  if (!cells) return false;
+  for (let row = cells.r0; row <= cells.r1; row++) {
+    for (let col = cells.c0; col <= cells.c1; col++) {
+      if (grid.dark[row * grid.cols + col] !== 0) return false;
     }
   }
   return true;
+}
+
+/**
+ * The same answer as `shownByScan` in constant time: a summed-area table of the dark cells, built
+ * once per darkness, so a lit map with many large texts and drawings costs no scan for each.
+ */
+function shownTable(grid: DarknessRaster): (bounds: WorldBounds) => boolean {
+  const { cols, rows, dark } = grid;
+  const width = cols + 1;
+  const sums = new Int32Array(width * (rows + 1));
+  for (let row = 0; row < rows; row++) {
+    let line = 0;
+    for (let col = 0; col < cols; col++) {
+      if (dark[row * cols + col] !== 0) line++;
+      sums[(row + 1) * width + col + 1] = sums[row * width + col + 1]! + line;
+    }
+  }
+  return (bounds) => {
+    const cells = touchedCells(grid, bounds);
+    if (!cells) return false;
+    const { c0, c1, r0, r1 } = cells;
+    return sums[(r1 + 1) * width + c1 + 1]! - sums[r0 * width + c1 + 1]! - sums[(r1 + 1) * width + c0]! + sums[r0 * width + c0]! === 0;
+  };
 }
 
 /** Half as many cells each way; a cell is dark when any of the cells it holds is. */

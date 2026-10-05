@@ -102,7 +102,7 @@ export function projectForPlayers(state: ProjectedState, context: ProjectionCont
 }
 
 /**
- * What texts and drawings are checked against. Under lighting the item must be proven shown: wholly outside
+ * What texts and drawings are checked against. Under lighting the item must be shown per lighting cell: wholly outside
  * the map (or a map of unknown size) it is hidden, and any other item is clipped to the map and sent only when
  * every darkness cell its clipped bounds touch is shown (`Darkness.shown`, which also holds for a zero-area item:
  * the cell under it). The GM's fog and the darkness's rectangles apply on top.
