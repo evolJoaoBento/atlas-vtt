@@ -21,6 +21,7 @@ import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { Json } from '../../api/types/common';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { movedLegacySceneData } from './legacySceneData';
+import { SceneChangeWatcher } from './sceneChanges';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { trashVaultItem } from '../utils/trashVaultItem';
 
@@ -236,6 +237,7 @@ export class AssetService {
   private initialization: Promise<void> | null = null;
   /** Held by work that must not interleave with re-reading or checking the index, such as an import. */
   private readonly indexLock = new SerialLock();
+  private readonly sceneChanges = new SceneChangeWatcher();
   /** Metadata writes, in the order they were requested. */
   private readonly writes = new SerialLock();
   private saveCount = 0;
@@ -369,6 +371,12 @@ export class AssetService {
 
     // Ensure all collections have uid, version, and settings fields
     await this.migrateCollectionFields();
+    if (this.metadata) this.sceneChanges.check(this.metadata.assets);
+  }
+
+  /** Calls `listener` after scene records were added, removed, renamed, moved to another collection or pointed at another map. Returns the unsubscribe. */
+  onScenesChanged(listener: () => void): () => void {
+    return this.sceneChanges.onChange(listener);
   }
 
   /**
@@ -407,6 +415,7 @@ export class AssetService {
       this.metadata = stored.metadata;
       await this.migrateTags();
       await this.migrateCollectionFields();
+      this.sceneChanges.check(this.metadata.assets);
       return;
     }
   }
@@ -510,6 +519,7 @@ export class AssetService {
   /** Saves the index as it is now; saves reach the disk in the order they were made. */
   private saveMetadata(): Promise<void> {
     if (!this.metadata) return Promise.resolve();
+    this.sceneChanges.check(this.metadata.assets);
     const content = JSON.stringify(this.metadata, null, 2);
     this.saveCount++;
     return this.writes.run(() => this.writeMetadataFile(content));

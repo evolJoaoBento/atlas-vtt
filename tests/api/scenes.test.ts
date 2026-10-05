@@ -1,0 +1,243 @@
+// @vitest-environment node
+// Reading an image header needs Blob.arrayBuffer, which jsdom lacks.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { bundlesApi } from '../../src/api/bundles';
+import { DisposerSet } from '../../src/api/disposers';
+import { savedMapText } from '../../src/api/savedMap';
+import { scenesApi } from '../../src/api/scenes';
+import type { SavedMapInput, ScenesApi } from '../../src/api/types/scenes';
+import { bundleNoteKeys } from '../../src/app/extensions/bundleNoteKeys';
+import { AssetService } from '../../src/app/services/AssetService';
+import { createDefaultInitiativeState } from '../../src/app/types/initiativeTypes';
+import { createDefaultWidgets } from '../../src/app/storeFactory';
+import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
+
+const BACKGROUND = 'atlas-vtt/assets/bg.png';
+const MAP_PATH = 'atlas-vtt/collections/source/scenes/Cave.atlasmap';
+
+/** A PNG header: the signature and an IHDR chunk saying 320 x 200. Only the header is read. */
+const PNG = (): ArrayBuffer => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+  new DataView(bytes.buffer).setUint32(16, 320);
+  new DataView(bytes.buffer).setUint32(20, 200);
+  return bytes.buffer;
+};
+
+function emptyMap(overrides: Partial<SavedMapInput> = {}): SavedMapInput {
+  return {
+    background: null, grid: null, objects: { tokens: {}, texts: {}, drawings: {}, fog: {} },
+    widgets: { settings: createDefaultWidgets(), values: {} }, initiative: createDefaultInitiativeState(), ...overrides,
+  };
+}
+
+interface Fixture { scenes: ScenesApi; assets: AssetService; vault: InMemoryApp; sceneId: string; mapPath: string; scope: { id: string; disposers: DisposerSet } }
+
+async function withScene(): Promise<Fixture> {
+  AssetService.resetInstance();
+  const vault = createInMemoryApp();
+  vi.mocked(vault.app.vault.readBinary).mockImplementation(async (file: { path: string }) => (file.path === BACKGROUND ? PNG() : new ArrayBuffer(0)));
+  const assets = AssetService.getInstance(vault.app);
+  await assets.initialize();
+  await assets.createCollection('source');
+  await vault.app.vault.create(BACKGROUND, 'png');
+  const map = JSON.parse(savedMapText(emptyMap({ background: BACKGROUND }), MAP_PATH, 'Cave')) as { state: Record<string, unknown> };
+  // What a real save also holds, and an extension never gets back
+  Object.assign(map.state, { diceLog: [{ id: 'roll' }], dmNotePath: 'DM/Secret.md', exploredMask: 'mask' });
+  Object.assign(map.state.objects as object, { pins: { p1: { id: 'p1', notePath: 'DM/Secret.md' } }, walls: { w: { id: 'w' } } });
+  await vault.app.vault.create(MAP_PATH, JSON.stringify(map));
+  const scene = await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP_PATH } });
+  const scope = { id: 'ext', disposers: new DisposerSet() };
+  return { scenes: scenesApi(vault.app, scope), assets, vault, sceneId: scene.id, mapPath: MAP_PATH, scope };
+}
+
+beforeEach(() => { AssetService.resetInstance(); });
+afterEach(() => vi.restoreAllMocks());
+
+describe('scenes', () => {
+  it('lists scene records and finds one by its map', async () => {
+    const { scenes, sceneId } = await withScene();
+    expect(await scenes.list()).toEqual([{ id: sceneId, name: 'Cave', collectionId: 'source', mapPath: MAP_PATH }]);
+    expect(await scenes.findByMap(MAP_PATH)).toMatchObject({ id: sceneId });
+    expect(await scenes.findByMap('other.atlasmap')).toBeNull();
+    expect(Object.isFrozen((await scenes.list())[0])).toBe(true);
+  });
+
+  it('C-scenes-1: setData keeps data under the extension id, re-reads before writing, and null clears it', async () => {
+    const { scenes, assets, sceneId } = await withScene();
+    await scenes.setData(sceneId, { item: 'abc' });
+    expect((await assets.getAssetById(sceneId))!.data).toMatchObject({ extensions: { ext: { item: 'abc' } } });
+    await assets.updateAsset(sceneId, { data: { ...(await assets.getAssetById(sceneId) as { data: object }).data, mapPath: 'moved.atlasmap' } });
+    await scenes.setData(sceneId, { item: 'def' });
+    expect((await assets.getAssetById(sceneId))!.data).toMatchObject({ mapPath: 'moved.atlasmap', extensions: { ext: { item: 'def' } } });
+    expect(await scenes.getData(sceneId)).toEqual({ item: 'def' });
+    expect(Object.isFrozen(await scenes.getData(sceneId))).toBe(true);
+    await scenes.setData(sceneId, null);
+    expect((await assets.getAssetById(sceneId))!.data).not.toHaveProperty('extensions');
+    expect(await scenes.getData(sceneId)).toBeUndefined();
+  });
+
+  it("C-scenes-1: setData leaves other extensions' data alone, copies its value and refuses what is not a scene or not JSON", async () => {
+    const { scenes, assets, vault, sceneId } = await withScene();
+    await scenesApi(vault.app, { id: 'other' }).setData(sceneId, 'theirs');
+    const value = { list: [1] };
+    await scenes.setData(sceneId, value);
+    value.list.push(2);
+    expect(await scenes.getData(sceneId)).toEqual({ list: [1] });
+    await scenes.setData(sceneId, null);
+    expect((await assets.getAssetById(sceneId))!.data).toMatchObject({ extensions: { other: 'theirs' } });
+    await expect(scenes.setData('missing', 1)).rejects.toThrow(/no scene/);
+    await expect(scenes.setData(sceneId, undefined as never)).rejects.toThrow(/plain JSON/);
+    await expect(scenes.setData(sceneId, 1n as never)).rejects.toThrow(/plain JSON/);
+  });
+
+  it('C-scenes-2: addToCollection leaves nothing behind on failure and runs one at a time', async () => {
+    const { scenes, vault } = await withScene();
+    const { app } = vault;
+    const assets = AssetService.getInstance(app);
+    const input = { collection: { name: 'Shared with me' }, name: 'Cave', folder: 'atlas-vtt/collections/Shared with me/Cave', map: emptyMap({ background: 'bg.webp' }), images: [{ path: 'bg.webp', data: new ArrayBuffer(4) }] };
+    vi.spyOn(assets, 'addAsset').mockRejectedValueOnce(new Error('index full'));
+    await expect(scenes.addToCollection(input)).rejects.toThrow('index full');
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me/Cave/bg.webp')).toBe(false);
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me/Cave/Cave.atlasmap')).toBe(false);
+    expect(await app.vault.adapter.exists('atlas-vtt/collections/Shared with me')).toBe(false);
+    expect((await assets.getCollections()).map((collection) => collection.id)).not.toContain('Shared with me');
+    expect((await assets.getAssets(undefined, 'scene')).map((scene) => scene.name)).toEqual(['Cave']);
+
+    // Writes are slowed so that overlapping calls would show: at most one runs at a time, and the first finishes before the second starts.
+    let running = 0;
+    let most = 0;
+    const log: string[] = [];
+    for (const method of ['createBinary', 'create'] as const) {
+      const mock = vi.mocked(app.vault[method]);
+      const original = mock.getMockImplementation() as (path: string, data: never) => Promise<unknown>;
+      mock.mockImplementation((async (path: string, data: never) => {
+        running++;
+        most = Math.max(most, running);
+        log.push(path);
+        for (let tick = 0; tick < 10; tick++) await Promise.resolve();
+        try { return await original(path, data); } finally { running--; }
+      }) as never);
+    }
+    const [a, b] = await Promise.all([scenes.addToCollection(input), scenes.addToCollection({ ...input, name: 'Cave 2', folder: `${input.folder} 2` })]);
+    expect(a.sceneId).not.toBe(b.sceneId);
+    expect(most).toBe(1);
+    expect(log.findLastIndex((path) => path.includes('/Cave/'))).toBeLessThan(log.findIndex((path) => path.includes('/Cave 2/')));
+    expect((await assets.getCollections()).filter((collection) => collection.id === 'Shared with me')).toHaveLength(1);
+    expect(JSON.parse(await app.vault.adapter.read(a.mapPath)).state).toMatchObject({ mapPath: a.mapPath, background: `${input.folder}/bg.webp` });
+    expect(await assets.getAssetById(a.sceneId)).toMatchObject({ collection: 'Shared with me', data: { mapPath: a.mapPath } });
+  });
+
+  it('C-scenes-2: addToCollection refuses paths that leave the folder, and writes nothing', async () => {
+    const { scenes, vault } = await withScene();
+    const folder = 'atlas-vtt/collections/source/Cave';
+    const base = { collection: { id: 'source' }, name: 'Cave', folder, map: emptyMap(), images: [] };
+    for (const path of ['../escape.webp', '/abs.webp', 'a/../../b.webp', 'a\\b.webp', '', 'a//b.webp']) {
+      await expect(scenes.addToCollection({ ...base, images: [{ path, data: new ArrayBuffer(1) }] })).rejects.toThrow();
+    }
+    await expect(scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/other/Cave' })).rejects.toThrow(/inside the collection/);
+    await expect(scenes.addToCollection({ ...base, folder: 'atlas-vtt/collections/source/../x' })).rejects.toThrow();
+    await expect(scenes.addToCollection({ ...base, collection: { id: 'nope' } })).rejects.toThrow(/no collection/);
+    await expect(scenes.addToCollection({ ...base, collection: { name: 'bad/name' } })).rejects.toThrow(/cannot contain/);
+    expect(vault.folders.has(folder)).toBe(false);
+    expect([...vault.files.keys()].some((path) => path.includes('escape') || path.includes('abs.webp'))).toBe(false);
+  });
+
+  it('C-scenes-2: addToCollection into an existing collection keeps it, numbers a taken map name and does not touch existing files', async () => {
+    const { scenes, assets, vault } = await withScene();
+    const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [] };
+    const added = await scenes.addToCollection(input);
+    expect(added.mapPath).toBe('atlas-vtt/collections/source/scenes/Cave (2).atlasmap');
+    expect(vault.files.has(MAP_PATH)).toBe(true);
+    await expect(scenes.addToCollection({ ...input, images: [{ path: '../scenes/Cave.atlasmap', data: new ArrayBuffer(1) }] })).rejects.toThrow();
+    vi.spyOn(assets, 'addAsset').mockRejectedValueOnce(new Error('nope'));
+    await expect(scenes.addToCollection(input)).rejects.toThrow('nope');
+    expect(vault.files.has(MAP_PATH)).toBe(true);
+    expect(vault.files.has(added.mapPath)).toBe(true);
+    expect(vault.files.has('atlas-vtt/collections/source/scenes/Cave (3).atlasmap')).toBe(false);
+    expect(vault.folders.has('atlas-vtt/collections/source')).toBe(true);
+  });
+
+  it('C-scenes-3: readMap returns the migrated map with its size, or null for a missing file', async () => {
+    const { scenes, mapPath } = await withScene();
+    const map = await scenes.readMap(mapPath);
+    expect(map?.objects.tokens).toEqual({});
+    expect(map?.background).toBe(BACKGROUND);
+    expect(map?.mapSize).toEqual({ width: 320, height: 200 });
+    expect(await scenes.readMap('nope.atlasmap')).toBeNull();
+    await expect(scenes.readMap('atlas-vtt/assets/bg.png')).rejects.toThrow(/\.atlasmap/);
+  });
+
+  it('C-scenes-3: readMap copies nothing private, hands out a frozen copy and sizes a map without a background 0 x 0', async () => {
+    const { scenes, mapPath, vault } = await withScene();
+    const map = (await scenes.readMap(mapPath))!;
+    expect(Object.keys(map).sort()).toEqual(['background', 'grid', 'initiative', 'lighting', 'mapSize', 'objects', 'widgets']);
+    expect(Object.keys(map.objects).sort()).toEqual(['drawings', 'fog', 'texts', 'tokens']);
+    expect(JSON.stringify(map)).not.toContain('Secret');
+    expect(Object.isFrozen(map)).toBe(true);
+    expect(Object.isFrozen(map.objects)).toBe(true);
+    const plain = 'atlas-vtt/collections/source/scenes/Plain.atlasmap';
+    await vault.app.vault.create(plain, savedMapText(emptyMap(), plain, 'Plain'));
+    expect((await scenes.readMap(plain))?.mapSize).toEqual({ width: 0, height: 0 });
+  });
+
+  it('rejects with a clear error when the asset index failed to load', async () => {
+    const vault = createInMemoryApp();
+    vi.spyOn(AssetService.getInstance(vault.app), 'initialize').mockRejectedValue(new Error('disk gone'));
+    await expect(scenesApi(vault.app, { id: 'ext' }).list()).rejects.toThrow(/asset index is not available: disk gone/);
+  });
+});
+
+describe('scenes-changed', () => {
+  it('C-scenes-4: fires when scene records are added, renamed, moved or removed, and not for anything else', async () => {
+    const { assets, sceneId } = await withScene();
+    const changed = vi.fn();
+    const stop = assets.onScenesChanged(changed);
+    await assets.addTokenAsset({ name: 'Goblin', imagePath: 'goblin.webp', collection: 'source', tags: [] });
+    await assets.updateAsset(sceneId, { tags: ['x'] });
+    expect(changed).not.toHaveBeenCalled();
+    const added = await assets.addAsset({ type: 'scene', name: 'Inn', collection: 'source', tags: [], data: { mapPath: 'inn.atlasmap' } });
+    expect(changed).toHaveBeenCalledTimes(1);
+    await assets.updateAsset(added.id, { name: 'Tavern' });
+    expect(changed).toHaveBeenCalledTimes(2);
+    await assets.updateAsset(added.id, { data: { mapPath: 'tavern.atlasmap' } });
+    expect(changed).toHaveBeenCalledTimes(3);
+    await assets.deleteAsset(added.id);
+    expect(changed).toHaveBeenCalledTimes(4);
+    stop();
+    await assets.addAsset({ type: 'scene', name: 'Again', collection: 'source', tags: [], data: { mapPath: 'again.atlasmap' } });
+    expect(changed).toHaveBeenCalledTimes(4);
+  });
+
+  it('C-scenes-4: a failing listener does not stop the others', async () => {
+    const { assets } = await withScene();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const later = vi.fn();
+    assets.onScenesChanged(() => { throw new Error('boom'); });
+    assets.onScenesChanged(later);
+    await assets.addAsset({ type: 'scene', name: 'Inn', collection: 'source', tags: [], data: { mapPath: 'inn.atlasmap' } });
+    expect(later).toHaveBeenCalled();
+    expect(errors).toHaveBeenCalled();
+  });
+});
+
+describe('bundles', () => {
+  it('C-bundles-1: stripNoteProperties adds keys until disposed', () => {
+    const disposers = new DisposerSet();
+    const stop = bundlesApi({ id: 'ext', disposers }).stripNoteProperties(['atlas-share']);
+    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(true);
+    stop();
+    expect(bundleNoteKeys.keys().has('atlas-share')).toBe(false);
+  });
+
+  it('C-bundles-1: keys of an extension go when it disconnects, and bad input is refused', () => {
+    const disposers = new DisposerSet();
+    const bundles = bundlesApi({ id: 'ext', disposers });
+    bundles.stripNoteProperties(['Atlas-Share', 'secret']);
+    expect([...bundleNoteKeys.keys()]).toEqual(['atlas-share', 'secret']);
+    expect(() => bundles.stripNoteProperties([''])).toThrow(/non-empty/);
+    expect(() => bundles.stripNoteProperties('atlas-share' as never)).toThrow(/array/);
+    disposers.disposeAll();
+    expect(bundleNoteKeys.keys().size).toBe(0);
+  });
+});

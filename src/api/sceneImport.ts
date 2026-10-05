@@ -1,0 +1,128 @@
+import { normalizePath, type App, type TAbstractFile } from 'obsidian';
+import { ensureFolder } from '../app/plugin/vaultFolders';
+import type { AssetService, CollectionMetadata } from '../app/services/AssetService';
+import { collectionFolderName, collectionFolderPath, collectionNameProblem } from '../app/services/assetPaths';
+import { mapStrings } from '../app/utils/mapStrings';
+import { trashVaultItem } from '../app/utils/trashVaultItem';
+import { savedMapText } from './savedMap';
+import type { ScenesApi } from './types/scenes';
+
+type AddInput = Parameters<ScenesApi['addToCollection']>[0];
+
+/** Whether `path` is a plain relative path: no empty, `.` or `..` segment, no leading slash or backslash. */
+function isPlainRelative(path: unknown): path is string {
+  return typeof path === 'string' && path.length > 0 && path.length < 1024 && !path.includes('\\') && !path.startsWith('/')
+    && ![...path].some((character) => character.charCodeAt(0) < 0x20)
+    && path.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+}
+
+const isInside = (path: string, folder: string): boolean => normalizePath(path).startsWith(`${normalizePath(folder)}/`);
+
+/** The collection `ref` names; a name no collection has creates it. */
+async function resolveCollection(assets: AssetService, ref: AddInput['collection']): Promise<{ id: string; created: boolean }> {
+  const known = await assets.getCollections();
+  if ('id' in ref) {
+    if (!known.some((collection) => collection.id === ref.id)) throw new Error(`[Atlas API] There is no collection with the id "${String(ref.id)}".`);
+    return { id: ref.id, created: false };
+  }
+  const problem = typeof ref.name === 'string' ? collectionNameProblem(ref.name) : 'Enter a name';
+  if (problem) throw new Error(`[Atlas API] The collection name cannot be used: ${problem}`);
+  const key = ref.name.trim().toLowerCase();
+  const match = known.find((collection: CollectionMetadata) => collection.id.toLowerCase() === key || collection.name.toLowerCase() === key);
+  if (match) return { id: match.id, created: false };
+  return { id: (await assets.createCollection(ref.name.trim())).id, created: true };
+}
+
+/** `folder/stem.atlasmap`, or `stem (2)`, `stem (3)`, … while a file or a name differing only by case is there. */
+function freeMapPath(app: App, folder: string, name: string): string {
+  const taken = new Set((app.vault.getFolderByPath(folder)?.children ?? []).map((child) => child.name.toLowerCase()));
+  const stem = collectionFolderName(name);
+  let file = `${stem}.atlasmap`;
+  for (let n = 2; taken.has(file.toLowerCase()); n++) file = `${stem} (${n}).atlasmap`;
+  return `${folder}/${file}`;
+}
+
+/** The first folder of `folder`'s path that does not exist yet; null when all of it does. */
+function firstMissingFolder(app: App, folder: string): string | null {
+  const parts = folder.split('/');
+  for (let length = 1; length <= parts.length; length++) {
+    const path = parts.slice(0, length).join('/');
+    if (!app.vault.getAbstractFileByPath(path)) return path;
+  }
+  return null;
+}
+
+/** Removes what a failed call wrote, last first; a failing cleanup is logged and never hides the error that made it necessary. */
+async function undo(app: App, assets: AssetService, written: readonly string[], folder: string | null, collection: string | null, mapPath: string): Promise<void> {
+  const attempt = async (step: () => Promise<void>): Promise<void> => {
+    try {
+      await step();
+    } catch (error) {
+      console.error('[Atlas API] Could not remove what a failed addToCollection wrote:', error);
+    }
+  };
+  await attempt(async () => {
+    const scene = (await assets.getAssets(undefined, 'scene')).find((asset) => asset.data?.mapPath === mapPath);
+    if (scene) await assets.deleteAsset(scene.id);
+  });
+  for (const path of [...written].reverse()) {
+    await attempt(async () => {
+      const file: TAbstractFile | null = app.vault.getAbstractFileByPath(path);
+      if (file) await trashVaultItem(app, file);
+    });
+  }
+  if (folder) {
+    await attempt(async () => {
+      const dir = app.vault.getAbstractFileByPath(folder);
+      if (dir) await trashVaultItem(app, dir);
+    });
+  }
+  if (collection) await attempt(() => assets.deleteCollection(collection));
+}
+
+/**
+ * Adds a scene with its images under the asset index lock, so the vault check never adopts the map as a second
+ * scene and two calls never pick the same file name. Everything is checked before the first write; a failure
+ * afterwards removes what this call wrote (including a folder or collection it created) and rethrows.
+ */
+export function addSceneToCollection(app: App, assets: AssetService, input: AddInput): Promise<{ sceneId: string; mapPath: string }> {
+  return assets.runExclusive(async () => {
+    if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
+      throw new Error('[Atlas API] addToCollection needs { collection, name, folder, map, images }.');
+    }
+    const collection = await resolveCollection(assets, input.collection);
+    const written: string[] = [];
+    let createdFolder: string | null = null;
+    let mapPath = '';
+    try {
+      const folder = typeof input.folder === 'string' ? normalizePath(input.folder) : '';
+      if (!isPlainRelative(folder) || !isInside(`${folder}/x`, collectionFolderPath(collection.id))) {
+        throw new Error(`[Atlas API] The folder must lie inside the collection's folder, ${collectionFolderPath(collection.id)}.`);
+      }
+      const targets = new Map<string, ArrayBuffer>();
+      for (const image of input.images as AddInput['images']) {
+        const path: unknown = image?.path;
+        if (!isPlainRelative(path) || !isInside(`${folder}/${path}`, folder)) throw new Error(`[Atlas API] The image path "${String(path)}" must stay inside the folder.`);
+        const target = `${folder}/${path}`;
+        if (targets.has(target) || app.vault.getAbstractFileByPath(target)) throw new Error(`[Atlas API] There is already a file at ${target}.`);
+        targets.set(target, image.data);
+      }
+      createdFolder = firstMissingFolder(app, folder);
+      await ensureFolder(app, folder);
+      for (const [target, data] of targets) {
+        written.push(target);
+        await app.vault.createBinary(target, data);
+      }
+      mapPath = freeMapPath(app, folder, input.name);
+      const imagePaths = new Map([...targets.keys()].map((target) => [target.slice(folder.length + 1), target]));
+      const map = mapStrings(input.map, (text) => imagePaths.get(text) ?? text);
+      written.push(mapPath);
+      await app.vault.create(mapPath, savedMapText(map, mapPath, input.name.trim()));
+      const scene = await assets.addAsset({ type: 'scene', name: input.name.trim(), collection: collection.id, tags: [], data: { mapPath } });
+      return { sceneId: scene.id, mapPath };
+    } catch (error) {
+      await undo(app, assets, written, createdFolder, collection.created ? collection.id : null, mapPath);
+      throw error;
+    }
+  });
+}

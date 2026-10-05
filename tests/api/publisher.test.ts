@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initialize = vi.hoisted(() => vi.fn<() => Promise<void>>());
+const sceneListeners = vi.hoisted(() => new Set<() => void>());
 vi.mock('../../src/app/services/AssetService', () => ({
-  AssetService: { getInstance: (): { initialize: () => Promise<void> } => ({ initialize }) },
+  AssetService: {
+    getInstance: (): { initialize: () => Promise<void>; onScenesChanged: (listener: () => void) => () => void } => ({
+      initialize,
+      onScenesChanged: (listener: () => void): (() => void) => { sceneListeners.add(listener); return () => { sceneListeners.delete(listener); }; },
+    }),
+  },
 }));
 
 // The facades load the present path, which loads the view code; none of it runs here.
@@ -26,6 +32,7 @@ function atlas(): { plugin: AtlasVTTPlugin; triggered: ReturnType<typeof fakeApp
 describe('ExtensionApiPublisher', () => {
   beforeEach(() => {
     initialize.mockReset();
+    sceneListeners.clear();
   });
 
   it('sets plugin.api only once the asset index is ready, then announces it', async () => {
@@ -75,6 +82,19 @@ describe('ExtensionApiPublisher', () => {
     await new ExtensionApiPublisher(plugin).start();
     expect(plugin.api).toBeDefined();
     expect(triggered).toEqual([{ name: 'atlas-vtt:api-ready', data: [plugin.api] }]);
+  });
+
+  it('C-scenes-4: tells extensions when the index reports a scene change, until stopped', async () => {
+    initialize.mockResolvedValue(undefined);
+    const { plugin } = atlas();
+    const publisher = new ExtensionApiPublisher(plugin);
+    await publisher.start();
+    const listener = vi.fn();
+    plugin.api?.connect(fakePlugin('ext')).on('scenes-changed', listener);
+    for (const notify of sceneListeners) notify();
+    expect(listener).toHaveBeenCalledTimes(1);
+    publisher.stop();
+    expect(sceneListeners.size).toBe(0);
   });
 
   it('disposes the sight frames of every view on stop', async () => {

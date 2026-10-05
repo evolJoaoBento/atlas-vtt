@@ -362,7 +362,7 @@ export type TokenInput = Omit<TokenEntity, 'id' | 'kind'> & { kind?: 'token' | '
 export type PersistedViewState = Partial<ViewAtlasState>;
 
 // Simple default widget settings
-const createDefaultWidgets = (): WidgetSettings => ({
+export const createDefaultWidgets = (): WidgetSettings => ({
   widgets: {},
   globalVisible: true,
   position: 'top',

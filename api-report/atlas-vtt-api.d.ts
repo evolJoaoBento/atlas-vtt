@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.7.0";
+export declare const API_VERSION = "1.8.0";
 
 /** `app.plugins.plugins['atlas-vtt'].api`, set once Atlas's storage and asset index are ready. */
 export declare interface AtlasApi {
@@ -31,6 +31,8 @@ export declare interface AtlasEvents {
     'rules-changed': (collectionId: string | null) => void;
     /** A setting's value changed; read it again with `settings.get`. */
     'settings-changed': (key: AtlasSettingKey) => void;
+    /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
+    'scenes-changed': () => void;
 }
 
 export declare interface AtlasExtension {
@@ -46,6 +48,8 @@ export declare interface AtlasExtension {
     readonly settings: SettingsApi;
     readonly storage: StorageApi;
     readonly ui: UiApi;
+    readonly scenes: ScenesApi;
+    readonly bundles: BundlesApi;
     on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }
 
@@ -111,6 +115,11 @@ export declare interface BaseToken {
     layer?: number;
     /** Instance number for distinguishing multiple tokens of the same type (same imagePath) */
     instanceNumber?: number;
+}
+
+export declare interface BundlesApi {
+    /** Frontmatter keys removed from notes when a collection is exported and when a bundle is installed (e.g. 'atlas-share'). */
+    stripNoteProperties(keys: readonly string[]): Disposer;
 }
 
 /**
@@ -826,6 +835,17 @@ export declare interface RulesApi {
     forMap(mapPath: string | null): MapRules;
 }
 
+/** The parts of a saved map an extension may read and write; everything else in the file stays Atlas's. */
+export declare interface SavedMapInput {
+    /** As in `SceneSnapshot`. Written with `addToCollection`, image paths are relative to its `images` and become vault paths; `readMap` returns vault paths. */
+    background: BackgroundState;
+    grid: GridState | null;
+    objects: SceneSnapshot['objects'];
+    widgets: SceneSnapshot['widgets'];
+    initiative: InitiativeState;
+    lighting?: SceneLighting;
+}
+
 /** Dynamic lighting of one scene. Saved in the map file, never undo-tracked. */
 export declare interface SceneLighting {
     enabled: boolean;
@@ -854,6 +874,51 @@ export declare interface SceneLighting {
     darkSightLook?: DarkSightLook;
     /** Tint of that picture, `#rrggbb`; unset is none. Read with `darkSightTintOf`. */
     darkSightTint?: string;
+}
+
+export declare interface SceneRecord {
+    id: string;
+    name: string;
+    collectionId: string;
+    mapPath: string | null;
+}
+
+export declare interface ScenesApi {
+    list(): Promise<SceneRecord[]>;
+    findByMap(mapPath: string): Promise<SceneRecord | null>;
+    /** This extension's data on the scene record (`data.extensions[<extension id>]`); a frozen copy, undefined when unset. */
+    getData(sceneId: string): Promise<Json | undefined>;
+    /** Sets or (null) clears it. Atlas drops it from copies, exports and imports, and leaves it out of fingerprints. */
+    setData(sceneId: string, value: Json | null): Promise<void>;
+    /** A saved `.atlasmap` file, migrated to the current format, without opening a view; a frozen copy. Null when there is no such file. */
+    readMap(mapPath: string): Promise<(SavedMapInput & {
+        mapSize: {
+            width: number;
+            height: number;
+        };
+    }) | null>;
+    /**
+     * Writes the images and the map file into `folder` (inside the collection's folder) and adds the scene record,
+     * all under the asset index lock; on failure nothing is left behind. Creates the collection by name when
+     * none of that name exists. A path in `images` that is absolute or climbs out of `folder` is refused.
+     */
+    addToCollection(input: {
+        collection: {
+            id: string;
+        } | {
+            name: string;
+        };
+        name: string;
+        folder: string;
+        map: SavedMapInput;
+        images: ReadonlyArray<{
+            path: string;
+            data: ArrayBuffer;
+        }>;
+    }): Promise<{
+        sceneId: string;
+        mapPath: string;
+    }>;
 }
 
 /** The scene in a view's store. Records are the store's frozen data, passed by reference: never mutate them. */

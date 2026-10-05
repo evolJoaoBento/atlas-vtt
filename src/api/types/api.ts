@@ -5,6 +5,7 @@ import type { LasersApi } from './lasers';
 import type { LightingApi } from './lighting';
 import type { PresentationApi } from './presentation';
 import type { RulesApi } from './rules';
+import type { BundlesApi, ScenesApi } from './scenes';
 import type { AtlasSettingKey, SettingsApi, StorageApi } from './settings';
 import type { TokensApi } from './tokens';
 import type { UiApi } from './ui';
@@ -33,6 +34,8 @@ export interface AtlasEvents {
   'rules-changed': (collectionId: string | null) => void;
   /** A setting's value changed; read it again with `settings.get`. */
   'settings-changed': (key: AtlasSettingKey) => void;
+  /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
+  'scenes-changed': () => void;
 }
 
 export interface AtlasExtension {
@@ -48,5 +51,7 @@ export interface AtlasExtension {
   readonly settings: SettingsApi;
   readonly storage: StorageApi;
   readonly ui: UiApi;
+  readonly scenes: ScenesApi;
+  readonly bundles: BundlesApi;
   on<E extends keyof AtlasEvents>(event: E, listener: AtlasEvents[E]): Disposer;
 }

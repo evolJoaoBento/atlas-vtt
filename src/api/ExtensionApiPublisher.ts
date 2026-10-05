@@ -45,6 +45,7 @@ export class ExtensionApiPublisher {
     views.start();
     this.plugin.api = host.api;
     host.publish();
+    this.stopWatches.push(AssetService.getInstance(this.plugin.app).onScenesChanged(() => host.apiEvents.emit('scenes-changed')));
     this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents, true), watchSettings(this.plugin.settingsService, host.apiEvents));
   }
 
