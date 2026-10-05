@@ -2,7 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { registerRemoteControls } from '../../src/app/remote-view/remoteControls';
-import { RemoteViewDice, rollOfResult, ROLL_DICE_COUNT } from '../../src/app/remote-view/RemoteViewDice';
+import { RemoteViewDice, rollDiceCount, rollOfResult } from '../../src/app/remote-view/RemoteViewDice';
 import { DiceRollLog } from '../../src/app/react/components/dice-log/DiceRollLog';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
@@ -76,6 +76,12 @@ describe("a remote view's dice log", () => {
     expect(dice.roll({ d20: 1, nonsense: 3 }, 2)).toBeNull();
     expect(second).toHaveBeenCalledWith({ d20: 1 }, 2);
     expect(third).not.toHaveBeenCalled();
-    expect(dice.roll({ d6: 101 }, 0)).toBe(ROLL_DICE_COUNT);
+    expect(dice.roll({ d6: 101 }, 0)).toBe(rollDiceCount(100));
+    // An owner's own limit: Connect sends at most 20 dice.
+    const twenty = new RemoteViewDice(store, 20);
+    twenty.rolls.add(() => null);
+    expect(twenty.roll({ d6: 21 }, 0)).toBe('Roll 1 to 20 dice.');
+    expect(twenty.roll({ d6: 20 }, 0)).toBeNull();
+    expect(store.getState().remoteView?.maxDice).toBe(20);
   });
 });

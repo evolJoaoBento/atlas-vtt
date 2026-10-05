@@ -11,7 +11,8 @@
 - Extension API: list scenes, keep an extension's own data on a scene (never exported), read a saved map without opening it, add a scene with its images in one step, and keep note properties out of exports
 - Extension API: a presented scene carries a `presentationId`, the same while the scene is held and resumed and new for each presentation, so an extension no longer has to guess whether it is the one it knows
 - Extension API: note properties an extension asks to keep out of exports stay stripped while that extension is switched off, until it removes them itself, which `bundles.forgetNoteProperties` also does
-- Extension API: 1.12 (optional `remote-view` capability): a read-only map view fed by another plugin, never saved, with the player's tools: dragging the tokens they may move, measuring, the laser and the dice tray into a shared log
+- Extension API: an optional `remote-view` capability: a read-only map view fed by another plugin, never saved, with the player's tools: dragging the tokens they may move, measuring, the laser and the dice tray into a shared log
+- Extension API: remote views are listed by `views.list()` and announced by `map-loaded` and `map-closed` as `kind: 'remote'`; an extension that picks the GM's map views keeps to `kind === 'map'`
 
 ## Improved
 

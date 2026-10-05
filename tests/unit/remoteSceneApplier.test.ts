@@ -105,4 +105,14 @@ describe('RemoteSceneApplier', () => {
     applier.apply(remoteScene({ objects: { tokens: {}, texts: {}, drawings: {}, fog: {} } }));
     expect(getHistoryStore(store)?.getState().pastStates).toHaveLength(0);
   });
+
+  it("drops a token's links into a vault: the view never reads the player's own notes by them", () => {
+    const { store, applier } = setup();
+    const linked = { ...remoteToken('t1'), kind: 'character', name: 'Ogre', notePath: 'notes/ogre.md', statblockPath: 'bestiary/ogre.md' } as never;
+    applier.apply(remoteScene({ objects: { tokens: { t1: linked }, texts: {}, drawings: {}, fog: {} } }));
+    const token = store.getState().objects.tokens.t1 as Record<string, unknown>;
+    expect(token.name).toBe('Ogre');
+    expect(token).not.toHaveProperty('notePath');
+    expect(token).not.toHaveProperty('statblockPath');
+  });
 });

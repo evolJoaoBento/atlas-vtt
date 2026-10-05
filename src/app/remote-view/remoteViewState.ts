@@ -31,6 +31,8 @@ export interface RemoteViewState {
   status: RemoteStatus;
   /** The shared dice log the view's dice log shows. */
   diceLog: readonly DiceRollResult[];
+  /** The most dice the tray offers for one roll (`remoteViews.open({ maxDice })`). */
+  maxDice: number;
   /** The player's latest own roll, which the view throws once (by id); null before the first. */
   ownRoll: DiceRollResult | null;
 }
@@ -45,6 +47,7 @@ export function initialRemoteViewState(): RemoteViewState {
     initiativeRules: null,
     status: { title: '', connection: '', tone: 'pending', message: null },
     diceLog: [],
+    maxDice: 100,
     ownRoll: null,
   };
 }

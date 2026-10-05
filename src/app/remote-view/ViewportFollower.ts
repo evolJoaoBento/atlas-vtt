@@ -13,6 +13,11 @@ export const PLAYER_MOVES: ReadonlySet<string> = new Set(['drag', 'wheel', 'pinc
 export const GLIDE_MS = 150;
 /** Space left around the map when it is fitted, in screen pixels. */
 export const FIT_PADDING = 16;
+/** The zoom a camera may ask for, as screen pixels per world unit. */
+export const MIN_ZOOM = 1 / 64;
+export const MAX_ZOOM = 64;
+
+const clampZoom = (zoom: number): number => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
 
 /** The part of pixi-viewport's `Viewport` the follower uses. */
 export interface FollowViewport {
@@ -119,12 +124,12 @@ export class ViewportFollower {
     const screen = { width: Math.max(1, screenWidth), height: Math.max(1, screenHeight) };
     if (goal.kind === 'view') {
       const { view } = goal;
-      return { centerX: view.centerX, centerY: view.centerY, zoom: Math.min(screen.width / view.width, screen.height / view.height) };
+      return { centerX: view.centerX, centerY: view.centerY, zoom: clampZoom(Math.min(screen.width / view.width, screen.height / view.height)) };
     }
     const map = this.options.mapSize();
     if (!map) return null;
     const zoom = Math.min(Math.max(1, screen.width - 2 * FIT_PADDING) / Math.max(1e-6, map.width), Math.max(1, screen.height - 2 * FIT_PADDING) / Math.max(1e-6, map.height));
-    return { centerX: map.width / 2, centerY: map.height / 2, zoom };
+    return { centerX: map.width / 2, centerY: map.height / 2, zoom: clampZoom(zoom) };
   }
 
   private schedule(): void {

@@ -92,7 +92,8 @@ describe('resources in the remote view', () => {
   it('draws no bar for a definition players may not see, which still downs the token', () => {
     mockCanvas();
     const store = remoteStore();
-    expect(store.getState().tokenSettings.hiddenResources).toEqual(['downed']);
+    // Decided per token: nothing is hidden map-wide.
+    expect(store.getState().tokenSettings.hiddenResources).toEqual([]);
     const ui = tokenUi(store);
     try {
       ui.update(tokenOf(store, 'fallen'), 70);
@@ -100,5 +101,30 @@ describe('resources in the remote view', () => {
     } finally { ui.destroy(); }
     expect(isTokenDowned(tokenOf(store, 'fallen'), definitionsOf(store)('fallen'))).toBe(true);
     expect(isTokenDowned(tokenOf(store, 'hurt'), definitionsOf(store)('hurt'))).toBe(false);
+  });
+
+  it('decides per token: a key hidden on one token still draws its bar on another', () => {
+    mockCanvas();
+    const { app } = createInMemoryApp();
+    const store = createViewAtlasStore(app, 'remote-shared-key', undefined, false, { remote: true });
+    const scene = new RemoteViewScene({ app, viewId: 'remote-shared-key', atlasStore: store, containerEl: document.createElement('div'), renderer: null });
+    scene.setScene(remoteScene({ objects: {
+      tokens: { secret: character('secret', { bar0: { current: 5, max: 10 } }), open: character('open', { bar0: { current: 5, max: 10 } }) },
+      texts: {}, drawings: {}, fog: {},
+    } }));
+    scene.setPlayer({
+      movableTokenIds: [], measurement: resolveMeasurementSettings(undefined, null),
+      tokenUi: { conditions: [], resources: { secret: [{ ...BAR, visibleToPlayers: false }], open: [BAR] } },
+      initiative: { rules: null, health: {} },
+    });
+    const slots = (id: string): string[] => {
+      const ui = tokenUi(store);
+      try {
+        ui.update(tokenOf(store, id), 70);
+        return ui.getResourceSlots().map((slot) => slot.key);
+      } finally { ui.destroy(); }
+    };
+    expect(slots('secret')).toEqual([]);
+    expect(slots('open')).toEqual(['bar0']);
   });
 });

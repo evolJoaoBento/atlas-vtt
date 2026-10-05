@@ -8,7 +8,7 @@ import type { RemoteView, RemoteViewsApi } from './types/remoteViews';
 export function remoteViewsApi(app: App, scope: Pick<ExtensionScope, 'id' | 'disposers'>, tracker: ViewTracker): RemoteViewsApi {
   const owned = new WeakSet<RemoteView>();
   return Object.freeze({
-    open: async (options: { title: string; icon?: string; reuse?: boolean }): Promise<RemoteView> => {
+    open: async (options: { title: string; icon?: string; reuse?: boolean; maxDice?: number }): Promise<RemoteView> => {
       const handle = await openRemoteView(app, scope.id, options);
       const view = handle.openView;
       if (!view) throw new Error('remoteViews.open: the remote view closed while it opened.');

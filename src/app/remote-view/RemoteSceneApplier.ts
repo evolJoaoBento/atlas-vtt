@@ -70,6 +70,13 @@ class KeptCopy<T> {
   }
 }
 
+/** A remote token's links into a vault are not this vault's: the view never reads the player's own notes by them. */
+function withoutVaultLinks(token: TokenEntity): TokenEntity {
+  if (token.kind !== 'character') return token;
+  const { notePath: _note, statblockPath: _statblock, ...rest } = token;
+  return rest;
+}
+
 const copyRecord = <T>(_id: string, record: T): T => frozenCopy(record);
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 
@@ -141,7 +148,7 @@ export class RemoteSceneApplier {
       grid: scene.grid ? this.grid.of(scene.grid) : NO_GRID,
       objects: {
         // A token without an image URL draws as Atlas's default token.
-        tokens: this.tokens.build(scene.objects.tokens, shownAt, (id, token) => frozenCopy({ ...token, imagePath: imageOf(id), ...this.positionOf(id) })),
+        tokens: this.tokens.build(scene.objects.tokens, shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
         fog: this.fog.build(scene.objects.fog, () => '', copyRecord),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),

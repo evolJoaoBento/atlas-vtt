@@ -43,27 +43,36 @@ function darknessOp(x: number): FogOperation {
 
 afterEach(() => { vi.restoreAllMocks(); });
 
+/** The draws of each of three darkness changes in a view whose store has `remoteView` as given. */
+function drawsPerChange(remoteView: object | null): number[] {
+  const restore = stubJsdomGraphics();
+  const gmFog = heavyFog(200);
+  const store = createStore(() => ({
+    isPlayerView: true, isGMView: false, isMapLoading: false, activeTool: 'select', mapPath: 'remote:view-1', remoteView,
+    objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(300) } },
+  }));
+  const renderer = new FogOfWarRenderer(new Container() as never, { canvas: createEl('canvas') } as never, new EventEmitter(), store as never);
+  try {
+    const perChange: number[] = [];
+    for (const x of [400, 500, 600]) {
+      rendered.count = 0;
+      store.setState({ objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(x) } } });
+      perChange.push(rendered.count);
+    }
+    return perChange;
+  } finally {
+    renderer.destroy();
+    restore();
+  }
+}
+
 describe('a darkness change in a remote view costs the same however much fog the GM painted', () => {
   it('draws only the darkness again, not every GM operation', () => {
-    const restore = stubJsdomGraphics();
-    const gmFog = heavyFog(200);
-    const store = createStore(() => ({
-      isPlayerView: true, isGMView: false, isMapLoading: false, activeTool: 'select', mapPath: 'remote:view-1', remoteView: {},
-      objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(300) } },
-    }));
-    const renderer = new FogOfWarRenderer(new Container() as never, { canvas: createEl('canvas') } as never, new EventEmitter(), store as never);
-    try {
-      const perChange: number[] = [];
-      for (const x of [400, 500, 600]) {
-        rendered.count = 0;
-        store.setState({ objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(x) } } });
-        perChange.push(rendered.count);
-      }
-      // The darkness's own canvas and the composite's latest operation, at most: never the 400 GM operations.
-      expect(Math.max(...perChange)).toBeLessThanOrEqual(2);
-    } finally {
-      renderer.destroy();
-      restore();
-    }
+    // The darkness's own canvas and the composite's latest operation, at most: never the 400 GM operations.
+    expect(Math.max(...drawsPerChange({}))).toBeLessThanOrEqual(2);
+  });
+
+  it('a view that is not remote composites every operation again, as upstream does', () => {
+    expect(Math.min(...drawsPerChange(null))).toBeGreaterThan(400);
   });
 });

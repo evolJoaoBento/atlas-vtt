@@ -86,6 +86,7 @@ export class AtlasView {
   }
 
   get isClosed(): boolean { return this.closed; }
+  get isRemote(): boolean { return this.atlasStore.getState().remoteView != null; }
   register(callback: () => void): void { this.closers.push(callback); }
   switchToTab(): Promise<void> { return Promise.resolve(); }
   async onOpen(): Promise<void> { this.closed = false; }

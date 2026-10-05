@@ -70,7 +70,7 @@ describe('views', () => {
     expect(closed).toHaveBeenCalledWith('v1');
   });
 
-  it('C-views-3: list shows map views only, picked up on layout change', () => {
+  it('C-views-3: lists map views as kind map, picked up on layout change', () => {
     const views = [fakeView('v1')];
     const { api, layoutChanged } = setup(views);
     views.push(fakeView('v2'));

@@ -30,7 +30,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
   private dice: RemoteViewDice | null = null;
   private stopControls: Disposer = noop;
 
-  constructor(readonly owner: string, readonly title: string, readonly icon: string, readonly leaf: WorkspaceLeaf) {
+  constructor(readonly owner: string, readonly title: string, readonly icon: string, readonly leaf: WorkspaceLeaf, private readonly maxDice: number) {
     this.ready = new Promise((resolve) => { this.settle = resolve; });
   }
 
@@ -67,7 +67,17 @@ export class RemoteViewHandle implements RemoteViewOwner {
 
   opened(view: unknown): void {
     if (this.done) return;
-    const remote = view as RemoteMapView;
+    try {
+      this.start(view as RemoteMapView);
+      this.settle(true);
+    } catch (error) {
+      // A view that cannot be fed closes: `open()` rejects rather than waiting forever.
+      console.error('[Atlas API] A remote view failed to start:', error);
+      this.close();
+    }
+  }
+
+  private start(remote: RemoteMapView): void {
     this.view = remote;
     const scene = new RemoteViewScene({
       app: remote.app, viewId: remote.viewId, atlasStore: remote.atlasStore, containerEl: remote.containerEl, renderer: remote.renderer,
@@ -79,10 +89,9 @@ export class RemoteViewHandle implements RemoteViewOwner {
       mapSize: () => scene.mapSize(), refreshScene: () => scene.refresh(),
     });
     const motion = this.motion;
-    const dice = new RemoteViewDice(remote.atlasStore);
+    const dice = new RemoteViewDice(remote.atlasStore, this.maxDice);
     this.dice = dice;
     this.stopControls = registerRemoteControls(remote.viewId, { fitMap: () => motion.fitMap(), roll: (picked, modifier) => dice.roll(picked, modifier) });
-    this.settle(true);
   }
 
   closed(): void {

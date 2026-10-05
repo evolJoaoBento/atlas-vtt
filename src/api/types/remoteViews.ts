@@ -10,9 +10,10 @@ export interface RemoteSceneInput {
   background: { url: string | null; width: number; height: number };
   grid: GridState | null;
   objects: SceneSnapshot['objects'];
-  /** Token image URL by token id. */
+  /** Token image URL by token id. A token's `notePath` and `statblockPath` are dropped: they name another vault's notes. */
   tokenImages: Readonly<Record<string, string | null>>;
   widgets: SceneSnapshot['widgets'];
+  /** The initiative list shows whenever `entries` is non-empty. */
   initiative: InitiativeState;
 }
 
@@ -20,8 +21,8 @@ export interface RemotePlayerState {
   movableTokenIds: readonly string[];
   measurement: MeasurementSettings;
   /**
-   * Stand-ins the GM's projection decided on; players never receive the GM's definitions. A resource definition with
-   * `visibleToPlayers: false` draws no bar in the remote view; it still counts for the downed look (`defeatedWhenSpent`).
+   * Stand-ins the GM's projection decided on; players never receive the GM's definitions. Decided per token: a resource
+   * definition with `visibleToPlayers: false` draws no bar on that token; it still counts for its downed look (`defeatedWhenSpent`).
    */
   tokenUi: { conditions: readonly ConditionDefinition[]; resources: Readonly<Record<string, readonly ResourceDefinition[]>> };
   initiative: { rules: InitiativeRules | null; health: Readonly<Record<string, { value: number; max: number }>> };
@@ -36,8 +37,12 @@ export interface RemoteStatus {
 }
 
 export interface RemoteViewsApi {
-  /** Opens (or reveals, with `reuse`) a tab of type `atlas-vtt-remote`, owned by the calling extension. */
-  open(options: { title: string; icon?: string; reuse?: boolean }): Promise<RemoteView>;
+  /**
+   * Opens (or reveals, with `reuse`) a tab of type `atlas-vtt-remote`, owned by the calling extension. `maxDice` is the most
+   * dice its tray offers for one roll, a whole number from 1 to 100 (default 100); a revealed view keeps its own title, icon
+   * and `maxDice`. Throws on a malformed option; rejects when the view could not open.
+   */
+  open(options: { title: string; icon?: string; reuse?: boolean; maxDice?: number }): Promise<RemoteView>;
 }
 
 /**

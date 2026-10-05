@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GLIDE_MS, ViewportFollower, type FollowViewport, type Frames } from '../../src/app/remote-view/ViewportFollower';
+import { GLIDE_MS, MAX_ZOOM, MIN_ZOOM, ViewportFollower, type FollowViewport, type Frames } from '../../src/app/remote-view/ViewportFollower';
 
 class FakeViewport implements FollowViewport {
   screenWidth = 800;
@@ -114,5 +114,13 @@ describe('ViewportFollower', () => {
     follower.dispose();
     expect(viewport.listenerCount).toBe(0);
     expect(frames.pending()).toBe(0);
+  });
+
+  it('keeps any camera within the zoom limits', () => {
+    const { viewport, follower } = setup();
+    follower.setCamera({ centerX: 0, centerY: 0, width: 1e-300, height: 1e-300 }, false);
+    expect(viewport.scale.x).toBe(MAX_ZOOM);
+    follower.setCamera({ centerX: 0, centerY: 0, width: 1e300, height: 1e300 }, false);
+    expect(viewport.scale.x).toBe(MIN_ZOOM);
   });
 });

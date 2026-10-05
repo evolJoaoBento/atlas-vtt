@@ -31,10 +31,17 @@ export interface FakeLeaf {
   detach(): void;
 }
 
+/** How the fake workspace opens the next remote view: as Obsidian does, closed before it opens, making no view, or refusing. */
+export type LeafMode = 'open' | 'close-before-open' | 'no-view' | 'reject';
+
 export interface RemoteWorkspace {
   leaves: FakeLeaf[];
   leavesOf(type: string): FakeLeaf[];
   revealed: FakeLeaf[];
+  /** How the next `setViewState` behaves; back to 'open' after it. */
+  next: { mode: LeafMode };
+  /** A remote view nothing opened, as Obsidian restores or duplicates one: a leaf no owner was bound to. */
+  restore(): Promise<FakeLeaf>;
 }
 
 /** An in-memory vault app whose workspace makes and closes remote views. */
@@ -43,15 +50,24 @@ export function remoteApp(): { app: App; workspace: RemoteWorkspace; files: Map<
   const leaves: FakeLeaf[] = [];
   const revealed: FakeLeaf[] = [];
   let active: unknown = null;
+  const next = { mode: 'open' as LeafMode };
   const makeLeaf = (): FakeLeaf => {
     const leaf: FakeLeaf = {
       app, view: null, type: null,
       setViewState: async ({ type }): Promise<void> => {
+        const mode = next.mode;
+        next.mode = 'open';
+        if (mode === 'reject') throw new Error('the workspace refused');
+        if (mode === 'no-view') return;
         leaf.type = type;
         const view = new RemoteMapView(leaf as unknown as WorkspaceLeaf);
         leaf.view = view;
         leaves.push(leaf);
         active = view;
+        if (mode === 'close-before-open') {
+          leaf.detach();
+          return;
+        }
         await view.onOpen();
       },
       getViewState: () => ({ type: leaf.type }),
@@ -75,7 +91,12 @@ export function remoteApp(): { app: App; workspace: RemoteWorkspace; files: Map<
     trigger: (): void => undefined,
   };
   (app as unknown as { workspace: unknown }).workspace = workspace;
-  return { app, files, workspace: { leaves, leavesOf: workspace.getLeavesOfType, revealed } };
+  const restore = async (): Promise<FakeLeaf> => {
+    const leaf = makeLeaf();
+    await leaf.setViewState({ type: 'atlas-vtt-remote' });
+    return leaf;
+  };
+  return { app, files, workspace: { leaves, leavesOf: workspace.getLeavesOfType, revealed, next, restore } };
 }
 
 export interface RemoteHarness {

@@ -19,7 +19,8 @@ let streamed: { store: StoreApi<ViewAtlasState>; tabId: string } | null = null;
 export async function presentActiveTabInPlayerWindow(app: App): Promise<void> {
   const view = app.workspace.getActiveViewOfType(AtlasView);
   const activeTabId = view?.tabMetaStore.getState().activeTabId ?? null;
-  if (!view || !activeTabId) {
+  // A remote view shows a scene fed from outside, never one of this vault's maps.
+  if (!view || view.isRemote || !activeTabId) {
     new Notice('No active map to send to the player view');
     return;
   }

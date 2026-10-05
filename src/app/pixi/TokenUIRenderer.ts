@@ -309,10 +309,11 @@ export class TokenUIRenderer {
   public update(token: BaseToken & Partial<Character>, spriteWidth: number, playerSettings?: Pick<AtlasSettings['localPlayerView'], 'showTokenNameplates'>): void {
     const tokenSettings = this.store?.getState().tokenSettings;
     // Players see the resources their definitions allow, whatever the DM hides on this map.
-    const viewer: ResourceViewer = playerSettings ? 'player' : 'dm';
+    // A remote view draws what its owner lets the player see of each token's own definitions.
+    const viewer: ResourceViewer = playerSettings || this.isRemote() ? 'player' : 'dm';
     const definitions = this.resourceDefsProvider(token.id);
-    // The map's own switches hide resources from the GM; the player view never reads them
-    const hidden = playerSettings ? [] : tokenSettings?.hiddenResources ?? [];
+    // The map's own switches hide resources from the GM; the player view and the remote view never read them
+    const hidden = viewer === 'player' ? [] : tokenSettings?.hiddenResources ?? [];
     const shown = visibleResources(token, definitions, viewer).filter(({ definition }) => !hidden.includes(definition.key));
 
     const bars = shown.filter(({ slot }) => shapeOf(slot) === 'bar');

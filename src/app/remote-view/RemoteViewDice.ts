@@ -12,11 +12,12 @@ import { callGuarded, ListenerSet } from './listeners';
 import { ROLL_NOT_SENT } from './remoteControls';
 import { updateRemoteView } from './remoteViewState';
 
-/** The most dice the remote view's tray lets the player pick for one roll. */
+/** The most dice a remote view's tray may offer for one roll (`remoteViews.open({ maxDice })`, its default). */
 export const REMOTE_MAX_DICE = 100;
 /** The most entries of the shared log the dice log shows. */
 export const REMOTE_LOG_ENTRIES = 100;
-export const ROLL_DICE_COUNT = `Roll 1 to ${REMOTE_MAX_DICE} dice.`;
+/** Why a pick of the wrong size is not sent. */
+export const rollDiceCount = (maxDice: number): string => `Roll 1 to ${maxDice} dice.`;
 
 export type RollListener = (dice: Readonly<Record<string, number>>, modifier: number) => string | null;
 
@@ -64,7 +65,9 @@ export class RemoteViewDice {
   readonly rolls = new ListenerSet<RollListener>();
   private readonly thrown: string[] = [];
 
-  constructor(private readonly store: ViewAtlasStore) {}
+  constructor(private readonly store: ViewAtlasStore, private readonly maxDice: number = REMOTE_MAX_DICE) {
+    updateRemoteView(store, { maxDice });
+  }
 
   setStatus(status: unknown): void {
     updateRemoteView(this.store, { status: checkedStatus(status) });
@@ -93,7 +96,7 @@ export class RemoteViewDice {
       picked[die] = count;
       total += count;
     }
-    if (total < 1 || total > REMOTE_MAX_DICE) return ROLL_DICE_COUNT;
+    if (total < 1 || total > this.maxDice) return rollDiceCount(this.maxDice);
     const selection = Object.freeze(picked);
     const sent = Number.isSafeInteger(modifier) ? modifier : 0;
     let reason: string | null = null;

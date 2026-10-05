@@ -73,6 +73,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const isActualPlayerView = view?.getViewType?.() === 'atlas-vtt-player'
   // A remote view: a scene fed from outside, with the player's tools only
   const remote = useAtlasStore(state => state.remoteView != null)
+  const remoteMaxDice = useAtlasStore(state => state.remoteView?.maxDice ?? REMOTE_MAX_DICE)
 
   const diceTool = useMemo(() => view?.serviceManager?.getToolController?.()?.getDiceTool?.() ?? null, [view]);
 
@@ -208,7 +209,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
               onToggle={toggleDiceTray}
               triggerRef={diceButtonRef}
               // A remote view never rolls locally: its owner's listeners send the roll
-              {...(remote ? { onRoll: remoteTrayRoll(view?.viewId), maxDice: REMOTE_MAX_DICE } : {})}
+              {...(remote ? { onRoll: remoteTrayRoll(view?.viewId), maxDice: remoteMaxDice } : {})}
             />
           )}
         </div>
