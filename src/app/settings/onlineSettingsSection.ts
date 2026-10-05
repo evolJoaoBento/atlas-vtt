@@ -18,7 +18,8 @@ const WRAP_CLASS = 'atlas-setting-wrap';
 /** Controls too wide to sit beside the text take their own full-width row under it. */
 const BELOW_CLASS = 'atlas-setting-wrap--below';
 
-export function onlineSettingsSection(settings: SettingsService): AtlasSettingSection {
+/** `newTableKey` asks for and makes a new table key (`confirmNewTableKey`); without it the row is left out. */
+export function onlineSettingsSection(settings: SettingsService, newTableKey?: () => void): AtlasSettingSection {
   const signaling = (): ReturnType<SettingsService['getOnlineSettings']>['signaling'] => settings.getOnlineSettings().signaling;
   const setSignaling = (partial: Partial<ReturnType<typeof signaling>>): void =>
     settings.setOnlineSettings({ signaling: { ...signaling(), ...partial } });
@@ -160,6 +161,18 @@ export function onlineSettingsSection(settings: SettingsService): AtlasSettingSe
             .onChange((logEvents) => settings.setOnlineSettings({ logEvents })));
         },
       },
+      ...(newTableKey ? [{
+        name: t('online.tableKey.command'),
+        desc: t('online.tableKey.settingDesc'),
+        aliases: ['table key', 'reset', 'leaked', 'backup', 'online'],
+        render: (setting: Setting): void => {
+          setting.addButton((button) => {
+            button.setButtonText(t('online.tableKey.button')).onClick(newTableKey);
+            // `setDestructive` needs Obsidian 1.13 and `setWarning` is deprecated: the class both set.
+            button.buttonEl.addClass('mod-warning');
+          });
+        },
+      }] : []),
     ],
   };
 }

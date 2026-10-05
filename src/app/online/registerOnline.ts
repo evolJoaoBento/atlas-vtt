@@ -4,12 +4,14 @@ import { onlineSessionStore } from './onlineSessionStore';
 import type { OnlineSessionService } from './OnlineSessionService';
 import { JOIN_SESSION_LABEL } from './ui/onlineCopy';
 import { openOnlineSession } from './ui/openOnlineSession';
+import { confirmNewTableKey } from './ui/newTableKey';
 import { t } from '../i18n';
 
 /** Commands, the status bar item, and stopping the session with the plugin. */
 export function registerOnline(plugin: Plugin, service: OnlineSessionService): void {
   plugin.addCommand({ id: 'online-session', name: t('online.sessionMenu'), callback: () => openOnlineSession(plugin.app) });
   plugin.addCommand({ id: 'join-online-session', name: JOIN_SESSION_LABEL, callback: () => openJoinSessionModal(plugin.app) });
+  plugin.addCommand({ id: 'new-table-key', name: t('online.tableKey.command'), callback: () => void confirmNewTableKey(service) });
   plugin.addCommand({
     id: 'stop-online-session',
     name: t('online.stopSession'),
