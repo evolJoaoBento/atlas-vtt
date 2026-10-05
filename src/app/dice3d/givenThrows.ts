@@ -27,18 +27,24 @@ function throwsOf(store: object): ViewThrows {
   return entry;
 }
 
-/** Notes that the view of `store` throws roll `id`; false when it threw that id before (of its last 100). */
-export function firstThrow(store: object, id: string): boolean {
-  const { ids } = throwsOf(store);
-  if (ids.includes(id)) return false;
-  ids.push(id);
-  if (ids.length > THROWN_IDS) ids.shift();
-  return true;
+/** Whether the view of `store` threw roll `id` already (of its last 100). */
+export function thrownBefore(store: object, id: string): boolean {
+  return throwsOf(store).ids.includes(id);
 }
 
-/** Hands `roll` to the dice display of the GM map view of `store`; nothing happens while none listens. */
-export function sendGivenThrow(store: object, roll: DiceRollResult): void {
-  for (const listener of [...throwsOf(store).listeners]) listener(roll);
+/** Notes that the view of `store` threw roll `id`, so it is not thrown there again. */
+export function noteThrown(store: object, id: string): void {
+  const { ids } = throwsOf(store);
+  if (ids.includes(id)) return;
+  ids.push(id);
+  if (ids.length > THROWN_IDS) ids.shift();
+}
+
+/** Hands `roll` to the dice display of the GM map view of `store`; false when no display listens (none mounted, or it failed). */
+export function sendGivenThrow(store: object, roll: DiceRollResult): boolean {
+  const listeners = [...throwsOf(store).listeners];
+  for (const listener of listeners) listener(roll);
+  return listeners.length > 0;
 }
 
 /** Hears the rolls `sendGivenThrow` hands to the view of `store`; returns the unsubscribe. */

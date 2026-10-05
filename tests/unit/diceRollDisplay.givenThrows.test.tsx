@@ -1,12 +1,15 @@
 import React from 'react';
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { diceApi } from '../../src/api/dice';
+import { DisposerSet } from '../../src/api/disposers';
 import { sendGivenThrow } from '../../src/app/dice3d/givenThrows';
 import { DiceRollDisplay } from '../../src/app/react/components/dice/DiceRollDisplay';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import { DICE_ROLLED_EVENT, type DiceRollResult } from '../../src/app/tools/diceRolling';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { fakeView, loadMap, trackerWith } from '../api/apiFakes';
 
 // jsdom has no WebGL; these cases are about which rolls are thrown, not about the device.
 const { webgl } = vi.hoisted(() => ({ webgl: { on: true } }));
@@ -21,8 +24,7 @@ const roll = (id: string, overrides: Partial<DiceRollResult> = {}): DiceRollResu
 });
 
 /** The GM's dice display in a map view whose store is `store`. */
-function setup(store: object = {}): ReturnType<typeof render> & { store: object } {
-  const { app } = createInMemoryApp({ files: {} });
+function setup(store: object = {}, app = createInMemoryApp({ files: {} }).app): ReturnType<typeof render> & { store: object } {
   new SettingsService(app).setDiceDisplay('full');
   const view = { viewId: 'v1', atlasStore: store, containerEl: { doc: document, win: window } };
   const rendered = render(
@@ -58,6 +60,20 @@ describe("a GM map view's dice display and the rolls handed to it", () => {
     const blind = setup();
     act(() => sendGivenThrow(blind.store, roll('r2')));
     expect(blind.container.querySelector('.atlas-dice-toast')?.textContent).toContain('15');
+  });
+
+  it('throws what dice.throw hands a loaded GM map view, and refuses once the display is gone', () => {
+    const { app } = createInMemoryApp({ files: {} });
+    const map = fakeView('v1');
+    loadMap(map);
+    const dice = diceApi(app, new DisposerSet(), trackerWith([map]).tracker);
+    const { container, unmount } = setup(map.atlasStore, app);
+    let answer: boolean | undefined;
+    act(() => { answer = dice.throw?.('v1', roll('r1')); });
+    expect(answer).toBe(true);
+    expect(container.querySelector('.atlas-dice-roll')?.textContent).toContain('1d20+2');
+    unmount();
+    expect(dice.throw?.('v1', roll('r2'))).toBe(false);
   });
 
   it("hears only its own view's rolls, and none after it unmounts", () => {

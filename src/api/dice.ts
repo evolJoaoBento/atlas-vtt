@@ -1,4 +1,5 @@
 import type { App } from 'obsidian';
+import { landsOnAFace } from '../app/dice3d/diceScene';
 import { mapDiceRules } from '../app/services/mapDiceRules';
 import { DICE_ROLLED_EVENT, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
 import { throwGivenRoll } from './diceThrow';
@@ -74,6 +75,7 @@ export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | n
       }
       dispatch(copy);
     },
-    throw: (viewId: ViewId, roll: DiceRollResult): boolean => isRoll(roll) && throwGivenRoll(app, views, viewId, roll),
+    throw: (viewId: ViewId, roll: DiceRollResult): boolean =>
+      isRoll(roll) && roll.rolls.every(landsOnAFace) && throwGivenRoll(app, views, viewId, roll),
   });
 }

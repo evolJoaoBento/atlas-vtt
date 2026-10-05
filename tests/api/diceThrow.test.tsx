@@ -44,6 +44,18 @@ describe('dice.throw', () => {
     expect(thrown.map((result) => result.id)).toEqual(['r1', 'r2']);
   });
 
+  it('answers false, leaving the id free, while no dice display listens in a GM view', () => {
+    const view = fakeView('v1');
+    loadMap(view);
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet(), trackerWith([view]).tracker);
+    expect(dice.throw?.('v1', roll('r1'))).toBe(false);
+    const thrown: DiceRollResult[] = [];
+    const stop = onGivenThrow(view.atlasStore, (given) => thrown.push(given));
+    expect(dice.throw?.('v1', roll('r1'))).toBe(true);
+    expect(thrown.map((result) => result.id)).toEqual(['r1']);
+    stop();
+  });
+
   it('refuses an unknown view, and a view that closed', () => {
     const { dice, view, thrown } = gmSetup();
     loadMap(view);
@@ -58,7 +70,9 @@ describe('dice.throw', () => {
     const { dice, view, thrown } = gmSetup();
     loadMap(view);
     for (const bad of [null, 'r1', { id: 'r1' }, roll('r1', { rolls: [{ die: 'd20', value: Number.NaN, max: 20 }] }),
-      roll('r1', { total: '15' as never }), { ...roll('r1'), extra: () => undefined }]) {
+      roll('r1', { total: '15' as never }), { ...roll('r1'), extra: () => undefined },
+      roll('r1', { rolls: [{ die: 'd20', value: 25, max: 20 }] }), roll('r1', { rolls: [{ die: 'd20', value: 0, max: 20 }] }),
+      roll('r1', { rolls: [{ die: 'd6', value: 2.5, max: 6 }] })]) {
       expect(dice.throw?.('v1', bad as never)).toBe(false);
     }
     expect(thrown).toEqual([]);

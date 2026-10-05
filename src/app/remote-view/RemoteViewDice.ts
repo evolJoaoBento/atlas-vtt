@@ -5,7 +5,7 @@
  * `onRoll` listeners. The status bar's status lives here too: it is the owner's text.
  */
 import { frozenCopy } from '../../api/frozen';
-import { firstThrow } from '../dice3d/givenThrows';
+import { noteThrown, thrownBefore } from '../dice3d/givenThrows';
 import type { RemoteStatus } from '../../api/types/remoteViews';
 import type { ViewAtlasStore } from '../storeFactory';
 import { isDieType, type DiceRollResult } from '../tools/diceRolling';
@@ -78,7 +78,8 @@ export class RemoteViewDice {
   /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
   throwRoll(result: unknown): void {
     if (!isRoll(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
-    if (!firstThrow(this.store, result.id)) return;
+    if (thrownBefore(this.store, result.id)) return;
+    noteThrown(this.store, result.id);
     updateRemoteView(this.store, { ownRoll: frozenCopy(result) });
   }
 
