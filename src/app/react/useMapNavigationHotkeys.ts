@@ -4,7 +4,7 @@ import { canRunMapHotkeys, matchesMapHotkey } from '../keyboard/mapHotkeys';
 import { focusToken } from '../pixi/tokenFocus';
 import { addTokenHighlight } from '../pixi/utils/tokenHighlight';
 import type { SettingsService } from '../services/SettingsService';
-import { fitRemoteMap } from '../remote-view/remoteFit';
+import { fitRemoteMap } from '../remote-view/remoteControls';
 import type { ViewAtlasStore } from '../storeFactory';
 
 /** Map navigation keyboard shortcuts (Shift+1: fit map, Shift+2: zoom to selected token). */

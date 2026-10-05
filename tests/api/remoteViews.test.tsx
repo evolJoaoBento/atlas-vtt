@@ -1,10 +1,19 @@
+import React from 'react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/app/atlas-view', async () => import('./fakeAtlasView'));
 
 import { tokensApi } from '../../src/api/tokens';
 import { REMOTE_DRAG_CANCEL, REMOTE_TOKEN_DROPPED } from '../../src/app/remote-view/remoteDrag';
-import { fitRemoteMap } from '../../src/app/remote-view/remoteFit';
+import { fitRemoteMap, remoteTrayRoll } from '../../src/app/remote-view/remoteControls';
+import { REMOTE_MAX_DICE } from '../../src/app/remote-view/RemoteViewDice';
+import { DiceRollLog } from '../../src/app/react/components/dice-log/DiceRollLog';
+import { DiceDropdownMenu } from '../../src/app/react/components/dice/DiceDropdownMenu';
+import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
+import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
+import type { DiceTool } from '../../src/app/tools/DiceTool';
+import type { DiceRollResult } from '../../src/app/tools/diceRolling';
 import type { AtlasView as FakeAtlasView } from './fakeAtlasView';
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { mapMeasurementSettings } from '../../src/app/services/mapMeasurementSettings';
@@ -21,7 +30,8 @@ function storeOf(harness: RemoteHarness, viewId: string): NonNullable<ReturnType
   return view.atlasStore;
 }
 
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+Element.prototype.scrollTo = vi.fn();
 
 describe('remoteViews', () => {
   it('C-remote-1: open with reuse reveals the same tab; close fires onClose once; the view is never active() and never saved', async () => {
@@ -193,5 +203,53 @@ describe('remoteViews', () => {
     view.cancelDrag();
     expect(store.getState().objects.tokens.t1).toMatchObject({ x: 120, y: 100 });
     expect(getHistoryStore(store)?.getState().pastStates).toHaveLength(0);
+  });
+
+  it('C-remote-5: the tray shows an onRoll refusal and closes once sent; the shared log renders without Clear; throwRoll once per id', async () => {
+    const harness = await remoteHarness();
+    const view = await harness.api.open({ title: 'A' });
+    const store = storeOf(harness, view.viewId);
+    const rollDice = vi.fn();
+    const onToggle = vi.fn();
+    const ui = { app: harness.app, view: { viewId: view.viewId, serviceManager: {} } as never, pixiApp: null, renderer: null };
+    render(
+      <AtlasUIContext.Provider value={ui}>
+        <DiceDropdownMenu diceTool={{ rollDice } as unknown as DiceTool} isOpen onToggle={onToggle} onRoll={remoteTrayRoll(view.viewId)} maxDice={REMOTE_MAX_DICE} />
+      </AtlasUIContext.Provider>,
+    );
+    const stop = view.onRoll(() => 'Not connected');
+    fireEvent.click(screen.getByLabelText(/^Add a d20/));
+    fireEvent.click(screen.getByText('Roll'));
+    expect(await screen.findByText('Not connected')).toBeTruthy();
+    expect(onToggle).not.toHaveBeenCalled();
+    stop();
+    const sent = vi.fn((): string | null => null);
+    view.onRoll(sent);
+    fireEvent.click(screen.getByText('Roll'));
+    expect(sent).toHaveBeenCalledWith({ d20: 1 }, 0);
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(rollDice).not.toHaveBeenCalled();
+    cleanup();
+
+    const entry: DiceRollResult = { id: 'r1', timestamp: 0, formula: '1d20+2', rolls: [{ die: 'd20', value: 13, max: 20 }], modifiers: 2, total: 15, crit: null, rolledBy: 'Anna' };
+    const log = render(
+      <AtlasUIContext.Provider value={ui}>
+        <ViewStoreProvider store={store as never}><DiceRollLog isOpen onClose={() => undefined} /></ViewStoreProvider>
+      </AtlasUIContext.Provider>,
+    );
+    act(() => view.setDiceLog([entry]));
+    expect(log.container.textContent).toContain('1d20+2');
+    expect(screen.queryByLabelText('Clear history')).toBeNull();
+    expect(store.getState().diceLog).toEqual([]);
+
+    view.throwRoll(entry);
+    const thrown = store.getState().remoteView?.ownRoll;
+    expect(thrown).toEqual(entry);
+    view.throwRoll({ ...entry, total: 99 });
+    expect(store.getState().remoteView?.ownRoll).toBe(thrown);
+    view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null });
+    expect(store.getState().remoteView?.status.connection).toBe('Connected');
+    view.close();
+    expect(() => view.throwRoll({ ...entry, id: 'r2' })).not.toThrow();
   });
 });

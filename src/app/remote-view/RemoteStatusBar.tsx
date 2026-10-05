@@ -1,0 +1,23 @@
+import React from 'react';
+import { Button } from '../packages/components/primitives/button';
+import { useAtlasStore } from '../react/ViewStoreContext';
+
+/** The remote view's slim status bar: its owner's title, connection and message, and the owner's action. */
+export function RemoteStatusBar(): React.ReactElement | null {
+  const status = useAtlasStore((state) => state.remoteView?.status ?? null);
+  if (!status || (status.title === '' && status.connection === '' && !status.message && !status.action)) return null;
+  const { action } = status;
+  return (
+    <div className="atlas-remote-status-bar" role="status" aria-live="polite">
+      <span className={`atlas-remote-status-bar__dot atlas-remote-status-bar__dot--${status.tone}`} aria-hidden="true" />
+      {status.title && <span className="atlas-remote-status-bar__title">{status.title}</span>}
+      {status.connection && <span className="atlas-remote-status-bar__connection">{status.connection}</span>}
+      {status.message && <span className="atlas-remote-status-bar__message">{status.message}</span>}
+      {action && (
+        <Button variant="default" size="sm" className="atlas-remote-status-bar__action" onClick={() => action.run()}>
+          {action.label}
+        </Button>
+      )}
+    </div>
+  );
+}

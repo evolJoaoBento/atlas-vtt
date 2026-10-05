@@ -200,7 +200,7 @@ export class AtlasView extends FileView {
 
   /** True for the remote map view, which shows a scene fed from outside and never one of this vault's maps. */
   get isRemote(): boolean {
-    return this.store.getState().remoteView !== null;
+    return this.store.getState().remoteView != null;
   }
 
   getTabMetaStore(): TabMetaStore {

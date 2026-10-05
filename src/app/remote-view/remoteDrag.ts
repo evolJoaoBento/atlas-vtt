@@ -23,7 +23,7 @@ export interface RemoteDrop {
 
 /** Whether the player may drag `tokenId`: a remote view, and a token its owner lets them move. */
 export function mayDragInRemoteView(state: Pick<ViewAtlasState, 'remoteView'>, tokenId: string): boolean {
-  return state.remoteView !== null && state.remoteView.movableTokenIds.includes(tokenId);
+  return state.remoteView != null && state.remoteView.movableTokenIds.includes(tokenId);
 }
 
 /** Where a token of `token`'s size dropped at `point` lands in the remote view's grid. */

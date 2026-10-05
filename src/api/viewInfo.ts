@@ -9,7 +9,7 @@ export function isLoaded(state: Pick<ViewAtlasState, 'mapLoaded' | 'isMapLoading
 
 /** A remote view (`remoteViews.open`): its store has a remote part, and no other view's does. */
 export function isRemoteView(view: Pick<TrackedMapView, 'atlasStore'>): boolean {
-  return view.atlasStore.getState().remoteView !== null;
+  return view.atlasStore.getState().remoteView != null;
 }
 
 export function viewInfo(view: TrackedMapView): ViewInfo {

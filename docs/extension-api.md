@@ -28,7 +28,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.9.0 | shipped in 1.9.0 | none | none | none |
 | 1.10.0 | shipped in 1.10.0 | none | none | none |
 | 1.11.0 | shipped in 1.11.0 | none | `bundles.forgetNoteProperties` | none |
-| 1.12.0 | planned for 1.12.0 | `remote-view` | `remoteViews` (optional) | none |
+| 1.12.0 | shipped in 1.12.0 | `remote-view` | `remoteViews` (optional) | none |
 
 Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
 
@@ -39,6 +39,20 @@ Version 1.11.0 adds `bundles.forgetNoteProperties()`. Handing the disposer of `b
 Extension data on scenes (`scenes.setData`) lives only in Atlas's asset index, never in the scene's record file, so it travels in no bundle and no copy. When Atlas cannot read the index and rebuilds it from the collection files, that data is lost, because the files do not hold it.
 
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
+
+## Remote views (`remote-view`, 1.12.0)
+
+`remoteViews` is set only when `api.has('remote-view')`. `remoteViews.open({ title, icon?, reuse? })` opens a tab of type `atlas-vtt-remote`, owned by the calling extension, and resolves to a `RemoteView` handle. With `reuse` it reveals the extension's remote view that is already open. The view is an Atlas map view fed from outside: read-only, never saved, with no undo history, and it closes when the extension or Atlas unloads. A tab Obsidian restores at startup, or a copy of the tab, has no owner and closes itself.
+
+- **Scene.** `setScene(input)` shows a `RemoteSceneInput`: Atlas's own records, the background and each token's image by URL (object URLs work; release one only after replacing it), the grid, widgets and initiative. The records are copied, and a record handed again as the same object is not copied again, so keep unchanged records as the same objects. The snapshot (`views.snapshot(viewId)`) is loaded with the map path `remote:<viewId>`. `setScene(null)` shows an empty, unloaded scene.
+- **Player.** `setPlayer(state)` says which tokens the player may drag, the measurement of the ruler and the measure tool, the definitions of the condition badges and of each token's bars (a definition with `visibleToPlayers: false` draws no bar but still downs the token), and the initiative list's rules and HP bars.
+- **Moves.** The player drags a movable token with Atlas's drag and ruler, one at a time. `onTokenDrop` reports the drop at the point it snaps to in the view's grid; the token goes back until the next `setScene` moves it. `cancelDrag()` ends a drag in progress, and a new scene or player state ends a drag whose token left the scene or may no longer move.
+- **Camera.** `setCamera(camera, { animate })` shows a world area as large as fits the view and keeps showing it through resizes. `onCameraMoved(true)` fires when the player pans or zooms, and `onCameraMoved(false)` when Fit map (Shift+1) fits the map. Following someone stays the extension's decision: add Follow and Fit buttons as toolbar items with `views: ['remote']`.
+- **Dice.** The dice tray (up to 100 dice) and the dice log's Roll again go to `onRoll` listeners and never roll locally. Listeners are asked in the order they were added until one returns null (sent); otherwise the tray shows the first reason returned. `setDiceLog(entries)` is the log the view's dice log shows, without Clear. `throwRoll(result)` throws one of the player's own rolls once per id with their dice look, or shows a result card where WebGL is unavailable.
+- **Status.** `setStatus(status)` fills the status bar at the start of the top row; its optional action is a button.
+- **Other groups.** `views.*` and `lasers.*` take the remote view's id. `views.active()` never returns it, `tokens.move` answers `not-loaded` and `presentation.present` answers false for it.
+
+Every handle method does nothing after the view closed, every listener runs guarded and is dropped when it closes, and `onClose` fires once, however the view closed.
 
 ## Semver rules
 

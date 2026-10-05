@@ -518,7 +518,7 @@ export class InteractionController implements ITokenInteractionController {
       const tokenUpdates: Array<{id: string, x: number, y: number}> = [];
       const snapToGrid = this.store.getState().grid?.snapToGrid ?? true;
       const tokens = this.store.getState().objects.tokens;
-      const remote = this.store.getState().remoteView !== null;
+      const remote = this.store.getState().remoteView != null;
       
       for (const id of this.dragState.dragIds) {
         const initPos = this.dragState.initialPositions[id];

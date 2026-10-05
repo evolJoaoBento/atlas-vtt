@@ -1,6 +1,6 @@
 import type { Disposer, ViewId } from './common';
 import type {
-  ConditionDefinition, GridState, InitiativeRules, InitiativeState, MeasurementSettings, ResourceDefinition,
+  ConditionDefinition, DiceRollResult, GridState, InitiativeRules, InitiativeState, MeasurementSettings, ResourceDefinition,
 } from './records';
 import type { TokenMove } from './tokens';
 import type { SceneSnapshot, ViewCamera } from './views';
@@ -53,6 +53,12 @@ export interface RemoteView {
    */
   setScene(scene: RemoteSceneInput | null): void;
   setPlayer(state: RemotePlayerState): void;
+  /** The status bar at the start of the view's top row; its action runs guarded. Throws when `status` is not a RemoteStatus. */
+  setStatus(status: RemoteStatus): void;
+  /** The shared log shown in this view's dice log (the first 100 entries, copied); Clear is hidden, Roll again calls `onRoll`. */
+  setDiceLog(entries: readonly DiceRollResult[]): void;
+  /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
+  throwRoll(result: DiceRollResult): void;
   /**
    * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
    * resizes until the player moves the camera. Throws when `camera` is not finite numbers with a size above 0.
@@ -64,6 +70,13 @@ export interface RemoteView {
   onTokenDrop(listener: (move: TokenMove) => void): Disposer;
   /** The player moved the camera (`byUser`), or Fit map ran; lets the extension stop following the GM. */
   onCameraMoved(listener: (byUser: boolean) => void): Disposer;
+  /**
+   * The dice tray (at most 100 dice) or Roll again; return null once sent, or why not (shown in the tray, or as a notice for
+   * Roll again). Listeners are asked in the order they were added until one returns null; a roll is sent by one listener at
+   * most. With no listener, or when none sent it, the first reason given shows ("The roll could not be sent." for a listener
+   * that throws or for none). The tray never rolls locally in a remote view.
+   */
+  onRoll(listener: (dice: Readonly<Record<string, number>>, modifier: number) => string | null): Disposer;
   /** Called once when the view closes: `close()`, the user closing the tab, the extension or Atlas unloading. */
   onClose(listener: () => void): Disposer;
   close(): void;

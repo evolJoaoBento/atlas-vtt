@@ -6,7 +6,7 @@ import { obsidianIconComponent } from '../react/components/ObsidianIcon';
 import { safely, type SlotEntry } from './SlotRegistry';
 import { toolbarSlot } from './slots';
 import { useSlot } from './useSlot';
-import { viewContextOf } from './viewContext';
+import { viewContextOf, type ViewContextState } from './viewContext';
 
 /** Between Atlas's own priorities, which run from 45 to 100. */
 export const DEFAULT_EXTENSION_PRIORITY = 50;
@@ -55,16 +55,16 @@ export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ct
   };
 }
 
-/** The registered toolbar items that belong in this view, to be placed among Atlas's own. None in a player view. */
+/** The registered toolbar items that belong in this view, to be placed among Atlas's own. None in a player view, except a remote view's own. */
 export function useExtensionToolbarItems(
   viewId: string | undefined,
-  store: { getState(): { isPlayerView?: boolean } },
+  store: { getState(): ViewContextState },
   isActualPlayerView: boolean,
 ): ResponsiveToolbarItem[] {
   const entries = useSlot(toolbarSlot);
   if (!viewId || isActualPlayerView) return [];
   const ctx = viewContextOf({ viewId }, store);
-  if (ctx.isPlayerView) return [];
+  if (ctx.isPlayerView && ctx.kind !== 'remote') return [];
   return entries
     .filter(({ item }) => (item.views ?? ['map']).includes(ctx.kind))
     .map((entry) => extensionToolbarItem(entry, ctx));

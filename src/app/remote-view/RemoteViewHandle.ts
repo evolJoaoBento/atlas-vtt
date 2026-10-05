@@ -9,6 +9,8 @@ import type { Disposer } from '../../api/types/common';
 import { callGuarded, ListenerSet } from './listeners';
 import type { RemoteMapView } from './RemoteMapView';
 import type { RemoteViewOwner } from './remoteOwners';
+import { registerRemoteControls } from './remoteControls';
+import { RemoteViewDice, type RollListener } from './RemoteViewDice';
 import { RemoteViewMotion } from './RemoteViewMotion';
 import { RemoteViewScene } from './RemoteViewScene';
 import type { TokenMove } from '../../api/types/tokens';
@@ -25,6 +27,8 @@ export class RemoteViewHandle implements RemoteViewOwner {
   private facade: RemoteView | null = null;
   private scene: RemoteViewScene | null = null;
   private motion: RemoteViewMotion | null = null;
+  private dice: RemoteViewDice | null = null;
+  private stopControls: Disposer = noop;
 
   constructor(readonly owner: string, readonly title: string, readonly icon: string, readonly leaf: WorkspaceLeaf) {
     this.ready = new Promise((resolve) => { this.settle = resolve; });
@@ -51,6 +55,10 @@ export class RemoteViewHandle implements RemoteViewOwner {
       cancelDrag: (): void => { this.motion?.cancelDrag(); },
       onTokenDrop: (listener: (move: TokenMove) => void): Disposer => this.motion?.drops.add(listener) ?? noop,
       onCameraMoved: (listener: (byUser: boolean) => void): Disposer => this.motion?.cameraMoves.add(listener) ?? noop,
+      setStatus: (status: unknown): void => { this.dice?.setStatus(status); },
+      setDiceLog: (entries: unknown): void => { this.dice?.setDiceLog(entries); },
+      throwRoll: (result: unknown): void => { this.dice?.throwRoll(result); },
+      onRoll: (listener: RollListener): Disposer => this.dice?.rolls.add(listener) ?? noop,
       onClose: (listener: () => void): Disposer => this.closeListeners.add(listener),
       close: (): void => this.close(),
     });
@@ -66,10 +74,14 @@ export class RemoteViewHandle implements RemoteViewOwner {
     });
     this.scene = scene;
     this.motion = new RemoteViewMotion({
-      viewId: remote.viewId, atlasStore: remote.atlasStore,
+      atlasStore: remote.atlasStore,
       eventBus: remote.serviceManager.getEventBus(), viewport: remote.serviceManager.getRendererService().getViewport(),
       mapSize: () => scene.mapSize(), refreshScene: () => scene.refresh(),
     });
+    const motion = this.motion;
+    const dice = new RemoteViewDice(remote.atlasStore);
+    this.dice = dice;
+    this.stopControls = registerRemoteControls(remote.viewId, { fitMap: () => motion.fitMap(), roll: (picked, modifier) => dice.roll(picked, modifier) });
     this.settle(true);
   }
 
@@ -91,6 +103,9 @@ export class RemoteViewHandle implements RemoteViewOwner {
     if (this.done) return;
     this.done = true;
     this.settle(false);
+    this.stopControls();
+    this.dice?.dispose();
+    this.dice = null;
     this.motion?.dispose();
     this.motion = null;
     this.scene?.dispose();

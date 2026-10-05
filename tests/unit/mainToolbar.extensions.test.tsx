@@ -18,6 +18,7 @@ const storeState = {
   setLootRollerOpen: vi.fn(),
   objects: { tokens: {} },
   selectedIds: [],
+  remoteView: null as object | null,
 };
 
 vi.mock('../../src/app/react/ViewStoreContext', () => ({
@@ -68,6 +69,7 @@ function add(toolbarItem: ToolbarItem): () => void {
 describe('MainToolbar with extension items', () => {
   beforeEach(() => {
     storeState.isPlayerView = false;
+    storeState.remoteView = null;
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
   afterEach(() => {
@@ -156,5 +158,21 @@ describe('MainToolbar with extension items', () => {
     expect(ids.indexOf('ext:ext:dice')).toBe(ids.indexOf('dice') + 1);
     expect(ids.indexOf('loot')).toBe(ids.indexOf('ext:ext:dice') + 1);
     remove();
+  });
+
+  it('shows the remote view its own items, told it is the remote view, and leaves out map items and GM tools there', () => {
+    storeState.isPlayerView = true;
+    storeState.remoteView = {};
+    const onClick = vi.fn();
+    render(<MainToolbar viewId="view-1" />);
+    const removeRemote = add(item({ views: ['remote'], onClick }));
+    const removeMap = add(item({ id: 'map-only', label: 'Map only' }));
+    fireEvent.click(button()!);
+    expect(onClick).toHaveBeenCalledWith({ viewId: 'view-1', kind: 'remote', isPlayerView: true });
+    expect(screen.queryByRole('button', { name: 'Map only' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Loot Roller' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Roll Dice' })).toBeTruthy();
+    removeRemote();
+    removeMap();
   });
 });

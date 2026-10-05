@@ -12,6 +12,8 @@ import { CoinIcon } from "../../react/components/CoinIcon"
 import { useAtlasUI } from "src/app/react/root/AtlasUIContext"
 import { Toggle } from "./primitives/Toggle"
 import { DiceDropdownMenu } from "../../react/components/dice/DiceDropdownMenu"
+import { remoteTrayRoll } from "../../remote-view/remoteControls"
+import { REMOTE_MAX_DICE } from "../../remote-view/RemoteViewDice"
 import { AMBIENT_AUDIO_ENABLED } from "../../featureFlags"
 import { isAtlasToolAvailable } from "../../tools/toolAvailability"
 import { useExperimentalFeature } from "../../react/hooks/useExperimentalFeature"
@@ -69,6 +71,8 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const lightingOn = useExperimentalFeature('dynamicLighting')
 
   const isActualPlayerView = view?.getViewType?.() === 'atlas-vtt-player'
+  // A remote view: a scene fed from outside, with the player's tools only
+  const remote = useAtlasStore(state => state.remoteView != null)
 
   const diceTool = useMemo(() => view?.serviceManager?.getToolController?.()?.getDiceTool?.() ?? null, [view]);
 
@@ -126,7 +130,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   }, [isDiceTrayOpen, setDiceTrayOpen])
 
   useMapClipboardHotkeys(store, view, viewId);
-  useToolbarHotkeys(viewId, isActualPlayerView, {
+  useToolbarHotkeys(viewId, isActualPlayerView || remote, {
     selectTool: handleToolClick,
     toggleAssetManager: handleAssetManagerToggle,
     closeAssetManager: handleCloseAssetManager,
@@ -170,7 +174,7 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
   const toolButtonItem = (id: 'pin' | 'audio', tool: Tool, icon: ToolFace["icon"], label: string, shortcut: string): ResponsiveToolbarItem =>
     buttonItem(id, { icon, label, shortcut, isActive: activeTool === tool, onClick: () => handleToolClick(tool) }, activeTool === tool)
 
-  const dm = !isActualPlayerView
+  const dm = !isActualPlayerView && !remote
   // Items other plugins registered: they sit with Atlas's own by priority and fall into "More tools" like them.
   const extensionItems = useExtensionToolbarItems(viewId ?? view?.viewId, store, isActualPlayerView)
 
@@ -198,7 +202,14 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
         <div ref={diceButtonRef} className="relative flex items-center">
           <ToolButton icon={Dices} label="Roll Dice" shortcut={hotkeyLabel('diceTray')} isActive={isDiceTrayOpen} onClick={toggleDiceTray} />
           {diceTool && (
-            <DiceDropdownMenu diceTool={diceTool} isOpen={isDiceTrayOpen} onToggle={toggleDiceTray} triggerRef={diceButtonRef} />
+            <DiceDropdownMenu
+              diceTool={diceTool}
+              isOpen={isDiceTrayOpen}
+              onToggle={toggleDiceTray}
+              triggerRef={diceButtonRef}
+              // A remote view never rolls locally: its owner's listeners send the roll
+              {...(remote ? { onRoll: remoteTrayRoll(view?.viewId), maxDice: REMOTE_MAX_DICE } : {})}
+            />
           )}
         </div>
       ),
@@ -229,16 +240,20 @@ export const MainToolbar = forwardRef<HTMLDivElement, MainToolbarProps>(({ viewI
           />
         )}
       />
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        toolbarRef={toolbarRef}
-      />
-      <AssetManager
-        isOpen={isAssetManagerOpen}
-        onClose={handleCloseAssetManager}
-        {...(assetManagerInitialTab && { initialTab: assetManagerInitialTab })}
-      />
+      {!remote && (
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setCommandPaletteOpen(false)}
+          toolbarRef={toolbarRef}
+        />
+      )}
+      {!remote && (
+        <AssetManager
+          isOpen={isAssetManagerOpen}
+          onClose={handleCloseAssetManager}
+          {...(assetManagerInitialTab && { initialTab: assetManagerInitialTab })}
+        />
+      )}
       {isDiceTrayOpen && !diceTool && (
         <div style={{
           position: 'fixed',

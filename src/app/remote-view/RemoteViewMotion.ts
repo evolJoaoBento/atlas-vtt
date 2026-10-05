@@ -5,17 +5,14 @@
  */
 import type { EventEmitter } from 'events';
 import type { Viewport } from 'pixi-viewport';
-import type { Disposer } from '../../api/types/common';
 import type { TokenMove } from '../../api/types/tokens';
 import type { ViewCamera } from '../services/presentedCamera';
 import type { ViewAtlasStore } from '../storeFactory';
 import { cancelLostDrag, mayDragInRemoteView, REMOTE_DRAG_CANCEL, REMOTE_TOKEN_DROPPED, type RemoteDrop } from './remoteDrag';
-import { registerRemoteFit } from './remoteFit';
 import { callGuarded, ListenerSet } from './listeners';
 import { ViewportFollower, type FollowViewport } from './ViewportFollower';
 
 export interface RemoteMotionHost {
-  readonly viewId: string;
   readonly atlasStore: ViewAtlasStore;
   readonly eventBus: EventEmitter;
   readonly viewport: Viewport | null;
@@ -44,7 +41,6 @@ export class RemoteViewMotion {
   readonly drops = new ListenerSet<(move: TokenMove) => void>();
   readonly cameraMoves = new ListenerSet<(byUser: boolean) => void>();
   private readonly follower: ViewportFollower | null;
-  private readonly stopFit: Disposer;
 
   constructor(private readonly host: RemoteMotionHost) {
     this.follower = host.viewport ? new ViewportFollower({
@@ -52,7 +48,6 @@ export class RemoteViewMotion {
       mapSize: () => host.mapSize(),
       onMoved: (byUser) => { for (const listener of this.cameraMoves.list()) callGuarded('camera', listener, byUser); },
     }) : null;
-    this.stopFit = registerRemoteFit(host.viewId, () => this.follower?.fitMap());
     host.eventBus.on(REMOTE_TOKEN_DROPPED, this.onDrop);
     host.eventBus.on('background-sprite-updated', this.onBackgroundMoved);
   }
@@ -62,6 +57,11 @@ export class RemoteViewMotion {
       && isFiniteNumber(camera.width) && camera.width > 0 && isFiniteNumber(camera.height) && camera.height > 0;
     if (!valid) throw new Error('RemoteView.setCamera: the camera must be { centerX, centerY, width, height } numbers, with a size above 0.');
     this.follower?.setCamera({ centerX: camera.centerX, centerY: camera.centerY, width: camera.width, height: camera.height }, options?.animate === true);
+  }
+
+  /** Fit map: the whole map, and the owner is told the camera moved, not by the player. */
+  fitMap(): void {
+    this.follower?.fitMap();
   }
 
   cancelDrag(): void {
@@ -81,7 +81,6 @@ export class RemoteViewMotion {
   dispose(): void {
     this.drops.close();
     this.cameraMoves.close();
-    this.stopFit();
     this.host.eventBus.off(REMOTE_TOKEN_DROPPED, this.onDrop);
     this.host.eventBus.off('background-sprite-updated', this.onBackgroundMoved);
     this.follower?.dispose();
