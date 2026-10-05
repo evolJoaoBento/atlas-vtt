@@ -195,12 +195,19 @@ describe('remoteViews', () => {
     store.getState().setTokenPositions([{ id: 't1', x: 400, y: 400 }]);
     view.setScene(remoteScene({ objects: { tokens: { t1: remoteToken('t1', { x: 120 }) }, texts: {}, drawings: {}, fog: {} } }));
     expect(store.getState().objects.tokens.t1).toMatchObject({ x: 400, y: 400 });
-    const cancelled = vi.fn();
+    // What the drag controller does on cancel: the drag ends and the token goes back to where it started.
+    const cancelled = vi.fn(() => {
+      store.setState({ isDragging: false });
+      store.getState().setTokenPositions([{ id: 't1', x: 100, y: 100 }]);
+    });
     fake.eventBus.on(REMOTE_DRAG_CANCEL, cancelled);
     view.setPlayer({ ...player, movableTokenIds: [] });
     expect(cancelled).toHaveBeenCalledOnce();
-    store.setState({ isDragging: false });
+    // The scene then puts it where the latest scene has it.
+    expect(store.getState().objects.tokens.t1).toMatchObject({ x: 120, y: 100 });
+    store.setState({ isDragging: true, selectedIds: ['t1'] });
     view.cancelDrag();
+    expect(cancelled).toHaveBeenCalledTimes(2);
     expect(store.getState().objects.tokens.t1).toMatchObject({ x: 120, y: 100 });
     expect(getHistoryStore(store)?.getState().pastStates).toHaveLength(0);
   });
@@ -247,6 +254,9 @@ describe('remoteViews', () => {
     expect(thrown).toEqual(entry);
     view.throwRoll({ ...entry, total: 99 });
     expect(store.getState().remoteView?.ownRoll).toBe(thrown);
+    view.throwRoll({ ...entry, id: 'r2' });
+    view.throwRoll(entry);
+    expect(store.getState().remoteView?.ownRoll?.id).toBe('r2');
     view.setStatus({ title: 'T', connection: 'Connected', tone: 'connected', message: null });
     expect(store.getState().remoteView?.status.connection).toBe('Connected');
     view.close();

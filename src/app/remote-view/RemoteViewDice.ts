@@ -57,8 +57,12 @@ function checkedStatus(status: unknown): RemoteStatus {
   }) as RemoteStatus;
 }
 
+/** How many thrown roll ids are remembered, so a roll handed again is not thrown again. */
+const THROWN_IDS = 100;
+
 export class RemoteViewDice {
   readonly rolls = new ListenerSet<RollListener>();
+  private readonly thrown: string[] = [];
 
   constructor(private readonly store: ViewAtlasStore) {}
 
@@ -71,10 +75,12 @@ export class RemoteViewDice {
     updateRemoteView(this.store, { diceLog: frozenCopy(entries.slice(0, REMOTE_LOG_ENTRIES)) });
   }
 
-  /** Throws `result` once: the same id again, the roll on screen, is ignored. */
+  /** Throws `result` once: an id thrown before (of the last 100) is ignored. */
   throwRoll(result: unknown): void {
     if (!isRoll(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
-    if (this.store.getState().remoteView?.ownRoll?.id === result.id) return;
+    if (this.thrown.includes(result.id)) return;
+    this.thrown.push(result.id);
+    if (this.thrown.length > THROWN_IDS) this.thrown.shift();
     updateRemoteView(this.store, { ownRoll: frozenCopy(result) });
   }
 

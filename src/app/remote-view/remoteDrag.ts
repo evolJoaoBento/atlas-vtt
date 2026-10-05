@@ -32,8 +32,9 @@ export function remoteDropPoint(state: Pick<ViewAtlasState, 'grid'>, token: Pick
   return snapDroppedToken(state.grid, point, size);
 }
 
-/** The drag of a token the player may no longer move, or that left the scene, ends unsent. */
-export function cancelLostDrag(state: Pick<ViewAtlasState, 'remoteView' | 'selectedIds' | 'objects'>, eventBus: Pick<EventEmitter, 'emit'>): void {
+/** The drag of a token the player may no longer move, or that left the scene, ends unsent; true when one was told to end. */
+export function cancelLostDrag(state: Pick<ViewAtlasState, 'remoteView' | 'selectedIds' | 'objects'>, eventBus: Pick<EventEmitter, 'emit'>): boolean {
   const lost = state.selectedIds.some((id) => !mayDragInRemoteView(state, id) || !Object.hasOwn(state.objects.tokens, id));
   if (lost) eventBus.emit(REMOTE_DRAG_CANCEL);
+  return lost;
 }

@@ -71,7 +71,8 @@ export class RemoteViewMotion {
 
   /** After a new scene or player state: a drag whose token left the scene or may no longer move ends. */
   checkDrag(): void {
-    cancelLostDrag(this.host.atlasStore.getState(), this.host.eventBus);
+    // The drag puts the token back where it started; the scene then puts it where it is now.
+    if (cancelLostDrag(this.host.atlasStore.getState(), this.host.eventBus)) this.host.refreshScene();
   }
 
   resize(): void {
