@@ -187,7 +187,9 @@ export class LightingController {
   playerLighting(): PlayerLighting | undefined { return playerLightingOf(this.renderer, this.playerSight()); }
 
   /** The senses and conditions of the map's collection, and how each token perceives. */
-  private sightRules(): SightRules { return this.rules.current(); }
+  private sightRules(): SightRules {
+    return this.rules.current();
+  }
 
   /** The window the canvas is in: a popout has its own frames. */
   private frames(): Window {

@@ -101,14 +101,17 @@ export class LightingRenderer implements SceneLightingView {
     this.engine = new LightingEngine(renderer);
     this.layer = this.engine.layer;
     this.memory = new ExploredMemory({
-      renderer, store: deps.store,
+      renderer,
+      store: deps.store,
       onTexture: (texture) => {
         if (texture) this.engine.setExplored(texture);
         deps.exploredWatcher?.setTexture(texture);
       },
       onTravel: (undone) => deps.exploredWatcher?.memoryTravelled(undone),
-      onChange: () => requestRender(deps.app), guard: (work) => this.run(work),
-      onSettled: () => { this.sightChanged = true; }, // inside `run`, which tells whoever waits on the memory
+      onChange: () => requestRender(deps.app),
+      guard: (work) => this.run(work),
+      // Inside `run`, which tells whoever waits on the memory.
+      onSettled: () => { this.sightChanged = true; },
     });
     renderer.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.layer.zIndex = LIGHTING_Z_INDEX;
@@ -120,7 +123,9 @@ export class LightingRenderer implements SceneLightingView {
     this.run(() => this.update(deps.store.getState()));
   }
 
-  isEnabled(): boolean { return this.deps.store.getState().lighting.enabled; }
+  isEnabled(): boolean {
+    return this.deps.store.getState().lighting.enabled;
+  }
 
   currentSight(): Sight { return this.sight; }
   lightReaches(): LightReach[] { return this.reaches; }
@@ -150,8 +155,13 @@ export class LightingRenderer implements SceneLightingView {
     });
   }
 
-  resetExplored(): void { this.memory.reset(); }
-  editExplored(edit: ExploredEdit): boolean { return this.memory.edit(edit); }
+  resetExplored(): void {
+    this.memory.reset();
+  }
+
+  editExplored(edit: ExploredEdit): boolean {
+    return this.memory.edit(edit);
+  }
 
   /** Before the map unloads: save the scene's pending memory into it, then start the next scene blank. */
   beforeMapUnload(): void {
@@ -171,7 +181,10 @@ export class LightingRenderer implements SceneLightingView {
     if (this.stopped) return;
     try {
       // What changes meanwhile is not worked out: until the restore rebuilds, sight is stale.
-      if (contextLost(this.deps.app.renderer)) { this.fresh = false; return; }
+      if (contextLost(this.deps.app.renderer)) {
+        this.fresh = false;
+        return;
+      }
       if (this.engine.takeRestored()) this.afterContextRestored();
       if (!this.stopped) work();
     } catch (error) {
@@ -206,9 +219,13 @@ export class LightingRenderer implements SceneLightingView {
       this.fresh = false;
       return;
     }
-    if (!this.beginAttempt()) { this.stop('unfinished'); return; }
+    if (!this.beginAttempt()) {
+      this.stop('unfinished');
+      return;
+    }
     this.engine.setEnabled(true);
     this.memory.sync(bounds, state.exploredMask);
+
     const { model, rebuilt } = this.model.update(state, bounds, this.deps.measurement, this.deps.rules);
     const base = rebuilt || !this.lastScene ? (this.lastScene = this.takeModel(model, state, bounds)) : this.lastScene;
     const spots = (this.spotsNow = this.spots.update(model, state, this.deps.measurement, this.deps.rules));
