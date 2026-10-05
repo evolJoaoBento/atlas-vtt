@@ -50,4 +50,5 @@
 - Callouts no longer mark private parts: `> [!private]`, `> [!only|…]` and `> [!except|…]` are not a sharing syntax any more. A note that still has them keeps everything from the first one to its end back from everyone, and **Share with…** says so; mark those parts again with **Share part** on the selection.
 - A note with a `%%[!end]%%` that closes no part is not shared until you fix it: **Share with…** names the line, and nobody can list or pull it.
 - A share tag written inside code, math or a link (where Obsidian shows it as text) is not used: the rest of the note is kept back, and **Share with…** says so.
-- Online play's settings now live with Atlas' other settings in the plugin's settings and sync with them, the table key included: every device that syncs them hosts as the same table, and a device that had a table of its own takes the one the first device carried over.
+- Online play's settings now live with Atlas' other settings in the plugin's settings and sync with them.
+- Your table's key now stays on this device; a second device hosts its own table, as before.
