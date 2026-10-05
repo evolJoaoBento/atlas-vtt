@@ -31,6 +31,9 @@
 - Online players' Large and Gargantuan tokens snap where cells meet, as yours do: Atlas places a player's drop there, and the drag ruler on the join page and in the Online scene tab ends there.
 - Online players' drags snap where Atlas places the drop also when they do not see the grid (hidden, switched off, or kept from players): on the join page and in the Online scene tab, which no longer snaps tokens to a square grid of its own. On a map without a grid nothing snaps, as for you.
 - Online players see the cell numbers your player window shows, on square and hex grids and in every format, on the join page and in the Online scene tab. Players on an older Atlas or join page still see the numbers of hex grids in the formats they know.
+- Online players measure a scene at its own **Distance per cell** (Grid Settings), as you do: the drag ruler and the measure tool on the join page and in the Online scene tab show the scene's distances, and a change reaches them as you make it.
+- The **Online session** button keeps its place after **Dice** when you customize the toolbar, wherever you put Dice. The toolbar editor does not move or hide it, and it steps aside while you edit the toolbar.
+- Online play's menus, dialogs, settings and notices in Atlas go through Atlas's translations, like the rest of Atlas. They are in English in every language for now; the join page stays English.
 
 ## Fixed
 
@@ -47,3 +50,4 @@
 - Callouts no longer mark private parts: `> [!private]`, `> [!only|…]` and `> [!except|…]` are not a sharing syntax any more. A note that still has them keeps everything from the first one to its end back from everyone, and **Share with…** says so; mark those parts again with **Share part** on the selection.
 - A note with a `%%[!end]%%` that closes no part is not shared until you fix it: **Share with…** names the line, and nobody can list or pull it.
 - A share tag written inside code, math or a link (where Obsidian shows it as text) is not used: the rest of the note is kept back, and **Share with…** says so.
+- Online play's settings now live with Atlas' other settings in the plugin's settings and sync with them, the table key included: every device that syncs them hosts as the same table, and a device that had a table of its own takes the one the first device carried over.
