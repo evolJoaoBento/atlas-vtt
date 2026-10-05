@@ -6,6 +6,8 @@ import { diceFontClass, useDiceLook } from '../../hooks/useDiceLook';
 import { cn } from '../../../../utils/cn';
 import { throwStyle } from '../../../dice3d/diceDisplay';
 import { diceSceneToShow } from '../../../dice3d/rollPresentation';
+import type { DiceScene } from '../../../dice3d/diceScene';
+import { givenRollScene, onGivenThrow } from '../../../dice3d/givenThrows';
 import { warmDiceSounds } from '../../../dice3d/audio/diceSamples';
 import { canShowDice, warmStages } from '../../../dice3d/stagePool';
 import type { DiceRollResult } from '../../../tools/DiceTool';
@@ -38,23 +40,34 @@ export function DiceRollDisplay({ container, prepare, muted = false }: DiceRollD
   /** Where the dice stages live: a canvas and its context belong to one document. */
   const stageDoc = container?.ownerDocument ?? view?.containerEl.doc ?? document;
 
+  /** Throws `result` on `scene`, or shows it as a card without one. */
+  const show = useCallback((result: DiceRollResult, scene: DiceScene | null): void => {
+    // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card
+    if (!scene || !canShowDice(stageDoc)) {
+      addToast(result);
+      return;
+    }
+    if (!muted) warmDiceSounds();
+    setRolls((prev) => pushRoll(prev, { result, scene, style: throwStyle(display) }));
+  }, [addToast, display, muted, stageDoc]);
+
   useEffect(() => {
     const handler = (e: Event): void => {
       const raw = (e as CustomEvent<DiceRollResult>).detail;
       const result = prepare ? prepare(raw) : raw;
       // A roll by someone other than the GM is thrown on their own screen; here it shows as a card.
-      const scene = result.rolledBy ? null : diceSceneToShow(result, display);
-      // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card
-      if (!scene || !canShowDice(stageDoc)) {
-        addToast(result);
-        return;
-      }
-      if (!muted) warmDiceSounds();
-      setRolls((prev) => pushRoll(prev, { result, scene, style: throwStyle(display) }));
+      show(result, result.rolledBy ? null : diceSceneToShow(result, display));
     };
     document.addEventListener('atlas-dice-rolled', handler);
     return (): void => document.removeEventListener('atlas-dice-rolled', handler);
-  }, [addToast, prepare, display, muted, stageDoc]);
+  }, [show, prepare, display]);
+
+  // A roll an extension hands this map view to throw (`dice.throw`); the player window takes none.
+  const store = container ? null : view?.atlasStore ?? null;
+  useEffect(() => {
+    if (!store) return;
+    return onGivenThrow(store, (roll) => show(roll, givenRollScene(roll, display)));
+  }, [store, show, display]);
 
   // Dice stages are built while nothing rolls, so that the first roll does not wait for one.
   useEffect(() => {

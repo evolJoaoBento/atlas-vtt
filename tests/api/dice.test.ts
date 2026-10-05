@@ -139,7 +139,7 @@ describe('dice', () => {
 
   it('listens on the document it is given', () => {
     const other = document.implementation.createHTMLDocument('popout');
-    const dice = diceApi(createInMemoryApp().app, new DisposerSet(), other);
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet(), null, other);
     const listener = vi.fn();
     dice.onRolled(listener);
     document.dispatchEvent(new CustomEvent('atlas-dice-rolled', { detail: rollFormula('1d4', () => 0, 1) }));

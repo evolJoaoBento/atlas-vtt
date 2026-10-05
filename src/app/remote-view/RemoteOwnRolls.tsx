@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { throwStyle } from '../dice3d/diceDisplay';
-import { diceSceneToShow } from '../dice3d/rollPresentation';
+import { givenRollScene } from '../dice3d/givenThrows';
 import { warmDiceSounds } from '../dice3d/audio/diceSamples';
 import { canShowDice, warmStages } from '../dice3d/stagePool';
 import { canRunMapHotkeys } from '../keyboard/mapHotkeys';
@@ -38,7 +38,7 @@ export function RemoteOwnRolls(): React.ReactElement | null {
   useEffect(() => {
     if (!ownRoll || ownRoll.id === shown.current) return;
     shown.current = ownRoll.id;
-    const scene = ownRoll.unlistedDice ? null : diceSceneToShow(ownRoll, display);
+    const scene = givenRollScene(ownRoll, display);
     // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card, as on the GM's map.
     if (!scene || !canShowDice(stageDoc)) {
       addToast(ownRoll);

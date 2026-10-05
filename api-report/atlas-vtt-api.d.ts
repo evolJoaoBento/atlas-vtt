@@ -259,6 +259,15 @@ export declare interface DiceApi {
     onRolled(listener: (result: DiceRollResult) => void): Disposer;
     /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll. */
     publish(result: DiceRollResult): void;
+    /**
+     * Throws `roll`, a result decided elsewhere, with Atlas's 3D dice in the map view `viewId` (a GM map view or a remote
+     * view), seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed. Each roll id is thrown
+     * once per view: handing it again throws nothing and answers true. False when nothing is thrown: the view is not open
+     * or its map not loaded, the user shows dice as result cards, or `roll` is not a roll; show the roll your own way then.
+     * Where the view cannot draw 3D dice (no WebGL), or the roll does not list all its dice, Atlas shows its result card.
+     * It only throws: nothing is logged, `onRolled` hears nothing and the player window shows nothing (`publish` does those).
+     */
+    throw?(viewId: ViewId, roll: DiceRollResult): boolean;
 }
 
 declare type DiceCrit = 'high' | 'low' | null;

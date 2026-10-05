@@ -5,6 +5,7 @@
  * `onRoll` listeners. The status bar's status lives here too: it is the owner's text.
  */
 import { frozenCopy } from '../../api/frozen';
+import { firstThrow } from '../dice3d/givenThrows';
 import type { RemoteStatus } from '../../api/types/remoteViews';
 import type { ViewAtlasStore } from '../storeFactory';
 import { isDieType, type DiceRollResult } from '../tools/diceRolling';
@@ -58,12 +59,8 @@ function checkedStatus(status: unknown): RemoteStatus {
   }) as RemoteStatus;
 }
 
-/** How many thrown roll ids are remembered, so a roll handed again is not thrown again. */
-const THROWN_IDS = 100;
-
 export class RemoteViewDice {
   readonly rolls = new ListenerSet<RollListener>();
-  private readonly thrown: string[] = [];
 
   constructor(private readonly store: ViewAtlasStore, private readonly maxDice: number = REMOTE_MAX_DICE) {
     updateRemoteView(store, { maxDice });
@@ -78,12 +75,10 @@ export class RemoteViewDice {
     updateRemoteView(this.store, { diceLog: frozenCopy(entries.slice(0, REMOTE_LOG_ENTRIES)) });
   }
 
-  /** Throws `result` once: an id thrown before (of the last 100) is ignored. */
+  /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
   throwRoll(result: unknown): void {
     if (!isRoll(result)) throw new Error('RemoteView.throwRoll: the result must be a dice roll result.');
-    if (this.thrown.includes(result.id)) return;
-    this.thrown.push(result.id);
-    if (this.thrown.length > THROWN_IDS) this.thrown.shift();
+    if (!firstThrow(this.store, result.id)) return;
     updateRemoteView(this.store, { ownRoll: frozenCopy(result) });
   }
 

@@ -39,6 +39,8 @@ Version 1.11.0 adds `bundles.forgetNoteProperties()`. Handing the disposer of `b
 
 Version 1.13.0 adds `MenuItem.keepOpen`: a plain item with `keepOpen: true` leaves its menu open when chosen, for toggles picked several in a row. An open submenu runs its provider again after `ui.invalidate()`, so its checkmarks follow the change; the items of the menu itself are read when it opens.
 
+Version 1.13.0 also adds `dice.throw(viewId, roll)`, which throws a roll decided elsewhere with Atlas's own 3D dice in a GM map view or a remote view: seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed, and once per roll id in each view (handing an id again throws nothing and answers true). It answers false when nothing is thrown: the view is not open or its map not loaded, the user shows dice as result cards, or the roll is malformed; show the roll your own way then. Where the view cannot draw 3D dice, or the roll does not list all its dice, Atlas shows its own result card. It only throws: nothing is logged, `onRolled` hears nothing and the player window shows nothing, which is what `publish` is for. In a remote view it shares the thrown ids with `RemoteView.throwRoll`.
+
 Extension data on scenes (`scenes.setData`) lives only in Atlas's asset index, never in the scene's record file, so it travels in no bundle and no copy. When Atlas cannot read the index and rebuilds it from the collection files, that data is lost, because the files do not hold it.
 
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
