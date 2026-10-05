@@ -1,4 +1,4 @@
-import type { Json } from '../../api/types/common';
+import type { Json } from '../types/json';
 import type { Asset } from './AssetService';
 
 /**

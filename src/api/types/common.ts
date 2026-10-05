@@ -13,5 +13,4 @@ export type AtlasCapability =
   | 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice'
   | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view';
 
-/** Plain JSON: all an extension may keep on Atlas's records. */
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type { Json } from '../../app/types/json';

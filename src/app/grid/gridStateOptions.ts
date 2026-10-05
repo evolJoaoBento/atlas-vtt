@@ -1,5 +1,5 @@
 import type { GridState } from '../services/MapPersistence';
-import type { GridOptions } from './GridSystem';
+import type { GridOptions } from './gridTypes';
 import { parseGridColor } from './gridContrastColor';
 import { cellNumberStyleOfGrid } from './cellNumbering';
 

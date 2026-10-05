@@ -6,6 +6,7 @@
 import { getDiceCrit, type DiceCrit } from './diceCrit';
 import { hasDiceTerm, rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';
 import type { DiceRules } from '../types/diceRulesTypes';
+import { t } from '../i18n';
 
 /** The dice of Atlas's dice tray, in tray order. */
 export const DICE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'] as const;
@@ -75,7 +76,7 @@ export function rollFormula(formula: string, random: () => number = Math.random,
     modifiers,
     total,
     ...(rules && { crit: getDiceCrit(rolls, rules) }),
-    player: 'Player',
+    player: t('dice.player'),
   };
 }
 

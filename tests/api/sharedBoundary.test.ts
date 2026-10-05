@@ -24,11 +24,23 @@ function resolveLocal(from: string, spec: string, english: boolean): string | nu
   throw new Error(`Cannot resolve ${spec} from ${from}`);
 }
 
+const reached = new Map<string, { files: Set<string>; packages: Set<string> }>();
+
+/** `walk`, once per entry and resolution: the walk reads every module, which is slow under a busy test run. */
+function reach(entry: string, english = true): { files: Set<string>; packages: Set<string> } {
+  const key = `${entry}:${english}`;
+  const known = reached.get(key);
+  if (known) return known;
+  const result = walk(entry, english);
+  reached.set(key, result);
+  return result;
+}
+
 /**
  * Every module an entry reaches, and the packages they import: as the packages' build bundles them (`english`, the
  * default), or as `tsc -p tsconfig.shared.json` reads them for the declarations, which knows no such resolution.
  */
-function reach(entry: string, english = true): { files: Set<string>; packages: Set<string> } {
+function walk(entry: string, english: boolean): { files: Set<string>; packages: Set<string> } {
   const files = new Set<string>();
   const packages = new Set<string>();
   const queue = [resolve(`src/shared/${entry}.ts`)];

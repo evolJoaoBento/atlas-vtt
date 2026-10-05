@@ -18,7 +18,7 @@ import { assetFilePath, groupTokenRefs } from './vault-sync/assetFiles';
 import { reconcileIndex, type VaultReconciliation } from './vault-sync/reconcileIndex';
 import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
-import type { Json } from '../../api/types/common';
+import type { Json } from '../types/json';
 import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
 import { SceneChangeWatcher } from './sceneChanges';
