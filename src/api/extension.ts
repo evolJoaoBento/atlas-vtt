@@ -38,7 +38,7 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
     return scope.disposers.add(scope.events.on(event, listener));
   }
   return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers, scope.capabilities.has('scene-tabs')),
-    presentation: presentationApi(services.views, scope.disposers, scope.id), dice: diceApi(services.app, scope.disposers, services.views,
+    presentation: presentationApi(services.views, scope.disposers, scope.id, scope.capabilities.has('scene-tabs')), dice: diceApi(services.app, scope.disposers, services.views,
       scope.capabilities.has('dice-looks') ? registerLookFor(scope.id, scope.disposers) : undefined),
     lasers: lasersApi(services.views, scope.disposers), lighting: lightingApi(services.views, services.sightFrames, scope.disposers),
     tokens: tokensApi(services.views), rules: rulesApi(services.app),

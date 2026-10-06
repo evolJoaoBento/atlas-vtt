@@ -89,6 +89,8 @@ Version 1.17.0 also adds `ui.addSceneTabMenuSection(section)` (optional, with `s
 
 From 1.17.0 the scene-tab menu's own items follow `ui.invalidate()` too, unlike the items of a map's More options and a token's menu (the 1.13.0 note above).
 
+Version 1.17.0 also adds `PresentationTarget.tabBadge(tab)` (optional, read with `scene-tabs`): a short mark after a scene tab's eye, such as "2 players", or null for none. `tab` is `{ viewId, tabId }`. It is asked only while the target is active, on render and after `ui.invalidate()`, and the first active target's non-null mark wins. The mark is plain text, trimmed and at most 24 characters (a longer one is cut with "…"). A tab with a mark draws its eye as shown even when it is not the presented tab, and the mark joins the eye's accessible name; what clicking the eye does is unchanged. A `tabBadge` that throws or answers something other than a string or null shows no mark and is logged once; one that is given but is not a function makes `addTarget` throw.
+
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ### Atlas 0.6

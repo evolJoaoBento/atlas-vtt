@@ -31,6 +31,7 @@
 - Extension API: a remote view shows at most 2,000 fog operations and 200,000 fog points (10,000 per operation, brushes no wider than the map); a scene with more is shown fully fogged with a line saying why, instead of freezing Obsidian, and fog sent again unchanged is not worked out again
 - Extension API: `tabs-changed` tells extensions when a map view's tabs or active tab change, a scene snapshot names its tab, and `views.showTab` opens a tab without presenting it (API 1.17.0, `scene-tabs`)
 - Extension API: `ui.addSceneTabMenuSection` adds a section to the menu that right-clicking a scene tab's eye opens; its checkmarks follow changes while it is open
+- Extension API: a presentation target can mark scene tabs next to their eye, for example with how many players see them
 
 ## Improved
 
