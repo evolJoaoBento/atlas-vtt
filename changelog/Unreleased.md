@@ -8,6 +8,7 @@
 - Extension API: ask what the player window shows of a lit scene, token by token and cell by cell, failing closed while sight is not ready
 - Extension API: move tokens like a GM drag (snapped, kept on the map, one undo step), and ask where a dropped token lands
 - Extension API: other plugins can add toolbar buttons, command palette sections, dashboard tiles (an odd last tile takes the whole row), entries in a map's More options and a token's menu, and floating panels in Atlas's style
+- Extension API: a floating panel an extension added can be moved by its header, like Atlas's own panels, and stays inside the view
 - Extension API: list scenes, keep an extension's own data on a scene (never exported), read a saved map without opening it, add a scene with its images in one step, and keep note properties out of exports
 - Extension API: a presented scene carries a `presentationId`, the same while the scene is held and resumed and new for each presentation, so an extension no longer has to guess whether it is the one it knows
 - Extension API: note properties an extension asks to keep out of exports stay stripped while that extension is switched off, until it removes them itself, which `bundles.forgetNoteProperties` also does

@@ -33,8 +33,17 @@ function spec(overrides: Partial<PanelSpec> = {}): PanelSpec {
 }
 
 // jsdom runs no animation frames to completion: the panel leaves at once.
-beforeAll(() => { MotionGlobalConfig.skipAnimations = true; });
-afterAll(() => { MotionGlobalConfig.skipAnimations = false; });
+beforeAll(() => {
+  MotionGlobalConfig.skipAnimations = true;
+  // jsdom has no PointerEvent; without one the pointer events lose their button and coordinates.
+  if (typeof window.PointerEvent === 'undefined') {
+    vi.stubGlobal('PointerEvent', class PointerEvent extends MouseEvent {});
+  }
+});
+afterAll(() => {
+  MotionGlobalConfig.skipAnimations = false;
+  vi.unstubAllGlobals();
+});
 
 describe('Extension panels', () => {
   beforeEach(() => {
@@ -177,5 +186,44 @@ describe('Extension panels', () => {
     expect(screen.getAllByRole('region').map((region) => region.getAttribute('aria-label'))).toEqual(['First', 'Second']);
     first.remove();
     second.remove();
+  });
+
+  it('stays in the stack until its header is dragged, then moves with the pointer', () => {
+    const { panel, remove } = register(spec());
+    const { container } = renderPanels();
+    open(panel);
+    const frame = screen.getByRole('region', { name: 'Quick notes' });
+    const header = container.querySelector('.atlas-extension-panel__header') as HTMLElement;
+    expect(frame.classList.contains('is-moved')).toBe(false);
+    expect(frame.style.left).toBe('');
+
+    fireEvent.pointerDown(header, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(window, { clientX: 140, clientY: 130 });
+    expect(frame.classList.contains('is-dragging')).toBe(true);
+    fireEvent.pointerUp(window);
+
+    expect(frame.classList.contains('is-moved')).toBe(true);
+    expect(frame.classList.contains('is-dragging')).toBe(false);
+    // jsdom lays nothing out, so the panel starts at its margin (12) and moves by the pointer's travel.
+    expect(frame.style.left).toBe('52px');
+    expect(frame.style.top).toBe('42px');
+    remove();
+  });
+
+  it('does not drag when the close button is pressed', () => {
+    const { panel, remove } = register(spec());
+    renderPanels();
+    open(panel);
+    const frame = screen.getByRole('region', { name: 'Quick notes' });
+    const close = screen.getByRole('button', { name: 'Close Quick notes' });
+    fireEvent.pointerDown(close, { button: 0, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(window, { clientX: 160, clientY: 160 });
+    fireEvent.pointerUp(window);
+    expect(frame.classList.contains('is-moved')).toBe(false);
+    expect(frame.classList.contains('is-dragging')).toBe(false);
+    expect(frame.style.left).toBe('');
+    fireEvent.click(close);
+    expect(isPanelOpen(panel, 'view-1')).toBe(false);
+    remove();
   });
 });
