@@ -32,6 +32,7 @@
 - Extension API: `tabs-changed` tells extensions when a map view's tabs or active tab change, a scene snapshot names its tab, and `views.showTab` opens a tab without presenting it (API 1.17.0, `scene-tabs`)
 - Extension API: `ui.addSceneTabMenuSection` adds a section to the menu that right-clicking a scene tab's eye opens; its checkmarks follow changes while it is open
 - Extension API: a presentation target can mark scene tabs next to their eye, for example with how many players see them
+- Extension API: the shared 3D dice module (`@atlas-vtt/shared/dice3d`) lets a page outside Obsidian install its own DOM, so it can draw Atlas's dice
 
 ## Improved
 
