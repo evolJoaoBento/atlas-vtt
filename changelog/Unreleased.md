@@ -33,6 +33,7 @@
 - Extension API: `ui.addSceneTabMenuSection` adds a section to the menu that right-clicking a scene tab's eye opens; its checkmarks follow changes while it is open
 - Extension API: a presentation target can mark scene tabs next to their eye, for example with how many players see them
 - Extension API: the shared 3D dice module (`@atlas-vtt/shared/dice3d`) lets a page outside Obsidian install its own DOM, so it can draw Atlas's dice
+- Extension API: other plugins can add a tab to the asset manager, beside Scenes, Maps, Encounters and Tokens, that shows their own content for the chosen collection (API 1.18.0, `asset-tabs`)
 
 ## Improved
 

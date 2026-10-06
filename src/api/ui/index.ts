@@ -1,13 +1,13 @@
 import { closePanel, closePanelEverywhere, isPanelOpen, openPanel } from '../../app/extensions/panelState';
 import type { SlotRegistry } from '../../app/extensions/SlotRegistry';
 import {
-  dashboardSlot, invalidateSlots, paletteSlot, panelSlot, sceneTabMenuSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
+  assetTabSlot, dashboardSlot, invalidateSlots, paletteSlot, panelSlot, sceneTabMenuSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
 } from '../../app/extensions/slots';
 import type { ExtensionScope } from '../extension';
 import type { ViewTracker } from '../viewTracker';
 import type { Disposer, ViewId } from '../types/common';
 import type {
-  DashboardTile, MenuItem, PaletteSection, PanelHandle, PanelSpec, SceneTabMenuSection, TokenMenuContext, ToolbarItem, UiApi, ViewContext,
+  AssetTabSpec, DashboardTile, MenuItem, PaletteSection, PanelHandle, PanelSpec, SceneTabMenuSection, TokenMenuContext, ToolbarItem, UiApi, ViewContext,
 } from '../types/ui';
 
 /** The longest heading a scene tab menu section shows; a longer one is cut. */
@@ -142,6 +142,13 @@ export function uiApi(scope: ExtensionScope, views: ViewTracker): UiApi {
         const heading = (record.heading as string).trim().slice(0, SCENE_TAB_MENU_HEADING_MAX).trim();
         if (heading === '') throw new Error('[Atlas API] ui.addSceneTabMenuSection: "heading" must be a non-empty string.');
         return register(sceneTabMenuSlot, kept<SceneTabMenuSection>(given, { ...record, heading }));
+      },
+    } : {}),
+    ...(scope.capabilities.has('asset-tabs') ? {
+      addAssetTab: (given: AssetTabSpec): Disposer => {
+        const tab = kept<AssetTabSpec>(given, checked('ui.addAssetTab', given, { id: 'text', title: 'text', icon: 'text', mount: 'function' }));
+        assertNew('ui.addAssetTab', assetTabSlot, scope.id, tab.id);
+        return register(assetTabSlot, tab);
       },
     } : {}),
     invalidate: (): void => invalidateSlots(),

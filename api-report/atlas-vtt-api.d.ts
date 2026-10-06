@@ -7,7 +7,29 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.17.0";
+export declare const API_VERSION = "1.18.0";
+
+/** 1.18.0 (`asset-tabs`): what an asset manager tab is told: the collection the asset manager shows. */
+export declare interface AssetTabContext {
+    collectionId: string;
+}
+
+/** 1.18.0 (`asset-tabs`): a tab of an extension's own beside the asset manager's Scenes, Maps, Encounters and Tokens. */
+export declare interface AssetTabSpec {
+    /** Unique among this extension's asset tabs. */
+    id: string;
+    /** The tab's name, as given. */
+    title: string;
+    /** Lucide name, shown before the title. */
+    icon: string;
+    /**
+     * Runs when the tab is shown, with the collection the asset manager shows; the returned disposer runs when the tab is
+     * left, the asset manager closes, the tab is removed, or the GM picks another collection, which mounts it again with
+     * that collection. Render inside `container`: keys pressed there (all but Escape) stay with it, and a press outside
+     * the asset manager closes it. A mount or disposer that throws is logged.
+     */
+    mount(container: HTMLElement, ctx: AssetTabContext): Disposer;
+}
 
 /**
  * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
@@ -22,7 +44,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -1616,6 +1638,11 @@ export declare interface UiApi {
      * items. The menu opens whenever it has something to show. `heading` must be non-empty once trimmed and `items` a function.
      */
     addSceneTabMenuSection?(section: SceneTabMenuSection): Disposer;
+    /**
+     * 1.18.0 (`asset-tabs`): a tab in the asset manager after Atlas's own, which shows what `mount` renders in place of
+     * the asset grid. `id`, `title` and `icon` must be non-empty and `mount` a function.
+     */
+    addAssetTab?(tab: AssetTabSpec): Disposer;
     /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
     invalidate(): void;
 }

@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { motion, useIsPresent } from 'framer-motion';
 import { GripHorizontal } from 'lucide-react';
 import type { PanelSpec, ViewContext } from '../../api/types/ui';
 import { CloseButton } from '../packages/components/primitives/CloseButton';
 import { useDialogWindowVariants } from '../packages/components/primitives/dialogMotion';
 import { useDraggablePosition } from '../react/hooks/useDraggablePosition';
-import { safely } from './SlotRegistry';
+import { useExtensionMount } from './useExtensionMount';
 import { t } from '../i18n';
 
 const DRAG_MARGIN = 12; // as the stack's inset
@@ -26,7 +26,6 @@ interface ExtensionPanelFrameProps {
 export function ExtensionPanelFrame({ owner, panel, ctx, onClose }: ExtensionPanelFrameProps): React.ReactElement | null {
   const variants = useDialogWindowVariants();
   const present = useIsPresent();
-  const body = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const [moved, setMoved] = useState(false);
   const { position, panelRef, startDrag, isDragging } = useDraggablePosition(
@@ -34,28 +33,10 @@ export function ExtensionPanelFrame({ owner, panel, ctx, onClose }: ExtensionPan
     { margin: DRAG_MARGIN, measureStart: (panel) => (panel.offsetParent ? { x: panel.offsetLeft, y: panel.offsetTop } : null) },
   );
   // The context is read when the panel opens; a later render must not mount it again.
-  const latest = useRef({ ctx, onClose });
-  latest.current = { ctx, onClose };
-
-  useEffect(() => {
-    const container = body.current;
-    if (!container || !present) return undefined;
-    let disposer: (() => void) | null = null;
-    try {
-      const result: unknown = panel.mount(container, latest.current.ctx);
-      disposer = typeof result === 'function' ? (result as () => void) : null;
-    } catch (error) {
-      console.error(`[Atlas API] ${owner}: panel "${panel.id}" mount failed:`, error);
-      setFailed(true);
-      latest.current.onClose();
-      return undefined;
-    }
-    return () => {
-      const dispose = disposer;
-      if (dispose) safely(owner, `panel "${panel.id}" disposer`, () => { dispose(); }, undefined);
-      container.replaceChildren();
-    };
-  }, [panel, owner, present]);
+  const body = useExtensionMount({
+    owner, what: `panel "${panel.id}"`, spec: panel, ctx, remountKey: '', active: present,
+    onFailed: () => { setFailed(true); onClose(); },
+  });
 
   if (failed) return null;
   return (

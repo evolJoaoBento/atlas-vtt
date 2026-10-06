@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AtlasApiHost } from '../../src/api/AtlasApiHost';
 import { buildExtension } from '../../src/api/extension';
 import {
-  dashboardSlot, paletteSlot, panelSlot, sceneTabMenuSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
+  assetTabSlot, dashboardSlot, paletteSlot, panelSlot, sceneTabMenuSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
 } from '../../src/app/extensions/slots';
 import { isPanelOpen, panelState } from '../../src/app/extensions/panelState';
 import { LANDED_CAPABILITIES } from '../../src/api/capabilities';
@@ -36,6 +36,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   expect(slotCounts()).toEqual(NONE);
   expect(sceneTabMenuSlot.list()).toHaveLength(0);
+  expect(assetTabSlot.list()).toHaveLength(0);
   expect(panelState.getState().open).toEqual([]);
 });
 

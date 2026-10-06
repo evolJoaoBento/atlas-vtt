@@ -137,6 +137,28 @@ export interface PanelHandle {
   dispose(): void;
 }
 
+/** 1.18.0 (`asset-tabs`): what an asset manager tab is told: the collection the asset manager shows. */
+export interface AssetTabContext {
+  collectionId: string;
+}
+
+/** 1.18.0 (`asset-tabs`): a tab of an extension's own beside the asset manager's Scenes, Maps, Encounters and Tokens. */
+export interface AssetTabSpec {
+  /** Unique among this extension's asset tabs. */
+  id: string;
+  /** The tab's name, as given. */
+  title: string;
+  /** Lucide name, shown before the title. */
+  icon: string;
+  /**
+   * Runs when the tab is shown, with the collection the asset manager shows; the returned disposer runs when the tab is
+   * left, the asset manager closes, the tab is removed, or the GM picks another collection, which mounts it again with
+   * that collection. Render inside `container`: keys pressed there (all but Escape) stay with it, and a press outside
+   * the asset manager closes it. A mount or disposer that throws is logged.
+   */
+  mount(container: HTMLElement, ctx: AssetTabContext): Disposer;
+}
+
 /**
  * Every `add*` reads the fields it needs once and keeps its own frozen copy; methods are called on the object given, so
  * a class instance works. It throws, naming the call and the field, for a malformed item or an id this extension already
@@ -161,6 +183,11 @@ export interface UiApi {
    * items. The menu opens whenever it has something to show. `heading` must be non-empty once trimmed and `items` a function.
    */
   addSceneTabMenuSection?(section: SceneTabMenuSection): Disposer;
+  /**
+   * 1.18.0 (`asset-tabs`): a tab in the asset manager after Atlas's own, which shows what `mount` renders in place of
+   * the asset grid. `id`, `title` and `icon` must be non-empty and `mount` a function.
+   */
+  addAssetTab?(tab: AssetTabSpec): Disposer;
   /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
   invalidate(): void;
 }
