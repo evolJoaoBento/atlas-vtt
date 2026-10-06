@@ -1,12 +1,16 @@
 /**
  * Atlas's dice: the dice its tray offers, the formula a selection makes, rolling a formula, and
- * what players may see of a roll. It imports only pure dice maths (`diceFormula.ts`, `diceCrit.ts`
- * and the dice rules they read, `gameSystems/diceRules`), so it needs no PIXI or UI code.
+ * what players may see of a roll. It imports only pure dice maths (`parseFormula.ts`, `diceFormula.ts`,
+ * `diceCrit.ts` and the dice rules they read, `gameSystems/diceRules`), so it needs no PIXI or UI code.
  */
-import { getDiceCrit, type DiceCrit } from './diceCrit';
-import { hasDiceTerm, rollFormula as rollDiceFormula, type RolledDie } from './diceFormula';
+import { getDiceCrit } from './diceCrit';
+import { rollFormula as rollDiceFormula } from './diceFormula';
+import { parseFormula, type FormulaErrorCode, type ParsedFormula } from './parseFormula';
 import type { DiceRules } from '../types/diceRulesTypes';
+import type { DiceRollResult } from '../types/diceTypes';
 import { t } from '../i18n';
+
+export type { DiceRollResult } from '../types/diceTypes';
 
 /** The dice of Atlas's dice tray, in tray order. */
 export const DICE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100'] as const;
@@ -15,34 +19,6 @@ export type DieType = typeof DICE_TYPES[number];
 /** How many of each die are picked; a die left out counts 0. */
 export type DiceSelection = Partial<Record<DieType, number>>;
 
-/** Every roll reaches Atlas's dice log, toasts and sounds as this document event. */
-export const DICE_ROLLED_EVENT = 'atlas-dice-rolled';
-
-export interface DiceRollResult {
-  id: string;
-  timestamp: number;
-  formula: string;
-  rolls: RolledDie[];
-  modifiers: number;
-  total: number;
-  /** Decided by the collection's critical rule when rolled; missing on rolls logged before rules existed. */
-  crit?: DiceCrit;
-  /** Dice the roll had beyond those in `rolls`: a log may list only the first of a roll's dice (for example a long roll made by someone other than the GM). */
-  unlistedDice?: number;
-  /** Atlas's own label for the GM's roller ("Player" in English), stamped on every roll; not who rolled it. */
-  player?: string;
-  /** Who rolled it when it was someone other than the GM: their name. Atlas shows it in the log and toasts. */
-  rolledBy?: string;
-  source?: {
-    type: 'toolbar' | 'statblock';
-    /** Let the roll follow its token's or statblock's current artwork. */
-    tokenId?: string;
-    statblockPath?: string;
-    tokenName?: string;
-    tokenImagePath?: string;
-    abilityName?: string;
-  };
-}
 
 export function isDieType(value: unknown): value is DieType {
   return typeof value === 'string' && (DICE_TYPES as readonly string[]).includes(value);
@@ -62,13 +38,23 @@ export function diceFormula(selection: Readonly<Partial<Record<string, number>>>
   return `${dice}${modifier > 0 ? '+' : '-'}${Math.abs(modifier)}`;
 }
 
-/**
- * Rolls `formula` with `random` for the dice (`diceFormula.ts`), by the collection's `rules` when
- * given: its exploding dice and, for the result, its critical rule. The id stays random however
- * the dice are rolled, so rolls made in the same millisecond never share one.
- */
-export function rollFormula(formula: string, random: () => number = Math.random, now: number = Date.now(), rules?: DiceRules): DiceRollResult {
-  const { rolls, modifiers, total } = rollDiceFormula(formula, random, rules);
+/** A formula Atlas does not roll (`parseFormula`): `code` says why. Nothing was rolled. */
+export class DiceFormulaError extends Error {
+  constructor(readonly formula: string, readonly code: FormulaErrorCode) {
+    super(`Atlas does not roll "${formula.slice(0, 80)}" (${code}): at most 64 characters, 10 terms, 100 dice and 1,000 faces.`);
+    this.name = 'DiceFormulaError';
+  }
+}
+
+/** `formula` checked whole before any die is rolled; throws `DiceFormulaError` when Atlas would not roll it. */
+function parsedFormula(formula: string): ParsedFormula {
+  const parsed = parseFormula(formula);
+  if (!parsed.ok) throw new DiceFormulaError(formula, parsed.code);
+  return parsed;
+}
+
+function rollParsed(formula: string, parsed: ParsedFormula, random: () => number, now: number, rules?: DiceRules): DiceRollResult {
+  const { rolls, modifiers, total } = rollDiceFormula(parsed, random, rules);
   return {
     id: `roll_${now}_${Math.random().toString(36).slice(2, 11)}`,
     timestamp: now,
@@ -79,6 +65,16 @@ export function rollFormula(formula: string, random: () => number = Math.random,
     ...(rules && { crit: getDiceCrit(rolls, rules) }),
     player: t('dice.player'),
   };
+}
+
+/**
+ * Rolls `formula` with `random` for the dice (`diceFormula.ts`), by the collection's `rules` when
+ * given: its exploding dice and, for the result, its critical rule. The id stays random however
+ * the dice are rolled, so rolls made in the same millisecond never share one. Throws
+ * `DiceFormulaError`, before any die is rolled, for a formula Atlas's dice tray would refuse.
+ */
+export function rollFormula(formula: string, random: () => number = Math.random, now: number = Date.now(), rules?: DiceRules): DiceRollResult {
+  return rollParsed(formula, parsedFormula(formula), random, now, rules);
 }
 
 /** A roll for a token hidden from players keeps its ability and result, not the token's name or portrait. */
@@ -108,7 +104,13 @@ function withDefaultRoll(modifier: string, defaultRoll: string): string {
   return bonus === '' || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
 }
 
-/** Rolls `formula` by a collection's `rules`; one without dice (`+3`) is added to the rules' default roll. */
+/**
+ * Rolls `formula` by a collection's `rules`, as Atlas's dice tray does: one without dice (`+3`), or an empty one, is
+ * added to the rules' default roll. The formula as given and the completed one are both checked before any die is
+ * rolled, so completing a bonus cannot pass text or limits the tray refuses; throws `DiceFormulaError` then.
+ */
 export function rollByRules(formula: string, rules: DiceRules, random: () => number = Math.random, now: number = Date.now()): DiceRollResult {
-  return rollFormula(hasDiceTerm(formula) ? formula : withDefaultRoll(formula, rules.defaultRoll), random, now, rules);
+  const input = parsedFormula(formula === '' ? rules.defaultRoll : formula);
+  const complete = input.terms.some((term) => term.kind === 'dice') && formula !== '' ? formula : withDefaultRoll(formula, rules.defaultRoll);
+  return rollParsed(complete, parsedFormula(complete), random, now, rules);
 }

@@ -1,93 +1,54 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Container } from 'pixi.js';
-import { EventEmitter } from 'eventemitter3';
-import { createStore } from 'zustand/vanilla';
-import { FogCanvasCompositor } from '../../src/app/pixi/fog/FogCanvasCompositor';
-import { FogOfWarRenderer } from '../../src/app/pixi/fog/FogOfWarRenderer';
-import type { FogBounds, FogOperation } from '../../src/app/types/fogTypes';
-import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
+import { describe, expect, it } from 'vitest';
+import { FogCoverageCache } from '../../src/app/fog/FogCoverageCache';
+import { RemoteSceneApplier } from '../../src/app/remote-view/RemoteSceneApplier';
+import { createViewAtlasStore } from '../../src/app/storeFactory';
+import type { FogOperation } from '../../src/app/types/fogTypes';
+import { createInMemoryApp } from '../mocks/inMemoryVault';
+import { remoteScene, remoteToken } from './remoteSceneFixtures';
 
-const bounds: FogBounds = { x: 0, y: 0, width: 200, height: 100 };
+/**
+ * A remote view's fog is fed from outside, often (a lit scene's darkness changes on its own). Upstream's fog renderer
+ * (#300) keeps one view's committed coverage in a `FogCoverageCache`, keyed by the fog record's identity and grown by an
+ * appended operation. The remote view's scene applier hands the same record while its operations stay the same, so
+ * feeding the scene again works nothing out anew, and one more operation is applied to the coverage there was.
+ */
 
-const op = (id: string, timestamp: number): FogOperation => ({
-  id, kind: 'fog', type: 'rectangle', timestamp, isErasing: false, x: 0, y: 0, width: 10, height: 10,
+const rect = (id: string, timestamp: number, x: number): FogOperation => ({
+  id, kind: 'fog', type: 'rectangle', timestamp, isErasing: false, x, y: 0, width: 50, height: 50,
 });
 
-/** Records what each canvas was painted with, as the names of the operations in drawing order. */
-function recordPaints(): { restore: () => void; paintsOf: (canvas: HTMLCanvasElement) => string[] } {
-  const restoreGraphics = stubJsdomGraphics();
-  const log = new WeakMap<object, string[]>();
-  const paintsOf = (canvas: HTMLCanvasElement): string[] => {
-    const entries = log.get(canvas) ?? [];
-    log.set(canvas, entries);
-    return entries;
-  };
-  const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
-    return {
-      canvas: this,
-      clearRect: () => { paintsOf(this).length = 0; },
-      drawImage: (source: HTMLCanvasElement) => { paintsOf(this).push(...paintsOf(source)); },
-      fillRect: () => paintsOf(this).push('fill'),
-      save: () => undefined, restore: () => undefined, beginPath: () => undefined, fill: () => undefined, rect: () => undefined,
-    } as unknown as CanvasRenderingContext2D;
-  } as HTMLCanvasElement['getContext']);
-  return { restore: () => { getContext.mockRestore(); restoreGraphics(); }, paintsOf };
+function setup(): { store: ReturnType<typeof createViewAtlasStore>; applier: RemoteSceneApplier } {
+  const { app } = createInMemoryApp();
+  const store = createViewAtlasStore(app, 'remote-fog', undefined, false, { remote: true });
+  return { store, applier: new RemoteSceneApplier(store, 'remote:remote-fog') };
 }
 
-let cleanup: (() => void) | null = null;
-afterEach(() => { cleanup?.(); cleanup = null; vi.restoreAllMocks(); });
-
-describe('FogCanvasCompositor output', () => {
-  it('composites the same operations in the same order with and without the prefix cache', async () => {
-    const renderUtils = await import('../../src/app/pixi/fog/fogRenderUtils');
-    const paints = recordPaints();
-    cleanup = paints.restore;
-    vi.spyOn(renderUtils, 'renderOperation').mockImplementation((ctx, operation) => {
-      (ctx as unknown as { fillRect: () => void }).fillRect();
-      paints.paintsOf(ctx.canvas).push(operation.id);
-    });
-    const plain = new FogCanvasCompositor(bounds, 0.5, false);
-    const cached = new FogCanvasCompositor(bounds, 0.5, true);
-    const base = [op('a', 1), op('b', 2), op('c', 3)];
-    // Unsorted input, then the same records with a new latest operation (a darkness that changes on its own), then an undo.
-    for (const ops of [[base[2]!, base[0]!, base[1]!], [...base, op('d', 4)], [...base, op('e', 4)], base.slice(0, 2)]) {
-      plain.compositeAll(ops);
-      cached.compositeAll(ops);
-      expect(paints.paintsOf(cached.getCanvas())).toEqual(paints.paintsOf(plain.getCanvas()));
-    }
-    plain.destroy();
-    cached.destroy();
-  });
-});
-
-describe('which fog views keep a second, map-sized canvas', () => {
-  function rendererFor(state: object): { compositeAll: () => number; destroy: () => void } {
-    const store = createStore(() => ({ isPlayerView: false, isGMView: true, isMapLoading: false, activeTool: 'select', mapPath: 'map', objects: { fog: {} }, ...state }));
-    const renderer = new FogOfWarRenderer(new Container() as never, { canvas: createEl('canvas') } as never, new EventEmitter(), store as never);
-    const compositor = (renderer as unknown as { compositor: FogCanvasCompositor }).compositor;
-    return {
-      // Canvases allocated by compositing three operations twice, the second time with a new latest one.
-      compositeAll: () => {
-        const created = vi.spyOn(globalThis, 'createEl');
-        compositor.compositeAll([op('a', 1), op('b', 2), op('c', 3)]);
-        compositor.compositeAll([op('a', 1), op('b', 2), op('d', 4)]);
-        const canvases = created.mock.calls.filter(([tag]) => tag === 'canvas').length;
-        created.mockRestore();
-        return canvases;
-      },
-      destroy: () => renderer.destroy(),
-    };
-  }
-
-  it('a GM view allocates none, as upstream does', () => {
-    cleanup = stubJsdomGraphics();
-    const gm = rendererFor({});
-    try { expect(gm.compositeAll()).toBe(0); } finally { gm.destroy(); }
+describe("a remote view's fed fog and the coverage cache", () => {
+  it('feeding the same fog again keeps the record, so the coverage is not worked out again', () => {
+    const { store, applier } = setup();
+    const fog = { a: rect('a', 1, 0), b: rect('b', 2, 100) };
+    applier.apply(remoteScene({ objects: { tokens: { t1: remoteToken('t1') }, texts: {}, drawings: {}, fog } }));
+    const cache = new FogCoverageCache();
+    const fogBefore = store.getState().objects.fog;
+    const first = cache.get(fogBefore, store.getState().mapPath);
+    // The token moved; the fog's operations are handed again (`RecordMemo` keeps records by the objects handed).
+    applier.apply(remoteScene({ objects: { tokens: { t1: remoteToken('t1', { x: 300 }) }, texts: {}, drawings: {}, fog: { ...fog } } }));
+    // The same coverage object: the cache saw the same record (a recomputation would build a new one).
+    expect(store.getState().objects.fog).toBe(fogBefore);
+    expect(cache.get(store.getState().objects.fog, store.getState().mapPath)).toBe(first);
   });
 
-  it('the remote view keeps one for its fed darkness', () => {
-    cleanup = stubJsdomGraphics();
-    const remote = rendererFor({ isPlayerView: true, isGMView: false, remoteView: {} });
-    try { expect(remote.compositeAll()).toBe(1); } finally { remote.destroy(); }
+  it('one more operation grows the coverage it had', () => {
+    const { store, applier } = setup();
+    const fog = { a: rect('a', 1, 0), b: rect('b', 2, 100) };
+    applier.apply(remoteScene({ objects: { tokens: {}, texts: {}, drawings: {}, fog } }));
+    const cache = new FogCoverageCache();
+    const before = cache.get(store.getState().objects.fog, store.getState().mapPath);
+    applier.apply(remoteScene({ objects: { tokens: {}, texts: {}, drawings: {}, fog: { ...fog, c: rect('c', 3, 300) } } }));
+    const after = cache.get(store.getState().objects.fog, store.getState().mapPath);
+    expect(after).not.toBe(before);
+    expect(after?.covers({ x: 25, y: 25 })).toBe(true);
+    expect(after?.covers({ x: 325, y: 25 })).toBe(true);
+    expect(after?.covers({ x: 225, y: 25 })).toBe(false);
   });
 });

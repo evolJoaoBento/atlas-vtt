@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Sprite } from 'pixi.js';
 import { toGridOptions } from '../../src/app/grid/gridStateOptions';
 import { RemoteMapBackdrop, type BackdropRenderer } from '../../src/app/remote-view/RemoteMapBackdrop';
-import type { GridState } from '../../src/app/types/gridStateTypes';
+import type { GridState } from '../../src/app/types/gridTypes';
 
 const GRID: GridState = { enabled: true, visible: true, type: 'square', size: 70, offsetX: 0, offsetY: 0, opacity: 0.5 };
 const MAP = { url: null, width: 1000, height: 800 };

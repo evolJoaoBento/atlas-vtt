@@ -38,7 +38,7 @@ function reach(entry: string, english = true): { files: Set<string>; packages: S
 
 /**
  * Every module an entry reaches, and the packages they import: as the packages' build bundles them (`english`, the
- * default), or as `tsc -p tsconfig.shared.json` reads them for the declarations, which knows no such resolution.
+ * default), or as `tsc -p tsconfig.packages.json` reads them for the declarations, which knows no such resolution.
  */
 function walk(entry: string, english: boolean): { files: Set<string>; packages: Set<string> } {
   const files = new Set<string>();

@@ -10,7 +10,8 @@ function openTray(props: { onRoll?: (dice: Readonly<Record<string, number>>, mod
   rollDice: ReturnType<typeof vi.fn>; onToggle: ReturnType<typeof vi.fn>;
 } {
   const { app } = createInMemoryApp();
-  const rollDice = vi.fn();
+  // A roll that was made: since upstream #275 a refused formula returns null and keeps the tray open.
+  const rollDice = vi.fn(() => ({ id: 'roll' }));
   const onToggle = vi.fn();
   render(
     <AtlasUIContext.Provider value={{ app, view: null, pixiApp: null, renderer: null }}>

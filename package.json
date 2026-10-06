@@ -24,9 +24,10 @@
     "lint": "eslint . --max-warnings 0 --suppressions-location eslint.suppressions.json",
     "api:report": "tsc -p tsconfig.api.json && api-extractor run --local",
     "api:check": "npm run api:report && git diff --exit-code -- api-report && node scripts/api-version-check.js",
-    "build:packages": "npm run api:report && vite build -c vite.shared.config.mts && tsc -p tsconfig.shared.json",
+    "build:packages": "npm run api:report && vite build -c vite.shared.config.mts && tsc -p tsconfig.packages.json",
     "lint:scan": "node scripts/lint-scan.js",
-    "preflight": "node scripts/preflight.js"
+    "preflight": "node scripts/preflight.js",
+    "check:boundaries": "node scripts/check-boundaries.mjs && tsc -p tsconfig.shared.json"
   },
   "keywords": [
     "obsidian",
@@ -44,6 +45,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.4",
     "@tanstack/react-virtual": "^3.14.13",
+    "clipper2-ts": "2.0.1-18",
     "clsx": "^2.1.1",
     "framer-motion": "^12.7.4",
     "howler": "^2.2.4",

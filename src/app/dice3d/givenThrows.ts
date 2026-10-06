@@ -4,7 +4,7 @@
  * that hands a roll to a GM map view's dice display. Kept per view store, so a closed view's
  * memory goes with its store and no map file can ever carry it.
  */
-import type { DiceRollResult } from '../tools/diceRolling';
+import type { DiceRollResult } from '../types/diceTypes';
 import type { DiceDisplay } from './diceDisplay';
 import type { DiceScene } from './diceScene';
 import { diceSceneToShow } from './rollPresentation';

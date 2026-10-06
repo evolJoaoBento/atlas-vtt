@@ -8,7 +8,8 @@ import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
-import { DICE_ROLLED_EVENT, type DiceRollResult } from '../../src/app/tools/diceRolling';
+import type { DiceRollResult } from '../../src/app/tools/diceRolling';
+import { followRolls } from '../../src/app/tools/diceRollFeed';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 // jsdom has no WebGL; these cases are about which rolls are thrown, not about the device.
@@ -82,10 +83,10 @@ describe("the remote view's own rolls", () => {
 
   it("dispatches no dice event: the player's other maps never hear the roll", () => {
     const heard = vi.fn();
-    document.addEventListener(DICE_ROLLED_EVENT, heard);
+    const unfollow = followRolls(heard);
     const { throwRoll } = setup('full');
     throwRoll(roll('r1'));
-    document.removeEventListener(DICE_ROLLED_EVENT, heard);
+    unfollow();
     expect(heard).not.toHaveBeenCalled();
   });
 });

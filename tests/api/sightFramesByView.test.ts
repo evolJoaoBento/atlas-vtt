@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DARKNESS_INTERVAL_MS } from '../../src/app/lighting/playerDarkness/sightFrames';
+import { DARKNESS_INTERVAL_MS } from '../../src/app/pixi/lighting/playerDarkness/sightFrames';
 import { fixtureLighting, lightingFromStore, scene, character, wall } from '../unit/lightingFixtures';
 import { fakeView, framesFor, loadMap } from './apiFakes';
 

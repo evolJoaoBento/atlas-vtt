@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
-import { rollerName, type DiceRollResult } from '../../../tools/diceRolling';
+import type { DiceRollResult } from '../../../types/diceTypes';
+import { rollerName } from '../../../tools/diceRolling';
 import { TokenPortrait } from '../../../packages/components/shared/TokenPortrait';
 import { useDiceAvatar } from './useDiceAvatar';
 import { DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';

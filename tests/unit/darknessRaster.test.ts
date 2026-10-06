@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { showsMap } from '../../src/app/gameSystems/senseRules';
-import { DARKNESS_MIN_CELL, darknessRaster, type ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
-import { insideSpans } from '../../src/app/lighting/playerDarkness/spans';
+import { DARKNESS_MIN_CELL, darknessRaster, type ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
+import { insideSpans } from '../../src/app/pixi/lighting/playerDarkness/spans';
 import type { PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
 import type { LightSource } from '../../src/app/types/lightingTypes';
 import { lightLevelAt } from '../../src/app/vision/lightLevels';

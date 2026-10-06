@@ -1,3 +1,4 @@
+import type { EventEmitter } from 'events';
 import React, { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAtlasUI } from '../../root/AtlasUIContext';
@@ -10,7 +11,7 @@ import type { DiceScene } from '../../../dice3d/diceScene';
 import { givenRollScene, onGivenThrow } from '../../../dice3d/givenThrows';
 import { warmDiceSounds } from '../../../dice3d/audio/diceSamples';
 import { canShowDice, warmStages } from '../../../dice3d/stagePool';
-import type { DiceRollResult } from '../../../tools/DiceTool';
+import type { DiceRollResult } from '../../../types/diceTypes';
 import { DiceRollStack } from '../dice3d/DiceRollStack';
 import { closeAllRolls, closeRoll, dismissRoll, pushRoll, type StackedRoll } from '../dice3d/rollStackState';
 import { canRunMapHotkeys } from '../../../keyboard/mapHotkeys';
@@ -19,6 +20,8 @@ import { DICE_TOAST_KNOT_PATHS, DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrn
 import { useDiceToasts } from './useDiceToasts';
 
 interface DiceRollDisplayProps {
+  /** Explicit source for a display outside its owning Atlas view. */
+  eventBus?: EventEmitter;
   /** Element the rolls render into, e.g. in the player window. Defaults to where the component is mounted. */
   container?: HTMLElement;
   /** Adapts each roll before it is shown, e.g. to leave out who rolled it. */
@@ -31,8 +34,9 @@ interface DiceRollDisplayProps {
  * Every dice roll, at the top centre of the map: thrown as 3D dice, or as a
  * result card when 3D dice are off or the roll holds dice no real body shows.
  */
-export function DiceRollDisplay({ container, prepare, muted = false }: DiceRollDisplayProps): React.ReactElement | null {
+export function DiceRollDisplay({ container, prepare, muted = false, eventBus: suppliedBus }: DiceRollDisplayProps): React.ReactElement | null {
   const { app, view } = useAtlasUI();
+  const eventBus = suppliedBus ?? view?.serviceManager?.getEventBus();
   const display = useDiceDisplay(app ?? undefined);
   const look = useDiceLook(app ?? undefined);
   const { toasts, addToast, dismissToast, dismissAllToasts } = useDiceToasts();
@@ -52,15 +56,14 @@ export function DiceRollDisplay({ container, prepare, muted = false }: DiceRollD
   }, [addToast, display, muted, stageDoc]);
 
   useEffect(() => {
-    const handler = (e: Event): void => {
-      const raw = (e as CustomEvent<DiceRollResult>).detail;
+    const handler = (raw: DiceRollResult): void => {
       const result = prepare ? prepare(raw) : raw;
       // A roll by someone other than the GM is thrown on their own screen; here it shows as a card.
       show(result, result.rolledBy ? null : diceSceneToShow(result, display));
     };
-    document.addEventListener('atlas-dice-rolled', handler);
-    return (): void => document.removeEventListener('atlas-dice-rolled', handler);
-  }, [show, prepare, display]);
+    eventBus?.on('dice-rolled', handler);
+    return (): void => { eventBus?.off('dice-rolled', handler); };
+  }, [show, prepare, display, eventBus]);
 
   // A roll an extension hands this map view to throw (`dice.throw`); the player window takes none.
   const store = container ? null : view?.atlasStore ?? null;

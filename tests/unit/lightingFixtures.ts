@@ -1,13 +1,13 @@
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { exploredMemoryOn } from '../../src/app/lighting/sceneLightingOptions';
-import type { ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
+import type { ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
 import { heldForSight } from '../../src/app/lighting/sightOnDrop';
 import { playerLightingOf, tokenPerception, type PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
 import { SceneModelBuilder, SceneSpots } from '../../src/app/pixi/lighting/sceneModel';
 import type { MapSize } from '../../src/app/services/viewMapSize';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
 import type { Character } from '../../src/app/types';
-import type { GridState } from '../../src/app/types/gridStateTypes';
+import type { GridState } from '../../src/app/types/gridTypes';
 import { DEFAULT_SCENE_LIGHTING, type LightSource, type SceneLighting } from '../../src/app/types/lightingTypes';
 import type { WallSegment } from '../../src/app/types/wallTypes';
 import { SEES_ALL } from '../../src/app/vision/sight';

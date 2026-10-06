@@ -15,16 +15,12 @@ function makeRenderer(): {
     scale: { x: 1 },
     toWorld: (point: { x: number; y: number }) => ({ x: point.x, y: point.y }),
   });
-  const store = {
-    subscribe: (_select: unknown, listener: (tool: string) => void) => {
-      listener('laser-pointer');
-      return (): void => undefined;
-    },
-  };
+  // The active tool as the renderer reads it since upstream #288: a read-only source.
+  const activeTool = { get: () => 'laser-pointer', subscribe: () => (): void => undefined };
   const pixiApp = { renderer: { name: 'canvas' }, ticker: { add: vi.fn(), remove: vi.fn() } };
   const canvas = document.createElement('canvas');
   const renderer = new LaserPointerRenderer(
-    viewport as never, pixiApp as never, store as never, canvas, () => ({ color: '#ff0059', size: 16 }),
+    viewport as never, pixiApp as never, activeTool as never, canvas, () => ({ color: '#ff0059', size: 16 }),
   );
   const pressAt = (x: number, y: number): void => {
     viewport.emit('pointerdown', { button: 0, global: { x, y }, stopPropagation: () => undefined });

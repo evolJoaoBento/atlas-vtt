@@ -1,6 +1,8 @@
+import { tableSightSource } from '../../vision/tokenSightPolicy';
 import type { TokenEntity } from '../../types';
 import type { WallSegment } from '../../types/wallTypes';
-import { doorsInSight } from '../../vision/doorSight';
+import type { FogCoverage } from '../../fog/fogCoverage';
+import { doorMiddle, doorsInSight } from '../../vision/doorSight';
 import { wallList } from '../../vision/wallList';
 import { movedWhileHeld } from '../../lighting/sightOnDrop';
 import { lightLevelAt } from '../../vision/lightLevels';
@@ -55,7 +57,7 @@ export type TokenPerception = (tokenId: string) => Perception;
 
 /**
  * How the vision tokens perceive each token, by its centre, the light there and its conditions.
- * A token with vision is always shown, whatever its conditions and the light: the players'
+ * A nonhidden token with vision is always shown, whatever its conditions and the light: the players'
  * window is one shared screen, and they are the party. `tokens` is the record the positions are
  * read from, so a caller may pass tokens at other places than the store's.
  *
@@ -79,7 +81,8 @@ export function tokenPerception(
   const known = memo?.of(sight, ambient, lights, options) ?? new WeakMap<TokenEntity, Perception>();
   const perceived = (token: TokenEntity): Perception => {
     const at = { x: token.x, y: token.y };
-    if (token.vision?.enabled) return !movedWhileHeld(token, held) || withinReach(at, sight) ? 'seen' : 'unseen';
+    if (token.isHidden) return 'unseen';
+    if (tableSightSource(token)) return !movedWhileHeld(token, held) || withinReach(at, sight) ? 'seen' : 'unseen';
     return perceive(at, sight, () => lightLevelAt(at, ambient, lights), targetOf(tokenEffects(token, conditions)));
   };
   return (tokenId) => {
@@ -127,13 +130,19 @@ export function playerTokenSight(
 
 const NO_DOORS: ReadonlySet<string> = new Set();
 
-/** The doors the players see by a scene's lighting (`doorsInSight`): those whose badges their view shows. None while the scene is unlit. */
+/** Ordinary doors in current sight with an uncovered midpoint. None while unlit or fog is invalid. */
 export function playerDoorSight(
   lighting: Pick<SceneLightingView, 'isEnabled' | 'currentSight' | 'ambientLight' | 'lightReaches'>,
   walls: Record<string, WallSegment>,
+  fog?: FogCoverage | null,
 ): ReadonlySet<string> {
-  if (!lighting.isEnabled()) return NO_DOORS;
-  return doorsInSight(wallList(walls), lighting.currentSight(), lighting.ambientLight(), lighting.lightReaches());
+  if (!lighting.isEnabled() || fog === null) return NO_DOORS;
+  const list = wallList(walls);
+  const seen = doorsInSight(list, lighting.currentSight(), lighting.ambientLight(), lighting.lightReaches());
+  if (fog) for (const wall of list) {
+    if (seen.has(wall.id) && fog.covers(doorMiddle(wall))) seen.delete(wall.id);
+  }
+  return seen;
 }
 
 /**
@@ -152,17 +161,24 @@ export interface PlayerLighting {
   showsExplored: boolean;
   /** The memory the view shows may hold less than the saved mask (`SceneLightingView.exploredSettling`): the mask would show too much. */
   exploredSettling: boolean;
+  /**
+   * The scene's committed fog, which the players' frame always hides tokens under (`PlayerSightTokens.framePerception`);
+   * null while its geometry is invalid, which the window covers whole. Unset where the view has no fog.
+   */
+  fog?: FogCoverage | null;
 }
 
-/** The players' lighting of a lit scene, `perception` as `playerTokenSight` gave it; undefined while the scene is unlit. */
+/** The players' lighting of a lit scene, `perception` as `playerTokenSight` gave it, with the scene's `fog`; undefined while the scene is unlit. */
 export function playerLightingOf(
   lighting: Pick<SceneLightingView, 'sightReady' | 'currentSight' | 'ambientLight' | 'lightReaches' | 'seenSpots' | 'showsExplored' | 'exploredSettling'>,
   perception: TokenPerception | undefined,
+  fog?: FogCoverage | null,
 ): PlayerLighting | undefined {
   if (!perception) return undefined;
   return {
     ready: lighting.sightReady(), perception, sight: lighting.currentSight(), ambient: lighting.ambientLight(),
     reaches: lighting.lightReaches(), spots: lighting.seenSpots(), showsExplored: lighting.showsExplored(),
     exploredSettling: lighting.exploredSettling(),
+    ...(fog !== undefined && { fog }),
   };
 }

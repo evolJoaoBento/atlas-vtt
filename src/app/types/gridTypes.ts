@@ -1,5 +1,12 @@
 import type { CellNumberFormat } from '../grid/cellNumbering';
 
+// Type definitions
+export interface CameraState {
+  x: number;
+  y: number;
+  scale: number;
+}
+
 /** A scene's grid settings as saved in the map file (pure types, shared with extensions via `@atlas-vtt/shared`). */
 export interface GridState {
   enabled: boolean;

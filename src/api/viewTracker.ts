@@ -1,3 +1,4 @@
+import type { EventEmitter } from 'events';
 import type { App } from 'obsidian';
 import type { LaserHub } from '../app/pixi/laser/LaserHub';
 import type { PlayerLighting } from '../app/pixi/lighting/playerLightingLayers';
@@ -22,6 +23,8 @@ export interface TrackedMapView {
     watchPlayerLighting?(listener: () => void): () => void;
   } | null;
   readonly isClosed: boolean;
+  /** The view's own event bus: Atlas's dice log, toasts, sounds and the player window it feeds hear its `dice-rolled` rolls there. */
+  readonly serviceManager?: { getEventBus(): EventEmitter };
   register(callback: () => void): void;
   switchToTab(tabId: string): Promise<void>;
 }

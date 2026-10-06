@@ -137,14 +137,16 @@ describe('dice', () => {
     expect(heard).toHaveBeenCalledTimes(1);
   });
 
-  it('listens on the document it is given', () => {
-    const other = document.implementation.createHTMLDocument('popout');
-    const dice = diceApi(createInMemoryApp().app, new DisposerSet(), null, other);
+  it("hears rolls through Atlas's roll feed, never a document event", () => {
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet());
     const listener = vi.fn();
     dice.onRolled(listener);
+    const broadcast = vi.spyOn(document, 'dispatchEvent');
     document.dispatchEvent(new CustomEvent('atlas-dice-rolled', { detail: rollFormula('1d4', () => 0, 1) }));
     expect(listener).not.toHaveBeenCalled();
+    broadcast.mockClear();
     dice.publish(rollFormula('1d4', () => 0, 1));
     expect(listener).toHaveBeenCalledTimes(1);
+    expect(broadcast).not.toHaveBeenCalled();
   });
 });

@@ -72,7 +72,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
                 setNote(problem);
                 return false;
               }
-            } else diceTool.rollDice(formula);
+            } else if (!diceTool.rollDice(formula)) return false;
             onToggle();
             return true;
           }}

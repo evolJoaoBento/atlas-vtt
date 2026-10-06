@@ -3,8 +3,8 @@
  * sight, light and spots the GM's player window is drawn by, `PlayerLighting`), with the
  * explored memory decoded from the scene's saved mask, and rebuilt at most every interval.
  */
-import type { PlayerLighting } from '../../pixi/lighting/playerLightingLayers';
-import type { MapSize } from '../../services/viewMapSize';
+import type { PlayerLighting } from '../playerLightingLayers';
+import type { MapSize } from '../../../services/viewMapSize';
 import { darknessRaster, MAX_DARKNESS_CELLS_PER_SIDE, type DarknessRaster } from './darknessRaster';
 import { ExploredImages, type ExploredDecoder } from './exploredImage';
 

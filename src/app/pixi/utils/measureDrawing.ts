@@ -8,9 +8,9 @@ import { Text, type Graphics } from 'pixi.js';
 import type { Point } from '../../grid/hexGeometry';
 import {
   MEASURE_AREA, MEASURE_LABEL_COLORS, MEASURE_LABEL_FONT_SIZE, MEASURE_PATH_STROKES, MEASURE_POINT, MEASURE_SHADOW, measureLabelBox,
-} from '../measureGeometry';
+} from './measureGeometry';
 
-export { measureLabelFontSize, pathMidpoint } from '../measureGeometry';
+export { measureLabelFontSize, pathMidpoint } from './measureGeometry';
 
 /** A polyline with a soft shadow, an accent body and a bright core. */
 export function drawMeasurePath(graphics: Graphics, color: number, points: readonly Point[]): void {

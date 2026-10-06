@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DarknessRaster, ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
-import { DARKNESS_INTERVAL_MS, SightFrames } from '../../src/app/lighting/playerDarkness/sightFrames';
+import type { DarknessRaster, ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
+import { DARKNESS_INTERVAL_MS, SightFrames } from '../../src/app/pixi/lighting/playerDarkness/sightFrames';
 import { character, exploredImage, lightingFromStore, MAP, scene, wall, type Scene } from './lightingFixtures';
 
 const walled = (heroX = 140): Scene => scene({ ambient: 1 }, {

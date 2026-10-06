@@ -7,7 +7,7 @@ import { ViewTracker, type TrackedMapView } from '../../src/api/viewTracker';
 import type { SettingsService } from '../../src/app/services/SettingsService';
 import type { LaserHub } from '../../src/app/pixi/laser/LaserHub';
 import type { PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
-import type { ExploredDecoder } from '../../src/app/lighting/playerDarkness/exploredImage';
+import type { ExploredDecoder } from '../../src/app/pixi/lighting/playerDarkness/exploredImage';
 import { SightFramesByView } from '../../src/api/sightFramesByView';
 import type { CameraViewport } from '../../src/app/services/presentedCamera';
 import { createViewAtlasStore } from '../../src/app/storeFactory';

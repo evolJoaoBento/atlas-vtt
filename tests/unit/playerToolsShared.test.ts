@@ -9,7 +9,7 @@ import { beamWidth, laserPointSpacing } from '../../src/app/pixi/laser/laserBeam
 import { LaserTrail } from '../../src/app/pixi/laser/laserTrail';
 import {
   arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
-} from '../../src/app/pixi/measureGeometry';
+} from '../../src/app/pixi/utils/measureGeometry';
 import { DragRulerPath, dragRulerLabel, samePoint, WAYPOINT_KEY } from '../../src/app/pixi/token-renderer/dragRulerPath';
 import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
 import { LASER_FADE_TIME } from '../../src/app/tools/laserPointerSettings';

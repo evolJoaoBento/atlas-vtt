@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DisposerSet } from '../../src/api/disposers';
 import { lightingApi } from '../../src/api/lighting';
-import type { ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
+import type { ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
 import { character, exploredImage, fixtureExploredImage, fixtureLighting, lightingFromStore, scene, wall } from '../unit/lightingFixtures';
 import { fakeView, framesFor, loadMap as load, trackerWith, type FakeView } from './apiFakes';
 

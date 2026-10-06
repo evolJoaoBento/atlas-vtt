@@ -9,7 +9,7 @@ import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
 import { isHandled } from './utils/handledEvents';
 import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
-import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './measureGeometry';
+import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './utils/measureGeometry';
 import { MAP_LAYER_Z } from './mapLayerOrder';
 
 interface PersistentMeasurement {

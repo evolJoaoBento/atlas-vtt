@@ -1,23 +1,21 @@
 /**
  * A remote view's fog holds a lit scene's darkness as one operation after every fog operation the
- * GM painted, and the darkness changes on its own. Each change must draw again only the darkness,
- * never every GM operation: the fog renderer keeps each operation's canvas whose records did not
- * change, and the remote view's compositor keeps everything before the latest operation once.
+ * GM painted, and the darkness changes on its own. Since upstream #300 the fog is drawn from one
+ * committed coverage (`fogCoverage`, clipper unions), so each change must apply only the darkness
+ * to the coverage of the GM's operations, never replay them all: with 2,000 GM operations a replay
+ * takes seconds. `fogCoverage` keeps the shape before the operation applied last for that.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Container } from 'pixi.js';
-import { EventEmitter } from 'eventemitter3';
-import { createStore } from 'zustand/vanilla';
+import { describe, expect, it, vi } from 'vitest';
 import type { FogOperation } from '../../src/app/types/fogTypes';
-import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 
-const rendered = vi.hoisted(() => ({ count: 0 }));
-vi.mock('../../src/app/pixi/fog/fogRenderUtils', async (actual) => {
-  const module = await actual<typeof import('../../src/app/pixi/fog/fogRenderUtils')>();
-  return { ...module, renderOperation: (...args: Parameters<typeof module.renderOperation>) => { rendered.count++; module.renderOperation(...args); } };
+const shaped = vi.hoisted(() => ({ count: 0 }));
+vi.mock('../../src/app/fog/fogOperationShape', async (actual) => {
+  const module = await actual<typeof import('../../src/app/fog/fogOperationShape')>();
+  return { ...module, fogOperationShape: (op: FogOperation) => { shaped.count++; return module.fogOperationShape(op); } };
 });
-// Imported after the mock, so the renderer draws through the counting `renderOperation`.
-const { FogOfWarRenderer } = await import('../../src/app/pixi/fog/FogOfWarRenderer');
+// Imported after the mock, so coverage is built through the counting `fogOperationShape`.
+const { fogCoverage } = await import('../../src/app/fog/fogCoverage');
+const { FogCoverageCache } = await import('../../src/app/fog/FogCoverageCache');
 
 /** The darkness's id and order as an extension feeds it: after every GM operation. */
 const DARKNESS_ID = 'darkness';
@@ -41,38 +39,52 @@ function darknessOp(x: number): FogOperation {
   };
 }
 
-afterEach(() => { vi.restoreAllMocks(); });
-
-/** The draws of each of three darkness changes in a view whose store has `remoteView` as given. */
-function drawsPerChange(remoteView: object | null): number[] {
-  const restore = stubJsdomGraphics();
-  const gmFog = heavyFog(200);
-  const store = createStore(() => ({
-    isPlayerView: true, isGMView: false, isMapLoading: false, activeTool: 'select', mapPath: 'remote:view-1', remoteView,
-    objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(300) } },
-  }));
-  const renderer = new FogOfWarRenderer(new Container() as never, { canvas: createEl('canvas') } as never, new EventEmitter(), store as never);
-  try {
-    const perChange: number[] = [];
-    for (const x of [400, 500, 600]) {
-      rendered.count = 0;
-      store.setState({ objects: { fog: { ...gmFog, [DARKNESS_ID]: darknessOp(x) } } });
-      perChange.push(rendered.count);
-    }
-    return perChange;
-  } finally {
-    renderer.destroy();
-    restore();
-  }
+/** Samples where `a` and `b` cover, on a grid over the scene. */
+function sameCoverage(a: { covers(p: { x: number; y: number }): boolean }, b: typeof a): boolean {
+  for (let x = 0; x < 1100; x += 7) for (let y = 0; y < 800; y += 9) if (a.covers({ x, y }) !== b.covers({ x, y })) return false;
+  return true;
 }
 
 describe('a darkness change in a remote view costs the same however much fog the GM painted', () => {
-  it('draws only the darkness again, not every GM operation', () => {
-    // The darkness's own canvas and the composite's latest operation, at most: never the 400 GM operations.
-    expect(Math.max(...drawsPerChange({}))).toBeLessThanOrEqual(2);
+  it('shapes only the darkness again, not every GM operation', () => {
+    const gmFog = heavyFog(200);
+    const cache = new FogCoverageCache();
+    cache.get({ ...gmFog, [DARKNESS_ID]: darknessOp(300) }, 'remote:view-1');
+    for (const x of [400, 500, 600]) {
+      shaped.count = 0;
+      const coverage = cache.get({ ...gmFog, [DARKNESS_ID]: darknessOp(x) }, 'remote:view-1');
+      expect(shaped.count).toBe(1);
+      expect(coverage?.covers({ x: x - 5, y: 700 })).toBe(true);
+      expect(coverage?.covers({ x: x + 5, y: 700 })).toBe(false);
+    }
   });
 
-  it('a view that is not remote composites every operation again, as upstream does', () => {
-    expect(Math.min(...drawsPerChange(null))).toBeGreaterThan(400);
+  it('gives the coverage a full replay gives, also when the darkness is not the last entry or ties', () => {
+    const gmFog = heavyFog(20);
+    const records = [
+      { ...gmFog, [DARKNESS_ID]: darknessOp(300) },
+      { ...gmFog, [DARKNESS_ID]: darknessOp(150) },
+      { [DARKNESS_ID]: darknessOp(150), ...gmFog },
+      { [DARKNESS_ID]: { ...darknessOp(120), timestamp: 49 }, ...gmFog },
+      { [DARKNESS_ID]: { ...darknessOp(90), timestamp: 10 }, ...gmFog },
+      { ...gmFog, [DARKNESS_ID]: { ...darknessOp(90), timestamp: 49 } },
+      { ...gmFog, [DARKNESS_ID]: { ...darknessOp(60), isErasing: true } },
+    ];
+    let previous: ReturnType<typeof fogCoverage> | undefined;
+    for (const record of records) {
+      const grown = fogCoverage(record, previous);
+      expect(sameCoverage(grown, fogCoverage(record))).toBe(true);
+      previous = grown;
+    }
+  });
+
+  it('a GM operation changed before the last still replays everything', () => {
+    const gmFog = heavyFog(20);
+    const first = fogCoverage({ ...gmFog, [DARKNESS_ID]: darknessOp(300) });
+    const moved = { ...gmFog, p3: { ...gmFog.p3!, points: [{ x: 500, y: 500 }, { x: 540, y: 540 }] }, [DARKNESS_ID]: darknessOp(300) };
+    shaped.count = 0;
+    const next = fogCoverage(moved, first);
+    expect(shaped.count).toBe(Object.keys(moved).length);
+    expect(sameCoverage(next, fogCoverage(moved))).toBe(true);
   });
 });

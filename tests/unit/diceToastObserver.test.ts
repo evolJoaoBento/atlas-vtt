@@ -1,16 +1,20 @@
+import { EventEmitter } from 'events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DiceToastObserver } from '../../src/app/services/DiceToastObserver';
 import type { SoundEffectService } from '../../src/app/services/SoundEffectService';
 import { rollFormula, type DiceRollResult } from '../../src/app/tools/diceRolling';
 
+/** The view's bus, where its sound observer hears its rolls (upstream #277). */
+const bus = new EventEmitter();
+
 function observe(display: 'card' | 'fast' | 'full'): { playDiceResult: ReturnType<typeof vi.fn>; observer: DiceToastObserver } {
   const playDiceResult = vi.fn();
-  const observer = new DiceToastObserver({ playDiceResult } as unknown as SoundEffectService, { getDiceDisplay: () => display });
+  const observer = new DiceToastObserver({ playDiceResult } as unknown as SoundEffectService, { getDiceDisplay: () => display }, bus);
   return { playDiceResult, observer };
 }
 
 const roll = (extra: Partial<DiceRollResult> = {}): void => {
-  document.dispatchEvent(new CustomEvent('atlas-dice-rolled', { detail: { ...rollFormula('1d20', () => 0.5, 1), ...extra } }));
+  bus.emit('dice-rolled', { ...rollFormula('1d20', () => 0.5, 1), ...extra });
 };
 
 describe('the sound of a roll shown as a card', () => {

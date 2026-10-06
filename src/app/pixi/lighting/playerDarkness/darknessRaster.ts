@@ -15,14 +15,14 @@
  * light level of every cell first (the ambient light by zone, then each light's polygon,
  * `lightLevelAt` itself inside magical darkness), then each sense's polygon.
  */
-import { NORMAL_SIGHT } from '../../gameSystems/senses/generic';
-import { perceivedLevel, showsMap } from '../../gameSystems/senseRules';
-import type { PlayerLighting } from '../../pixi/lighting/playerLightingLayers';
-import type { LightLevel } from '../../types/senseTypes';
-import { ambientLevel, lightLevelAt } from '../../vision/lightLevels';
-import type { AmbientLight, LightReach } from '../../vision/sight';
-import type { Polygon } from '../../vision/visibility';
-import type { MapSize } from '../../services/viewMapSize';
+import { NORMAL_SIGHT } from '../../../gameSystems/senses/generic';
+import { perceivedLevel, showsMap } from '../../../gameSystems/senseRules';
+import type { PlayerLighting } from '../playerLightingLayers';
+import type { LightLevel } from '../../../types/senseTypes';
+import { ambientLevel, lightLevelAt } from '../../../vision/lightLevels';
+import type { AmbientLight, LightReach } from '../../../vision/sight';
+import type { Polygon } from '../../../vision/visibility';
+import type { MapSize } from '../../../services/viewMapSize';
 import { insideSpans } from './spans';
 
 /** The smallest darkness cell, in world pixels. */

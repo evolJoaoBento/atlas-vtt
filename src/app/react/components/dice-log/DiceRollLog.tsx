@@ -48,7 +48,8 @@ export function DiceRollLog({ isOpen, onClose }: DiceRollLogProps): React.ReactE
     }
   }, [view]);
 
-  const { history, clearHistory, repeatRoll } = useDiceHistory(getDiceTool, storeActions, { listen: !remote });
+  // A remote view shows only its owner's shared log: it hears no view's rolls.
+  const { history, clearHistory, repeatRoll } = useDiceHistory(getDiceTool, storeActions, remote ? undefined : view?.serviceManager?.getEventBus());
 
   // In a remote view, rolling again asks its owner to roll.
   const repeat = useCallback((result: DiceRollResult): void => {

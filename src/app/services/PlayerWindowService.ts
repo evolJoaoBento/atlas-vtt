@@ -121,6 +121,7 @@ export class PlayerWindowService {
   public releaseSource(store: StoreApi<ViewAtlasState>): void {
     if (!this.streamSource || this.streamSource.store !== store) return;
     this.holdCurrentFrame();
+    this.sceneOverlays.forEach((overlay) => overlay.releaseSource?.());
     const heldFrame = this.heldFrame ?? createEl('canvas');
     this.streamSource = { canvas: heldFrame, withPlayerSafeFrame: (capture) => capture() };
     // The window no longer shows a scene tab, so presenting one again must re-target it.
@@ -365,7 +366,7 @@ export class PlayerWindowService {
   /** Bind the overlays to the view store that now holds the presented scene. */
   private presentScene(): void {
     const store = this.streamSource?.store ?? this.store;
-    this.sceneOverlays.forEach((overlay) => overlay.present(store));
+    this.sceneOverlays.forEach((overlay) => overlay.present(store, this.streamSource?.diceEvents));
   }
 
   private destroySceneOverlays(): void {

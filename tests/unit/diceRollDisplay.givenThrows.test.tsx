@@ -7,7 +7,8 @@ import { sendGivenThrow } from '../../src/app/dice3d/givenThrows';
 import { DiceRollDisplay } from '../../src/app/react/components/dice/DiceRollDisplay';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { SettingsService } from '../../src/app/services/SettingsService';
-import { DICE_ROLLED_EVENT, type DiceRollResult } from '../../src/app/tools/diceRolling';
+import type { DiceRollResult } from '../../src/app/tools/diceRolling';
+import { followRolls } from '../../src/app/tools/diceRollFeed';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { fakeView, loadMap, trackerWith } from '../api/apiFakes';
 
@@ -41,10 +42,10 @@ describe("a GM map view's dice display and the rolls handed to it", () => {
 
   it('throws a handed roll as dice, even one rolled by someone else, and dispatches no dice event', () => {
     const heard = vi.fn();
-    document.addEventListener(DICE_ROLLED_EVENT, heard);
+    const unfollow = followRolls(heard);
     const { container, store } = setup();
     act(() => sendGivenThrow(store, roll('r1')));
-    document.removeEventListener(DICE_ROLLED_EVENT, heard);
+    unfollow();
     expect(container.querySelector('.atlas-dice-roll')?.textContent).toContain('1d20+2');
     expect(container.querySelector('.atlas-dice-toast')).toBeNull();
     expect(heard).not.toHaveBeenCalled();

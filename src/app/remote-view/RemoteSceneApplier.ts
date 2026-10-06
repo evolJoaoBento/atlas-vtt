@@ -15,7 +15,7 @@ import type { ViewAtlasState } from '../storeFactory';
 import { runUntracked } from '../stores/history';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
 import type { FogOperation } from '../types/fogTypes';
-import type { GridState } from '../types/gridStateTypes';
+import type { GridState } from '../types/gridTypes';
 import type { InitiativeState } from '../types/initiativeTypes';
 import type { WidgetSettings } from '../types/widgetTypes';
 

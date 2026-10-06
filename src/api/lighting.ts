@@ -1,4 +1,4 @@
-import { cellsPerSide, pendingVisibility, visibilityOf } from '../app/lighting/playerDarkness/playerVisibility';
+import { cellsPerSide, pendingVisibility, visibilityOf } from '../app/pixi/lighting/playerDarkness/playerVisibility';
 import type { DisposerSet } from './disposers';
 import { acceptsListener } from './listenerCheck';
 import type { SightFramesByView } from './sightFramesByView';
@@ -61,7 +61,8 @@ export function lightingApi(tracker: ViewTracker, frames: SightFramesByView, dis
       const stopDue = frames.onDue(view, call);
       const unsubscribe = view.atlasStore.subscribe((state, previous) => {
         renderer.retry();
-        if (WATCHED.some((key) => state[key] !== previous[key])) call();
+        // Committed fog hides the tokens under it from the players' frame (upstream #303).
+        if (WATCHED.some((key) => state[key] !== previous[key]) || state.objects.fog !== previous.objects.fog) call();
       });
       let cancelClose: () => void = () => undefined;
       // The view going away ends the watch too, so a closed view is never retained.

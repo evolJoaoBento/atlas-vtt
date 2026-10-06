@@ -1,10 +1,11 @@
+import type { DiceRollResult } from '../types/diceTypes';
 import { EventEmitter } from 'events';
-import { DEFAULT_DICE_RULES } from '../gameSystems/diceRules';
 import type { DiceRules } from '../types/diceRulesTypes';
-import { DICE_ROLLED_EVENT, DICE_TYPES, rollByRules, type DiceRollResult } from './diceRolling';
-import { t } from '../i18n';
-
-export type { DiceRollResult } from './diceRolling';
+import { getDiceCrit } from './diceCrit';
+import { rollFormula } from './diceFormula';
+import { parseFormula, type FormulaError } from './parseFormula';
+import { DICE_TYPES } from './diceRolling';
+import { announceRoll } from './diceRollFeed';
 
 export interface DiceToolState {
   isTrayOpen: boolean;
@@ -13,12 +14,19 @@ export interface DiceToolState {
   quickDice: string[]; // Quick access dice buttons
 }
 
+export interface DiceRollInputs {
+  random: () => number;
+  rollId: () => string;
+  roller: () => string;
+  onFormulaError: (error: FormulaError) => void;
+}
+
 export class DiceTool {
   public state: DiceToolState;
   private eventBus: EventEmitter;
   private readonly getDiceRules: () => DiceRules;
 
-  constructor(eventBus: EventEmitter, getDiceRules: () => DiceRules = () => DEFAULT_DICE_RULES) {
+  constructor(eventBus: EventEmitter, getDiceRules: () => DiceRules, private readonly inputs: DiceRollInputs) {
     this.eventBus = eventBus;
     this.getDiceRules = getDiceRules;
     this.state = {
@@ -34,8 +42,9 @@ export class DiceTool {
     this.eventBus.emit('dice-tray-toggled', this.state.isTrayOpen);
   }
 
-  public rollDice(formula: string, source?: DiceRollResult['source']): DiceRollResult {
+  public rollDice(formula: string, source?: DiceRollResult['source']): DiceRollResult | null {
     const result = this.parseAndRoll(formula);
+    if (!result) return null;
     if (source) {
       result.source = source;
     }
@@ -48,21 +57,47 @@ export class DiceTool {
       this.state.rollHistory = this.state.rollHistory.slice(0, 50);
     }
     
-    document.dispatchEvent(new CustomEvent(DICE_ROLLED_EVENT, { detail: result }));
+    this.eventBus.emit('dice-rolled', result);
+    // Atlas's own displays hear the roll on this view's bus only; extensions follow every roll Atlas logs (`dice.onRolled`).
+    announceRoll(result);
 
     return result;
   }
 
   /** Rolls the formula; one without dice (`+3`) is added to the collection's default roll. */
-  private parseAndRoll(formula: string): DiceRollResult {
-    // The shared roll stays free of Obsidian (players' pages use it); the GM's own roll names its roller in Atlas's language.
-    return { ...rollByRules(formula, this.getDiceRules()), player: t('dice.player') };
+  private parseAndRoll(formula: string): DiceRollResult | null {
+    const rules = this.getDiceRules();
+    // An empty quick roll keeps the existing default-roll shortcut. Validate raw
+    // input first so completing a bonus cannot strip illegal text or evade caps.
+    const input = parseFormula(formula === '' ? rules.defaultRoll : formula);
+    if (!input.ok) {
+      this.inputs.onFormulaError(input);
+      return null;
+    }
+    const complete = input.terms.some(term => term.kind === 'dice') && formula !== ''
+      ? formula : withDefaultRoll(formula, rules.defaultRoll);
+    const parsed = parseFormula(complete);
+    if (!parsed.ok) {
+      this.inputs.onFormulaError(parsed);
+      return null;
+    }
+    const { rolls, modifiers, total } = rollFormula(parsed, this.inputs.random, rules);
+
+    return {
+      id: this.inputs.rollId(),
+      timestamp: Date.now(),
+      formula: complete,
+      rolls,
+      modifiers,
+      total,
+      crit: getDiceCrit(rolls, rules),
+      player: this.inputs.roller()
+    };
   }
 
   public clearHistory(): void {
     this.state.rollHistory = [];
     this.eventBus.emit('dice-history-cleared');
-    document.dispatchEvent(new CustomEvent('atlas-dice-history-cleared'));
   }
 
   public setActiveFormula(formula: string): void {
@@ -87,4 +122,10 @@ export class DiceTool {
   public getState(): DiceToolState {
     return { ...this.state };
   }
+}
+
+/** `+3` with `1d20` gives `1d20+3`; a bare number counts as a bonus. */
+function withDefaultRoll(modifier: string, defaultRoll: string): string {
+  const bonus = modifier.replace(/\s+/g, '');
+  return bonus === '' || /^[+-]/.test(bonus) ? `${defaultRoll}${bonus}` : `${defaultRoll}+${bonus}`;
 }

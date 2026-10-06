@@ -3,7 +3,7 @@
  * extension's `lasers.onLocal` listens), and other people's to show (`lasers.show` shows,
  * `RemoteLaserRenderer` draws). PIXI-free.
  */
-import type { LocalLaserEvent, RemoteLaser } from '../../../api/types/lasers';
+import type { LocalLaserEvent, RemoteLaser } from './laserEvents';
 
 export type { LocalLaserEvent, RemoteLaser };
 

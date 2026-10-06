@@ -19,7 +19,8 @@ import { reconcileIndex, type VaultReconciliation } from './vault-sync/reconcile
 import { listVault, readVault } from './vault-sync/vaultListing';
 import type { CollectionSettings } from '../types/collectionSettingsTypes';
 import type { Json } from '../types/json';
-import { isLegacyTokenRecord, isRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
+import { isLegacyTokenRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
+import { isRecord } from '../utils/guards';
 import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
 import { SceneChangeWatcher } from './sceneChanges';
 import type { SceneIndexData } from './sceneIndexData';

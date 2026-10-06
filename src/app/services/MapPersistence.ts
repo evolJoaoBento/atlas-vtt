@@ -1,3 +1,4 @@
+import type { CameraState, GridState } from '../types/gridTypes';
 import type { PersistStorage, StorageValue } from 'zustand/middleware';
 import type { App } from 'obsidian';
 import type { TokenEntity, TextElement, DrawingStroke, NotePin } from '../types';
@@ -5,7 +6,6 @@ import type { WallSegment } from '../types/wallTypes';
 import type { LightSource, LightZone } from '../types/lightingTypes';
 import type { WidgetSettings } from '../types/widgetTypes';
 import type { CellNumberFormat } from '../grid/cellNumbering';
-import type { GridState } from '../types/gridStateTypes';
 import { MAX_GRID_OFFSET } from '../grid/gridLimits';
 import { offsetsWithin } from '../grid/gridOrigin';
 import type AtlasVTTPlugin from '../../../main';
@@ -17,14 +17,6 @@ import { getDataFilePath } from '../utils/dataFileMigration';
 import { sceneFromFile, sceneToFile, tokenFromFile } from '../resources/resourceFileFormat';
 import { preserveDamagedSceneFile, SceneFileError } from './sceneFileProblems';
 import { SceneFileWriter } from './sceneFileWriter';
-
-// Type definitions
-export type { GridState };
-export interface CameraState {
-  x: number;
-  y: number;
-  scale: number;
-}
 
 import type { FogOperation } from '../types/fogTypes';
 

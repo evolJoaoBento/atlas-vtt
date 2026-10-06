@@ -1,10 +1,12 @@
 import type { App } from 'obsidian';
 import { landsOnAFace } from '../app/dice3d/diceScene';
 import { mapDiceRules } from '../app/services/mapDiceRules';
-import { DICE_ROLLED_EVENT, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
+import { DiceFormulaError, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
+import { announceRoll, followRolls } from '../app/tools/diceRollFeed';
 import { isDiceRollResult, plainCopy } from './diceRollCheck';
 import { throwGivenRoll } from './diceThrow';
 import type { DisposerSet } from './disposers';
+import { isRemoteView } from './viewInfo';
 import { acceptsListener } from './listenerCheck';
 import { frozenCopy } from './frozen';
 import type { Disposer, ViewId } from './types/common';
@@ -22,32 +24,48 @@ function assertRequest(request: unknown): asserts request is DiceRollRequest {
 }
 
 /**
- * `views` finds the map views `throw` throws in (none without it). `doc` is the document whose `atlas-dice-rolled`
- * event carries Atlas's rolls; the main window's by default.
+ * `views` finds the map views a roll shows in and `throw` throws in (none without it). `onRolled` follows Atlas's roll
+ * feed (`diceRollFeed.ts`), which announces every roll Atlas logs once, whichever view or window made it.
  */
-export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | null = null, doc: Document = document): DiceApi {
+export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | null = null): DiceApi {
   const dispatch = (result: DiceRollResult): void => {
-    doc.dispatchEvent(new CustomEvent(DICE_ROLLED_EVENT, { detail: result }));
+    // Atlas's own log, toasts, sounds and the player window follow each map view's bus (upstream #277): every open GM
+    // map view hears the roll, a remote view none (its log is its owner's). One view's failure never stops the others.
+    for (const view of views?.views() ?? []) {
+      if (isRemoteView(view)) continue;
+      try {
+        view.serviceManager?.getEventBus().emit('dice-rolled', result);
+      } catch (error) {
+        console.error('[Atlas API] A map view could not show a roll:', error);
+      }
+    }
+    announceRoll(result);
   };
   return Object.freeze({
     roll: (request: DiceRollRequest): DiceRollResult => {
       assertRequest(request);
-      const rolled = rollByRules(request.formula, mapDiceRules(app, request.mapPath ?? null));
+      let rolled: DiceRollResult;
+      try {
+        rolled = rollByRules(request.formula, mapDiceRules(app, request.mapPath ?? null));
+      } catch (error) {
+        // Atlas's dice tray refuses the same formulas (upstream #275); nothing was rolled or logged.
+        if (error instanceof DiceFormulaError) throw new Error(`[Atlas API] dice.roll: ${error.message}`);
+        throw error;
+      }
       const result = request.rolledBy ? { ...rolled, rolledBy: request.rolledBy } : rolled;
       dispatch(result);
       return frozenCopy(result);
     },
     onRolled: (listener: (result: DiceRollResult) => void): Disposer => {
       if (!acceptsListener('dice.onRolled', listener)) return () => undefined;
-      const handler = (event: Event): void => {
+      const unfollow = followRolls((result) => {
         try {
-          listener(frozenCopy((event as CustomEvent<DiceRollResult>).detail));
+          listener(frozenCopy(result));
         } catch (error) {
           console.error('[Atlas API] A dice listener failed:', error);
         }
-      };
-      doc.addEventListener(DICE_ROLLED_EVENT, handler);
-      return disposers.add(() => doc.removeEventListener(DICE_ROLLED_EVENT, handler));
+      });
+      return disposers.add(unfollow);
     },
     publish: (result: DiceRollResult): void => {
       // Copied first and the copy checked, so nothing the caller changes afterwards gets past the check.

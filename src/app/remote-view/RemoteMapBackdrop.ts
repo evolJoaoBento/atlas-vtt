@@ -8,7 +8,7 @@
 import { Sprite, Texture } from 'pixi.js';
 import type { GridOptions } from '../grid/GridSystem';
 import { toGridOptions } from '../grid/gridStateOptions';
-import type { GridState } from '../types/gridStateTypes';
+import type { GridState } from '../types/gridTypes';
 
 export interface BackdropRenderer {
   setBackgroundSprite(sprite: Sprite): void;

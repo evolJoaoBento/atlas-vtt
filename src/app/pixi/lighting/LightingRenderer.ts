@@ -77,6 +77,7 @@ export class LightingRenderer implements SceneLightingView {
   /** What the scene is built from, and when it is built anew (`SceneModelBuilder`). */
   private readonly model = new SceneModelBuilder();
   private readonly spots = new SceneSpots();
+  private readonly gmSpots = new SceneSpots();
   private reaches: LightReach[] = [];
   private sight: Sight = SEES_ALL;
   private spotsNow: readonly SeenSpot[] = [];
@@ -232,18 +233,20 @@ export class LightingRenderer implements SceneLightingView {
     // Sight that was not the scene's is again (a restored context may rebuild nothing): who waited on it is told.
     if (!this.fresh) this.sightChanged = true;
     this.fresh = true;
-    this.engine.update({ ...base, spots, ...sceneLook(lighting) });
+    const gmSight = model.gmSight ?? model.sight;
+    const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
+    this.engine.update({ ...base, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(lighting) });
     requestRender(this.deps.app);
   }
 
   /** A model built anew: its sight and reaches are the view's, and what the tokens now see is recorded. */
-  private takeModel({ walls, lights, reaches, sight, explored, zones, ambient }: SceneModel, state: ViewAtlasState, bounds: MapBounds): SceneWithoutLook {
+  private takeModel({ walls, lights, reaches, sight, gmSight = sight, explored, zones, ambient }: SceneModel, state: ViewAtlasState, bounds: MapBounds): SceneWithoutLook {
     this.reaches = reaches;
     this.sight = sight;
     this.zones = ambient.zones ?? [];
     this.sightChanged = true;
     if (explored) this.memory.record(explored);
-    return { bounds, albedo: this.deps.albedo(), walls, lights, sight, sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, zones };
+    return { bounds, albedo: this.deps.albedo(), walls, lights, sight: gmSight, sightRadius: (state.grid?.size ?? DEFAULT_CELL_SIZE) * 0.5, zones };
   }
 
   /**

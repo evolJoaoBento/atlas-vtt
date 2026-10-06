@@ -4,7 +4,7 @@ export type { LightSource, LightZone } from '../../app/types/lightingTypes';
 export type { TokenSettings } from '../../app/types/tokenSettingsTypes';
 export type { WallSegment } from '../../app/types/wallTypes';
 export type { FogBrushStroke, FogLassoFill, FogOperation, FogRectangleFill } from '../../app/types/fogTypes';
-export type { GridState } from '../../app/types/gridStateTypes';
+export type { GridState } from '../../app/types/gridTypes';
 export type { InitiativeEntry, InitiativeState } from '../../app/types/initiativeTypes';
 export type { InitiativeRules } from '../../app/types/initiativeRulesTypes';
 export type { SceneLighting } from '../../app/types/lightingTypes';

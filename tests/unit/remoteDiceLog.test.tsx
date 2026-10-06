@@ -7,7 +7,8 @@ import { DiceRollLog } from '../../src/app/react/components/dice-log/DiceRollLog
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
 import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { createViewAtlasStore } from '../../src/app/storeFactory';
-import { DICE_ROLLED_EVENT, type DiceRollResult } from '../../src/app/tools/diceRolling';
+import { EventEmitter } from 'events';
+import type { DiceRollResult } from '../../src/app/tools/diceRolling';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 
 Element.prototype.scrollTo = vi.fn();
@@ -22,7 +23,8 @@ function setup() {
   const { app } = createInMemoryApp();
   const store = createViewAtlasStore(app, 'remote-log', undefined, false, { remote: true });
   const dice = new RemoteViewDice(store);
-  const view = { viewId: 'remote-log', serviceManager: {} } as never;
+  const bus = new EventEmitter();
+  const view = { viewId: 'remote-log', serviceManager: { getEventBus: () => bus } } as never;
   const roller = vi.fn((): string | null => 'Not connected');
   const stop = registerRemoteControls('remote-log', { owner: 'ext', fitMap: () => undefined, roll: roller });
   const shown = render(
@@ -30,18 +32,20 @@ function setup() {
       <ViewStoreProvider store={store as never}><DiceRollLog isOpen onClose={() => undefined} /></ViewStoreProvider>
     </AtlasUIContext.Provider>,
   );
-  return { store, dice, roller, stop, shown };
+  return { store, dice, roller, stop, shown, bus };
 }
 
 describe("a remote view's dice log", () => {
   it('shows the shared log as it changes, hides Clear, and never takes Atlas\'s own rolls', () => {
-    const { dice, stop, shown } = setup();
+    const { dice, stop, shown, bus } = setup();
     act(() => dice.setDiceLog([roll('a')]));
     expect(shown.container.textContent).toContain('2d6+1');
     act(() => dice.setDiceLog([roll('b', { formula: '1d20', rolls: [{ die: 'd20', value: 7, max: 20 }], modifiers: 0, total: 7 }), roll('a')]));
     expect(shown.container.textContent).toContain('1d20');
     expect(screen.queryByLabelText('Clear history')).toBeNull();
-    act(() => { document.dispatchEvent(new CustomEvent(DICE_ROLLED_EVENT, { detail: roll('mine', { formula: '9d9' }) })); });
+    // Even a roll on the view's own bus: a remote view's log is its owner's alone.
+    act(() => { bus.emit('dice-rolled', roll('mine', { formula: '9d9' })); });
+    expect(bus.listenerCount('dice-rolled')).toBe(0);
     expect(shown.container.textContent).not.toContain('9d9');
     stop();
   });

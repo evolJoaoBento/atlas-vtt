@@ -34,7 +34,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.15.0 | shipped in 1.15.0 | none | none | none |
 | 1.15.1 | shipped in 1.15.1 | none | none | none |
 
-Dice events (`dice.onRolled`, `dice.roll`, `dice.publish`) use the main window's `document`, which popout windows share, so they reach every open map view and the player window.
+`dice.onRolled` hears every roll Atlas logs once, whichever map view or window made it (`dice.roll` and `dice.publish` included); Atlas no longer announces rolls as a `document` event. Since Atlas keeps each map view's rolls in that view (see Atlas 0.6.1 below), `roll` and `publish` hand their roll to every open GM map view, whose log, toasts and sounds show it, and to the player window through the view it presents; a remote view shows only its owner's log.
 
 Version 1.9.0 adds `presentationId` to a presented scene: the same while the scene is held and resumed, new for every presentation and never repeated after Atlas reloads. Version 1.10.0 makes `bundles.stripNoteProperties` remember its keys per extension id: they stay stripped when the extension is not loaded, and only the returned disposer forgets them, not the extension unloading.
 
@@ -79,6 +79,16 @@ What changed for extensions with Atlas 0.6 besides version 1.14.0:
 - **Toolbar items.** Atlas 0.6 lets the GM reorder and hide the toolbar's controls, and the bar now moves controls into "More tools" from its right end. Extension items sit together right after the dice button (before the Command palette when there is none), and `ToolbarItem.priority` orders them among themselves: a higher priority sits further left, so lower priorities move into "More tools" first. The GM's toolbar editor arranges Atlas's controls only; extension items are not in it and leave the bar while it is open.
 - **Language.** Atlas follows Obsidian's language where it has a translation, and English otherwise. Texts Atlas shows around what extensions add (the panel's close button, the eye's menu, notices) go through its translations; they are written in English so far, so other languages show them in English until they are translated. The labels, titles and messages an extension gives are shown as given. Errors thrown to an extension stay in English. The `@atlas-vtt/shared` packages run outside Obsidian and carry Atlas's English texts (laser colours, map icons, token sizes, the roller's name).
 - **Links in notes.** Notes can link and embed scenes, their snapshots (`[[Tavern.atlasmap#Snapshot name]]`) and encounters. Those links are note text that names the map file, so `scenes` and `bundles` do not track them: `replaceMap` keeps the map path and the scene id (its snapshots stay with it), so links to the scene keep working; a scene `addToCollection` adds has a new path no link names yet. Embeds draw a card, not a map view, so they never appear in `views.list()`.
+
+### Atlas 0.6.1
+
+What changed for extensions with the Atlas 0.6.1 betas, in API 1.15.1 (no type changed shape):
+
+- **Dice stay in their map view.** Atlas's dice tray, statblocks and the dice log's Roll again log a roll in the view that made it only, and the player window follows the view it presents. `dice.onRolled` still hears each of them once. `dice.roll` and `dice.publish` still reach every open GM map view, as before.
+- **Formulas Atlas does not roll.** `dice.roll` checks the formula before any die is rolled, as the dice tray does: at most 64 characters, 10 terms, 100 dice and 1,000 faces per die, constants of up to four digits, and nothing but dice, numbers, `+`, `-`, spaces and exploding notation (`!`, `!!`, `!3`, `!i`). Anything else throws `[Atlas API] dice.roll: …` and nothing is rolled or logged; a formula `diceFormula` builds from at most 100 dice and a modifier of at most four digits always passes. An empty formula, like a bare bonus such as `+3`, rolls the rules' default roll. `dice.publish` and `dice.throw` take rolls decided elsewhere and still check only the roll itself (plain data, at most 1,000 dice): their `formula` is the text Atlas shows. `rollFormula` in `@atlas-vtt/shared/rules` throws `DiceFormulaError` for the same formulas.
+- **Fog hides tokens from players.** The player window leaves out every token under committed fog, lit scene or not, and while the fog cannot be drawn it covers the whole map. `lighting.playerVisibility` answers the same: a token under fog is `'unseen'`, and fog Atlas cannot draw makes it `pending`. `lighting.watch` fires when the fog changes. While the answer is `unlit`, apply hidden tokens and fog yourself, as before.
+- **GM-hidden tokens give players no sight.** A token the GM hid neither sees nor explores for the players any more, so `playerVisibility` shows nothing that only a hidden token's vision would show, and the hidden token itself is `'unseen'`. Areas explored before stay in the memory.
+- **Door badges** under fog no longer show to players. The API hands out no walls or doors, so this changes no answer.
 
 ## Rules every group follows
 

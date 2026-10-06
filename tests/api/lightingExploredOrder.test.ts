@@ -29,7 +29,7 @@ vi.mock('../../src/app/pixi/lighting/exploredMaskSaving', () => ({ saveExploredM
 import type { Renderer } from 'pixi.js';
 import { DisposerSet } from '../../src/api/disposers';
 import { lightingApi } from '../../src/api/lighting';
-import type { ExploredImage } from '../../src/app/lighting/playerDarkness/darknessRaster';
+import type { ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
 import { ExploredMemory } from '../../src/app/pixi/lighting/ExploredMemory';
 import { character, exploredImage, lightingFromStore, scene, wall } from '../unit/lightingFixtures';
 import { fakeView, framesFor, loadMap, trackerWith } from './apiFakes';

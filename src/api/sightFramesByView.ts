@@ -1,5 +1,5 @@
-import type { ExploredDecoder } from '../app/lighting/playerDarkness/exploredImage';
-import { SightFrames } from '../app/lighting/playerDarkness/sightFrames';
+import type { ExploredDecoder } from '../app/pixi/lighting/playerDarkness/exploredImage';
+import { SightFrames } from '../app/pixi/lighting/playerDarkness/sightFrames';
 import type { ViewAtlasStore } from '../app/storeFactory';
 import type { ViewId } from './types/common';
 

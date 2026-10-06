@@ -1,10 +1,12 @@
 import { EventEmitter } from 'events';
 import { describe, expect, it } from 'vitest';
 import {
-  DICE_TYPES, diceFormula, diceTerms, persistableDiceLog, rollerName, rollFormula, withoutHiddenToken, type DiceRollResult,
+  DICE_TYPES, DiceFormulaError, diceFormula, diceTerms, persistableDiceLog, rollByRules, rollerName, rollFormula, withoutHiddenToken, type DiceRollResult,
 } from '../../src/app/tools/diceRolling';
 import type { DiceRules } from '../../src/app/types/diceRulesTypes';
 import { DiceTool } from '../../src/app/tools/DiceTool';
+import { DEFAULT_DICE_RULES } from '../../src/app/gameSystems/diceRules';
+import { offlineDiceInputs } from '../../src/app/services/offlineDiceInputs';
 
 /** Returns `values` in turn, over and over, as `Math.random` would. */
 function sequence(...values: number[]): () => number {
@@ -50,8 +52,8 @@ describe('rollFormula', () => {
   });
 
   it('is what DiceTool rolls', () => {
-    const tool = new DiceTool(new EventEmitter());
-    const result = tool.rollDice('2d6+3d8');
+    const tool = new DiceTool(new EventEmitter(), () => DEFAULT_DICE_RULES, offlineDiceInputs());
+    const result = tool.rollDice('2d6+3d8')!;
     expect(result.rolls).toHaveLength(5);
     expect(result.modifiers).toBe(0);
     expect(tool.getQuickDice()).toEqual([...DICE_TYPES]);
@@ -106,5 +108,41 @@ describe('what the dice log saves', () => {
     const gm = rollFormula('d20');
     const player = { ...rollFormula('d6'), rolledBy: 'Anna' };
     expect(persistableDiceLog([player, gm])).toEqual([gm]);
+  });
+});
+
+describe('formulas Atlas does not roll (upstream #275)', () => {
+  const rules: DiceRules = { defaultRoll: '1d20', crit: 'natural' };
+
+  it('refuses them before any die is rolled, saying why', () => {
+    const random = (): number => { throw new Error('rolled'); };
+    const refused = (formula: string): string => {
+      try {
+        rollFormula(formula, random, 0);
+      } catch (error) {
+        expect(error).toBeInstanceOf(DiceFormulaError);
+        return (error as DiceFormulaError).code;
+      }
+      throw new Error(`${formula} was rolled`);
+    };
+    expect(refused('1d20 plus 3')).toBe('syntax');
+    expect(refused('')).toBe('syntax');
+    expect(refused('x'.repeat(65))).toBe('length');
+    expect(refused(Array.from({ length: 11 }, () => '1').join('+'))).toBe('terms');
+    expect(refused('101d6')).toBe('dice');
+    expect(refused('1d1001')).toBe('faces');
+    expect(refused('1d1')).toBe('faces');
+  });
+
+  it("rolls the tray's own formulas as before", () => {
+    expect(rollFormula(diceFormula({ d6: 20, d8: 20, d10: 20, d12: 20, d20: 20 }, -9999), sequence(0.5), 0).rolls).toHaveLength(100);
+  });
+
+  it('completes a bonus to the default roll as the tray does, and checks the bonus as given', () => {
+    expect(rollByRules('', rules, sequence(0.5), 0).formula).toBe('1d20');
+    expect(rollByRules('+3', rules, sequence(0.5), 0).formula).toBe('1d20+3');
+    expect(rollByRules('3', rules, sequence(0.5), 0).formula).toBe('1d20+3');
+    expect(() => rollByRules('+3 and more', rules)).toThrow(DiceFormulaError);
+    expect(() => rollByRules('+3', { ...rules, defaultRoll: '1d0' })).toThrow(DiceFormulaError);
   });
 });
