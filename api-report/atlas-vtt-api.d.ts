@@ -790,7 +790,8 @@ export declare interface MenuItem {
     /**
      * A plain item that leaves its menu open when chosen, for toggles picked several in a row. An open submenu reads its
      * provider again after `ui.invalidate()`, so its checkmarks follow. An item in the menu itself also leaves it open, but
-     * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu.
+     * its checkmark stays as it was when the menu opened; put toggles picked several in a row in a submenu. From 1.17.0
+     * the scene tab menu's own items (`addSceneTabMenuSection`) follow `ui.invalidate()` too.
      */
     keepOpen?: boolean;
 }
@@ -1367,6 +1368,30 @@ export declare interface SceneSnapshot {
     readonly lighting: SceneLighting;
 }
 
+/** 1.17.0 (`scene-tabs`): the scene tab whose eye was right-clicked, read anew each time the menu reads its sections. */
+export declare interface SceneTabMenuContext {
+    viewId: ViewId;
+    tabId: string;
+    mapPath: string;
+    /** The tab's name, as its tab shows it. */
+    name: string;
+    /** The view's active tab. */
+    active: boolean;
+    /** Atlas's presented tab, held or not. */
+    presented: boolean;
+}
+
+/** 1.17.0 (`scene-tabs`): an extension's part of the menu that right-clicking a scene tab's eye opens. */
+export declare interface SceneTabMenuSection {
+    /** Shown as a label row at the section's top; plain text, trimmed, at most 40 characters (longer is cut). */
+    heading: string;
+    /**
+     * Read when the menu opens and again after `ui.invalidate()` (and when the view's tabs change) while it is open, so
+     * the checkmarks of top-level items follow. Return [] to leave the section out. A throw leaves it out and is logged once.
+     */
+    items(context: SceneTabMenuContext): MenuItem[];
+}
+
 export declare interface SettingsApi {
     /** Read-only; changes arrive as 'settings-changed'. */
     get<K extends AtlasSettingKey>(key: K): AtlasSettingsView[K];
@@ -1574,7 +1599,13 @@ export declare interface UiApi {
     addTokenMenuItems(provider: (ctx: TokenMenuContext) => MenuItem[]): Disposer;
     /** A floating panel in Atlas's panel style; the extension renders into `container` with its own React. */
     addPanel(panel: PanelSpec): PanelHandle;
-    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands and menu providers now. */
+    /**
+     * 1.17.0 (`scene-tabs`): a section in the menu that right-clicking a scene tab's eye opens (or the context-menu key or
+     * Shift+F10 on the eye), after Atlas's own "Open player window": a separator, the `heading` as a label row, then the
+     * items. The menu opens whenever it has something to show. `heading` must be non-empty once trimmed and `items` a function.
+     */
+    addSceneTabMenuSection?(section: SceneTabMenuSection): Disposer;
+    /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
     invalidate(): void;
 }
 

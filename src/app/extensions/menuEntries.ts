@@ -1,8 +1,8 @@
 import type { ContextMenuEntry } from '../react/root/ContextMenuContext';
-import type { MenuItem, TokenMenuContext, ViewContext } from '../../api/types/ui';
+import type { MenuItem, SceneTabMenuContext, SceneTabMenuSection, TokenMenuContext, ViewContext } from '../../api/types/ui';
 import type { TokenEntity } from '../types';
-import { safely, type SlotRegistry } from './SlotRegistry';
-import { tokenMenuSlot } from './slots';
+import { safely, type SlotEntry, type SlotRegistry } from './SlotRegistry';
+import { sceneTabMenuSlot, tokenMenuSlot } from './slots';
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return typeof value === 'object' && value !== null && typeof (value as { then?: unknown }).then === 'function';
@@ -95,4 +95,35 @@ export function tokenMenuEntries(ctx: ViewContext, token: Pick<TokenEntity, 'id'
   if (ctx.isPlayerView) return [];
   const tokenCtx: TokenMenuContext = Object.freeze({ ...ctx, tokenId: token.id, tokenKind: token.kind });
   return providedMenuEntries(tokenMenuSlot, 'token menu items', tokenCtx);
+}
+
+/** Sections whose `items` threw already: the failure is logged once, not on every read of an open menu. */
+const failedSections = new WeakSet<SceneTabMenuSection>();
+
+/** A section's items for `ctx`; none once the section is removed, and none (logged once) when `items` throws. */
+function sectionItems({ owner, item: section }: SlotEntry<SceneTabMenuSection>, ctx: SceneTabMenuContext): readonly MenuItem[] {
+  if (!sceneTabMenuSlot.list().some((entry) => entry.item === section)) return [];
+  try {
+    return [...itemsOf(section.items(ctx))].filter((item): item is MenuItem => item != null);
+  } catch (error) {
+    if (!failedSections.has(section)) {
+      failedSections.add(section);
+      console.error(`[Atlas API] ui.addSceneTabMenuSection: ${owner}'s section "${section.heading}" failed:`, error);
+    }
+    return [];
+  }
+}
+
+/**
+ * What extensions add to a scene tab's eye menu for `ctx`, in the order they were added: for each section with items,
+ * a separator, its heading as a label row, then its items. Read anew on every call; an open submenu in a section
+ * follows `ui.invalidate()` as in the other menus.
+ */
+export function sceneTabMenuEntries(ctx: SceneTabMenuContext): ContextMenuEntry[] {
+  const subscribe = (onChange: () => void): (() => void) => sceneTabMenuSlot.subscribe(onChange);
+  return sceneTabMenuSlot.list().flatMap((entry) => {
+    const read = (): readonly MenuItem[] => sectionItems(entry, ctx);
+    const items = menuEntriesOf(entry.owner, read(), { read, subscribe });
+    return items.length === 0 ? [] : [{ type: 'separator' } as const, { type: 'label', text: entry.item.heading } as const, ...items];
+  });
 }

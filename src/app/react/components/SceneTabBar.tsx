@@ -20,8 +20,11 @@ interface SceneTabBarProps {
   onCloseTab: (tabId: string) => void;
   onAddTab: () => void;
   onPresentTab: (tabId: string) => void;
-  /** The eye's context menu; returns false when it offers none, so the right-click is left alone. */
-  onPresentTabMenu?: ((tabId: string, position: MenuPosition) => boolean) | undefined;
+  /**
+   * The eye's context menu; returns false when it offers none, so the right-click is left alone. Opened from the
+   * keyboard (the context-menu key, Shift+F10) it is told the eye, for focus to go back to.
+   */
+  onPresentTabMenu?: ((tabId: string, position: MenuPosition, returnFocus?: HTMLElement) => boolean) | undefined;
   /** Lists every open map; offered while the tabs do not fit the bar. */
   onShowAllTabs: () => void;
 }
@@ -32,8 +35,13 @@ interface TabActionButtonProps {
   /** When defined the button is a toggle and stays visible while active. */
   isActive?: boolean;
   onClick: () => void;
-  /** Returns true when it opened a menu of its own. */
-  onContextMenu?: ((position: MenuPosition) => boolean) | undefined;
+  /** Returns true when it opened a menu of its own; `returnFocus` is the button when the keyboard opened it. */
+  onContextMenu?: ((position: MenuPosition, returnFocus?: HTMLElement) => boolean) | undefined;
+}
+
+/** The context-menu key and Shift+F10 open a focused control's context menu. */
+function isMenuKey(event: React.KeyboardEvent): boolean {
+  return event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
 }
 
 /** Icon button inside a tab; keeps its events from activating or closing the tab. */
@@ -53,7 +61,13 @@ function TabActionButton({ icon: Icon, label, isActive, onClick, onContextMenu }
           e.stopPropagation();
         }}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (!isMenuKey(e)) return;
+          const button = e.currentTarget;
+          const rect = button.getBoundingClientRect();
+          if (onContextMenu?.({ x: rect.left, y: rect.bottom }, button)) e.preventDefault();
+        }}
         aria-pressed={isActive}
       >
         <Icon size={12} />
@@ -133,7 +147,9 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
                   isActive={isPresented}
                   // With a target active, the presented scene's eye hides it again.
                   onClick={() => (isPresented && target ? stopPresenting() : onPresentTab(tab.id))}
-                  onContextMenu={onPresentTabMenu && ((position) => onPresentTabMenu(tab.id, position))}
+                  onContextMenu={onPresentTabMenu && ((position, returnFocus) => (returnFocus
+                    ? onPresentTabMenu(tab.id, position, returnFocus)
+                    : onPresentTabMenu(tab.id, position)))}
                 />
                 <LabelTooltip side="bottom" label={tab.filePath}>
                   <span className="atlas-scene-tab__name">{tab.displayName}</span>

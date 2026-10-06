@@ -30,10 +30,16 @@ export type ContextMenuEntry =
     label: string;
     icon?: string;
     /** A function is read again whenever `subscribe` reports a change, so an open submenu stays current. */
-    children: ContextMenuEntry[] | (() => ContextMenuEntry[]);
+    children: ContextMenuEntries;
     subscribe?: (onChange: () => void) => () => void;
   }
-  | { type: 'custom'; render: () => React.ReactNode };
+  | { type: 'custom'; render: () => React.ReactNode }
+  /** A heading row over the entries that follow: plain text, not focusable and never chosen. */
+  | { type: 'label'; text: string }
+  | { type: 'separator' };
+
+/** A menu's entries: a function is read again whenever the menu's `subscribe` reports a change, so an open menu stays current. */
+export type ContextMenuEntries = ContextMenuEntry[] | (() => ContextMenuEntry[]);
 
 export interface MenuStepper {
   value: string;
@@ -61,12 +67,27 @@ function CtxIcon({ name }: { name: string }): React.ReactElement {
   return <ObsidianIcon name={name} className="atlas-ctx-icon" />;
 }
 
+interface LiveEntriesProps {
+  entries: ContextMenuEntries;
+  subscribe?: ((onChange: () => void) => () => void) | undefined;
+  onClose: () => void;
+  /** Closes the menu once a rebuild leaves nothing to show (the root menu; an empty submenu just shows nothing). */
+  closeWhenEmpty?: boolean;
+}
+
+/** A menu's entries, rebuilt whenever `subscribe` reports that they changed. Rows keep their keys (by index), so focus survives a rebuild of the same shape. */
+export function LiveEntries({ entries, subscribe, onClose, closeWhenEmpty = false }: LiveEntriesProps): React.ReactElement {
+  const [, refresh] = useReducer((version: number) => version + 1, 0);
+  useEffect(() => subscribe?.(refresh), [subscribe]);
+  const list = typeof entries === 'function' ? entries() : entries;
+  const empty = list.length === 0;
+  useEffect(() => { if (closeWhenEmpty && empty) onClose(); }, [closeWhenEmpty, empty, onClose]);
+  return <>{renderEntries(list, onClose)}</>;
+}
+
 /** A submenu's entries, rebuilt whenever the submenu reports that they changed. */
 function SubmenuEntries({ entry, onClose }: { entry: ContextMenuSubmenuEntry; onClose: () => void }): React.ReactElement {
-  const [, refresh] = useReducer((version: number) => version + 1, 0);
-  useEffect(() => entry.subscribe?.(refresh), [entry]);
-  const children = typeof entry.children === 'function' ? entry.children() : entry.children;
-  return <>{renderEntries(children, onClose)}</>;
+  return <LiveEntries entries={entry.children} subscribe={entry.subscribe} onClose={onClose} />;
 }
 
 /** Runs a stepper action from a click inside a menu item without choosing the item. */
@@ -138,6 +159,16 @@ export function renderEntries(
 ): React.ReactNode[] {
   return entries.map((entry, idx) => {
     switch (entry.type) {
+      case 'label':
+        return (
+          <DropdownMenu.Label key={`label-${idx}`} className="atlas-ctx-label">
+            <span role="presentation">{entry.text}</span>
+          </DropdownMenu.Label>
+        );
+
+      case 'separator':
+        return <DropdownMenu.Separator key={`separator-${idx}`} className="atlas-ctx-separator" />;
+
       case 'custom':
         return (
           <div key={`custom-${idx}`} className="atlas-ctx-custom" role="none">

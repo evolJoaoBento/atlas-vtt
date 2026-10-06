@@ -23,7 +23,7 @@ import { LootRoller } from './components/loot/LootRollerPanel';
 import { MapLoadingOverlay } from './components/MapLoadingOverlay';
 import { SceneTabBar } from './components/SceneTabBar';
 import { SceneSwitcher } from './components/scene-switcher/SceneSwitcher';
-import { openPresentMenu, presentTab as presentTabFor } from './tabPresenting';
+import { openSceneTabMenu, presentTab as presentTabFor } from './tabPresenting';
 import { canRunMapHotkeys, matchesMapHotkey } from '../keyboard/mapHotkeys';
 import { SettingsService } from '../services/SettingsService';
 import { HotkeyHelp } from '../keyboard/HotkeyHelp';
@@ -77,8 +77,8 @@ export const UIRoot: React.FC<UIRootProps> = ({ app, view, pixiApp }) => {
   const presentTab = (tabId: string): void => {
     if (view) presentTabFor(app, view, tabId);
   };
-  const presentTabMenu = (tabId: string, position: { x: number; y: number }): boolean =>
-    view ? openPresentMenu(app, view, tabId, position) : false;
+  const presentTabMenu = (tabId: string, position: { x: number; y: number }, returnFocus?: HTMLElement): boolean =>
+    view ? openSceneTabMenu(app, view, tabId, position, returnFocus ?? null) : false;
 
   // Context value with all required objects
   const contextValue: AtlasUIContextValue = useMemo(

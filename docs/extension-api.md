@@ -85,6 +85,10 @@ Version 1.17.0 also adds `SceneSnapshot.tabId`: the tab whose scene the snapshot
 
 Version 1.17.0 also adds `views.showTab(viewId, tabId)` (optional): it makes a tab of a GM map view active without presenting it, and answers true once that tab's map is loaded. It answers false, and never throws, for a closed, unknown or remote view, an unknown tab, a switch that failed, or when another switch (another `showTab`, the GM's click) overtook it. The presented scene holds while the view shows another tab, as on any switch, and resumes when the GM returns to it. Until 1.17.0 only `presentation.present` switched tabs, and it also presented.
 
+Version 1.17.0 also adds `ui.addSceneTabMenuSection(section)` (optional, with `scene-tabs`): a section in the menu that right-clicking a scene tab's eye opens, or the context-menu key or Shift+F10 with the eye focused. `section` is `{ heading, items(context) }`: `heading` is shown as a label row (plain text, trimmed, at most 40 characters; an empty one throws) and `items` is told the tab (`viewId`, `tabId`, `mapPath`, `name`, whether it is the view's active tab and whether it is Atlas's presented tab, held or not) and answers the section's items; `[]` leaves it out. The menu lists Atlas's own "Open player window" while a presentation target is active, then each section after a separator, and from 1.17.0 it opens whenever it has something to show, not only while a target is active. While it is open it reads every section again after `ui.invalidate()` and whenever the view's tabs or the presented scene change, so a top-level item's checkmark follows, and it stays open while an item's action makes its tab active. An `items` that throws leaves its section out and is logged once.
+
+From 1.17.0 the scene-tab menu's own items follow `ui.invalidate()` too, unlike the items of a map's More options and a token's menu (the 1.13.0 note above).
+
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ### Atlas 0.6

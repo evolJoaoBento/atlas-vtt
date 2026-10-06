@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AtlasApiHost } from '../../src/api/AtlasApiHost';
 import { buildExtension } from '../../src/api/extension';
 import {
-  dashboardSlot, paletteSlot, panelSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
+  dashboardSlot, paletteSlot, panelSlot, sceneTabMenuSlot, tokenMenuSlot, toolbarSlot, viewMenuSlot,
 } from '../../src/app/extensions/slots';
 import { isPanelOpen, panelState } from '../../src/app/extensions/panelState';
 import { LANDED_CAPABILITIES } from '../../src/api/capabilities';
@@ -35,6 +35,7 @@ const NONE = { toolbar: 0, palette: 0, dashboard: 0, viewMenu: 0, tokenMenu: 0, 
 afterEach(() => {
   vi.restoreAllMocks();
   expect(slotCounts()).toEqual(NONE);
+  expect(sceneTabMenuSlot.list()).toHaveLength(0);
   expect(panelState.getState().open).toEqual([]);
 });
 
@@ -53,6 +54,25 @@ describe('ui lifecycle', () => {
     plugin.unload();
     expect(slotCounts()).toEqual(NONE);
     expect(() => panel.dispose()).not.toThrow();
+  });
+
+  it('C-tabmenu-1: a scene tab menu section is read again after invalidate and removed when the extension unloads', () => {
+    const { host } = hostWithUi();
+    const plugin = fakePlugin('ext');
+    const ui = host.api.connect(plugin).ui;
+    let on = false;
+    ui.addSceneTabMenuSection!({ heading: ' Present to ', items: () => [{ label: 'Anna', checked: on }] });
+    const [entry] = sceneTabMenuSlot.list();
+    expect(entry).toMatchObject({ owner: 'ext', item: { heading: 'Present to' } });
+    const reads = vi.fn();
+    const stop = sceneTabMenuSlot.subscribe(reads);
+    on = true;
+    ui.invalidate();
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(entry!.item.items({} as never)).toEqual([{ label: 'Anna', checked: true }]);
+    stop();
+    plugin.unload();
+    expect(sceneTabMenuSlot.list()).toHaveLength(0);
   });
 
   it('C-ui-2: Atlas unloading removes every extension slot', () => {
