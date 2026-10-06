@@ -1,4 +1,4 @@
-import { showsTab, whenMapLoaded } from '../app/services/PresentedScene';
+import { showsTab } from '../app/services/PresentedScene';
 import { viewCamera, watchViewCamera } from '../app/services/presentedCamera';
 import type { DisposerSet } from './disposers';
 import { acceptsListener } from './listenerCheck';
@@ -32,6 +32,43 @@ function ownedByView(tracker: ViewTracker, disposers: DisposerSet, view: Tracked
 /** Each view's `showTab` requests, shared by every extension: a later one overtakes an earlier one. */
 const showRequests = new WeakMap<TrackedMapView, number>();
 
+/**
+ * How long `showTab` waits at most for its switch and load; past it the answer is false. Twice Atlas's stalled-load
+ * timeout (30 s, `MapService`), so a load Atlas still finishes on its own is answered for.
+ */
+export const SHOW_TAB_TIMEOUT_MS = 60_000;
+
+/**
+ * Waits for `switching`, then for the view's store to stop loading: true then, false when the view closes first, the
+ * switch fails, or the wait passes `SHOW_TAB_TIMEOUT_MS`. A load cut short by a close never resets the store's loading
+ * flag, so the close is what ends the wait. Leaves nothing subscribed once settled.
+ */
+function switchSettled(tracker: ViewTracker, view: TrackedMapView, switching: Promise<void>): Promise<boolean> {
+  return new Promise((resolve) => {
+    let done = false;
+    const stops: Array<() => void> = [];
+    const finish = (answer: boolean): void => {
+      if (done) return;
+      done = true;
+      for (const stop of stops.splice(0)) stop();
+      resolve(answer);
+    };
+    stops.push(tracker.onClose(view.viewId, () => finish(false)));
+    const timer = window.setTimeout(() => finish(false), SHOW_TAB_TIMEOUT_MS);
+    stops.push(() => window.clearTimeout(timer));
+    switching.then(() => {
+      if (done) return;
+      if (view.isClosed) { finish(false); return; }
+      const check = (): void => { if (view.isClosed) finish(false); else if (!view.atlasStore.getState().isMapLoading) finish(true); };
+      stops.push(view.atlasStore.subscribe(check));
+      check();
+    }, (error: unknown) => {
+      console.error('[Atlas API] views.showTab: switching tabs failed:', error);
+      finish(false);
+    });
+  });
+}
+
 /** `views.showTab`: switches to `tabId` without presenting it; true only when this request's tab is the one loaded. */
 async function showTab(tracker: ViewTracker, viewId: ViewId, tabId: string): Promise<boolean> {
   const view = tracker.view(viewId);
@@ -39,13 +76,9 @@ async function showTab(tracker: ViewTracker, viewId: ViewId, tabId: string): Pro
   if (!view.tabMetaStore.getState().tabs.some((tab) => tab.id === tabId)) return false;
   const request = (showRequests.get(view) ?? 0) + 1;
   showRequests.set(view, request);
-  try {
-    await view.switchToTab(tabId);
-    await whenMapLoaded(view.atlasStore);
-  } catch (error) {
-    console.error('[Atlas API] views.showTab: switching tabs failed:', error);
-    return false;
-  }
+  // Async, so a switch that throws at once rejects like one that fails later.
+  const switching = (async (): Promise<void> => view.switchToTab(tabId))();
+  if (!(await switchSettled(tracker, view, switching))) return false;
   return showRequests.get(view) === request && !view.isClosed && showsTab(view, tabId);
 }
 

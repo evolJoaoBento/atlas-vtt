@@ -4,7 +4,7 @@ import { DisposerSet } from '../../src/api/disposers';
 import { ApiEvents } from '../../src/api/events';
 import { LANDED_CAPABILITIES } from '../../src/api/capabilities';
 import { presentationApi } from '../../src/api/presentation';
-import { viewsApi } from '../../src/api/views';
+import { SHOW_TAB_TIMEOUT_MS, viewsApi } from '../../src/api/views';
 import type { ViewInfo } from '../../src/api/types/views';
 import { initialRemoteViewState } from '../../src/app/remote-view/remoteViewState';
 import { presentedScene } from '../../src/app/services/PresentedScene';
@@ -87,6 +87,61 @@ describe('views.showTab', () => {
     await expect(api.showTab!('v1', view.tabIds[1]!)).resolves.toBe(false);
     expect(error).toHaveBeenCalledWith('[Atlas API] views.showTab: switching tabs failed:', expect.any(Error));
     error.mockRestore();
+  });
+
+  it('C-tabs-3: answers false when the view closes while the tab loads', async () => {
+    const view = tabbedView('v1', [A, B]);
+    const { api } = setup([view]);
+    const asked = api.showTab!('v1', view.tabIds[1]!);
+    await flush();
+    expect(view.atlasStore.getState().isMapLoading).toBe(true);
+    view.close();
+    await expect(asked).resolves.toBe(false);
+  });
+
+  it('C-tabs-3: answers false when the view closes after the switch returned but its load was cut short', async () => {
+    const view = tabbedView('v1', [A, B]);
+    const { api } = setup([view]);
+    // As Atlas does when a close supersedes the load: the switch returns and the store is left loading.
+    view.switchToTab = (tabId: string): Promise<void> => {
+      view.tabMetaStore.getState().setActiveTab(tabId);
+      view.atlasStore.setState({ isMapLoading: true, mapLoaded: false });
+      return Promise.resolve();
+    };
+    // Counts the store listeners showTab keeps.
+    let listening = 0;
+    const subscribe = view.atlasStore.subscribe.bind(view.atlasStore);
+    view.atlasStore.subscribe = (listener): (() => void) => {
+      listening++;
+      const stop = subscribe(listener);
+      return (): void => { listening--; stop(); };
+    };
+    const asked = api.showTab!('v1', view.tabIds[1]!);
+    await flush();
+    expect(listening).toBe(1);
+    view.close();
+    await expect(asked).resolves.toBe(false);
+    expect(listening).toBe(0);
+  });
+
+  it('C-tabs-3: answers false once a load that never ends passes the backstop', async () => {
+    vi.useFakeTimers();
+    try {
+      const view = tabbedView('v1', [A, B]);
+      const { api } = setup([view]);
+      let answer: boolean | undefined;
+      void api.showTab!('v1', view.tabIds[1]!).then((value) => { answer = value; });
+      await vi.advanceTimersByTimeAsync(SHOW_TAB_TIMEOUT_MS - 1);
+      expect(answer).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(answer).toBe(false);
+      // A load that ends after the answer changes nothing.
+      view.finishLoad();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(answer).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('is attached only with the scene-tabs capability', () => {

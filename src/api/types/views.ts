@@ -73,7 +73,8 @@ export interface ViewsApi {
   /**
    * 1.17.0 (`scene-tabs`): makes a tab of a GM map view active without presenting it.
    * Answers true once that tab's map is loaded. Answers false for a closed, unknown or remote view,
-   * an unknown tab, or when another switch overtook this one. Never throws for these.
+   * an unknown tab, or when another switch overtook this one; also when the view closes before the tab has loaded, or
+   * the switch and load take longer than 60 s. Never throws for these.
    * The presented scene holds while the view shows another tab, as on any switch, and resumes when the GM returns to it.
    */
   showTab?(viewId: ViewId, tabId: string): Promise<boolean>;
