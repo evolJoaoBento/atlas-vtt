@@ -1,7 +1,7 @@
 import { getDomHost } from '../host/dom';
 import { DiceGpu } from './DiceGpu';
 import { DiceRenderer, stagePixelRatio } from './DiceRenderer';
-import { DIE_BODIES } from './diceScene';
+import { bodySides, LOOK_BODIES } from './dieBody';
 import { loadDiceArtwork } from './dieArtwork';
 import { makeDie } from './dieMotion';
 
@@ -174,8 +174,9 @@ function whenQuiet(doc: Document, run: () => void): void {
 function warmUp(renderer: DiceRenderer, win: Window): void {
   const rem = parseFloat(win.getComputedStyle(win.document.documentElement).fontSize) || 16;
   renderer.setSize(Math.ceil(WARM_REM[0] * rem), Math.ceil(WARM_REM[1] * rem), stagePixelRatio(win));
-  renderer.setPlan(DIE_BODIES);
-  renderer.render(DIE_BODIES.map((sides) => ({ sides, anim: { ...makeDie(Math.random), w: [...WARM_SPIN] } })), 0);
+  // The d100's tens die has its own faces (`dieBody.ts`): warmed too.
+  renderer.setPlan(LOOK_BODIES);
+  renderer.render(LOOK_BODIES.map((body) => ({ sides: bodySides(body), anim: { ...makeDie(Math.random), w: [...WARM_SPIN] } })), 0);
   renderer.reset();
 }
 

@@ -22,9 +22,11 @@ import * as THREE from 'three';
 import CARD_URL from '../assets/dice3d/card.webp?inline';
 import { CELL, atlasLayout } from './atlasCell';
 import type { DiceFont } from './diceLook';
+import { bodySides, type DieBody } from './dieBody';
 import { dieGeometry, type DieSides } from './dieGeometry';
-import { loadImage, loadNumerals, numeralsReady, paintNumeral } from './dieNumerals';
+import { loadImage, loadNumerals, numeralsReady } from './dieNumerals';
 import { activeLook, paintCard, paintWear } from './dieSkin';
+import { paintFaceMarks, paintFaceRelief } from './faceArt';
 
 let cardStock: HTMLImageElement | null = null;
 let cardPending: Promise<void> | null = null;
@@ -81,7 +83,8 @@ export interface DieTextures {
 }
 
 /**
- * The atlas of a body: one cell per face holding card and numeral. The last
+ * The atlas of a body: one cell per face holding card and numeral (or a dice
+ * look's art, `faceArt.ts`); the tens die of a d100 has its own. The last
  * cell stays bare card; it carries the chamfers and corners.
  *
  * Plus a relief. It comes from **the same two images**: the paper's grain is
@@ -89,13 +92,14 @@ export interface DieTextures {
  * Randomised separately, the relief would look like scratches on a photo of
  * paper.
  */
-export function buildTextures(sides: DieSides): DieTextures {
+export function buildTextures(body: DieBody): DieTextures {
+  const sides = bodySides(body);
   // Read at every redraw, so a new look reaches the faces with `refreshDieArtwork`.
   const albedo = (look = activeLook()): HTMLCanvasElement =>
     drawAtlas(sides, (ctx, { x, y, value }) => {
       paintCard(ctx, x, y, sides * 31 + (value ?? 0) * 7 + 5, cardStock, look);
       paintWear(ctx, x, y, value === null, look);
-      if (value !== null) paintNumeral(ctx, x, y, sides, value, look.font, look.ink);
+      if (value !== null) paintFaceMarks(ctx, x, y, body, value, look);
     });
 
   const bump = (look = activeLook()): HTMLCanvasElement =>
@@ -110,8 +114,8 @@ export function buildTextures(sides: DieSides): DieTextures {
       if (value === null) return;
       ctx.save();
       ctx.globalAlpha = 0.7;
-      // The relief always takes the numeral dark: it is cut into the face whatever its colour.
-      paintNumeral(ctx, x, y, sides, value, look.font, null);
+      // The relief always takes the numeral (or the look's art) dark: it is cut into the face whatever its colour.
+      paintFaceRelief(ctx, x, y, body, value, look);
       ctx.restore();
     });
 

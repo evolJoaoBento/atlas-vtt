@@ -25,9 +25,10 @@ function assertRequest(request: unknown): asserts request is DiceRollRequest {
 
 /**
  * `views` finds the map views a roll shows in and `throw` throws in (none without it). `onRolled` follows Atlas's roll
- * feed (`diceRollFeed.ts`), which announces every roll Atlas logs once, whichever view or window made it.
+ * feed (`diceRollFeed.ts`), which announces every roll Atlas logs once, whichever view or window made it. `registerLook`
+ * is set only with the `dice-looks` capability (`diceLooks.ts`).
  */
-export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | null = null): DiceApi {
+export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | null = null, registerLook?: DiceApi['registerLook']): DiceApi {
   const dispatch = (result: DiceRollResult): void => {
     // Atlas's own log, toasts, sounds and the player window follow each map view's bus (upstream #277): every open GM
     // map view hears the roll, a remote view none (its log is its owner's). One view's failure never stops the others.
@@ -78,5 +79,6 @@ export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | n
       const copy = plainCopy(roll);
       return copy !== null && isDiceRollResult(copy) && copy.rolls.every(landsOnAFace) && throwGivenRoll(app, views, viewId, copy);
     },
+    ...(registerLook ? { registerLook } : {}),
   });
 }

@@ -1,4 +1,5 @@
 import { diceApi } from './dice';
+import { registerLookFor } from './diceLooks';
 import type { DisposerSet } from './disposers';
 import { API_EVENTS, type ApiEvents } from './events';
 import { acceptsListener } from './listenerCheck';
@@ -37,7 +38,8 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
     return scope.disposers.add(scope.events.on(event, listener));
   }
   return Object.freeze({ id: scope.id, on, views: viewsApi(services.views, scope.disposers),
-    presentation: presentationApi(services.views, scope.disposers, scope.id), dice: diceApi(services.app, scope.disposers, services.views),
+    presentation: presentationApi(services.views, scope.disposers, scope.id), dice: diceApi(services.app, scope.disposers, services.views,
+      scope.capabilities.has('dice-looks') ? registerLookFor(scope.id, scope.disposers) : undefined),
     lasers: lasersApi(services.views, scope.disposers), lighting: lightingApi(services.views, services.sightFrames, scope.disposers),
     tokens: tokensApi(services.views), rules: rulesApi(services.app),
     settings: settingsApi(services.settings), storage: storageApi(services.app, scope.id),

@@ -7,6 +7,7 @@ import * as THREE from 'three';
 
 import { atlasLayout } from './atlasCell';
 import { buildTextures, diceArtworkReady, loadDiceArtwork } from './dieArtwork';
+import { bodySides, type DieBody } from './dieBody';
 import { dieGeometry, type DieSides } from './dieGeometry';
 import { activeLook } from './dieSkin';
 import { FACE_CELL_REACH, faceFrame } from './faceFrame';
@@ -21,8 +22,8 @@ export interface DieAssets {
   redraw: () => void;
 }
 
-/** One set of textures and mesh per body; dice of the same kind share it. */
-const assetCache = new Map<DieSides, DieAssets>();
+/** One set of textures and mesh per body (the d100's tens die has its own); dice of the same kind share it. */
+const assetCache = new Map<DieBody, DieAssets>();
 
 type Uv = [number, number];
 
@@ -147,11 +148,11 @@ export function chamferedGeometry(sides: DieSides): THREE.BufferGeometry {
   return geometry;
 }
 
-export function dieAssets(sides: DieSides): DieAssets {
-  const cached = assetCache.get(sides);
+export function dieAssets(body: DieBody): DieAssets {
+  const cached = assetCache.get(body);
   if (cached !== undefined) return cached;
 
-  const textures = buildTextures(sides);
+  const textures = buildTextures(body);
   // **Card has no gloss.** This used to be polished wood with a lacquer coat
   // and gilded, i.e. metallic, numerals: three controls that all did the same
   // thing, reflect. Paper does not reflect. What remains is a dull surface with
@@ -166,11 +167,11 @@ export function dieAssets(sides: DieSides): DieAssets {
   });
 
   const assets: DieAssets = {
-    geometry: chamferedGeometry(sides),
+    geometry: chamferedGeometry(bodySides(body)),
     material,
     redraw: textures.redraw,
   };
-  assetCache.set(sides, assets);
+  assetCache.set(body, assets);
   // Faces painted before their artwork arrived are painted once more when it does.
   // Only then: repainting means drawing every cell again and uploading the atlas anew.
   const font = activeLook().font;
@@ -179,9 +180,9 @@ export function dieAssets(sides: DieSides): DieAssets {
 }
 
 /** Redraws the faces of every cached body, or of one: when the artwork arrives or the look changes. */
-export function refreshDieArtwork(sides?: DieSides): void {
-  if (sides !== undefined) {
-    assetCache.get(sides)?.redraw();
+export function refreshDieArtwork(body?: DieBody): void {
+  if (body !== undefined) {
+    assetCache.get(body)?.redraw();
     return;
   }
   for (const assets of assetCache.values()) assets.redraw();

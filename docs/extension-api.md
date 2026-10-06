@@ -33,7 +33,7 @@ An extension requires its major version and checks `api.has(capability)` before 
 | 1.14.0 | shipped in 1.14.0 | none | none | none |
 | 1.15.0 | shipped in 1.15.0 | none | none | none |
 | 1.15.1 | shipped in 1.15.1 | none | none | none |
-| 1.16.0 | shipped in 1.16.0 | none | none | none |
+| 1.16.0 | shipped in 1.16.0 | `dice-looks` | `dice.registerLook` (optional) | none |
 
 `dice.onRolled` hears every roll Atlas logs once, whichever map view or window made it (`dice.roll` and `dice.publish` included); Atlas no longer announces rolls as a `document` event. Since Atlas keeps each map view's rolls in that view (see Atlas 0.6.1 below), `roll` and `publish` hand their roll to every open GM map view, whose log, toasts and sounds show it, and to the player window through the view it presents; a remote view shows only its owner's log.
 
@@ -72,6 +72,8 @@ Version 1.15.1 checks the grid of `RemoteView.setScene`, `scenes.addToCollection
 
 Version 1.16.0 bounds the fog a remote view works out. Since Atlas 0.6.1 fog is one clipped shape that most changes replay operation by operation, which takes seconds for a few thousand operations. `RemoteView.setScene` shows at most 2,000 fog operations (`objects.fog`); a scene with more fails closed: the view covers the whole map with fog and leaves every token out, as Atlas does for fog it cannot draw, and its status bar says the scene has too much fog to show, in Atlas's language. It does not throw, the rest of the scene shows. Send fewer operations (merge them, or drop the oldest under a cover) to show the fog itself. A fog record (like any record) handed as a new object but equal by value to the one shown keeps it, so sending the same fog again works nothing out anew.
 
+Version 1.16.0 also adds `dice.registerLook(spec)` (optional, with the `dice-looks` capability): a dice look the GM can choose in Atlas's dice settings and the command palette's Dice settings, after Atlas's own. Atlas keeps its dice, throw, sounds and results; the look changes only the faces and the body's colour, on every die Atlas throws in 3D (the dice tray, the player window, remote views, `dice.throw`). See Dice looks below.
+
 Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
 
 ### Atlas 0.6
@@ -101,7 +103,7 @@ What changed for extensions with the Atlas 0.6.1 betas, in API 1.15.1 (no type c
 - **Listeners.** A listener that is not a function (or `on` with an event Atlas does not have) registers nothing, gets a disposer that does nothing, and is logged once. `ui.*` registrations, which describe an item rather than listen, throw instead.
 - **Disposers.** Every disposer may be called more than once; the second call does nothing.
 - **Errors.** A malformed call throws (an async call rejects) with `[Atlas API] <namespace>.<method>: <what is wrong>`, in English whatever Atlas's language.
-- **Optional members.** From 1.12.0 on, a member added to a namespace that already shipped is typed optional (`dice.throw`, `scenes.replaceMap`, `RemoteView.onStatusAction`), so call it as `extension.dice.throw?.(...)`. Earlier additions (`bundles.forgetNoteProperties`, 1.11.0) and the members of the 1.1.0 to 1.8.0 namespaces are required. Whole namespaces are gated by `has()`.
+- **Optional members.** From 1.12.0 on, a member added to a namespace that already shipped is typed optional (`dice.throw`, `scenes.replaceMap`, `RemoteView.onStatusAction`, `dice.registerLook`), so call it as `extension.dice.throw?.(...)`. Earlier additions (`bundles.forgetNoteProperties`, 1.11.0) and the members of the 1.1.0 to 1.8.0 namespaces are required. Whole namespaces are gated by `has()`.
 - **Unknown views.** A call naming a view that is not open never throws: it answers `null`, `false` or a pending result, or gives a disposer that does nothing.
 
 ## Reference by group
@@ -114,6 +116,7 @@ The report (`api-report/atlas-vtt-api.d.ts`) has every member with its JSDoc; th
 - **`storage`.** `folder()` creates and returns `atlas-vtt/.atlas-data/extensions/<extension id>/`, a dot folder Obsidian does not index; the id must be kebab-case.
 - **`presentation`.** `current()` gives the presented scene (also while held), `present(viewId, tabId?)` presents a tab and `stop()` stops; `subscribe` hears `presented`, `held` and `cleared`, each with a `presentationId` that names one presentation. `addTarget` adds an audience besides the player window, which changes what the scene tab's eye does while it is active.
 - **`dice`.** `roll` rolls by a map's collection rules (optionally for someone, `rolledBy`); `onRolled` hears every roll Atlas logs; `publish` adds a roll made elsewhere to the log, toasts and sounds; `throw` throws a decided roll with Atlas's 3D dice in one view and logs nothing. A roll result is plain data with at most 1,000 dice.
+- **Dice looks** (`dice-looks`). `dice.registerLook(spec)` adds a look; see Dice looks below.
 - **`lasers`.** `onLocal(viewId)` hears each point of the GM's laser and its lift; `show(viewId, laser)` draws someone else's laser, fading like Atlas's own. A laser not heard from for a second is let go.
 - **`lighting`.** `playerVisibility(viewId)` says what the player window shows of a lit scene, token by token and cell by cell; it fails closed (`pending`) whenever Atlas cannot tell yet. `watch` hears when that answer may have changed.
 - **`tokens`.** `move(viewId, moves)` moves tokens like a GM drop, as one undo step, and answers why when it moves none; `snapPoint` says where a dropped token lands.
@@ -139,6 +142,28 @@ The report (`api-report/atlas-vtt-api.d.ts`) has every member with its JSDoc; th
 - **Scenes.** `scenes.*` never knows a `remote:` path: `findByMap` finds nothing for one, and `readMap` throws on it, as on any path that is not an `.atlasmap` file.
 
 Every handle method does nothing after the view closed, every listener runs guarded and is dropped when it closes, and `onClose` fires once, however the view closed.
+
+## Dice looks (`dice-looks`, 1.16.0)
+
+`dice.registerLook({ id, name, faces, bump?, body?, preview? })` adds a look and returns its disposer; it is set only when `api.has('dice-looks')`, so call it as `extension.dice.registerLook?.(...)`. Atlas stores the GM's choice as `<extension id>:<id>`. While the extension is not loaded, or after the disposer ran (also when the extension or Atlas unloads), Atlas paints its own look and keeps the choice, so the look comes back when it is registered again. Disposing the look in effect repaints the dice with Atlas's look once.
+
+- **Faces.** `faces(sides)` answers the art of one die type, keyed by face value. Atlas asks each type once per registration, all together, the first time the look is in effect, and keeps the look it had until every type answered (each within 10 s). The faces are then repainted once. The keys per type:
+
+  | `sides` | Keys | Notes |
+  |---|---|---|
+  | 4 | 1–4 | Each face carries three numbers, at its corners; a value's art is painted at the three corners showing it, turned to its corner, and the value at the top tip is the roll. |
+  | 6 | 1–6 | A d2 and a d3 are thrown as a d6 and wear its faces. |
+  | 8 | 1–8 | |
+  | 10 | 1–10 | 10 is the face Atlas prints "10"; on a d100's units die it reads as 0. |
+  | 12 | 1–12 | |
+  | 20 | 1–20 | |
+  | 100 | 0, 10, 20, … 90 | The d100's tens die, a d10 of its own; 0 is "00". With Atlas's own looks it carries the d10's numerals. |
+
+  Art goes where Atlas prints the numeral: upright, centred, and as large as the face allows within Atlas's margin, so leave transparent room in the image for anything that must not touch the edge. An image is copied at most 256 px on its longer side. A string is loaded as an image URL: `https:` (the server must allow CORS), `data:`, `blob:`, or a vault file through `app.vault.adapter.getResourcePath(path)`.
+- **Never a broken die.** A value left out, an image that fails to load or is over 8,192 px on a side, one that cannot be read back (a cross-origin image without CORS, which would make WebGL refuse the whole die), an answer after 10 s, or a `faces` that throws or rejects gets Atlas's own numeral for that face, in the GM's numbers font and the look's `ink` (or one that reads on its body). Atlas logs what it painted itself once per registration.
+- **Body and relief.** `body.colour` (`#rrggbb`) paints the card under the art, with the card's grain and worn rim; left out, the faces keep Atlas's card stock. `bump(sides)` gives the relief by the same keys, grey with dark pressed in; without it a face's art is pressed in as its silhouette, as Atlas presses its numerals in.
+- **Settings.** The look's `name` (at most 64 characters) and `preview` image are shown as given in Atlas's dice look setting and in the command palette's Dice settings. Colour and numbers stay the GM's own choice for Atlas's dice, and the numbers also set the faces a look has no art for. `settings.get('diceLook')` is unchanged: it still names the colour and numbers.
+- **Checks.** `registerLook` throws for an `id` or `name` that is not a non-empty string, a name over 64 characters, an `id` this extension registered already, a `faces` (or `bump`) that is not a function, a `body` colour or `ink` that is not `#rrggbb`, or a `preview` that is not a string. Another extension may use the same `id`.
 
 ## Semver rules
 

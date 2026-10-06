@@ -1,0 +1,121 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const images = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock('../../../src/app/dice3d/dieNumerals', async (original) => ({
+  ...(await original<typeof import('../../../src/app/dice3d/dieNumerals')>()),
+  loadImage: images.load,
+}));
+
+import { installDomHost, getDomHost } from '../../../src/app/host/dom';
+import { copyFaceImage, LOOK_ART_TIMEOUT_MS, lookArt } from '../../../src/app/dice3d/customLookArt';
+import type { CustomDiceLook, FaceArtSet } from '../../../src/app/dice3d/customLooks';
+import { artKeys, type DieBody } from '../../../src/app/dice3d/dieBody';
+
+/** An image source: its size, and whether drawing it taints the canvas (cross-origin without CORS). */
+const source = (width: number, height: number, tainted = false): CanvasImageSource => ({ width, height, tainted }) as unknown as CanvasImageSource;
+
+interface FakeCanvas { width: number; height: number; drawn: unknown[] }
+
+let restore: () => void;
+beforeEach(() => {
+  const host = getDomHost();
+  restore = installDomHost({
+    ...host,
+    createCanvas: (): HTMLCanvasElement => {
+      const canvas: FakeCanvas = { width: 0, height: 0, drawn: [] };
+      let tainted = false;
+      const ctx = {
+        drawImage: (image: { tainted?: boolean }) => { canvas.drawn.push(image); tainted ||= image.tainted === true; },
+        getImageData: () => {
+          if (tainted) throw new DOMException('tainted', 'SecurityError');
+          return { data: new Uint8ClampedArray(4) };
+        },
+      };
+      return Object.assign(canvas, { getContext: () => ctx }) as unknown as HTMLCanvasElement;
+    },
+  });
+  images.load.mockReset();
+});
+afterEach(() => {
+  restore();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+const look = (faces: (body: DieBody) => Promise<FaceArtSet>, bump?: CustomDiceLook['bump']): CustomDiceLook =>
+  ({ id: 'ext:test', name: 'Test', faces, bump, body: null, ink: null, preview: null });
+
+describe('copyFaceImage', () => {
+  it('copies an image at most a cell on its longer side, keeping its shape', () => {
+    const copy = copyFaceImage(source(1024, 512)) as unknown as FakeCanvas;
+    expect([copy.width, copy.height]).toEqual([256, 128]);
+    const small = copyFaceImage(source(40, 60)) as unknown as FakeCanvas;
+    expect([small.width, small.height]).toEqual([40, 60]);
+  });
+
+  it('refuses an image without a size, one over 8,192 px on a side, and one that would taint the atlas', () => {
+    expect(copyFaceImage(source(0, 10))).toBeNull();
+    expect(copyFaceImage(source(8193, 10))).toBeNull();
+    expect(copyFaceImage(source(64, 64, true))).toBeNull();
+  });
+});
+
+describe('lookArt', () => {
+  it('asks every body once per registration and keeps the art it could take, by key', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const faces = vi.fn(async (body: DieBody): Promise<FaceArtSet> => Object.fromEntries(artKeys(body).map((key) => [key, source(64, 64)])));
+    const registered = look(faces);
+    const art = await lookArt(registered);
+    await lookArt(registered);
+    expect(faces.mock.calls.map(([body]) => body).sort((a, b) => a - b)).toEqual([4, 6, 8, 10, 12, 20, 100]);
+    expect([...art.faces.get(100)!.keys()].sort((a, b) => a - b)).toEqual([0, 10, 20, 30, 40, 50, 60, 70, 80, 90]);
+    expect([...art.faces.get(20)!.keys()]).toHaveLength(20);
+    expect(art.bump.size).toBe(0);
+    expect(warn).not.toHaveBeenCalled();
+    // A new registration (a new object) asks again.
+    await lookArt(look(faces));
+    expect(faces).toHaveBeenCalledTimes(14);
+  });
+
+  it('leaves out each face it cannot take, and the rest of the die stays', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    images.load.mockImplementation((url: string) => (url === 'bad' ? Promise.reject(new Error('404')) : Promise.resolve(source(32, 32))));
+    const art = await lookArt(look(async (body) => (body === 6
+      ? { 1: 'good', 2: 'bad', 3: source(9000, 9000), 4: source(64, 64, true), 5: 42 as never, 7: source(10, 10) }
+      : {})));
+    expect([...art.faces.get(6)!.keys()]).toEqual([1]);
+    expect(images.load).toHaveBeenCalledWith('good', true);
+    // Logged once for the registration, naming the faces Atlas paints itself.
+    expect(warn).toHaveBeenCalledOnce();
+    expect(String(warn.mock.calls[0]![0])).toContain('d6: 2, 3, 4, 5');
+  });
+
+  it('a body whose faces() throws, rejects or answers no record paints Atlas numerals; the other bodies keep their art', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const art = await lookArt(look((body) => {
+      if (body === 4) throw new Error('boom');
+      if (body === 8) return Promise.reject(new Error('nope'));
+      if (body === 10) return Promise.resolve(null as never);
+      return Promise.resolve({ 1: source(16, 16) });
+    }));
+    expect(art.faces.get(4)!.size).toBe(0);
+    expect(art.faces.get(8)!.size).toBe(0);
+    expect(art.faces.get(10)!.size).toBe(0);
+    expect(art.faces.get(20)!.size).toBe(1);
+  });
+
+  it('gives up on a body after 10 s, and the art still resolves', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const pending = lookArt(look((body) => (body === 12 ? new Promise<FaceArtSet>(() => undefined) : Promise.resolve({}))));
+    await vi.advanceTimersByTimeAsync(LOOK_ART_TIMEOUT_MS + 1);
+    const art = await pending;
+    expect(art.faces.get(12)!.size).toBe(0);
+    expect(String(warn.mock.calls[0]![0])).toContain('d12: no answer within 10 s');
+  });
+
+  it('takes relief art by the same keys', async () => {
+    const art = await lookArt(look(async () => ({}), async (body) => (body === 20 ? { 20: source(16, 16) } : {})));
+    expect([...art.bump.get(20)!.keys()]).toEqual([20]);
+  });
+});

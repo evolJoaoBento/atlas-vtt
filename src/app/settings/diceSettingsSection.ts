@@ -1,6 +1,9 @@
 import type { Setting } from 'obsidian';
 import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS, isDiceDisplay } from '../dice3d/diceDisplay';
+import { onCustomLooksChange } from '../dice3d/customLooks';
 import { DICE_COLOUR_OPTIONS, DICE_FONT_OPTIONS, isDiceColour, isDiceFont } from '../dice3d/diceLook';
+import { diceLookChoices } from '../dice3d/diceLookChoices';
+import { t } from '../i18n';
 import type { SettingsService } from '../services/SettingsService';
 import type { AtlasSettingSection } from './settingSections';
 
@@ -28,6 +31,26 @@ function addLookDropdown(
   return unsubscribe;
 }
 
+/** The dice look dropdown: Atlas's own and every registered look, following registrations and the command palette. */
+function renderLookChoice(setting: Setting, settings: SettingsService): () => void {
+  let stops: Array<() => void> = [];
+  setting.addDropdown((dropdown) => {
+    const select = dropdown.selectEl;
+    const fill = (): void => {
+      const stored = settings.getDiceLookId();
+      const choices = diceLookChoices(stored);
+      select.replaceChildren();
+      dropdown.addOptions(Object.fromEntries(choices.map(({ value, label }) => [value, label]))).setValue(stored);
+      const missing = choices.some((choice) => !choice.loaded);
+      setting.setDesc(missing ? t('dice.look.notLoadedHint') : t('dice.look.desc'));
+    };
+    fill();
+    dropdown.onChange((value) => settings.setDiceLookId(value));
+    stops = [settings.onChange(fill), onCustomLooksChange(fill)];
+  });
+  return () => stops.forEach((stop) => stop());
+}
+
 /** How dice rolls are shown. */
 export function diceSettingsSection(settings: SettingsService): AtlasSettingSection {
   return {
@@ -53,6 +76,11 @@ export function diceSettingsSection(settings: SettingsService): AtlasSettingSect
         });
         return unsubscribe;
       },
+    }, {
+      name: t('dice.look.name'),
+      desc: t('dice.look.desc'),
+      aliases: ['dice', 'look', 'skin', 'theme', 'faces', 'pack'],
+      render: (setting) => renderLookChoice(setting, settings),
     }, {
       name: 'Dice colour',
       desc: 'Light card, dark with light numbers, or your accent colour. The command palette\'s Dice settings show each one.',
