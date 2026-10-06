@@ -10,6 +10,11 @@ import { isValidConeAngle, type MeasurementSettings } from '../grid/measurementF
 
 /** The largest map side a remote scene may have, in world pixels. */
 export const MAX_REMOTE_MAP_SIDE = 100_000;
+/**
+ * The most fog operations a remote scene shows. Fog since #300 is one clipped coverage, replayed whole on most changes
+ * (about 15 s for 2,000 operations in tests); a scene with more shows fully covered fog instead (`RemoteView.setScene`).
+ */
+export const REMOTE_FOG_OPS_MAX = 2000;
 
 const MODES: readonly unknown[] = ['metric', 'abstract'];
 const UNITS: readonly unknown[] = ['feet', 'yards', 'meters', 'units', 'custom'];

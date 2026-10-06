@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.15.1";
+export declare const API_VERSION = "1.16.0";
 
 /**
  * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
@@ -984,8 +984,10 @@ export declare interface RemoteView {
     /**
      * Shows the scene: read once and copied, so the caller keeps no reference into Atlas and nothing it changes later gets
      * past the checks, and the snapshot is loaded with the map path `remote:<viewId>`. Null shows an empty, unloaded scene.
-     * A record handed again as the same object is not copied again. A malformed scene, or a record that is not plain data,
-     * throws and the scene shown stays.
+     * A record handed again as the same object is not copied again, and one equal by value to the record shown keeps it, so
+     * nothing redraws. More than 2,000 fog operations fail closed: the view covers the whole map with fog and hides every
+     * token, and its status bar says the scene has too much fog to show; nothing throws. A malformed scene, or a record
+     * that is not plain data, throws and the scene shown stays.
      */
     setScene(scene: RemoteSceneInput | null): void;
     /** Says what the player may do and how their tokens show; a part equal by value to the one shown is kept, so nothing it draws redraws. */

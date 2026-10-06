@@ -44,6 +44,8 @@ export interface RemoteViewState {
   maxDice: number;
   /** The player's latest own roll, which the view throws once (by id); null before the first. */
   ownRoll: DiceRollResult | null;
+  /** The scene had more fog operations than a remote view shows (`REMOTE_FOG_OPS_MAX`): its fog covers everything. */
+  fogTooLarge: boolean;
 }
 
 /** The state before the owner feeds anything; its parts are frozen, like every part the owner's feed writes. */
@@ -59,6 +61,7 @@ export function initialRemoteViewState(): RemoteViewState {
     diceLog: [],
     maxDice: 100,
     ownRoll: null,
+    fogTooLarge: false,
   }) };
 }
 

@@ -10,7 +10,7 @@ import type { StoreApi } from 'zustand';
 import type { RemoteSceneInput } from '../../api/types/remoteViews';
 import { frozenCopy } from '../../api/frozen';
 import { sameValue } from '../utils/sameValue';
-import { isRemoteImageUrl } from './remoteInput';
+import { isRemoteImageUrl, REMOTE_FOG_OPS_MAX } from './remoteInput';
 import type { ViewAtlasState } from '../storeFactory';
 import { runUntracked } from '../stores/history';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
@@ -31,7 +31,10 @@ function setOwn<T>(target: Record<string, T>, id: string, value: T): void {
 
 interface Entry<S, A> { source: S; input: string; record: A }
 
-/** Copies by id, kept while the extension's record and its inputs stay the same; the same result object while nothing changed. */
+/**
+ * Copies by id, kept while the extension's record and its inputs stay the same, or while a record handed as a new object
+ * is equal by value to the one shown; the same result object while nothing changed.
+ */
 class RecordMemo<S, A> {
   private entries = new Map<string, Entry<S, A>>();
   private result: Record<string, A> = Object.freeze({});
@@ -46,8 +49,14 @@ class RecordMemo<S, A> {
         next.set(id, previous);
         continue;
       }
+      const record = convert(id, source);
+      // Equal by value (an owner that builds its records anew each time): keep the copy shown, so nothing redraws.
+      if (previous && previous.input === key && sameValue(record, previous.record)) {
+        next.set(id, { source, input: key, record: previous.record });
+        continue;
+      }
       changed = true;
-      next.set(id, { source, input: key, record: convert(id, source) });
+      next.set(id, { source, input: key, record });
     }
     this.entries = next;
     if (changed) {
@@ -89,6 +98,23 @@ function initiativeWithoutVaultLinks(initiative: InitiativeState): InitiativeSta
 }
 
 const copyRecord = <T>(_id: string, record: T): T => frozenCopy(record);
+
+/**
+ * The fog shown for a scene with more than `REMOTE_FOG_OPS_MAX` operations, never their geometry: one operation Atlas's
+ * fog refuses (a timestamp that is not finite, no points). Refused fog is Atlas's own fail-closed case (#303): the fog
+ * covers the whole map opaque, whatever size the map turns out to be, and every token is left out; nothing is clipped,
+ * and no canvas is sized from it.
+ */
+const COVER_ALL: Readonly<Record<string, FogOperation>> = frozenCopy({
+  'atlas-remote-fog-limit': {
+    id: 'atlas-remote-fog-limit', kind: 'fog', type: 'lasso', timestamp: Number.POSITIVE_INFINITY, isErasing: false, points: [],
+  },
+});
+
+/** Whether `fog` holds more operations than a remote view works out (each costs polygon clipping on every full replay). */
+export function isFogTooLarge(fog: Readonly<Record<string, unknown>>): boolean {
+  return Object.keys(fog).length > REMOTE_FOG_OPS_MAX;
+}
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 
 export class RemoteSceneApplier {
@@ -164,7 +190,8 @@ export class RemoteSceneApplier {
       objects: {
         // A token without an image URL draws as Atlas's default token.
         tokens: this.tokens.build(this.tokenCopies.build(scene.objects.tokens, () => '', copyRecord), shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
-        fog: this.fog.build(scene.objects.fog, () => '', copyRecord),
+        // Fails closed: too much fog covers the whole view rather than freezing it working the operations out.
+        fog: this.fog.build(isFogTooLarge(scene.objects.fog) ? COVER_ALL : scene.objects.fog, () => '', copyRecord),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),
       },

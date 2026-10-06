@@ -25,6 +25,7 @@
 - Extension API: a remote view redraws only the parts of the player's state that changed, so its initiative list keeps its scroll when the rest is sent again
 - Extension API: rolls an extension makes or publishes still show in every open map view now that Atlas keeps each view's rolls in that view, `dice.onRolled` hears every roll once, and `dice.roll` refuses the formulas the dice tray refuses
 - Extension API: what the player window shows (`lighting.playerVisibility`) leaves out tokens under fog, and whatever only a token the GM hid would see, as the player window now does
+- Extension API: a remote view shows at most 2,000 fog operations; a scene with more is shown fully fogged with a line saying why, instead of freezing Obsidian, and fog sent again unchanged is not worked out again
 
 ## Improved
 
