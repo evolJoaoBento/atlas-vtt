@@ -6,12 +6,13 @@ import { rollerName } from '../../../tools/diceRolling';
 import { TokenPortrait } from '../../../packages/components/shared/TokenPortrait';
 import { useDiceAvatar } from './useDiceAvatar';
 import { DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';
-import { dieLabel } from '../../../tools/diceLabels';
+import { DiceBadges, type DiceBadgeClasses } from './DiceBadges';
 import { t } from '../../../i18n';
 
 export type ToastPhase = 'entering' | 'visible' | 'exiting';
 
 const CORNERS = ['tl', 'tr', 'bl', 'br'] as const;
+const TOAST_BADGES: DiceBadgeClasses = { badge: 'atlas-dice-toast__die-badge', group: 'atlas-dice-toast__tag-group', tag: 'atlas-dice-toast__tag' };
 
 interface DiceToastProps {
   result: DiceRollResult;
@@ -87,18 +88,7 @@ export function DiceToast({ result, phase, onDismiss }: DiceToastProps): React.R
       </div>
         {isExpanded && (
           <div className="atlas-dice-toast__details">
-            {result.rolls.map((roll, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'atlas-dice-toast__die-badge',
-                  roll.value === roll.max && 'atlas-dice-toast__die-badge--max',
-                  roll.value === 1 && 'atlas-dice-toast__die-badge--min',
-                )}
-              >
-                {dieLabel(result.rolls, i)}
-              </span>
-            ))}
+            <DiceBadges result={result} classes={TOAST_BADGES} />
           </div>
         )}
       </div>

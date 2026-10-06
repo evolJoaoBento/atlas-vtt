@@ -26,6 +26,7 @@
 - Extension API: rolls an extension makes or publishes still show in every open map view now that Atlas keeps each view's rolls in that view, `dice.onRolled` hears every roll once, and `dice.roll` refuses the formulas the dice tray refuses
 - Extension API: what the player window shows (`lighting.playerVisibility`) leaves out tokens under fog, and whatever only a token the GM hid would see, as the player window now does
 - Extension API: other plugins can add dice looks with their own face art and colour, chosen in the dice settings; Atlas's dice keep their throw, sounds and results, and a face a look has no art for keeps Atlas's numeral
+- Extension API: a die in a roll can carry a colour and its name (e.g. "Fire"), as physical dice report them; the dice log and toasts group such dice under a coloured dot and the name, and the tags are saved with the dice log
 - Extension API: a remote view shows at most 2,000 fog operations; a scene with more is shown fully fogged with a line saying why, instead of freezing Obsidian, and fog sent again unchanged is not worked out again
 
 ## Improved

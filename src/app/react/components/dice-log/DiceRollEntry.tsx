@@ -6,7 +6,7 @@ import { rollerName } from '../../../tools/diceRolling';
 import { TokenPortrait } from '../../../packages/components/shared/TokenPortrait';
 import { useDiceAvatar } from '../dice/useDiceAvatar';
 import { LabelTooltip } from '../../../packages/components/primitives/tooltip';
-import { dieLabel } from '../../../tools/diceLabels';
+import { DiceBadges, type DiceBadgeClasses } from '../dice/DiceBadges';
 import { t } from '../../../i18n';
 
 interface DiceRollEntryProps {
@@ -14,6 +14,8 @@ interface DiceRollEntryProps {
   isNew?: boolean;
   onRepeat: () => void;
 }
+
+const LOG_BADGES: DiceBadgeClasses = { badge: 'dice-log-entry__badge', group: 'dice-log-entry__tag-group', tag: 'dice-log-entry__tag' };
 
 function formatRelativeTime(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -112,18 +114,7 @@ export function DiceRollEntry({ result, isNew, onRepeat }: DiceRollEntryProps): 
         {/* Expanded dice detail */}
         {isExpanded && (
           <div className="dice-log-entry__details">
-            {result.rolls.map((roll, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'dice-log-entry__badge',
-                  roll.value === roll.max && 'dice-log-entry__badge--max',
-                  roll.value === 1 && 'dice-log-entry__badge--min',
-                )}
-              >
-                {dieLabel(result.rolls, i)}
-              </span>
-            ))}
+            <DiceBadges result={result} classes={LOG_BADGES} />
             {/* A log may list only some of a roll's dice; the total counts them all. */}
             {result.unlistedDice ? <span className="dice-log-entry__badge">{t('dice.moreDice', { count: result.unlistedDice })}</span> : null}
           </div>

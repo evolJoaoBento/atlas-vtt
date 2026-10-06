@@ -3,6 +3,7 @@ import { landsOnAFace } from '../app/dice3d/diceScene';
 import { mapDiceRules } from '../app/services/mapDiceRules';
 import { DiceFormulaError, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
 import { announceRoll, followRolls } from '../app/tools/diceRollFeed';
+import { withCleanTags } from '../app/tools/diceTags';
 import { isDiceRollResult, plainCopy } from './diceRollCheck';
 import { throwGivenRoll } from './diceThrow';
 import type { DisposerSet } from './disposers';
@@ -73,11 +74,12 @@ export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | n
       const copy = plainCopy(result);
       if (copy === null) throw new Error('[Atlas API] dice.publish: the roll must be plain data.');
       if (!isDiceRollResult(copy)) throw new Error('[Atlas API] dice.publish: the roll must be { id, timestamp, formula, rolls, modifiers, total }.');
-      dispatch(copy);
+      // A die's tag that is not well-formed is dropped, never the roll.
+      dispatch(withCleanTags(copy));
     },
     throw: (viewId: ViewId, roll: DiceRollResult): boolean => {
       const copy = plainCopy(roll);
-      return copy !== null && isDiceRollResult(copy) && copy.rolls.every(landsOnAFace) && throwGivenRoll(app, views, viewId, copy);
+      return copy !== null && isDiceRollResult(copy) && copy.rolls.every(landsOnAFace) && throwGivenRoll(app, views, viewId, withCleanTags(copy));
     },
     ...(registerLook ? { registerLook } : {}),
   });

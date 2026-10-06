@@ -10,6 +10,7 @@ import { noteThrown, thrownBefore } from '../dice3d/givenThrows';
 import type { RemoteStatus, RemoteStatusAction } from '../../api/types/remoteViews';
 import type { ViewAtlasStore } from '../storeFactory';
 import { isDieType, type DiceRollResult } from '../tools/diceRolling';
+import { withCleanTags } from '../tools/diceTags';
 import { callGuarded, ListenerSet } from './listeners';
 import { ROLL_NOT_SENT } from './remoteControls';
 import { updateRemoteView, type ShownStatus, type ShownStatusAction } from './remoteViewState';
@@ -111,7 +112,8 @@ export class RemoteViewDice {
   setDiceLog(entries: unknown): void {
     const kept = copyToCheck('setDiceLog', Array.isArray(entries) ? entries.slice(0, REMOTE_LOG_ENTRIES) : entries);
     if (!Array.isArray(kept) || !kept.every(isDiceRollResult)) throw new Error('[Atlas API] RemoteView.setDiceLog: the entries must be dice roll results.');
-    updateRemoteView(this.store, { diceLog: frozenCopy(kept) });
+    // A die's tag that is not well-formed is dropped, never the roll.
+    updateRemoteView(this.store, { diceLog: frozenCopy(kept.map(withCleanTags)) });
   }
 
   /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
@@ -120,7 +122,7 @@ export class RemoteViewDice {
     if (!isDiceRollResult(result)) throw new Error('[Atlas API] RemoteView.throwRoll: the result must be a dice roll result.');
     if (thrownBefore(this.store, result.id)) return;
     noteThrown(this.store, result.id);
-    updateRemoteView(this.store, { ownRoll: frozenCopy(result) });
+    updateRemoteView(this.store, { ownRoll: frozenCopy(withCleanTags(result)) });
   }
 
   /** Asks the listeners in turn until one sends the roll; null once sent, else the first reason given. */
