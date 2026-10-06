@@ -11,19 +11,19 @@ import type { RolledDie } from './diceFormula';
 export const MAX_DIE_TAG_NAME = 32;
 
 const HEX = /^#[0-9a-f]{6}$/i;
-/** Plain text: letters, marks and digits of any script, spaces, and a little punctuation; no markup, links or control characters. */
-const PLAIN = /^[\p{L}\p{M}\p{N} .,'’\-_()&+!?:#/]+$/u;
+/** Not plain text: markup and link brackets, code ticks, control and invisible formatting characters (bidi overrides among them). */
+const NOT_PLAIN = /[<>[\]`\p{Cc}\p{Cf}]/u;
 
 /** `value` as a die's colour: `#rrggbb`, else nothing. */
 export function tagColour(value: unknown): string | undefined {
   return typeof value === 'string' && HEX.test(value) ? value : undefined;
 }
 
-/** `value` as a die's colour name: plain text, trimmed, its spaces collapsed, 1 to 32 characters; else nothing. */
+/** `value` as a die's colour name: plain text (any script, emoji and punctuation; no markup), trimmed, 1 to 32 characters; else nothing. */
 export function tagName(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
-  const name = value.trim().replace(/\s+/g, ' ');
-  return name !== '' && [...name].length <= MAX_DIE_TAG_NAME && PLAIN.test(name) ? name : undefined;
+  const name = value.trim();
+  return name !== '' && [...name].length <= MAX_DIE_TAG_NAME && !NOT_PLAIN.test(name) ? name : undefined;
 }
 
 /** `die` with a colour or name it may keep, and without one it may not; the same object when nothing is dropped. */

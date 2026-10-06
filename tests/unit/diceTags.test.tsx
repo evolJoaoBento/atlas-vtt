@@ -42,11 +42,12 @@ describe("a die's tag", () => {
   it('keeps a #rrggbb colour and a plain name of at most 32 characters, trimmed', () => {
     expect(tagColour('#D33a00')).toBe('#D33a00');
     for (const bad of ['#d33', 'red', '#dd3333 ', 'url(https://x)', 'var(--x)', 3, null]) expect(tagColour(bad)).toBeUndefined();
-    expect(tagName('  Fire   dragon ')).toBe('Fire dragon');
-    expect(tagName('Glühwürmchen #2')).toBe('Glühwürmchen #2');
-    expect(tagName('Огонь')).toBe('Огонь');
+    expect(tagName('  Fire dragon ')).toBe('Fire dragon');
+    // The native build's own names: its pack's colour names, and the colour code when a colour has none.
+    for (const name of ['Light Green', 'Sky Blue', '#FF0000', 'Glühwürmchen #2', 'Огонь', 'Fire 🔥', 'Dragon’s “breath” — red', '*bold*']) expect(tagName(name)).toBe(name);
     expect(tagName('x'.repeat(32))).toBe('x'.repeat(32));
-    for (const bad of ['x'.repeat(33), '', '   ', '<b>Fire</b>', '[[Note]]', '`code`', 'a\u0000b', 'Fire‮', '*bold*', 4]) {
+    expect(tagName('🔥'.repeat(32))).toBe('🔥'.repeat(32));
+    for (const bad of ['x'.repeat(33), '', '   ', '<b>Fire</b>', '[[Note]]', '[x](https://y)', '`code`', 'a\u0000b', 'Fire\nIce', 'Fire‮', 'a​b', 4]) {
       expect(tagName(bad)).toBeUndefined();
     }
   });

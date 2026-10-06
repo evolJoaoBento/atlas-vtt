@@ -7,7 +7,7 @@
 
 import type { DieBody } from './dieBody';
 
-/** One face's art: an image, or a URL (`https:`, `data:`, `blob:`, an app resource path) Atlas loads. */
+/** One face's art: an image, or a URL Atlas loads (`data:`, `blob:`, `https:` with CORS). */
 export type FaceArtSource = CanvasImageSource | string;
 export type FaceArtSet = Readonly<Record<number, FaceArtSource>>;
 

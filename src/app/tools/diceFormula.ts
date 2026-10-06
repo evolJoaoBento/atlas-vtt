@@ -25,7 +25,7 @@ export interface RolledDie {
   exploded?: true;
   /** The colour the die was thrown in (`#rrggbb`), e.g. a physical die's or a dice plugin's; shown with its die, never counted. */
   color?: string;
-  /** That colour's name, e.g. "Fire": plain text of at most 32 characters. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
+  /** That colour's name, e.g. "Fire": plain text (no markup) of at most 32 characters, trimmed. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
   colorName?: string;
 }
 

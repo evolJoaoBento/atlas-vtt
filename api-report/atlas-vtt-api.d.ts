@@ -295,7 +295,12 @@ export declare interface DiceApi {
 
 declare type DiceCrit = 'high' | 'low' | null;
 
-/** One face's art: an image, or a URL Atlas loads (`https:`, `data:`, `blob:`, or `app.vault.adapter.getResourcePath(path)`). */
+/**
+ * One face's art: an image (an `ImageBitmap` or a canvas is always readable), or a URL Atlas loads: `data:`, `blob:`, or
+ * `https:` from a server that allows CORS. For a vault file, read it yourself (`app.vault.adapter.readBinary`, then
+ * `createImageBitmap(new Blob([data]))` or `URL.createObjectURL`): an `app://` resource URL may not be readable back, and
+ * then that face shows Atlas's numeral.
+ */
 export declare type DiceFaceArt = CanvasImageSource | string;
 
 /**
@@ -1149,7 +1154,7 @@ declare interface RolledDie {
     exploded?: true;
     /** The colour the die was thrown in (`#rrggbb`), e.g. a physical die's or a dice plugin's; shown with its die, never counted. */
     color?: string;
-    /** That colour's name, e.g. "Fire": plain text of at most 32 characters. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
+    /** That colour's name, e.g. "Fire": plain text (no markup) of at most 32 characters, trimmed. A tag that is not well-formed is dropped where a roll enters Atlas, never the roll. */
     colorName?: string;
 }
 

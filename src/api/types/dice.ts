@@ -16,7 +16,12 @@ export interface DiceRollRequest {
  */
 export type DiceLookDie = 4 | 6 | 8 | 10 | 12 | 20 | 100;
 
-/** One face's art: an image, or a URL Atlas loads (`https:`, `data:`, `blob:`, or `app.vault.adapter.getResourcePath(path)`). */
+/**
+ * One face's art: an image (an `ImageBitmap` or a canvas is always readable), or a URL Atlas loads: `data:`, `blob:`, or
+ * `https:` from a server that allows CORS. For a vault file, read it yourself (`app.vault.adapter.readBinary`, then
+ * `createImageBitmap(new Blob([data]))` or `URL.createObjectURL`): an `app://` resource URL may not be readable back, and
+ * then that face shows Atlas's numeral.
+ */
 export type DiceFaceArt = CanvasImageSource | string;
 
 /**

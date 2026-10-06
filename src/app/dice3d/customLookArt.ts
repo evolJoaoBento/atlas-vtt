@@ -100,8 +100,9 @@ async function bodyArt(ask: (body: DieBody) => Promise<FaceArtSet>, body: DieBod
   const record = set as Record<number, unknown>;
   const lost: number[] = [];
   await Promise.all(artKeys(body).map(async (key) => {
-    if (!Object.hasOwn(record, key)) return;
     try {
+      // Inside the guard: a record can be a Proxy whose reads throw.
+      if (!Object.hasOwn(record, key)) return;
       const canvas = await faceImage(record[key] as FaceArtSource, deadline);
       if (canvas) art.set(key, canvas);
       else lost.push(key);
@@ -118,10 +119,11 @@ async function loadArt(look: CustomDiceLook): Promise<LookArt> {
   const faces = new Map<DieBody, Map<number, HTMLCanvasElement>>();
   const bump = new Map<DieBody, Map<number, HTMLCanvasElement>>();
   const relief = look.bump;
-  await Promise.all(LOOK_BODIES.map(async (body) => {
-    faces.set(body, await bodyArt((b) => look.faces(b), body, missed));
-    if (relief) bump.set(body, await bodyArt(relief, body, missed));
-  }));
+  // Faces and relief together: each answers within its own 10 s.
+  await Promise.all(LOOK_BODIES.flatMap((body) => [
+    bodyArt((b) => look.faces(b), body, missed).then((art) => { faces.set(body, art); }),
+    ...(relief ? [bodyArt(relief, body, missed).then((art) => { bump.set(body, art); })] : []),
+  ]));
   if (missed.length > 0) console.warn(`[Atlas] Dice look "${look.id}": Atlas paints its own numerals where art was missing or failed (${missed.join('; ')}).`);
   return { faces, bump };
 }
@@ -130,7 +132,11 @@ async function loadArt(look: CustomDiceLook): Promise<LookArt> {
 export function lookArt(look: CustomDiceLook): Promise<LookArt> {
   let art = loaded.get(look);
   if (!art) {
-    art = loadArt(look);
+    // Never rejects, also for what no guard above foresaw: the look then paints Atlas's numerals.
+    art = loadArt(look).catch((error: unknown) => {
+      console.warn(`[Atlas] Dice look "${look.id}": its art could not be read, so Atlas paints its own numerals.`, error);
+      return { faces: new Map(), bump: new Map() };
+    });
     loaded.set(look, art);
   }
   return art;

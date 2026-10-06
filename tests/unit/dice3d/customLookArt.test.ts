@@ -119,3 +119,22 @@ describe('lookArt', () => {
     expect([...art.bump.get(20)!.keys()]).toEqual([20]);
   });
 });
+
+describe('lookArt never rejects', () => {
+  it('a record whose reads throw (a Proxy) leaves its faces out, and the art still resolves', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const hostile = new Proxy({}, { getOwnPropertyDescriptor: () => { throw new Error('trap'); }, get: () => { throw new Error('trap'); } });
+    const art = await lookArt(look(async () => hostile));
+    expect(art.faces.get(6)!.size).toBe(0);
+  });
+
+  it('asks faces and relief together, so a slow relief does not delay the faces past their own 10 s', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const pending = lookArt(look(async () => ({ 1: source(8, 8) }), () => new Promise<FaceArtSet>(() => undefined)));
+    await vi.advanceTimersByTimeAsync(LOOK_ART_TIMEOUT_MS + 1);
+    const art = await pending;
+    expect(art.faces.get(6)!.size).toBe(1);
+    expect(art.bump.get(6)!.size).toBe(0);
+  });
+});
