@@ -32,6 +32,11 @@ describe('RemoteView.setScene with too much fog', () => {
     expect(store.getState().remoteView?.fogTooLarge).toBe(false);
     expect(bar.container.querySelector('.atlas-remote-status-bar')).toBeNull();
     act(() => view.setScene(remoteScene({ objects: { tokens: {}, texts: {}, drawings: {}, fog: fogOf(REMOTE_FOG_OPS_MAX + 1) } })));
+    // Under the operation cap, but one operation with too many points: the same cover and the same line.
+    const points = Array.from({ length: 10_001 }, (_, i) => ({ x: i % 900, y: 5 }));
+    act(() => view.setScene(remoteScene({ objects: { tokens: {}, texts: {}, drawings: {}, fog: { big: { id: 'big', kind: 'fog', type: 'lasso', timestamp: 1, isErasing: false, points } } } })));
+    expect(store.getState().remoteView?.fogTooLarge).toBe(true);
+    expect(Object.keys(harness.views.snapshot(view.viewId)?.objects.fog ?? {})).toEqual(['atlas-remote-fog-limit']);
     act(() => view.setScene(null));
     expect(store.getState().remoteView?.fogTooLarge).toBe(false);
     view.close();

@@ -15,6 +15,41 @@ export const MAX_REMOTE_MAP_SIDE = 100_000;
  * (about 15 s for 2,000 operations in tests); a scene with more shows fully covered fog instead (`RemoteView.setScene`).
  */
 export const REMOTE_FOG_OPS_MAX = 2000;
+/** The most fog points (brush and lasso) a remote scene shows in all: each is quantised and clipped on a replay. */
+export const REMOTE_FOG_POINTS_MAX = 200_000;
+/** The most points one fog operation may have in a remote scene. */
+export const REMOTE_FOG_OP_POINTS_MAX = 10_000;
+
+/** The radius a fog brush may have: the map's longer side, or the largest side a remote map may have while its size is unknown. */
+function brushRadiusMax(background: RemoteSceneInput['background']): number {
+  const side = Math.max(background.width, background.height);
+  return side > 0 ? side : MAX_REMOTE_MAP_SIDE;
+}
+
+/**
+ * Whether the scene's fog is more than a remote view works out: more than `REMOTE_FOG_OPS_MAX` operations, more than
+ * `REMOTE_FOG_POINTS_MAX` points in all or `REMOTE_FOG_OP_POINTS_MAX` in one operation, or a brush wider than the map.
+ * Such fog fails closed (`RemoteView.setScene`): it covers the whole map. Reads only counts and radii, never a point,
+ * and stops at the first limit passed; a record that cannot be read counts as too large.
+ */
+export function isFogTooLarge(scene: Pick<RemoteSceneInput, 'objects' | 'background'>): boolean {
+  const operations = Object.values(scene.objects.fog);
+  if (operations.length > REMOTE_FOG_OPS_MAX) return true;
+  const radiusMax = brushRadiusMax(scene.background);
+  let total = 0;
+  try {
+    for (const operation of operations) {
+      const { points, brushRadius } = operation as { points?: unknown; brushRadius?: unknown };
+      const count = Array.isArray(points) ? points.length : 0;
+      total += count;
+      if (count > REMOTE_FOG_OP_POINTS_MAX || total > REMOTE_FOG_POINTS_MAX) return true;
+      if (typeof brushRadius === 'number' && brushRadius > radiusMax) return true;
+    }
+  } catch {
+    return true;
+  }
+  return false;
+}
 
 const MODES: readonly unknown[] = ['metric', 'abstract'];
 const UNITS: readonly unknown[] = ['feet', 'yards', 'meters', 'units', 'custom'];

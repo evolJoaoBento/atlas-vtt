@@ -10,7 +10,7 @@ import type { StoreApi } from 'zustand';
 import type { RemoteSceneInput } from '../../api/types/remoteViews';
 import { frozenCopy } from '../../api/frozen';
 import { sameValue } from '../utils/sameValue';
-import { isRemoteImageUrl, REMOTE_FOG_OPS_MAX } from './remoteInput';
+import { isFogTooLarge, isRemoteImageUrl } from './remoteInput';
 import type { ViewAtlasState } from '../storeFactory';
 import { runUntracked } from '../stores/history';
 import type { DrawingStroke, TextElement, TokenEntity } from '../types';
@@ -100,7 +100,7 @@ function initiativeWithoutVaultLinks(initiative: InitiativeState): InitiativeSta
 const copyRecord = <T>(_id: string, record: T): T => frozenCopy(record);
 
 /**
- * The fog shown for a scene with more than `REMOTE_FOG_OPS_MAX` operations, never their geometry: one operation Atlas's
+ * The fog shown for a scene whose fog is over a remote view's limits (`isFogTooLarge`), never its geometry: one operation Atlas's
  * fog refuses (a timestamp that is not finite, no points). Refused fog is Atlas's own fail-closed case (#303): the fog
  * covers the whole map opaque, whatever size the map turns out to be, and every token is left out; nothing is clipped,
  * and no canvas is sized from it.
@@ -111,10 +111,6 @@ const COVER_ALL: Readonly<Record<string, FogOperation>> = frozenCopy({
   },
 });
 
-/** Whether `fog` holds more operations than a remote view works out (each costs polygon clipping on every full replay). */
-export function isFogTooLarge(fog: Readonly<Record<string, unknown>>): boolean {
-  return Object.keys(fog).length > REMOTE_FOG_OPS_MAX;
-}
 const OBJECT_KINDS = ['tokens', 'fog', 'texts', 'drawings'] as const;
 
 export class RemoteSceneApplier {
@@ -191,7 +187,7 @@ export class RemoteSceneApplier {
         // A token without an image URL draws as Atlas's default token.
         tokens: this.tokens.build(this.tokenCopies.build(scene.objects.tokens, () => '', copyRecord), shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
         // Fails closed: too much fog covers the whole view rather than freezing it working the operations out.
-        fog: this.fog.build(isFogTooLarge(scene.objects.fog) ? COVER_ALL : scene.objects.fog, () => '', copyRecord),
+        fog: this.fog.build(isFogTooLarge(scene) ? COVER_ALL : scene.objects.fog, () => '', copyRecord),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),
       },

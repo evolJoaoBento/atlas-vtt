@@ -80,9 +80,10 @@ export interface RemoteView {
    * Shows the scene: read once and copied, so the caller keeps no reference into Atlas and nothing it changes later gets
    * past the checks, and the snapshot is loaded with the map path `remote:<viewId>`. Null shows an empty, unloaded scene.
    * A record handed again as the same object is not copied again, and one equal by value to the record shown keeps it, so
-   * nothing redraws. More than 2,000 fog operations fail closed: the view covers the whole map with fog and hides every
-   * token, and its status bar says the scene has too much fog to show; nothing throws. A malformed scene, or a record
-   * that is not plain data, throws and the scene shown stays.
+   * nothing redraws. Fog over a remote view's limits fails closed: more than 2,000 operations, more than 200,000 points
+   * in all or 10,000 in one operation, or a brush radius above the map's longer side (100,000 px while its size is 0 × 0).
+   * The view then covers the whole map with fog and hides every token, and its status bar says the scene has too much fog
+   * to show; nothing throws. A malformed scene, or a record that is not plain data, throws and the scene shown stays.
    */
   setScene(scene: RemoteSceneInput | null): void;
   /** Says what the player may do and how their tokens show; a part equal by value to the one shown is kept, so nothing it draws redraws. */

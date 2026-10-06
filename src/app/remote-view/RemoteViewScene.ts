@@ -11,8 +11,8 @@ import { PlayerInitiativePanel } from '../services/PlayerInitiativePanel';
 import type { PlayerSettingsSource } from '../services/PlayerSceneOverlay';
 import type { ViewAtlasStore } from '../storeFactory';
 import { RemoteMapBackdrop, type BackdropRenderer } from './RemoteMapBackdrop';
-import { checkedPlayer, checkedScene } from './remoteInput';
-import { isFogTooLarge, RemoteSceneApplier } from './RemoteSceneApplier';
+import { checkedPlayer, checkedScene, isFogTooLarge } from './remoteInput';
+import { RemoteSceneApplier } from './RemoteSceneApplier';
 import { updateRemoteView, type RemoteViewState } from './remoteViewState';
 import { sameValue } from '../utils/sameValue';
 
@@ -62,7 +62,7 @@ export class RemoteViewScene {
     }
     this.background = scene ? { ...scene.background } : null;
     this.showBackdrop();
-    const fogTooLarge = scene !== null && isFogTooLarge(scene.objects.fog);
+    const fogTooLarge = scene !== null && isFogTooLarge(scene);
     if (this.host.atlasStore.getState().remoteView?.fogTooLarge !== fogTooLarge) updateRemoteView(this.host.atlasStore, { fogTooLarge });
   }
 
