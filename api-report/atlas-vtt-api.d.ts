@@ -267,8 +267,13 @@ export declare interface DiceApi {
     roll(request: DiceRollRequest): DiceRollResult;
     /** Every roll Atlas logs: the dice tray, statblocks, `roll`, `publish`. Listeners receive frozen copies and run guarded. */
     onRolled(listener: (result: DiceRollResult) => void): Disposer;
-    /** Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds. Throws when `result` is not a roll of plain data with at most 1,000 dice. */
-    publish(result: DiceRollResult): void;
+    /**
+     * Adds a roll made elsewhere (another Atlas, physical dice) to the log, toasts and sounds, and to the player window.
+     * A roll without `rolledBy` is also thrown with Atlas's 3D dice in every open GM map view, unless `options.throw` is
+     * false (1.16.0): then it shows as a result card there, for dice already shown elsewhere (a physical dice plugin's own
+     * throw). Throws when `result` is not a roll of plain data with at most 1,000 dice, or `options` is not `{ throw?: boolean }`.
+     */
+    publish(result: DiceRollResult, options?: DicePublishOptions): void;
     /**
      * Throws `roll`, a result decided elsewhere, with Atlas's 3D dice in the map view `viewId` (a GM map view or a remote
      * view), seeded by the roll's id as Atlas's own throws are, in the user's dice look and speed. Each roll id is thrown
@@ -339,6 +344,12 @@ export declare interface DiceLookSpec {
     };
     /** An image of the look for the dice settings: a URL as in `DiceFaceArt`. */
     preview?: string;
+}
+
+/** How `dice.publish` shows a roll (1.16.0). */
+export declare interface DicePublishOptions {
+    /** False: logged, toasted and shown in the player window as before, but never thrown in 3D (a result card instead). Default true. */
+    throw?: boolean;
 }
 
 export declare interface DiceRollRequest {

@@ -6,7 +6,7 @@ import { useDiceDisplay } from '../../hooks/useDiceDisplay';
 import { diceFontClass, useDiceLook } from '../../hooks/useDiceLook';
 import { cn } from '../../../../utils/cn';
 import { throwStyle } from '../../../dice3d/diceDisplay';
-import { diceSceneToShow } from '../../../dice3d/rollPresentation';
+import { loggedRollScene } from '../../../dice3d/rollPresentation';
 import type { DiceScene } from '../../../dice3d/diceScene';
 import { givenRollScene, onGivenThrow } from '../../../dice3d/givenThrows';
 import { warmDiceSounds } from '../../../dice3d/audio/diceSamples';
@@ -58,8 +58,9 @@ export function DiceRollDisplay({ container, prepare, muted = false, eventBus: s
   useEffect(() => {
     const handler = (raw: DiceRollResult): void => {
       const result = prepare ? prepare(raw) : raw;
-      // A roll by someone other than the GM is thrown on their own screen; here it shows as a card.
-      show(result, result.rolledBy ? null : diceSceneToShow(result, display));
+      // A roll by someone other than the GM is thrown on their own screen, and a card-only roll was shown elsewhere:
+      // here they show as a card. Asked of the event's own object, which `prepare` may copy.
+      show(result, loggedRollScene(raw, display));
     };
     eventBus?.on('dice-rolled', handler);
     return (): void => { eventBus?.off('dice-rolled', handler); };

@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
 import { landsOnAFace } from '../app/dice3d/diceScene';
+import { showAsCardOnly } from '../app/dice3d/rollPresentation';
 import { mapDiceRules } from '../app/services/mapDiceRules';
 import { DiceFormulaError, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
 import { announceRoll, followRolls } from '../app/tools/diceRollFeed';
@@ -12,9 +13,17 @@ import { acceptsListener } from './listenerCheck';
 import { frozenCopy } from './frozen';
 import type { Disposer, ViewId } from './types/common';
 import type { ViewTracker } from './viewTracker';
-import type { DiceApi, DiceRollRequest } from './types/dice';
+import type { DiceApi, DicePublishOptions, DiceRollRequest } from './types/dice';
 
 const isString = (value: unknown): value is string => typeof value === 'string';
+
+/** Whether `publish` throws its roll in 3D: true unless `options.throw` is false; anything else malformed throws. */
+function publishThrows(options: unknown): boolean {
+  if (options === undefined) return true;
+  const flag: unknown = typeof options === 'object' && options !== null ? Reflect.get(options, 'throw') : null;
+  if (flag !== undefined && typeof flag !== 'boolean') throw new Error('[Atlas API] dice.publish: the options must be { throw?: boolean }.');
+  return flag !== false;
+}
 
 function assertRequest(request: unknown): asserts request is DiceRollRequest {
   const given = request as Partial<DiceRollRequest> | null;
@@ -69,13 +78,16 @@ export function diceApi(app: App, disposers: DisposerSet, views: ViewTracker | n
       });
       return disposers.add(unfollow);
     },
-    publish: (result: DiceRollResult): void => {
+    publish: (result: DiceRollResult, options?: DicePublishOptions): void => {
+      const throwIt = publishThrows(options);
       // Copied first and the copy checked, so nothing the caller changes afterwards gets past the check.
       const copy = plainCopy(result);
       if (copy === null) throw new Error('[Atlas API] dice.publish: the roll must be plain data.');
       if (!isDiceRollResult(copy)) throw new Error('[Atlas API] dice.publish: the roll must be { id, timestamp, formula, rolls, modifiers, total }.');
       // A die's tag that is not well-formed is dropped, never the roll.
-      dispatch(withCleanTags(copy));
+      const shown = withCleanTags(copy);
+      if (!throwIt) showAsCardOnly(shown);
+      dispatch(shown);
     },
     throw: (viewId: ViewId, roll: DiceRollResult): boolean => {
       const copy = plainCopy(roll);
