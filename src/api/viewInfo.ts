@@ -1,3 +1,4 @@
+import { showsTab } from '../app/services/PresentedScene';
 import { loadedMapSize } from '../app/services/viewMapSize';
 import type { ViewAtlasState } from '../app/storeFactory';
 import type { TrackedMapView } from './viewTracker';
@@ -27,10 +28,22 @@ export function viewInfo(view: TrackedMapView): ViewInfo {
   });
 }
 
-/** The store fields a snapshot carries; a change to any of them (by reference) is a new snapshot. */
-export function snapshotSlice(state: ViewAtlasState): readonly unknown[] {
+/**
+ * The tab whose scene `view`'s store holds, loaded: its active tab once the store holds that tab's map. Null while a
+ * map loads, while the active tab already names the next tab but the store still holds the previous one, and in a
+ * remote view.
+ */
+export function snapshotTabId(view: TrackedMapView): string | null {
+  if (isRemoteView(view)) return null;
+  const { activeTabId } = view.tabMetaStore.getState();
+  return activeTabId !== null && showsTab(view, activeTabId) ? activeTabId : null;
+}
+
+/** The fields a snapshot carries; a change to any of them (by reference) is a new snapshot. */
+export function snapshotSlice(view: TrackedMapView): readonly unknown[] {
+  const state = view.atlasStore.getState();
   return [
-    state.mapPath, state.mapLoaded, state.isMapLoading, state.background, state.grid,
+    snapshotTabId(view), state.mapPath, state.mapLoaded, state.isMapLoading, state.background, state.grid,
     state.objects.tokens, state.objects.texts, state.objects.drawings, state.objects.fog,
     state.widgetSettings, state.widgetValues, state.initiative, state.initiativeTrackerOpen, state.lighting,
   ];
@@ -47,6 +60,7 @@ export function sceneSnapshot(view: TrackedMapView): SceneSnapshot {
     viewId: view.viewId,
     mapPath: state.mapPath,
     loaded: isLoaded(state),
+    tabId: snapshotTabId(view),
     mapSize: Object.freeze(loadedMapSize(view)),
     background: state.background,
     grid: kept(state.grid),

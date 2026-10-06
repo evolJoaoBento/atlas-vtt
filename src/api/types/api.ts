@@ -41,6 +41,11 @@ export interface AtlasEvents {
   'settings-changed': (key: AtlasSettingKey) => void;
   /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
   'scenes-changed': () => void;
+  /**
+   * 1.17.0 (`scene-tabs`): a GM map view's tabs (added, closed, moved, renamed) or its active tab changed. Fires once per
+   * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
+   */
+  'tabs-changed': (view: ViewInfo) => void;
 }
 
 export interface AtlasExtension {

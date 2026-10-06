@@ -11,6 +11,6 @@ export interface Point {
 
 export type AtlasCapability =
   | 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice'
-  | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks';
+  | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs';
 
 export type { Json } from '../../app/types/json';

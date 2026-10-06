@@ -131,6 +131,54 @@ export function trackerWith(views: FakeView[], active: () => FakeView | null = (
   return { tracker, events, layoutChanged };
 }
 
+export interface TabbedView extends FakeView {
+  /** One tab per path given, in order; the first is active and loaded. */
+  readonly tabIds: string[];
+  /** Ends the load of the switch in progress: the store then holds its tab's map, loaded. */
+  finishLoad(): void;
+}
+
+/**
+ * A map view with one tab per path, the first active and loaded. `switchToTab` follows Atlas's order: it activates the
+ * tab while the store still holds the previous tab's scene, marks the store loading, and holds the next tab's map,
+ * loaded, once `finishLoad()` runs (at once, a microtask later, with `autoLoad`).
+ */
+export function tabbedView(viewId: string, paths: readonly string[], options: { autoLoad?: boolean } = {}): TabbedView {
+  const view = fakeView(viewId);
+  const tabs = view.tabMetaStore.getState();
+  tabs.setTabs([], null);
+  const tabIds = paths.map((path) => tabs.addTab(path, path.replace(/^.*\/|\.atlasmap$/g, '')));
+  tabs.setActiveTab(tabIds[0]!);
+  view.atlasStore.setState({ mapPath: paths[0]!, mapLoaded: true, isMapLoading: false });
+  // The switch in progress: `finish` loads its tab; a later switch ends it unloaded, as Atlas drops a superseded load.
+  let pending: { finish(): void; drop(): void } | null = null;
+  let switches = 0;
+  const finishLoad = (): void => { const current = pending; pending = null; current?.finish(); };
+  const switchToTab = async (tabId: string): Promise<void> => {
+    const tab = view.tabMetaStore.getState().tabs.find((entry) => entry.id === tabId);
+    if (!tab) return;
+    // As Atlas: the active tab whose scene the store holds needs no load.
+    const state = view.atlasStore.getState();
+    if (view.tabMetaStore.getState().activeTabId === tabId && state.mapLoaded && !state.isMapLoading && state.mapPath === tab.filePath) return;
+    const request = ++switches;
+    const previous = pending;
+    pending = null;
+    previous?.drop();
+    view.tabMetaStore.getState().setActiveTab(tabId);
+    await Promise.resolve();
+    if (request !== switches) return;
+    view.atlasStore.setState({ isMapLoading: true, mapLoaded: false });
+    await new Promise<void>((resolve) => {
+      pending = {
+        finish: (): void => { view.atlasStore.setState({ mapPath: tab.filePath, mapLoaded: true, isMapLoading: false }); resolve(); },
+        drop: resolve,
+      };
+      if (options.autoLoad) queueMicrotask(finishLoad);
+    });
+  };
+  return Object.assign(view, { tabIds, finishLoad, switchToTab });
+}
+
 /** Marks `view`'s store as holding `maps/a.atlasmap`, loaded. */
 export function loadMap(view: FakeView): void {
   view.atlasStore.setState({ mapPath: 'maps/a.atlasmap', mapLoaded: true, isMapLoading: false });

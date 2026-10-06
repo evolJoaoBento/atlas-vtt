@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.16.0";
+export declare const API_VERSION = "1.17.0";
 
 /**
  * `app.plugins.plugins['atlas-vtt'].api`, set (and `atlas-vtt:api-ready` triggered) once Atlas's storage and asset index
@@ -22,7 +22,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -37,6 +37,11 @@ export declare interface AtlasEvents {
     'settings-changed': (key: AtlasSettingKey) => void;
     /** Scene records were added, removed, renamed, moved to another collection or pointed at another map. Read `scenes.list` again. */
     'scenes-changed': () => void;
+    /**
+     * 1.17.0 (`scene-tabs`): a GM map view's tabs (added, closed, moved, renamed) or its active tab changed. Fires once per
+     * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
+     */
+    'tabs-changed': (view: ViewInfo) => void;
 }
 
 export declare interface AtlasExtension {
@@ -1331,6 +1336,12 @@ export declare interface SceneSnapshot {
     readonly mapPath: string | null;
     readonly loaded: boolean;
     /**
+     * 1.17.0 (`scene-tabs`): the tab whose scene this is, set once `loaded`; null while loading and in remote views.
+     * Null too while the view's `activeTabId` already names the next tab but the store still holds the previous one's
+     * scene, so a snapshot whose `tabId` names a tab always holds that tab's scene. A snapshot with no tab is no tab's.
+     */
+    readonly tabId?: string | null;
+    /**
      * The loaded background's size in world pixels; 0 × 0 without one.
      * Read when the snapshot is taken: the background may finish drawing after `loaded`; take a fresh snapshot when you need the size.
      */
@@ -1608,12 +1619,19 @@ export declare interface ViewsApi {
     active(): ViewInfo | null;
     /** The scene in the view's store now; null for a view that is not open. */
     snapshot(viewId: ViewId): SceneSnapshot | null;
-    /** Called after each store change that replaced one of the snapshot's fields (by reference). */
+    /** Called after each store change that replaced one of the snapshot's fields (by reference); from 1.17.0 also when `tabId` changes. */
     subscribe(viewId: ViewId, listener: (snapshot: SceneSnapshot) => void): Disposer;
     /** The view's visible world area now, frozen; null for a view that is not open, has no viewport yet or has no size. */
     camera(viewId: ViewId): ViewCamera | null;
     /** Called after every viewport frame (pixi-viewport `frame-end`), so gestures, moves and resizes alike. */
     watchCamera(viewId: ViewId, listener: (camera: ViewCamera) => void): Disposer;
+    /**
+     * 1.17.0 (`scene-tabs`): makes a tab of a GM map view active without presenting it.
+     * Answers true once that tab's map is loaded. Answers false for a closed, unknown or remote view,
+     * an unknown tab, or when another switch overtook this one. Never throws for these.
+     * The presented scene holds while the view shows another tab, as on any switch, and resumes when the GM returns to it.
+     */
+    showTab?(viewId: ViewId, tabId: string): Promise<boolean>;
 }
 
 /** What a wall can stop: the sight of tokens, or light. */
