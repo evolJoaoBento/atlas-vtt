@@ -7,7 +7,7 @@ import { en } from '../app/i18n/locales/en';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
 import { checkMapGrid } from './savedMapGrid';
-import { checkedSceneFields, isPlainRelative, setsSceneFields, type SceneFields } from './savedMapFields';
+import { checkedSceneFields, inputCopy, isImageData, isPlainRelative, setsSceneFields, type SceneFields } from './savedMapFields';
 import type { SavedMapInput, ScenesApi } from './types/scenes';
 
 type AddInput = Parameters<ScenesApi['addToCollection']>[0];
@@ -104,8 +104,9 @@ async function undo(app: App, assets: AssetService, created: { files: readonly s
  * (`replaceMap`). Everything is checked before the first write; a failure afterwards removes what this call wrote
  * (including a folder or collection it created) and rethrows.
  */
-export function addSceneToCollection(app: App, assets: AssetService, input: AddInput, owner: string): Promise<{ sceneId: string; mapPath: string }> {
+export function addSceneToCollection(app: App, assets: AssetService, given: AddInput, owner: string): Promise<{ sceneId: string; mapPath: string }> {
   return assets.runExclusive(async () => {
+    const input = inputCopy(given, 'scenes.addToCollection');
     if (!input || typeof input.name !== 'string' || !input.name.trim() || !input.map || !Array.isArray(input.images)) {
       throw new Error('[Atlas API] scenes.addToCollection: the input must be { collection, name, folder, map, images }.');
     }
@@ -126,6 +127,7 @@ export function addSceneToCollection(app: App, assets: AssetService, input: AddI
       for (const image of input.images as AddInput['images']) {
         const path: unknown = image?.path;
         if (!isPlainRelative(path) || !isInside(`${folder}/${path}`, folder)) throw new Error(`[Atlas API] scenes.addToCollection: the image path "${String(path)}" must stay inside the folder.`);
+        if (!isImageData(image.data)) throw new Error(`[Atlas API] scenes.addToCollection: the image "${path}" needs its data as an ArrayBuffer.`);
         const target = `${folder}/${path}`;
         if (targets.has(target) || app.vault.getAbstractFileByPath(target)) throw new Error(`[Atlas API] scenes.addToCollection: there is already a file at ${target}.`);
         targets.set(target, image.data);

@@ -4,7 +4,7 @@ import { collectionFolderPath } from '../app/services/assetPaths';
 import { trashVaultItem } from '../app/utils/trashVaultItem';
 import { savedMapText } from './savedMap';
 import { checkMapGrid } from './savedMapGrid';
-import { isPlainRelative } from './savedMapFields';
+import { inputCopy, isImageData, isPlainRelative } from './savedMapFields';
 import { isInside, sceneFieldsOf, withImagePaths } from './sceneImport';
 import type { SavedMapInput } from './types/scenes';
 import type { ViewTracker } from './viewTracker';
@@ -31,17 +31,29 @@ function freeFilePath(app: App, path: string, chosen: ReadonlySet<string>): stri
   return candidate;
 }
 
-/** Whether anything besides the scene `sceneId` uses `path`: another asset record, another scene's map, or a note linking it. */
-async function usedElsewhere(app: App, assets: AssetService, sceneId: string, path: string): Promise<boolean> {
-  const others = (await assets.getAssets()).filter((asset) => asset.id !== sceneId);
-  if (others.some((asset) => JSON.stringify(asset).includes(JSON.stringify(path)))) return true;
-  for (const asset of others) {
-    const otherMap = asset.type === 'scene' ? asset.data?.mapPath : undefined;
-    const file = otherMap ? app.vault.getAbstractFileByPath(otherMap) : null;
-    if (file instanceof TFile && (await app.vault.read(file)).includes(JSON.stringify(path))) return true;
-  }
-  const links = (app.metadataCache as { resolvedLinks?: Record<string, Record<string, number>> } | undefined)?.resolvedLinks ?? {};
-  return Object.values(links).some((targets) => Object.hasOwn(targets, path));
+/**
+ * Whether anything besides the scene `sceneId` uses a path: another asset record, another scene's map, or a note
+ * linking it. The records and maps are read once, when the first path is asked about, however many paths follow.
+ */
+function usedElsewhere(app: App, assets: AssetService, sceneId: string): (path: string) => Promise<boolean> {
+  let texts: Promise<string[]> | null = null;
+  const read = async (): Promise<string[]> => {
+    const others = (await assets.getAssets()).filter((asset) => asset.id !== sceneId);
+    const found = others.map((asset) => JSON.stringify(asset));
+    for (const asset of others) {
+      const otherMap = asset.type === 'scene' ? asset.data?.mapPath : undefined;
+      const file = otherMap ? app.vault.getAbstractFileByPath(otherMap) : null;
+      if (file instanceof TFile) found.push(await app.vault.read(file));
+    }
+    return found;
+  };
+  return async (path) => {
+    texts ??= read();
+    const quoted = JSON.stringify(path);
+    if ((await texts).some((text) => text.includes(quoted))) return true;
+    const links = (app.metadataCache as { resolvedLinks?: Record<string, Record<string, number>> } | undefined)?.resolvedLinks ?? {};
+    return Object.values(links).some((targets) => Object.hasOwn(targets, path));
+  };
 }
 
 /**
@@ -50,11 +62,12 @@ async function usedElsewhere(app: App, assets: AssetService, sceneId: string, pa
  */
 async function removeOldImages(app: App, assets: AssetService, sceneId: string, created: readonly string[], newText: string): Promise<string[]> {
   const kept: string[] = [];
+  const isUsedElsewhere = usedElsewhere(app, assets, sceneId);
   for (const path of created) {
     const file = app.vault.getAbstractFileByPath(path);
     if (!(file instanceof TFile)) continue;
     try {
-      if (newText.includes(JSON.stringify(path)) || await usedElsewhere(app, assets, sceneId, path)) kept.push(path);
+      if (newText.includes(JSON.stringify(path)) || await isUsedElsewhere(path)) kept.push(path);
       else await trashVaultItem(app, file);
     } catch (error) {
       console.error('[Atlas API] replaceMap could not remove an old image:', path, error);
@@ -91,9 +104,10 @@ function withLocalPlay(newText: string, oldText: string): string {
  * images this call wrote and puts the old map back.
  */
 export function replaceSceneMap(
-  app: App, assets: AssetService, views: ViewTracker | null, owner: string, sceneId: string, input: ReplaceInput,
+  app: App, assets: AssetService, views: ViewTracker | null, owner: string, sceneId: string, given: ReplaceInput,
 ): Promise<{ sceneId: string; mapPath: string }> {
   return assets.runExclusive(async () => {
+    const input = inputCopy(given, 'scenes.replaceMap');
     const scene = typeof sceneId === 'string' ? await assets.getAssetById(sceneId) : null;
     if (scene?.type !== 'scene') fail(`there is no scene with the id "${String(sceneId)}".`);
     if (scene.data?.createdBy !== owner) fail('only a scene this extension added with addToCollection can be replaced.');
@@ -112,6 +126,7 @@ export function replaceSceneMap(
     for (const image of input.images as ReplaceInput['images']) {
       const path: unknown = image?.path;
       if (!isPlainRelative(path) || !isInside(`${folder}/${path}`, folder) || targets.has(path)) fail(`the image path "${String(path)}" must stay inside the folder, once.`);
+      if (!isImageData(image.data)) fail(`the image "${path}" needs its data as an ArrayBuffer.`);
       const target = freeFilePath(app, normalizePath(`${folder}/${path}`), chosen);
       chosen.add(target.toLowerCase());
       targets.set(path, { target, data: image.data });

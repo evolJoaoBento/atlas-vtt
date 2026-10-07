@@ -131,3 +131,18 @@ export function setsSceneFields(map: SavedMapInput): boolean {
 export function tokenSettingsForFile(settings: TokenSettings): Record<string, unknown> {
   return tokenSettingsToFile({ ...settings });
 }
+
+/**
+ * `input` read once: a deep copy, so nothing a getter or a later change of the extension's object does reaches what
+ * Atlas checked and writes. Throws `[Atlas API] <where>: …` for input that is not plain data (a function, a DOM node).
+ */
+export function inputCopy<T>(input: T, where: string): T {
+  try {
+    return structuredClone(input);
+  } catch {
+    throw new Error(`[Atlas API] ${where}: the input must be plain data (objects, arrays, strings, numbers and ArrayBuffers).`);
+  }
+}
+
+/** Whether an image's `data` is an ArrayBuffer (a copy keeps it one; a view or anything else is refused). */
+export const isImageData = (data: unknown): data is ArrayBuffer => data instanceof ArrayBuffer;

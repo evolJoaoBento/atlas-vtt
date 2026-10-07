@@ -103,6 +103,19 @@ describe('scenes', () => {
     expect([...vault.files.keys()].some((path) => path.includes('escape') || path.includes('abs.webp'))).toBe(false);
   });
 
+  it('C-scenes-2: addToCollection reads its input once, as plain data, and wants image data as an ArrayBuffer', async () => {
+    const { scenes, vault } = await withScene();
+    const folder = 'atlas-vtt/collections/source/Cave';
+    const base = { collection: { id: 'source' }, name: 'Cave', folder, map: emptyMap(), images: [] };
+    await expect(scenes.addToCollection({ ...base, images: [{ path: 'a.webp', data: new Uint8Array(1) as never }] })).rejects.toThrow(/ArrayBuffer/);
+    await expect(scenes.addToCollection({ ...base, map: { ...emptyMap(), extra: () => 1 } as never })).rejects.toThrow(/plain data/);
+    let reads = 0;
+    const once = { ...base, get name(): string { reads += 1; return reads === 1 ? 'Cave' : ('' as string); } };
+    await scenes.addToCollection(once);
+    expect(reads).toBe(1);
+    expect([...vault.files.keys()].some((path) => path.endsWith('/Cave.atlasmap'))).toBe(true);
+  });
+
   it('C-scenes-2: addToCollection into an existing collection keeps it, numbers a taken map name and does not touch existing files', async () => {
     const { scenes, assets, vault } = await withScene();
     const input = { collection: { id: 'source' }, name: 'Cave', folder: 'atlas-vtt/collections/source/scenes', map: emptyMap(), images: [] };
