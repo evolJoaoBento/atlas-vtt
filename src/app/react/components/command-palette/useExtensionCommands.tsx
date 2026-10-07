@@ -15,15 +15,33 @@ export interface ExtensionCommands {
 
 const isText = (value: unknown): value is string => typeof value === 'string' && value !== '';
 
+/** A command as Atlas keeps it: each field read once, the keywords a frozen copy. */
+interface ReadCommand {
+  id: string;
+  icon: unknown;
+  label: string;
+  keywords: readonly string[];
+  run: () => void;
+}
+
+/** One entry read once into a plain command; null when it is no command. */
+function readCommand(entry: unknown): ReadCommand | null {
+  if (typeof entry !== 'object' || entry === null) return null;
+  const { id, icon, label, keywords, run } = entry as Record<keyof PaletteCommand, unknown>;
+  if (!isText(id) || !isText(label) || typeof run !== 'function') return null;
+  if (keywords !== undefined && !(Array.isArray(keywords) && keywords.every((word) => typeof word === 'string'))) return null;
+  return { id, icon, label, keywords: Object.freeze([...(keywords ?? [])]), run: () => { (run as () => void).call(entry); } };
+}
+
 /** What `commands()` returned, less the entries that are not commands (logged); throws when it is no list. */
-function validCommands(owner: string, returned: unknown): PaletteCommand[] {
-  const list = [...(returned as Iterable<unknown>)];
-  return list.filter((entry): entry is PaletteCommand => {
-    const command = entry as Partial<PaletteCommand> | null;
-    const ok = typeof command === 'object' && command !== null && isText(command.id) && isText(command.label) && typeof command.run === 'function';
-    if (!ok) console.error(`[Atlas API] ${owner}: a palette command is malformed and was skipped:`, entry);
-    return ok;
-  });
+function validCommands(owner: string, returned: unknown): ReadCommand[] {
+  const commands: ReadCommand[] = [];
+  for (const entry of [...(returned as Iterable<unknown>)]) {
+    const command = readCommand(entry);
+    if (command) commands.push(command);
+    else console.error(`[Atlas API] ${owner}: a palette command is malformed and was skipped:`, entry);
+  }
+  return commands;
 }
 
 /** The commands other plugins added to the palette. Their callbacks run guarded: a section that throws shows nothing. */
@@ -46,7 +64,7 @@ export function useExtensionCommands(
         id: `${sectionId}:${command.id}`,
         icon: isText(command.icon) ? <ObsidianIcon name={command.icon} /> : null,
         label: command.label,
-        keywords: command.keywords ?? [],
+        keywords: [...command.keywords],
         section: sectionId,
         action: () => {
           safely(owner, `palette command "${command.id}"`, () => { command.run(); }, undefined);

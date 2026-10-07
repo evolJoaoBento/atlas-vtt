@@ -128,6 +128,39 @@ describe('Extension sections in the command palette', () => {
     remove();
   });
 
+  it('skips a command whose keywords are not a list of text, and keeps the palette working', () => {
+    const run = vi.fn();
+    const remove = add(section({
+      commands: () => [
+        { id: 'num', icon: 'x', label: 'Number keywords', keywords: 5, run },
+        { id: 'nul', icon: 'x', label: 'Null keyword', keywords: [null], run },
+        { id: 'ok', icon: 'x', label: 'Quick notes', keywords: ['host'], run },
+      ] as never,
+    }));
+    expect(() => renderPalette()).not.toThrow();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'host' } });
+    expect(option('Quick notes')).not.toBeNull();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'keyword' } });
+    expect(option('Number keywords')).toBeNull();
+    expect(option('Null keyword')).toBeNull();
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('malformed'), expect.objectContaining({ id: 'num' }));
+    remove();
+  });
+
+  it('reads each field of a command once, so a getter cannot answer differently later', () => {
+    const reads: number[] = [];
+    const fresh = (): object => {
+      const at = reads.push(0) - 1;
+      return { id: 'ok', icon: 'x', run: vi.fn(), keywords: ['host'], get label(): string { reads[at] += 1; return reads[at] === 1 ? 'Quick notes' : (5 as never); } };
+    };
+    const remove = add(section({ commands: () => [fresh()] as never }));
+    expect(() => renderPalette()).not.toThrow();
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'host' } });
+    expect(option('Quick notes')).not.toBeNull();
+    expect(reads.every((count) => count === 1)).toBe(true);
+    remove();
+  });
+
   it('shows nothing, without throwing, when commands returns no list', () => {
     const remove = add(section({ commands: () => 5 as never }));
     expect(() => renderPalette()).not.toThrow();
