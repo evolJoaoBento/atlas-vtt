@@ -8,7 +8,8 @@ import { formatDistance, resolveMeasurementSettings, type MeasurementSettings } 
 import type { ViewAtlasState } from '../storeFactory';
 import type { StoreApi } from 'zustand';
 import { isHandled } from './utils/handledEvents';
-import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint, measureLabelFontSize } from './utils/measureDrawing';
+import { createMeasureLabelText, drawMeasureCircle, drawMeasureLabel, drawMeasurePath, drawMeasurePoint } from './utils/measureDrawing';
+import { measureLabelFontSize } from './utils/measureGeometry';
 import { coneGeometry, MEASURE_AREA, measureLabelAnchor, type MeasureShape } from './utils/measureGeometry';
 import { MAP_LAYER_Z } from './mapLayerOrder';
 import { MeasurePartsVisibility, type MeasurePlayersView } from './measurePartsVisibility';

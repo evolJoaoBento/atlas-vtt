@@ -2,8 +2,6 @@ import { AlphaFilter, Buffer, BufferUsage, Container, Geometry, Mesh, Rectangle,
 import { beamSmoothingSpacing, createLaserBeamBuffers, smoothBeam, writeLaserBeam, type BeamPoint, type BeamWidth } from './laserBeamGeometry';
 import { createLaserBeamShader, type LaserBeamShader } from './laserBeamShader';
 
-export { beamSmoothingSpacing, beamWidth, type BeamWidth } from './laserBeamGeometry';
-
 /** Draws the laser beam; `LaserBeam` on the GPU, `CanvasLaserBeam` without one. */
 export interface LaserBeamView {
   /** Add this to the scene. */

@@ -4,14 +4,14 @@ import { snapDroppedToken } from '../../src/app/clipboard/mapObjectPlacement';
 import { cellCenterAt } from '../../src/app/grid/gridDistance';
 import type { MeasurementSettings } from '../../src/app/grid/measurementFormat';
 import { axialToPixel, createHexLayout, hexCircumradius } from '../../src/app/grid/hexGeometry';
-import * as laserBeam from '../../src/app/pixi/laser/LaserBeam';
 import { beamWidth, laserPointSpacing } from '../../src/app/pixi/laser/laserBeamGeometry';
 import { LaserTrail } from '../../src/app/pixi/laser/laserTrail';
 import {
   arcPoints, CONE_ANGLE, coneGeometry, measureLabelAnchor, measureLabelBox, measureLabelFontSize, pathMidpoint,
 } from '../../src/app/pixi/utils/measureGeometry';
 import { DragRulerPath, dragRulerLabel, samePoint, WAYPOINT_KEY } from '../../src/app/pixi/token-renderer/dragRulerPath';
-import { drawMeasurePath, drawMeasurePoint, pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureDrawing';
+import { drawMeasurePath, drawMeasurePoint } from '../../src/app/pixi/utils/measureDrawing';
+import { pathMidpoint as drawingMidpoint } from '../../src/app/pixi/utils/measureGeometry';
 import { LASER_FADE_TIME } from '../../src/app/tools/laserPointerSettings';
 
 /** Records the Graphics calls the measure drawing makes. */
@@ -132,10 +132,6 @@ describe('cellCenterAt', () => {
 });
 
 describe('the laser trail and beam width', () => {
-  it('keeps the beam width functions LaserBeam exported', () => {
-    expect(laserBeam.beamWidth).toBe(beamWidth);
-  });
-
   it("spaces points like Atlas's laser: three screen pixels, or more for a wide beam", () => {
     expect(laserPointSpacing(8, 1)).toBe(3);
     expect(laserPointSpacing(16, 2)).toBeCloseTo((beamWidth(16, 2).halfWidth) * 0.15);
