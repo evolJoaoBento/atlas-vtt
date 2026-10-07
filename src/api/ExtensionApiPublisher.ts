@@ -1,5 +1,6 @@
 import type AtlasVTTPlugin from '../../main';
 import { bundleNoteKeys } from '../app/extensions/bundleNoteKeys';
+import { syncPresentingCommands } from '../app/plugin/presentingCommands';
 import { AssetService } from '../app/services/AssetService';
 import { AtlasApiHost } from './AtlasApiHost';
 import { ATLAS_VIEW_HOOKS } from './atlasViewHooks';
@@ -62,6 +63,8 @@ export class ExtensionApiPublisher {
     this.stopWatches.push(assets.onScenesChanged(() => host.apiEvents.emit('scenes-changed')));
     this.stopWatches.push(assets.onCollectionsChanged(() => host.apiEvents.emit('collections-changed')));
     this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents, true), watchSettings(this.plugin.settingsService, host.apiEvents));
+    // Present to players and Stop presenting come with the first presentation target an extension registers.
+    this.stopWatches.push(syncPresentingCommands(this.plugin));
   }
 
   stop(): void {

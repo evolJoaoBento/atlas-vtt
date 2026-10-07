@@ -46,7 +46,6 @@
 ## Improved
 
 - The dice look setting and the command palette's Dice settings preview every dice look another plugin adds, drawn with its own faces where it gives no picture of itself
-- The presented scene keeps its marker on the scene tab until you choose Stop presenting, and an open player window follows the scene you present from anywhere. New commands: Present to players, Stop presenting
 - Fog paint and erase strokes now use consistent shapes.
 - Simplified how token artwork and collection rules update.
 - Simplified token statblock updates and added checks for linked notes.
@@ -68,7 +67,6 @@
 - When a map image is replaced, the old image is released only after its sprite has left the map, so it is never freed while still showing
 - Fog that did not change is no longer redrawn when other fog changes
 - The automatic grid colour no longer fails on a map whose texture is not an image
-- Presenting a scene again after the player window lost its source shows that scene, instead of keeping the window on its last frame
 - A cone angle edited by hand to a value no cone can open with measures as 90 degrees, in every view alike
 - Renaming a map while its explored areas wait to be saved saves them into the renamed map
 - A statblock note rewritten on export keeps its byte order mark

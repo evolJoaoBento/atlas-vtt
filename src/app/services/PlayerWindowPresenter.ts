@@ -10,6 +10,7 @@ import type { PlayerFrameSource } from './PlayerFrameMirror';
 import { PlayerWindowService } from './PlayerWindowService';
 import { rendersOnChange, requestRender, setBeforeRender } from '../pixi/RenderScheduler';
 import { presentedScene, showsTab, whenMapLoaded } from './PresentedScene';
+import { presentationTargetsRegistered, subscribePresentationTargets } from './presentationTargets';
 
 /** Set once the player window follows the presented scene; it starts with the first presentation through it. */
 let followingPresentedScene = false;
@@ -112,7 +113,8 @@ export async function restorePlayerWindow(app: App, player: LocalPlayerView): Pr
 /**
  * The player window shows the presented scene: it holds its frame while the DM
  * browses other tabs, resumes when the presented tab is back, follows a scene
- * presented elsewhere ("Present to players") and lets go of a view that closes.
+ * presented elsewhere ("Present to players", only while an extension registered a
+ * presentation target) and lets go of a view that closes.
  */
 function followPresentedScene(): void {
   if (followingPresentedScene) return;
@@ -127,6 +129,12 @@ function followPresentedScene(): void {
     // A view the window still streams may close after another scene was presented
     viewClosed: (view) => releaseStreamed(view.atlasStore),
   });
+  // Without a registered target the presented scene is what the player window shows, so it ends with the window.
+  const endWithWindow = (): void => {
+    if (!playerWindowStore.getState().isOpen && !presentationTargetsRegistered()) presentedScene.clear();
+  };
+  playerWindowStore.subscribe((state, previous) => { if (state.isOpen !== previous.isOpen) endWithWindow(); });
+  subscribePresentationTargets(endWithWindow);
 }
 
 function isStreaming(view: AtlasView, tabId: string): boolean {

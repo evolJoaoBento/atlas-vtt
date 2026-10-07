@@ -6,8 +6,6 @@ import { t } from '../i18n';
 import type { GlobalAssetManagerService } from '../services/GlobalAssetManagerService';
 import type { ImageDisplayService } from '../services/ImageDisplayService';
 import { presentActiveTabInPlayerWindow } from '../services/PlayerWindowPresenter';
-import { presentedScene } from '../services/PresentedScene';
-import { presentActiveTabToPlayers, stopPresenting } from '../services/presentToPlayers';
 import { hasBestiaryFrontmatter } from '../services/statblockNoteSource';
 import { TokenStatblockLinkService } from '../services/TokenStatblockLinkService';
 import { activeMapView } from './atlasLeaves';
@@ -63,22 +61,6 @@ function registerPlayerViewCommands(plugin: Plugin, imageDisplay: ImageDisplaySe
     id: 'send-map-to-player-view',
     name: t('command.sendMapToPlayerView'),
     callback: () => void presentActiveTabInPlayerWindow(plugin.app),
-  });
-
-  plugin.addCommand({
-    id: 'present-to-players',
-    name: t('command.presentToPlayers'),
-    callback: () => void presentActiveTabToPlayers(plugin.app),
-  });
-
-  plugin.addCommand({
-    id: 'stop-presenting',
-    name: t('command.stopPresenting'),
-    checkCallback: (checking) => {
-      if (!presentedScene.current()) return false;
-      if (!checking) stopPresenting();
-      return true;
-    },
   });
 
   plugin.addRibbonIcon('monitor', t('command.displayImageOnPlayerView'), () => {

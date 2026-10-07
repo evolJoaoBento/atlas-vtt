@@ -3,7 +3,7 @@ import { AtlasView } from '../atlas-view';
 import { playerWindowStore } from '../stores/playerWindowStore';
 import { presentTabInPlayerWindow } from './PlayerWindowPresenter';
 import { presentedScene, whenMapLoaded, type PresentedView } from './PresentedScene';
-import { activePresentationTarget } from './presentationTargets';
+import { activePresentationTarget, presentationTargetsRegistered } from './presentationTargets';
 import { t } from '../i18n';
 
 /**
@@ -19,8 +19,9 @@ export async function presentViewToPlayers(view: unknown): Promise<void> {
   }
   await whenMapLoaded(view.atlasStore);
   if (view.isClosed || view.tabMetaStore.getState().activeTabId !== tabId) return;
-  // Nothing shows a presented scene unless the player window is open or a target is active: open the window, as presenting from it does.
-  if (!playerWindowStore.getState().isOpen && !activePresentationTarget()) {
+  // Without a registered target Atlas presents as it always has, through the player window (`presentationTargetsRegistered`).
+  // With one, nothing shows a presented scene unless the player window is open or a target is active: open the window then.
+  if (!presentationTargetsRegistered() || (!playerWindowStore.getState().isOpen && !activePresentationTarget())) {
     await presentTabInPlayerWindow(view.app, view, tabId);
     return;
   }

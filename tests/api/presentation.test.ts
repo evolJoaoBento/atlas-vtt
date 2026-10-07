@@ -2,14 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class AtlasView {}, ATLAS_VIEW_TYPE: 'atlas-vtt' }));
 vi.mock('../../src/app/dashboard-view', () => ({ DASHBOARD_VIEW_TYPE: 'dashboard' }));
-vi.mock('../../src/app/services/PlayerWindowPresenter', () => ({ presentActiveTabInPlayerWindow: vi.fn(), presentTabInPlayerWindow: vi.fn() }));
+const presenter = vi.hoisted(() => ({ presentTabInPlayerWindow: vi.fn() }));
+vi.mock('../../src/app/services/PlayerWindowPresenter', () => ({ presentActiveTabInPlayerWindow: vi.fn(), presentTabInPlayerWindow: presenter.presentTabInPlayerWindow }));
 vi.mock('obsidian', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), Notice: vi.fn() }));
 
 import { AtlasView } from '../../src/app/atlas-view';
 import { DisposerSet } from '../../src/api/disposers';
 import { presentationApi } from '../../src/api/presentation';
 import { PresentedScene, presentedScene } from '../../src/app/services/PresentedScene';
-import { activePresentationTarget, tabBadgeFor } from '../../src/app/services/presentationTargets';
+import { activePresentationTarget, addPresentationTarget, tabBadgeFor } from '../../src/app/services/presentationTargets';
 import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
 import { initialRemoteViewState } from '../../src/app/remote-view/remoteViewState';
 import { fakeView, loadMap as load, trackerWith, type FakeView } from './apiFakes';
@@ -23,11 +24,14 @@ function setupWith(view: FakeView): { presentation: ReturnType<typeof presentati
 }
 
 describe('presentation', () => {
+  // Atlas presents a scene of its own only while a target is registered; one that is never active is enough.
+  let removeTarget: () => void = () => undefined;
   beforeEach(() => {
     presentedScene.clear();
     playerWindowStore.setState({ isOpen: true });
+    removeTarget = addPresentationTarget({ id: 'registered', label: 'an audience', isActive: () => false }, 'other');
   });
-  afterEach(() => { presentedScene.clear(); });
+  afterEach(() => { removeTarget(); presentedScene.clear(); });
 
   it('C-pres-1: present returns false for a closed view; held on tab switch; resumed only after the tab loaded; cleared when the tab closes', async () => {
     const view = fakeView('v1');
@@ -226,5 +230,24 @@ describe('presentation', () => {
     presentation.addTarget({ id: 'room', label: 'The room', isActive: () => true, tabBadge: () => '2 players' });
     expect(tabBadgeFor('v1', 't1')).toBeNull();
     disposers.disposeAll();
+  });
+});
+
+describe('presentation without a registered target', () => {
+  beforeEach(() => {
+    presentedScene.clear();
+    presenter.presentTabInPlayerWindow.mockClear();
+    playerWindowStore.setState({ isOpen: true });
+  });
+
+  it("presents through the player window, as Atlas's own command does, and reads what it shows", async () => {
+    const view = fakeView('v1');
+    const { presentation } = setupWith(view);
+    const tabId = view.tabMetaStore.getState().activeTabId!;
+    // The stock path presents the scene in the window, which is what the presented scene then holds.
+    presenter.presentTabInPlayerWindow.mockImplementationOnce(async () => { presentedScene.present(view, tabId); });
+    expect(await presentation.present('v1')).toBe(true);
+    expect(presenter.presentTabInPlayerWindow).toHaveBeenCalledWith(view.app, view, tabId);
+    expect(presentation.current()).toMatchObject({ viewId: 'v1', tabId, held: false });
   });
 });

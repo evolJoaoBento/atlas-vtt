@@ -6,6 +6,7 @@ vi.mock('../../src/app/atlas-view', () => ({ AtlasView: class AtlasView {} }));
 import { AtlasView } from '../../src/app/atlas-view';
 import { presentedScene } from '../../src/app/services/PresentedScene';
 import { presentTabToPlayers } from '../../src/app/services/presentToPlayers';
+import { addPresentationTarget } from '../../src/app/services/presentationTargets';
 import { playerWindowStore } from '../../src/app/stores/playerWindowStore';
 import { createTabMetaStore } from '../../src/app/stores/tabMetaStore';
 
@@ -24,9 +25,13 @@ function mapView(switches: boolean): { view: AtlasView & { switchToTab: ReturnTy
   return { view, caves };
 }
 
-describe('presentTabToPlayers', () => {
-  beforeEach(() => { playerWindowStore.setState({ isOpen: true }); });
-  afterEach(() => { presentedScene.clear(); });
+describe('presentTabToPlayers, once a presentation target is registered', () => {
+  let removeTarget: () => void = () => undefined;
+  beforeEach(() => {
+    playerWindowStore.setState({ isOpen: true });
+    removeTarget = addPresentationTarget({ id: 'registered', label: 'an audience', isActive: () => false });
+  });
+  afterEach(() => { removeTarget(); presentedScene.clear(); });
 
   it('switches to the clicked tab before presenting it', async () => {
     const { view, caves } = mapView(true);

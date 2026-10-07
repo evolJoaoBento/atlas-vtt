@@ -5,7 +5,7 @@ import { cn } from '../../../utils/cn';
 import { useSceneTabStore } from '../hooks/useSceneTabStore';
 import { useTabStripOverflow } from '../hooks/useTabStripOverflow';
 import { usePresentedTabId } from '../hooks/usePresentedTabId';
-import { activePresentationTarget, presentationTargetsVersion, subscribePresentationTargets, tabBadgeFor } from '../../services/presentationTargets';
+import { activePresentationTarget, presentationTargetsRegistered, presentationTargetsVersion, subscribePresentationTargets, tabBadgeFor } from '../../services/presentationTargets';
 import { useAtlasUI } from '../root/AtlasUIContext';
 import { stopPresenting } from '../../services/stopPresenting';
 import { playerWindowStore } from '../../stores/playerWindowStore';
@@ -84,8 +84,12 @@ export function SceneTabBar({ onSwitchTab, onCloseTab, onAddTab, onPresentTab, o
 
   const tabs = useStore(store, (s) => s.tabs);
   const activeTabId = useStore(store, (s) => s.activeTabId);
-  const presentedTabId = usePresentedTabId(store);
+  const scenePresentedTabId = usePresentedTabId(store);
+  const windowTabId = useStore(playerWindowStore, (s) => s.presentedTabId);
   const isPlayerWindowOpen = useStore(playerWindowStore, (s) => s.isOpen);
+  // Without a registered target the eye marks what the player window shows, as it always has.
+  const targetsRegistered = useSyncExternalStore(subscribePresentationTargets, presentationTargetsRegistered);
+  const presentedTabId = targetsRegistered ? scenePresentedTabId : isPlayerWindowOpen ? windowTabId : null;
   const target = useSyncExternalStore(subscribePresentationTargets, activePresentationTarget);
   // The version, not the target: `ui.invalidate()` keeps the same target, and its badges must still be read again.
   useSyncExternalStore(subscribePresentationTargets, presentationTargetsVersion);

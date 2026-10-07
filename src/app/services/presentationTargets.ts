@@ -33,6 +33,16 @@ export function activePresentationTarget(): PresentationTargetEntry | null {
   return null;
 }
 
+/**
+ * Whether any extension has registered a target, active or not. Only then does Atlas present a scene of its own
+ * (`PresentedScene`): the eye marker stays until Stop presenting, the player window follows a scene presented from
+ * anywhere, and the Present to players and Stop presenting commands exist. Without one, presenting is Atlas's stock
+ * behaviour: "Send current map to player view" and the eye, marked while the player window shows the tab.
+ */
+export function presentationTargetsRegistered(): boolean {
+  return presentationTargetSlot.list().length > 0;
+}
+
 /** For React (useSyncExternalStore) and `ui.invalidate()`: targets were added, removed, or asked to be re-read. */
 export function subscribePresentationTargets(listener: () => void): () => void {
   return presentationTargetSlot.subscribe(listener);
