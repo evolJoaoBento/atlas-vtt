@@ -7,7 +7,7 @@ vi.mock('../../../src/app/dice3d/dieNumerals', async (original) => ({
 }));
 
 import { installDomHost, getDomHost } from '../../../src/app/host/dom';
-import { copyFaceImage, LOOK_ART_TIMEOUT_MS, lookArt } from '../../../src/app/dice3d/customLookArt';
+import { copyFaceImage, LOOK_ART_TIMEOUT_MS, lookArt, onLateLookArt } from '../../../src/app/dice3d/customLookArt';
 import type { CustomDiceLook, FaceArtSet } from '../../../src/app/dice3d/customLooks';
 import { artKeys, type DieBody } from '../../../src/app/dice3d/dieBody';
 
@@ -87,7 +87,14 @@ describe('lookArt', () => {
     expect(images.load).toHaveBeenCalledWith('good', true);
     // Logged once for the registration, naming the faces Atlas paints itself.
     expect(warn).toHaveBeenCalledOnce();
-    expect(String(warn.mock.calls[0]![0])).toContain('d6: 2, 3, 4, 5');
+    const line = String(warn.mock.calls[0]![0]);
+    expect(line).toContain('failed to load: d6 2');
+    expect(line).toContain('too large: d6 3');
+    expect(line).toContain('unreadable (cross-origin without CORS): d6 4');
+    expect(line).toContain('not an image: d6 5');
+    expect(line).toContain('d4 (all)');
+    expect(line).toMatch(/not given: [^.]*d6: 6\b/);
+    expect(line).toContain('keys Atlas does not ask for, ignored: d6: 7');
   });
 
   it('a body whose faces() throws, rejects or answers no record paints Atlas numerals; the other bodies keep their art', async () => {
@@ -104,14 +111,23 @@ describe('lookArt', () => {
     expect(art.faces.get(20)!.size).toBe(1);
   });
 
-  it('gives up on a body after 10 s, and the art still resolves', async () => {
+  it('paints Atlas numerals on a body that misses its 10 s, and takes its art in when it still arrives', async () => {
     vi.useFakeTimers();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const pending = lookArt(look((body) => (body === 12 ? new Promise<FaceArtSet>(() => undefined) : Promise.resolve({}))));
+    let arrive: (set: FaceArtSet) => void = () => undefined;
+    const registered = look((body) => (body === 12 ? new Promise<FaceArtSet>((resolve) => { arrive = resolve; }) : Promise.resolve({})));
+    const late = vi.fn();
+    const stop = onLateLookArt(late);
+    const pending = lookArt(registered);
     await vi.advanceTimersByTimeAsync(LOOK_ART_TIMEOUT_MS + 1);
     const art = await pending;
     expect(art.faces.get(12)!.size).toBe(0);
-    expect(String(warn.mock.calls[0]![0])).toContain('d12: no answer within 10 s');
+    expect(String(warn.mock.calls[0]![0])).toContain('no answer within 10 s, painted once it arrives: d12');
+    arrive({ 3: source(16, 16) });
+    await vi.advanceTimersByTimeAsync(1);
+    expect([...art.faces.get(12)!.keys()]).toEqual([3]);
+    expect(late).toHaveBeenCalledWith(registered);
+    stop();
   });
 
   it('takes relief art by the same keys', async () => {

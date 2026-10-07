@@ -1,6 +1,8 @@
 import type { Plugin } from 'obsidian';
 import { customLook, onCustomLooksChange, type CustomDiceLook } from '../dice3d/customLooks';
 import { applyDiceLook } from '../dice3d/diceLookRuntime';
+import { onLateLookArt } from '../dice3d/customLookArt';
+import { refreshDieArtwork } from '../dice3d/dieMesh';
 import type { SettingsService } from '../services/SettingsService';
 
 /** The extension look the settings chose, while its extension has it registered; null for Atlas's own. */
@@ -31,4 +33,6 @@ export function registerDiceLookSync(plugin: Plugin, settings: SettingsService):
   plugin.register(settings.onChange(() => apply(false)));
   plugin.register(onCustomLooksChange(() => apply(false)));
   plugin.registerEvent(plugin.app.workspace.on('css-change', () => apply(true)));
+  // A look's art that arrived after its 10 s is in its art by now: the faces are painted again.
+  plugin.register(onLateLookArt(() => refreshDieArtwork()));
 }

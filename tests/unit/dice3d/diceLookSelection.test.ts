@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const runtime = vi.hoisted(() => ({ refresh: vi.fn(), art: vi.fn<(look: unknown) => Promise<unknown>>() }));
 vi.mock('../../../src/app/dice3d/dieMesh', () => ({ refreshDieArtwork: runtime.refresh }));
 vi.mock('../../../src/app/dice3d/dieArtwork', () => ({ loadDiceArtwork: () => Promise.resolve() }));
-vi.mock('../../../src/app/dice3d/customLookArt', () => ({ lookArt: runtime.art }));
+vi.mock('../../../src/app/dice3d/customLookArt', () => ({ lookArt: runtime.art, onLateLookArt: () => () => undefined }));
 
 import type { Plugin } from 'obsidian';
 import { addCustomLook, type CustomDiceLook } from '../../../src/app/dice3d/customLooks';
