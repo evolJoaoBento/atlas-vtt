@@ -1,11 +1,12 @@
 import type { App } from 'obsidian';
 import { ensureAdapterFolder } from '../app/plugin/vaultFolders';
+import { COLLECTION_DATA_DIR } from '../app/services/collectionBundle/installRecord';
 import type { StorageApi } from './types/settings';
 
 const EXTENSION_ID = /^[a-z0-9-]+$/;
 
 export function storageFolderOf(extensionId: string): string {
-  return `atlas-vtt/.atlas-data/extensions/${extensionId}`;
+  return `${COLLECTION_DATA_DIR}/extensions/${extensionId}`;
 }
 
 export function storageApi(app: App, extensionId: string): StorageApi {
