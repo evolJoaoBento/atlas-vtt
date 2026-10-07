@@ -23,12 +23,35 @@ function ToolBadge({ badge, label }: { badge: string | number | true; label: str
   );
 }
 
+/** The longest text badge a toolbar button shows; a longer one is cut with an ellipsis. */
+export const TOOLBAR_BADGE_MAX = 8;
+
 /** A badge worth drawing: `null`, an empty string and anything else an extension returns by mistake draw nothing. */
 function drawableBadge(value: unknown): string | number | true | null {
   if (value === true) return true;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value !== '') return value;
-  return null;
+  if (typeof value !== 'string' || value === '') return null;
+  // Characters, not UTF-16 units, so a cut never splits an emoji.
+  const characters = [...value];
+  return characters.length > TOOLBAR_BADGE_MAX ? `${characters.slice(0, TOOLBAR_BADGE_MAX - 1).join('')}…` : value;
+}
+
+/** The callbacks of each item that threw already: each failure is logged once, not on every render. */
+const failed = new WeakMap<ToolbarItem, Set<string>>();
+
+/** Runs one of an item's callbacks guarded; a throw answers `fallback` and is logged once per item and callback. */
+function guarded<R>(owner: string, item: ToolbarItem, callback: string, read: () => R, fallback: R): R {
+  try {
+    return read();
+  } catch (error) {
+    const seen = failed.get(item) ?? new Set<string>();
+    failed.set(item, seen);
+    if (!seen.has(callback)) {
+      seen.add(callback);
+      console.error(`[Atlas API] ${owner}: toolbar item "${item.id}" ${callback} failed:`, error);
+    }
+    return fallback;
+  }
 }
 
 /**
@@ -37,8 +60,8 @@ function drawableBadge(value: unknown): string | number | true | null {
  */
 export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ctx: ViewContext): ResponsiveToolbarItem {
   const slot = `toolbar item "${item.id}"`;
-  const active = safely(owner, `${slot} isActive`, () => item.isActive?.(ctx) === true, false);
-  const badge = safely(owner, `${slot} badge`, () => drawableBadge(item.badge?.(ctx)), null);
+  const active = guarded(owner, item, 'isActive', () => item.isActive?.(ctx) === true, false);
+  const badge = guarded(owner, item, 'badge', () => drawableBadge(item.badge?.(ctx)), null);
   const select = (): void => safely(owner, `${slot} onClick`, () => { item.onClick(ctx); }, undefined);
   const Icon = obsidianIconComponent(item.icon);
   return {
@@ -57,22 +80,11 @@ export function extensionToolbarItem({ owner, item }: SlotEntry<ToolbarItem>, ct
   };
 }
 
-/** Items whose `isVisible` threw already: the failure is logged once, not on every render. */
-const failedVisibility = new WeakSet<ToolbarItem>();
-
 /** Whether `entry` shows in the view of `ctx`: only `isVisible` answering true hides nothing; a throw hides it. */
 function isVisibleIn({ owner, item }: SlotEntry<ToolbarItem>, ctx: ViewContext): boolean {
   if (!item.isVisible) return true;
   const visibility: ToolbarItemContext = Object.freeze({ ...ctx, ownRemote: ctx.kind === 'remote' && remoteOwnerOf(ctx.viewId) === owner });
-  try {
-    return item.isVisible(visibility) === true;
-  } catch (error) {
-    if (!failedVisibility.has(item)) {
-      failedVisibility.add(item);
-      console.error(`[Atlas API] ${owner}: toolbar item "${item.id}" isVisible failed:`, error);
-    }
-    return false;
-  }
+  return guarded(owner, item, 'isVisible', () => item.isVisible?.(visibility) === true, false);
 }
 
 function priorityOf({ item }: SlotEntry<ToolbarItem>): number {

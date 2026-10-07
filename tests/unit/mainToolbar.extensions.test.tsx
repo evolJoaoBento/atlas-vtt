@@ -137,6 +137,25 @@ describe('MainToolbar with extension items', () => {
     remove();
   });
 
+  it('logs a throwing badge or isActive once, not on every render', () => {
+    const error = vi.mocked(console.error);
+    error.mockClear();
+    render(<MainToolbar viewId="view-1" />);
+    const remove = add(item({ badge: () => { throw new Error('boom'); }, isActive: () => { throw new Error('boom'); } }));
+    act(() => { toolbarSlot.invalidate(); });
+    act(() => { toolbarSlot.invalidate(); });
+    const logged = error.mock.calls.filter(([message]) => typeof message === 'string' && message.includes('toolbar item'));
+    expect(logged).toHaveLength(2);
+    remove();
+  });
+
+  it('cuts a text badge longer than a button shows', () => {
+    render(<MainToolbar viewId="view-1" />);
+    const remove = add(item({ badge: () => 'abcdefghijklmnop' }));
+    expect(screen.getByText('abcdefg…')).toBeTruthy();
+    remove();
+  });
+
   it('keeps the rest of the toolbar when onClick throws', () => {
     render(<MainToolbar viewId="view-1" />);
     const remove = add(item({ onClick: () => { throw new Error('boom'); } }));

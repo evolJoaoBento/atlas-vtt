@@ -8,12 +8,52 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   return typeof value === 'object' && value !== null && typeof (value as { then?: unknown }).then === 'function';
 }
 
+/** The longest label a menu row shows; a longer one is cut with an ellipsis. */
+export const MENU_LABEL_MAX = 64;
+
+/** An extension's menu item as Atlas keeps it: each field read once, inside a guard. */
+interface ReadItem {
+  label: string;
+  icon: string | null;
+  submenu: readonly unknown[] | null;
+  checked: boolean | undefined;
+  disabled: boolean | undefined;
+  keepOpen: boolean;
+  onClick: (() => unknown) | null;
+  source: unknown;
+}
+
+/** Characters, not UTF-16 units, so a cut never splits an emoji. */
+function capped(text: string): string {
+  const characters = [...text];
+  return characters.length > MENU_LABEL_MAX ? `${characters.slice(0, MENU_LABEL_MAX - 1).join('').trimEnd()}…` : text;
+}
+
+/** One item read once into a plain object; null for what is no item (no label), or whose reads throw (logged). */
+function readItem(owner: string, raw: unknown): ReadItem | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  return safely(owner, 'menu item', () => {
+    const { label, icon, submenu, checked, disabled, keepOpen, onClick } = raw as Record<keyof MenuItem, unknown>;
+    if (typeof label !== 'string' || label === '') return null;
+    return {
+      label: capped(label),
+      icon: typeof icon === 'string' && icon !== '' ? icon : null,
+      submenu: submenu === undefined ? null : Array.isArray(submenu) ? [...submenu as unknown[]] : [],
+      checked: checked === undefined ? undefined : checked === true,
+      disabled: disabled === undefined ? undefined : disabled === true,
+      keepOpen: keepOpen === true,
+      onClick: typeof onClick === 'function' ? onClick as () => unknown : null,
+      source: raw,
+    };
+  }, null);
+}
+
 /** Runs an extension's click; a throw or a rejected promise is logged, never raised into the menu. */
-function clickOf(owner: string, item: MenuItem): () => unknown {
+function clickOf(owner: string, item: ReadItem): () => unknown {
   const slot = `menu item "${item.label}"`;
   return () => {
     try {
-      const result: unknown = item.onClick?.();
+      const result: unknown = item.onClick?.call(item.source);
       if (isThenable(result)) {
         return Promise.resolve(result).then(() => undefined, (error: unknown) => { console.error(`[Atlas API] ${owner}: ${slot} failed:`, error); });
       }
@@ -36,9 +76,12 @@ function itemsOf(items: unknown): ReadonlyArray<MenuItem | null | undefined> {
 }
 
 /** The items of the first submenu labelled `label` among `items`; none when the provider no longer gives it. */
-function submenuOf(items: readonly MenuItem[], label: string): readonly MenuItem[] {
-  const found = itemsOf(items).find((item) => item?.label === label && item.submenu !== undefined);
-  return found?.submenu ?? [];
+function submenuOf(owner: string, items: readonly MenuItem[], label: string): readonly MenuItem[] {
+  for (const raw of itemsOf(items)) {
+    const item = readItem(owner, raw);
+    if (item?.label === label && item.submenu !== null) return item.submenu as readonly MenuItem[];
+  }
+  return [];
 }
 
 /**
@@ -49,13 +92,14 @@ function submenuOf(items: readonly MenuItem[], label: string): readonly MenuItem
  */
 export function menuEntriesOf(owner: string, items: readonly MenuItem[], live?: LiveMenu): ContextMenuEntry[] {
   const entries: ContextMenuEntry[] = [];
-  for (const item of itemsOf(items)) {
-    if (!item || typeof item.label !== 'string' || item.label === '') continue;
-    const icon = typeof item.icon === 'string' && item.icon !== '' ? { icon: item.icon } : {};
-    if (item.submenu !== undefined) {
+  for (const raw of itemsOf(items)) {
+    const item = readItem(owner, raw);
+    if (!item) continue;
+    const icon = item.icon !== null ? { icon: item.icon } : {};
+    if (item.submenu !== null) {
       const label = item.label;
-      const sub: LiveMenu | undefined = live && { read: () => submenuOf(live.read(), label), subscribe: live.subscribe };
-      const children = menuEntriesOf(owner, item.submenu, sub);
+      const sub: LiveMenu | undefined = live && { read: () => submenuOf(owner, live.read(), label), subscribe: live.subscribe };
+      const children = menuEntriesOf(owner, item.submenu as readonly MenuItem[], sub);
       if (children.length === 0) continue;
       entries.push(sub
         ? { type: 'submenu', label, children: () => menuEntriesOf(owner, sub.read(), sub), subscribe: sub.subscribe, ...icon }
@@ -67,9 +111,9 @@ export function menuEntriesOf(owner: string, items: readonly MenuItem[], live?: 
       label: item.label,
       onClick: clickOf(owner, item),
       ...icon,
-      ...(item.checked !== undefined ? { checked: item.checked === true } : {}),
-      ...(item.disabled !== undefined ? { disabled: item.disabled === true } : {}),
-      ...(item.keepOpen === true ? { keepOpen: true } : {}),
+      ...(item.checked !== undefined ? { checked: item.checked } : {}),
+      ...(item.disabled !== undefined ? { disabled: item.disabled } : {}),
+      ...(item.keepOpen ? { keepOpen: true } : {}),
     });
   }
   return entries;

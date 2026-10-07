@@ -100,6 +100,17 @@ describe('dice', () => {
     expect(() => dice.publish({ ...made, extra: () => 1 } as unknown as DiceRollResult)).toThrow('plain data');
   });
 
+  it('publish refuses texts longer than a roll carries', () => {
+    const dice = diceApi(createInMemoryApp().app, new DisposerSet());
+    const made = rollFormula('1d20', () => 0.5, 1);
+    const long = (length: number): string => 'x'.repeat(length);
+    for (const bad of [{ ...made, id: long(129) }, { ...made, formula: long(257) }, { ...made, rolledBy: long(65) }, { ...made, rolls: [{ ...made.rolls[0], die: long(17) }] }]) {
+      expect(() => dice.publish(bad as unknown as DiceRollResult)).toThrow('[Atlas API] dice.publish: the roll must be');
+    }
+    expect(() => dice.publish({ ...made, rolledBy: long(64) })).not.toThrow();
+    expect(() => dice.roll({ formula: '1d20', rolledBy: long(65) })).toThrow('[Atlas API] dice.roll');
+  });
+
   it('roll checks its request', () => {
     const dice = diceApi(createInMemoryApp().app, new DisposerSet());
     for (const bad of [null, {}, { formula: 4 }, { formula: '1d4', rolledBy: 3 }, { formula: '1d4', mapPath: 3 }]) {

@@ -5,7 +5,7 @@ import { mapDiceRules } from '../app/services/mapDiceRules';
 import { DiceFormulaError, rollByRules, type DiceRollResult } from '../app/tools/diceRolling';
 import { announceRoll, followRolls } from '../app/tools/diceRollFeed';
 import { withCleanTags } from '../app/tools/diceTags';
-import { isDiceRollResult, plainCopy } from './diceRollCheck';
+import { isDiceRollResult, plainCopy, ROLL_TEXT_MAX } from './diceRollCheck';
 import { throwGivenRoll } from './diceThrow';
 import type { DisposerSet } from './disposers';
 import { isRemoteView } from './viewInfo';
@@ -29,8 +29,8 @@ function assertRequest(request: unknown): asserts request is DiceRollRequest {
   const given = request as Partial<DiceRollRequest> | null;
   const valid = typeof given === 'object' && given !== null && isString(given.formula)
     && (given.mapPath === undefined || given.mapPath === null || isString(given.mapPath))
-    && (given.rolledBy === undefined || isString(given.rolledBy));
-  if (!valid) throw new Error('[Atlas API] dice.roll: the request must be { formula: string, mapPath?: string | null, rolledBy?: string }.');
+    && (given.rolledBy === undefined || (isString(given.rolledBy) && given.rolledBy.length <= ROLL_TEXT_MAX.rolledBy));
+  if (!valid) throw new Error(`[Atlas API] dice.roll: the request must be { formula: string, mapPath?: string | null, rolledBy?: string of at most ${ROLL_TEXT_MAX.rolledBy} characters }.`);
 }
 
 /**
