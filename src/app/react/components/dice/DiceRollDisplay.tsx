@@ -1,12 +1,14 @@
 import type { EventEmitter } from 'events';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { useDiceDisplay } from '../../hooks/useDiceDisplay';
 import { diceFontClass, useDiceLook } from '../../hooks/useDiceLook';
 import { cn } from '../../../../utils/cn';
 import { throwStyle } from '../../../dice3d/diceDisplay';
-import { diceSceneToShow } from '../../../dice3d/rollPresentation';
+import { loggedRollScene } from '../../../dice3d/rollPresentation';
+import type { DiceScene } from '../../../dice3d/diceScene';
+import { givenRollScene, onGivenThrow } from '../../../dice3d/givenThrows';
 import { warmDiceSounds } from '../../../dice3d/audio/diceSamples';
 import { canShowDice, warmStages } from '../../../dice3d/stagePool';
 import type { DiceRollResult } from '../../../types/diceTypes';
@@ -16,6 +18,9 @@ import { DiceRollStack } from '../dice3d/DiceRollStack';
 import { closeAllRolls, closeRoll, dismissRoll, pushRoll, type StackedRoll } from '../dice3d/rollStackState';
 import { canRunMapHotkeys } from '../../../keyboard/mapHotkeys';
 import { DiceToast } from './DiceToast';
+import { lookVariant } from '../../../dice3d/lookVariants';
+import { mapDiceLookId } from '../../../services/mapDiceLook';
+import { useOptionalAtlasStore } from '../../ViewStoreContext';
 import { DICE_TOAST_KNOT_PATHS, DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';
 import { useDiceToasts } from './useDiceToasts';
 
@@ -31,13 +36,18 @@ interface DiceRollDisplayProps {
   prepare?: (result: DiceRollResult, origin: DiceRollOrigin | undefined) => PreparedDiceRoll;
   /** Throws without sound, where another window already plays it. */
   muted?: boolean;
+  /**
+   * The map whose collection's dice look the rolls throw in, read at each throw, where no view's
+   * store is around to tell (the player window); unset, the store's map.
+   */
+  lookMapPath?: (() => string | null) | undefined;
 }
 
 /**
  * Every dice roll, at the top centre of the map: thrown as 3D dice, or as a
  * result card when 3D dice are off or the roll holds dice no real body shows.
  */
-export function DiceRollDisplay({ container, prepare, muted = false, eventBus: suppliedBus }: DiceRollDisplayProps): React.ReactElement | null {
+export function DiceRollDisplay({ container, prepare, muted = false, eventBus: suppliedBus, lookMapPath }: DiceRollDisplayProps): React.ReactElement | null {
   const { app, view } = useAtlasUI();
   const eventBus = suppliedBus ?? view?.serviceManager?.getEventBus();
   const display = useDiceDisplay(app ?? undefined);
@@ -46,22 +56,43 @@ export function DiceRollDisplay({ container, prepare, muted = false, eventBus: s
   const [rolls, setRolls] = useState<readonly StackedRoll[]>([]);
   /** Where the dice stages live: a canvas and its context belong to one document. */
   const stageDoc = container?.ownerDocument ?? view?.containerEl.doc ?? document;
+  // The map's collection may choose its own dice look (`dice.useLook`), read at each throw; its art loads ahead.
+  const storeMapPath = useOptionalAtlasStore((state) => state.mapPath, null);
+  const mapPath = lookMapPath ? lookMapPath() : storeMapPath;
+  const lookOf = useRef((): string | undefined => undefined);
+  lookOf.current = (): string | undefined => (app ? mapDiceLookId(app, lookMapPath ? lookMapPath() : storeMapPath) : undefined);
+  useEffect(() => { lookVariant(lookOf.current()); }, [app, mapPath]);
+
+  /** Throws `prepared` on `scene`, or shows it as a card without one. */
+  const show = useCallback((prepared: PreparedDiceRoll, scene: DiceScene | null): void => {
+    // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card
+    if (!scene || !canShowDice(stageDoc)) {
+      addToast(prepared);
+      return;
+    }
+    if (!muted) warmDiceSounds();
+    const lookId = lookOf.current();
+    const shown = lookId === undefined ? scene : { ...scene, lookId };
+    setRolls((prev) => pushRoll(prev, { ...prepared, scene: shown, style: throwStyle(display) }));
+  }, [addToast, display, muted, stageDoc]);
 
   useEffect(() => {
     const handler = (raw: DiceRollResult, origin?: DiceRollOrigin): void => {
       const prepared: PreparedDiceRoll = prepare ? prepare(raw, origin) : { result: raw };
-      const scene = diceSceneToShow(prepared.result, display);
-      // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card
-      if (!scene || !canShowDice(stageDoc)) {
-        addToast(prepared);
-        return;
-      }
-      if (!muted) warmDiceSounds();
-      setRolls((prev) => pushRoll(prev, { ...prepared, scene, style: throwStyle(display) }));
+      // A roll by someone other than the GM is thrown on their own screen, and a card-only roll was shown elsewhere:
+      // here they show as a card. Asked of the event's own object, which `prepare` may copy.
+      show(prepared, loggedRollScene(raw, display));
     };
     eventBus?.on('dice-rolled', handler);
     return (): void => { eventBus?.off('dice-rolled', handler); };
-  }, [addToast, prepare, display, muted, stageDoc, eventBus]);
+  }, [show, prepare, display, eventBus]);
+
+  // A roll an extension hands this map view to throw (`dice.throw`); the player window takes none.
+  const store = container ? null : view?.atlasStore ?? null;
+  useEffect(() => {
+    if (!store) return;
+    return onGivenThrow(store, (roll) => show({ result: roll }, givenRollScene(roll, display)));
+  }, [store, show, display]);
 
   // Dice stages are built while nothing rolls, so that the first roll does not wait for one.
   useEffect(() => {

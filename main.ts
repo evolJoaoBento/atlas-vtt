@@ -16,6 +16,7 @@ import { ImageDisplayService } from './src/app/services/ImageDisplayService';
 import { PlayerLootDisplay } from './src/app/services/PlayerLootDisplay';
 import { LootHistoryStore } from './src/app/loot/LootHistoryStore';
 import { PlayerWindowService } from './src/app/services/PlayerWindowService';
+import { presentedScene } from './src/app/services/PresentedScene';
 import { AssetService } from './src/app/services/AssetService';
 import { SettingsService } from './src/app/services/SettingsService';
 import { addStarterTokens } from './src/app/services/starterTokens';
@@ -48,6 +49,8 @@ import { ChangelogService } from './src/app/changelog/ChangelogService';
 import { AtlasErrorLog } from './src/app/support/errorLog';
 import { IssueReporter } from './src/app/support/IssueReporter';
 import { runInBackground } from './src/app/utils/backgroundTask';
+import { ExtensionApiPublisher } from './src/api/ExtensionApiPublisher';
+import type { AtlasApi } from './src/api/types/api';
 
 declare const __ATLAS_RELEASE_BUILD__: boolean;
 
@@ -61,6 +64,9 @@ export default class AtlasVTTPlugin extends Plugin {
   public globalAssetManager!: GlobalAssetManagerService;
   private imageDisplayService!: ImageDisplayService;
   private changelogService: ChangelogService | undefined;
+  /** The extension API (`src/api/`): set once storage and the asset index are ready, undefined before and after unload. */
+  public api: AtlasApi | undefined;
+  private extensionApi: ExtensionApiPublisher | undefined;
 
   async onload(): Promise<void> {
     // Record errors from the very start so startup problems can be reported too.
@@ -125,6 +131,8 @@ export default class AtlasVTTPlugin extends Plugin {
       imageDisplay: this.imageDisplayService,
       assetManager: this.globalAssetManager,
     });
+    this.extensionApi = new ExtensionApiPublisher(this);
+    runInBackground(this.extensionApi.start(), 'Publishing the extension API');
 
     this.app.workspace.onLayoutReady(() => {
       registerColorSwatchIcons();
@@ -156,6 +164,7 @@ export default class AtlasVTTPlugin extends Plugin {
   }
 
   onunload(): void {
+    this.extensionApi?.stop();
     this.changelogService?.destroy();
     void this.settingsService?.saveSettingsNow();
     SystemPresetFiles.release(this.app);
@@ -166,6 +175,7 @@ export default class AtlasVTTPlugin extends Plugin {
     PlayerLootDisplay.get().dispose();
     LootHistoryStore.release(this.app);
     PlayerWindowService.getInstance()?.destroy(false);
+    presentedScene.clear();
     this.globalAssetManager?.close();
     CreatureIndex.release(this.app);
     disposeImageProcessing();

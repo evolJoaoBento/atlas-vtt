@@ -31,6 +31,9 @@ function estimateBytes(texture: Texture): number {
   return pixelWidth * pixelHeight * 4 * (autoGenerateMipmaps ? 4 / 3 : 1);
 }
 
+/** Streamed maps arrive as object URLs: PIXI cannot tell their format from the URL, and they are never shown again once released. */
+const isObjectUrl = (url: string): boolean => url.startsWith('blob:');
+
 /**
  * Reference-counted cache for map background textures, shared by every map view
  * because PIXI's `Assets` cache is global.
@@ -56,7 +59,10 @@ class BackgroundTextureCache {
     if (!entry || entry.refs === 0) return;
     entry.refs--;
     entry.lastUsed = performance.now();
-    if (entry.refs === 0) this.trim();
+    if (entry.refs > 0) return;
+    // An object URL is revoked by its owner once released; keeping its texture idle only holds memory.
+    if (isObjectUrl(url)) this.evict(url);
+    else this.trim();
   }
 
   private evictAllIdle(): void {
@@ -66,7 +72,10 @@ class BackgroundTextureCache {
   }
 
   private load(url: string): CacheEntry {
-    const entry: CacheEntry = { texture: loadAsset<Texture>(url), refs: 0, bytes: 0, lastUsed: 0 };
+    const entry: CacheEntry = {
+      texture: loadAsset<Texture>(isObjectUrl(url) ? { src: url, parser: 'texture' } : url),
+      refs: 0, bytes: 0, lastUsed: 0,
+    };
     entry.texture = entry.texture.then(
       (texture) => {
         configureBackgroundTexture(texture);

@@ -8,6 +8,7 @@
 import { Container, Graphics, Text as PIXIText, TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { Viewport } from 'pixi-viewport';
 import { OutlineFilter } from 'pixi-filters';
+import { textBackground, textFontStyle, textFontWeight, textRotation, textScale } from './textBoxLayout';
 import { openContextMenuGlobal, type ContextMenuEntry } from '../react/root/ContextMenuContext';
 import type { TextElement } from '../types';
 import type { GridSystem } from '../grid/GridSystem';
@@ -138,8 +139,8 @@ export class TextRenderer {
       fontSize: textElement.fontSize,
       fill: textElement.color,
       align: textElement.align || 'center',
-      fontWeight: textElement.bold ? 'bold' : 'normal',
-      fontStyle: textElement.italic ? 'italic' : 'normal'
+      fontWeight: textFontWeight(textElement),
+      fontStyle: textFontStyle(textElement)
     });
     
     // Create text
@@ -152,12 +153,8 @@ export class TextRenderer {
     this.drawTextBackground(background, pixiText, textElement);
     
     // Apply transformations
-    if (textElement.rotation) {
-      container.rotation = (textElement.rotation * Math.PI) / 180;
-    }
-    if (textElement.scale) {
-      container.scale.set(textElement.scale);
-    }
+    container.rotation = textRotation(textElement.rotation);
+    container.scale.set(textScale(textElement.scale));
     
     // Set up interaction if not player view
     if (!this.isPlayerView) {
@@ -175,33 +172,11 @@ export class TextRenderer {
     textElement: TextElement
   ): void {
     background.clear();
-    
-    if (textElement.backgroundColor) {
-      const padding = textElement.padding || 8;
-      const bounds = text.getLocalBounds();
-      
-      if (textElement.borderRadius) {
-        background.roundRect(
-          bounds.x - padding,
-          bounds.y - padding,
-          bounds.width + padding * 2,
-          bounds.height + padding * 2,
-          textElement.borderRadius
-        );
-      } else {
-        background.rect(
-          bounds.x - padding,
-          bounds.y - padding,
-          bounds.width + padding * 2,
-          bounds.height + padding * 2
-        );
-      }
-
-      background.fill({
-        color: parseInt(textElement.backgroundColor.replace('#', ''), 16),
-        alpha: textElement.opacity || 1,
-      });
-    }
+    const box = textBackground(textElement, text.getLocalBounds());
+    if (!box) return;
+    if (box.radius) background.roundRect(box.x, box.y, box.width, box.height, box.radius);
+    else background.rect(box.x, box.y, box.width, box.height);
+    background.fill({ color: parseInt(box.color.replace('#', ''), 16), alpha: box.alpha });
   }
 
   private updateText(textElement: TextElement): void {
@@ -220,8 +195,8 @@ export class TextRenderer {
         fontSize: textElement.fontSize,
         fill: textElement.color,
         align: textElement.align || 'center',
-        fontWeight: textElement.bold ? 'bold' : 'normal',
-        fontStyle: textElement.italic ? 'italic' : 'normal'
+        fontWeight: textFontWeight(textElement),
+        fontStyle: textFontStyle(textElement)
       });
     }
     
@@ -232,8 +207,8 @@ export class TextRenderer {
     }
     
     // Update transformations
-    container.rotation = textElement.rotation ? (textElement.rotation * Math.PI) / 180 : 0;
-    container.scale.set(textElement.scale || 1);
+    container.rotation = textRotation(textElement.rotation);
+    container.scale.set(textScale(textElement.scale));
   }
 
   private removeText(id: string): void {
