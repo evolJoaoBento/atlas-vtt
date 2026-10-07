@@ -23,6 +23,10 @@ export class PlayerSightTokens {
   private readonly outlines = new SensedOutlines();
   private provider?: () => TokenPerception | undefined;
   private active?: (() => boolean) | undefined;
+  private current?: (() => boolean) | undefined;
+  /** The work `whenSettled` holds until the store's write has reached every listener. */
+  private settling: (() => void) | null = null;
+  private destroyed = false;
   private fog?: () => FogCoverage | null;
   private playerView?: () => boolean;
   /** The immutable shape and displayed centre fully determine fog membership. */
@@ -38,11 +42,14 @@ export class PlayerSightTokens {
   /**
    * `provider` answers how the players perceive each token while the canvas shows their view,
    * and nothing otherwise. Tokens they do not see are left out with their nameplates and bars,
-   * as in the player frame; those they only sense show as outlines.
+   * as in the player frame; those they only sense show as outlines. A provider that keeps sight
+   * of its own, worked out by its own store listener (the lighting), says through `current`
+   * whether that sight is of the scene the store holds.
    */
-  setProvider(provider: () => TokenPerception | undefined, active?: () => boolean): void {
+  setProvider(provider: () => TokenPerception | undefined, active?: () => boolean, current?: () => boolean): void {
     this.provider = provider;
     this.active = active;
+    this.current = current;
   }
 
   /** Committed fog remains available when the optional lighting controller is removed. */
@@ -54,6 +61,46 @@ export class PlayerSightTokens {
   /** Whether the canvas shows the players' view: session view, or the peek of a lit scene. */
   showsPlayers(): boolean {
     return !!this.active?.() || !!this.playerView?.();
+  }
+
+  /**
+   * Whether the canvas, while it shows the players' view, sees the tokens as a players' frame does:
+   * the lighting shows their view on it (session view, the peek), or no lighting is wired. The command
+   * palette's player mode leaves the lighting out on the canvas, which a frame applies.
+   */
+  sharesFrameSight(): boolean {
+    return this.active?.() ?? true;
+  }
+
+  /**
+   * Whether the provider's sight is that of the scene the store holds. The lighting keeps the sight
+   * of the scene before from a scene switch until it has built the one that arrives, and the sight
+   * from before a lost graphics context until it has built on the restored one; sight read from the
+   * store when asked always is.
+   */
+  sightIsCurrent(): boolean {
+    return this.current?.() ?? true;
+  }
+
+  /**
+   * Runs `work` once the provider's sight has taken in the store's latest write: at once where sight
+   * is read from the store when asked, and once the write has reached every listener where the
+   * provider keeps sight of its own, since its listener may come after the token renderer's. Calls
+   * made meanwhile run the last `work` once.
+   */
+  whenSettled(work: () => void): void {
+    if (!this.current) {
+      work();
+      return;
+    }
+    const scheduled = this.settling !== null;
+    this.settling = work;
+    if (scheduled) return;
+    queueMicrotask(() => {
+      const pending = this.settling;
+      this.settling = null;
+      if (!this.destroyed) pending?.();
+    });
   }
 
   private fogActive(perception?: TokenPerception): boolean {
@@ -127,6 +174,7 @@ export class PlayerSightTokens {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.outlines.destroy();
   }
 }

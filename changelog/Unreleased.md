@@ -41,6 +41,7 @@
 - Extension API: a dice look's art that takes longer than 10 s still reaches the dice when it arrives, and one console line per look names every face that shows Atlas's numbers instead of the look's art, and why
 - Extension API: a plugin can choose the dice look a collection's maps throw in, for example from its own asset tab, while Atlas's dice look setting stays the default for every other map; a remote view can be told the look of its scene's collection
 - Extension API: a remote view's rolls name no token, show no portrait or ability and read nothing from the vault for it, as the player window names a token only where players see it; a measurement in a remote view that starts on a token its player doesn't see is left out
+- Extension API: a remote view's instance badges count and number only the tokens its player sees, never by the numbers it is fed
 
 ## Improved
 
@@ -89,3 +90,5 @@
 - In the player window, a dice roll shows its token's portrait and ability only when players can see that token in the shown scene, and its name only when token nameplates are shown to players.
 
 - A measurement that starts on a token players can't see is no longer shown in the player view or session view. A measurement also leaves the player view while the token it started on is out of sight.
+
+- Instance badges in the player view and session view count and number only the tokens players can see, so their numbers can differ from those in the GM view. A token whose look-alikes are hidden or under fog shows no badge.

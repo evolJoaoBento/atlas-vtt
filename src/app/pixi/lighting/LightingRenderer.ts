@@ -87,7 +87,7 @@ export class LightingRenderer implements SceneLightingView {
   /** The zones of the scene as the rules read them, and the ambient light made of them and the scene's lighting. */
   private zones: readonly AmbientZone[] = [];
   private ambient: { lighting: SceneLighting; zones: readonly AmbientZone[]; light: AmbientLight } | null = null;
-  /** The last scene without its look (`SceneLook`), reused while only the look changes. */
+  /** The last scene without its look (`SceneLook`), reused while only the look changes; none from lighting off, the map leaving or a lost context until the next build. */
   private lastScene: SceneWithoutLook | null = null;
   private attemptState: AttemptState = 'none';
   private stopped = false;
@@ -130,6 +130,7 @@ export class LightingRenderer implements SceneLightingView {
   }
 
   currentSight(): Sight { return this.sight; }
+  sightIsCurrent(): boolean { return !this.isEnabled() || this.lastScene !== null; }
   lightReaches(): LightReach[] { return this.reaches; }
   seenSpots(): readonly SeenSpot[] { return this.spotsNow; }
   showsExplored(): boolean { return exploredMemoryOn(this.deps.store.getState().lighting); }
@@ -170,14 +171,16 @@ export class LightingRenderer implements SceneLightingView {
     this.run(() => this.memory.beforeMapUnload());
     this.model.reset();
     this.fresh = false;
+    this.lastScene = null;
     this.endAttempt();
   }
 
   /**
-   * Runs lighting work that reaches the GPU. Nothing is drawn while the context is lost; the
-   * first call after its restore rebuilds; an error stops the engine and reports the view
-   * unavailable, once. New sight is reported afterwards, outside the guard: what its listener
-   * does is not the engine's to fail on.
+   * Runs lighting work that reaches the GPU. Nothing is drawn while the context is lost, and the
+   * scene counts as not built from then on, since a change of it may go by; the first call after
+   * its restore rebuilds; an error stops the engine and reports the view unavailable, once. New
+   * sight is reported afterwards, outside the guard: what its listener does is not the engine's
+   * to fail on.
    */
   private run(work: () => void): void {
     if (this.stopped) return;
@@ -185,6 +188,7 @@ export class LightingRenderer implements SceneLightingView {
       // What changes meanwhile is not worked out: until the restore rebuilds, sight is stale.
       if (contextLost(this.deps.app.renderer)) {
         this.fresh = false;
+        this.lastScene = null;
         return;
       }
       if (this.engine.takeRestored()) this.afterContextRestored();
@@ -217,6 +221,7 @@ export class LightingRenderer implements SceneLightingView {
       // Nothing is drawn while off; the next update after switching on rebuilds everything.
       this.engine.setEnabled(false);
       this.model.reset();
+      this.lastScene = null;
       this.endAttempt();
       this.fresh = false;
       return;
