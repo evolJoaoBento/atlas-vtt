@@ -96,6 +96,19 @@ function copyToCheck(method: string, value: unknown): unknown {
   return copy;
 }
 
+/**
+ * `result` as a remote view shows it: of its `source`, only whether it came from the toolbar or a
+ * statblock. A remote view is a player view that knows no roll's origin, so, as the player window
+ * does for a roll without one (Atlas #319), it names no token, shows no portrait or ability, and
+ * looks nothing up in the vault for it. Who rolled it (`rolledBy`) stays.
+ */
+export function withoutRollSource(result: DiceRollResult): DiceRollResult {
+  if (result.source === undefined) return result;
+  const { source, ...rest } = result;
+  const type = (source as { type?: unknown } | null)?.type;
+  return type === 'toolbar' || type === 'statblock' ? { ...rest, source: { type } } : rest;
+}
+
 export class RemoteViewDice {
   readonly rolls = new ListenerSet<RollListener>('onRoll');
   /** Told the id of the status action the player chose. */
@@ -112,8 +125,8 @@ export class RemoteViewDice {
   setDiceLog(entries: unknown): void {
     const kept = copyToCheck('setDiceLog', Array.isArray(entries) ? entries.slice(0, REMOTE_LOG_ENTRIES) : entries);
     if (!Array.isArray(kept) || !kept.every(isDiceRollResult)) throw new Error('[Atlas API] RemoteView.setDiceLog: the entries must be dice roll results.');
-    // A die's tag that is not well-formed is dropped, never the roll.
-    updateRemoteView(this.store, { diceLog: frozenCopy(kept.map(withCleanTags)) });
+    // A die's tag that is not well-formed is dropped, never the roll; no entry names a token (`withoutRollSource`).
+    updateRemoteView(this.store, { diceLog: frozenCopy(kept.map((entry) => withoutRollSource(withCleanTags(entry)))) });
   }
 
   /** Throws `result` once: an id this view threw before (of the last 100, `dice.throw` included) is ignored. */
@@ -122,7 +135,7 @@ export class RemoteViewDice {
     if (!isDiceRollResult(result)) throw new Error('[Atlas API] RemoteView.throwRoll: the result must be a dice roll result.');
     if (thrownBefore(this.store, result.id)) return;
     noteThrown(this.store, result.id);
-    updateRemoteView(this.store, { ownRoll: frozenCopy(withCleanTags(result)) });
+    updateRemoteView(this.store, { ownRoll: frozenCopy(withoutRollSource(withCleanTags(result))) });
   }
 
   /** The look the view's rolls are thrown in: a full look id, `''` for Atlas's dice, or null for the player's own. */

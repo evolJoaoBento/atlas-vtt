@@ -7,6 +7,7 @@ import { exploredMemoryOn, sceneLook, type SceneLook } from '../../lighting/scen
 import type { SceneLighting } from '../../types/lightingTypes';
 import type { SeenSpot } from '../../vision/perception';
 import { SEES_ALL, type AmbientLight, type AmbientZone, type LightReach, type Sight } from '../../vision/sight';
+import { GM_SIGHT_POLICY } from '../../vision/tokenSightPolicy';
 import type { SightRules } from '../../vision/sightRules';
 import type { MapBounds } from '../../vision/visibility';
 import type { HideableLayer } from '../playerSafeFrame';
@@ -77,7 +78,7 @@ export class LightingRenderer implements SceneLightingView {
   /** What the scene is built from, and when it is built anew (`SceneModelBuilder`). */
   private readonly model = new SceneModelBuilder();
   private readonly spots = new SceneSpots();
-  private readonly gmSpots = new SceneSpots();
+  private readonly gmSpots = new SceneSpots(GM_SIGHT_POLICY);
   private reaches: LightReach[] = [];
   private sight: Sight = SEES_ALL;
   private spotsNow: readonly SeenSpot[] = [];
@@ -234,6 +235,7 @@ export class LightingRenderer implements SceneLightingView {
     if (!this.fresh) this.sightChanged = true;
     this.fresh = true;
     const gmSight = model.gmSight ?? model.sight;
+    // Both pictures always show the same tokens (`GM_SIGHT_POLICY`), so the same sight gives the same footprints.
     const gmSpots = gmSight === model.sight ? spots : this.gmSpots.update(model, state, this.deps.measurement, this.deps.rules, gmSight);
     this.engine.update({ ...base, spots: gmSpots, ...(gmSight !== model.sight && { playerSight: model.sight, playerSpots: spots }), ...sceneLook(lighting) });
     requestRender(this.deps.app);

@@ -25,6 +25,9 @@ import type { PlayerCameraState } from "./local-player-view";
 import { SelectionManager } from "./pixi/SelectionManager"; // Import SelectionManager
 import { FogOfWarRenderer } from "./pixi/fog/FogOfWarRenderer";
 import { MeasureRenderer } from "./pixi/MeasureRenderer"; // Import MeasureRenderer
+import { measurePlayersView } from './pixi/measurePlayersView';
+import { NOTHING_SEEN } from './pixi/token-renderer/PlayerSightTokens';
+import type { TokenPerception } from './vision/tokenPerception';
 import { LaserPointerRenderer } from "./pixi/LaserPointerRenderer"; // Import LaserPointerRenderer
 import { CanvasLaserBeam } from "./pixi/laser/CanvasLaserBeam";
 import { LaserBeam } from "./pixi/laser/LaserBeam";
@@ -53,6 +56,8 @@ import { destroyTree } from './pixi/utils/destroyTree';
 import { requestRender } from './pixi/RenderScheduler';
 import { SCENE_LAYER_Z } from './pixi/sceneLayerOrder';
 import { MAP_LAYER_Z } from './pixi/mapLayerOrder';
+import { shownRollTokens } from './pixi/playerRollTokens';
+import type { ShownRollToken } from './services/playerRollSource';
 import { t } from './i18n';
 
 export class PixiRendererOrchestrator { // Renamed class
@@ -65,6 +70,8 @@ export class PixiRendererOrchestrator { // Renamed class
   private selectionManager?: SelectionManager; // Add SelectionManager instance
   private fogRenderer?: FogOfWarRenderer; // Add FogRenderer instance
   private measureRenderer?: MeasureRenderer; // Add MeasureRenderer instance
+  /** Ends the measurements' watch on what the players see of the tokens. */
+  private stopMeasuresFollowingPlayers: (() => void) | undefined;
   private laserPointerRenderer?: LaserPointerRenderer; // Add LaserPointerRenderer instance
   /** This view's lasers; one hub for the view's lifetime, so the presented scene and the extension API keep reaching it. */
   private readonly laserHub = new LaserHub();
@@ -738,7 +745,9 @@ export class PixiRendererOrchestrator { // Renamed class
     const grid = this.gridSystem?.getGridSprite();
     if (grid) layers.push({ layer: grid, visible: settings.showGrid });
     // The lighting's part is the list session view holds on this canvas (`SessionLighting`).
-    layers.push(...(this.tokenRenderer?.getPlayerViewLayers(settings, this.lighting?.playerSight()) ?? []));
+    const sight = this.lighting?.playerSight();
+    layers.push(...(this.tokenRenderer?.getPlayerViewLayers(settings, sight) ?? []));
+    if (this.measureRenderer) layers.push(...this.measureRenderer.getPlayerViewLayers(this.playersSeeInFrame(sight)));
     layers.push(...(this.lighting?.playerLayers() ?? []));
     layers.push(...(this.fogRenderer?.getPlayerViewLayers() ?? []));
     layers.push(...(this.selectionManager?.getPlayerViewLayers() ?? []));
@@ -747,6 +756,22 @@ export class PixiRendererOrchestrator { // Renamed class
     const playerCamera = camera && viewport ? { target: viewport, camera } : undefined;
     const captureFrame = renderFollows ? captureBeforeRender : captureWithLayerVisibility;
     captureFrame(layers, () => app.renderer.render(app.stage), capture, playerCamera);
+  }
+
+  /**
+   * The tokens a players' frame of `mapPath` shows now, among `tokenIds` (all without), by
+   * the perception `withPlayerSafeFrame` composes: for rolls to name. Nothing once the view
+   * holds another scene, or none loaded.
+   */
+  public playerRollTokens(mapPath: string, tokenIds?: readonly string[]): ReadonlyMap<string, ShownRollToken> {
+    const tokens = this.tokenRenderer;
+    if (!tokens || this._isDestroyed) return new Map();
+    return shownRollTokens(this.store.getState(), mapPath, tokens.getTokenSprites(), () => tokens.playerFramePerception(this.lighting?.playerSight()), tokenIds);
+  }
+
+  /** Which tokens a players' frame shows, by the scene's `sight` with committed fog; none while there is no token renderer. */
+  private playersSeeInFrame(sight: TokenPerception | undefined): (tokenId: string) => boolean {
+    return this.tokenRenderer?.playersSeeInFrame(sight) ?? NOTHING_SEEN;
   }
 
   /** The GM's markers on the map: neither the players nor a picture of the scene show them. */
@@ -771,7 +796,7 @@ export class PixiRendererOrchestrator { // Renamed class
    * another way is added here.
    */
   private gmViewLayers(): LayerVisibility[] {
-    return [...(this.tokenRenderer?.getGmViewLayers() ?? []), ...(this.fogRenderer?.getGmViewLayers() ?? [])];
+    return [...(this.tokenRenderer?.getGmViewLayers() ?? []), ...(this.fogRenderer?.getGmViewLayers() ?? []), ...(this.measureRenderer?.getGmViewLayers() ?? [])];
   }
 
   getViewportInstance(): Viewport | null { return this.pixiAppManager.getViewport(); }
@@ -933,11 +958,16 @@ export class PixiRendererOrchestrator { // Renamed class
     }
   }
 
-  /** Lets MeasureRenderer read the current map's measurement settings. */
+  /** Lets MeasureRenderer read the current map's measurement settings, and follow what the players see of the tokens. */
   private wireMeasureRendererProvider(): void {
-    if (!this.measureRenderer) return;
+    const measure = this.measureRenderer;
+    if (!measure) return;
     const assetService = AssetService.getInstance(this.obsApp);
-    this.measureRenderer.measurementSettingsProvider = () => mapMeasurementSettings(assetService, this.store.getState());
+    measure.measurementSettingsProvider = () => mapMeasurementSettings(assetService, this.store.getState());
+    const grid = this.gridSystem;
+    if (grid) measure.playersView = measurePlayersView({ store: this.store, grid, tokens: () => this.tokenRenderer, lighting: () => this.lighting?.playerSight() });
+    this.stopMeasuresFollowingPlayers?.();
+    this.stopMeasuresFollowingPlayers = this.tokenRenderer?.onPlayersViewChange(() => measure.refreshVisibility());
   }
 
   /** Handle audio tool pointer down: click to select existing source or place new one */
@@ -1046,6 +1076,7 @@ export class PixiRendererOrchestrator { // Renamed class
     this.hexLinkInteraction?.destroy();
     this.hexLinkRenderer?.destroy();
     this.fogRenderer?.destroy(); // Destroy FogRenderer
+    this.stopMeasuresFollowingPlayers?.();
     this.measureRenderer?.destroy(); // Destroy MeasureRenderer
     this.laserPointerRenderer?.destroy(); // Destroy LaserPointerRenderer
     this.remoteLaserRenderer?.destroy();

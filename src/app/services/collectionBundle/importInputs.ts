@@ -9,7 +9,7 @@ import { mayRewrite, rewriteContent } from './bundleContent';
 import { withoutSceneExtensions } from './bundleExtensionData';
 import { importedSettings, withPresetId } from './bundleSettings';
 import { assetFingerprint, fieldFingerprint } from './fingerprints';
-import { sha256 } from './hashing';
+import { sha256 } from '../../utils/hashing';
 import { COLLECTION_FIELDS, type InstallRecord, type InstalledItem } from './installRecord';
 import type { PlanItemInput } from './importPlan';
 import { planImportPaths, remapPaths } from './pathRemap';

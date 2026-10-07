@@ -1,3 +1,4 @@
+// Frozen from e8b9b280c326ef15d62b4b55651727ac56a449ad src/app/stores/temporalEquality.ts.
 export interface TemporalSnapshotLike {
   objects: unknown;
   grid: unknown;

@@ -1,4 +1,5 @@
-import type { TokenEntity } from '../types';
+// Frozen from 8b3ddf049d7ad45e70beac62500d80e8bead30fd src/app/vision/tableSight.ts. Only import paths are adapted.
+import type { TokenEntity } from '../../../src/app/types';
 import { NO_SIGHT, type Sight } from './sight';
 import { gmSightSource, tableSightSource } from './tokenSightPolicy';
 

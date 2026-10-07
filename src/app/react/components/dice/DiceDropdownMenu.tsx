@@ -76,7 +76,7 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
                 setNote(problem);
                 return false;
               }
-            } else if (!(tags.some((tag) => tag !== null) ? diceTool.rollDice(formula, undefined, tags) : diceTool.rollDice(formula))) return false;
+            } else if (!(tags.some((tag) => tag !== null) ? diceTool.rollDice(formula, undefined, undefined, tags) : diceTool.rollDice(formula))) return false;
             onToggle();
             return true;
           }}

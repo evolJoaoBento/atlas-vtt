@@ -2,7 +2,8 @@ import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat
 import { exploredMemoryOn } from '../../src/app/lighting/sceneLightingOptions';
 import type { ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/darknessRaster';
 import { heldForSight } from '../../src/app/lighting/sightOnDrop';
-import { playerLightingOf, tokenPerception, type PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
+import { playerLightingOf, type PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
+import { tokenPerception } from '../../src/app/vision/tokenPerception';
 import { SceneModelBuilder, SceneSpots } from '../../src/app/pixi/lighting/sceneModel';
 import type { MapSize } from '../../src/app/services/viewMapSize';
 import type { ViewAtlasState } from '../../src/app/storeFactory';

@@ -22,7 +22,8 @@ import { useAtlasStore } from '../react/ViewStoreContext';
  * result card. Shared rolls go only to the dice log. Fed by `remoteView.ownRoll`, never by Atlas's
  * document dice event: the player's other maps listen to that one. A roll whose dice the result
  * does not all list shows as a card, since its throw would be missing dice, and so does every roll
- * where the document cannot show 3D dice (no WebGL, a lost context).
+ * where the document cannot show 3D dice (no WebGL, a lost context). A roll names no token here
+ * (`sourcePresentation: null`): a remote view knows no roll's origin.
  */
 export function RemoteOwnRolls(): React.ReactElement | null {
   const { app, view } = useAtlasUI();
@@ -45,12 +46,12 @@ export function RemoteOwnRolls(): React.ReactElement | null {
     const scene = givenRollScene(ownRoll, display);
     // Without WebGL a stage stays blank (white on some systems), so the roll shows as a card, as on the GM's map.
     if (!scene || !canShowDice(stageDoc)) {
-      addToast(ownRoll);
+      addToast({ result: ownRoll, sourcePresentation: null });
       return;
     }
     warmDiceSounds();
     const thrown = diceLookId === null ? scene : { ...scene, lookId: diceLookId };
-    setRolls((prev) => pushRoll(prev, { result: ownRoll, scene: thrown, style: throwStyle(display) }));
+    setRolls((prev) => pushRoll(prev, { result: ownRoll, sourcePresentation: null, scene: thrown, style: throwStyle(display) }));
   }, [ownRoll, display, addToast, stageDoc, diceLookId]);
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export function RemoteOwnRolls(): React.ReactElement | null {
       )}
       <DiceRollStack rolls={rolls} muted={false} onClose={close} onDone={dismiss} />
       {toasts.map((toast) => (
-        <DiceToast key={toast.id} result={toast.result} phase={toast.phase} onDismiss={() => dismissToast(toast.id)} />
+        <DiceToast key={toast.id} result={toast.result} presentation={toast.sourcePresentation} phase={toast.phase} onDismiss={() => dismissToast(toast.id)} />
       ))}
     </div>
   );

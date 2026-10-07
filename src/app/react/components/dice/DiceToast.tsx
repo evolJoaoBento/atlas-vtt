@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
 import type { DiceRollResult } from '../../../types/diceTypes';
-import { rollerName } from '../../../tools/diceRolling';
 import { TokenPortrait } from '../../../packages/components/shared/TokenPortrait';
 import { useDiceAvatar } from './useDiceAvatar';
+import type { RollSourcePresentation } from './diceSourcePresentation';
 import { DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';
 import { DiceBadges, type DiceBadgeClasses } from './DiceBadges';
 import { t } from '../../../i18n';
@@ -16,19 +16,26 @@ const TOAST_BADGES: DiceBadgeClasses = { badge: 'atlas-dice-toast__die-badge', g
 
 interface DiceToastProps {
   result: DiceRollResult;
+  /** Who the roll names; unset looks it up as the GM's window does. */
+  presentation?: RollSourcePresentation | null | undefined;
   phase: ToastPhase;
   onDismiss: () => void;
 }
 
-export function DiceToast({ result, phase, onDismiss }: DiceToastProps): React.ReactElement {
+export function DiceToast({ result, presentation, phase, onDismiss }: DiceToastProps): React.ReactElement {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const crit = result.crit;
   const source = result.source;
-  const sourceTokenName = source?.tokenName ?? t('dice.unknown');
-  const avatar = useDiceAvatar(source);
-  const hasSource = source?.type === 'statblock' && Boolean(source.tokenName);
-  const name = rollerName(result);
+  const avatar = useDiceAvatar(source, presentation);
+  const presented = presentation !== undefined;
+  // A presented roll shows exactly its name, or none: no placeholder, initial or alt text stands in.
+  const sourceTokenName = presented ? presentation?.name ?? '' : source?.tokenName ?? t('dice.unknown');
+  const hasSource = presented
+    ? Boolean(avatar || presentation?.name)
+    : source?.type === 'statblock' && Boolean(source.tokenName);
+  // Someone other than the GM is named as who rolled it; otherwise the token, as shown.
+  const name = result.rolledBy || (hasSource ? sourceTokenName : '');
 
   const handleToggleDetails = (e: React.MouseEvent): void => {
     e.stopPropagation();

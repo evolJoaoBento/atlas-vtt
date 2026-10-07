@@ -1,4 +1,5 @@
 import type { DiceRollResult } from '../types/diceTypes';
+import type { DiceRollOrigin } from '../types/diceRollOrigin';
 import { EventEmitter } from 'events';
 import type { DiceRules } from '../types/diceRulesTypes';
 import { getDiceCrit } from './diceCrit';
@@ -43,8 +44,13 @@ export class DiceTool {
     this.eventBus.emit('dice-tray-toggled', this.state.isTrayOpen);
   }
 
-  /** `tags`: one per die of the formula, in formula order, the colour each was added in (null: none); an exploded die keeps its parent's. */
-  public rollDice(formula: string, source?: DiceRollResult['source'], tags?: ReadonlyArray<DieTag | null>): DiceRollResult | null {
+  /**
+   * Rolls `formula` for `source`. `origin` says which token of which scene the roll was
+   * made for; it goes out with the `dice-rolled` event and is kept nowhere. `tags`: one per
+   * die of the formula, in formula order, the colour each was added in (null: none); an
+   * exploded die keeps its parent's.
+   */
+  public rollDice(formula: string, source?: DiceRollResult['source'], origin?: DiceRollOrigin, tags?: ReadonlyArray<DieTag | null>): DiceRollResult | null {
     const rolled = this.parseAndRoll(formula);
     if (!rolled) return null;
     const result = tags && tags.some((tag) => tag !== null) ? withDieTags(rolled, tags) : rolled;
@@ -60,7 +66,7 @@ export class DiceTool {
       this.state.rollHistory = this.state.rollHistory.slice(0, 50);
     }
     
-    this.eventBus.emit('dice-rolled', result);
+    this.eventBus.emit('dice-rolled', result, origin);
     // Atlas's own displays hear the roll on this view's bus only; extensions follow every roll Atlas logs (`dice.onRolled`).
     announceRoll(result);
 

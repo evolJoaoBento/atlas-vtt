@@ -123,6 +123,13 @@ What changed for extensions with the Atlas 0.6.1 betas, in API 1.15.1 (no type c
 - **GM-hidden tokens give players no sight.** A token the GM hid neither sees nor explores for the players any more, so `playerVisibility` shows nothing that only a hidden token's vision would show, and the hidden token itself is `'unseen'`. Areas explored before stay in the memory.
 - **Door badges** under fog no longer show to players. The API hands out no walls or doors, so this changes no answer.
 
+Later 0.6.1 betas, in API 1.18.0 (no type changed shape):
+
+- **Rolls name a token only where players see it.** In the player window a roll shows its token's name, portrait and ability only when it was made for that token from a statblock and the shown scene shows the token to players; the name also only while token nameplates show. A roll repeated from the log, or published or rolled through the API, names no token there. `dice.onRolled` still hands extensions the whole roll, `source` included: what you send to players, decide as the player window does (`lighting.playerVisibility`, hidden tokens, nameplates). A remote view knows no roll's origin, so a roll `RemoteView.setDiceLog` or `RemoteView.throwRoll` is handed keeps only `source.type` of its `source`: it names no token, shows no portrait or ability and reads nothing from the vault for it. `rolledBy` shows as before.
+- **Measurements from tokens players don't see.** The player window and session view leave out a measurement that starts on a token players do not see (hidden, out of sight, only sensed, under fog). A remote view is a player view, so its canvas does the same with its own tokens and fog. The API hands out no measurements.
+- **Undo takes back only what an edit changed.** A `tokens.move` is still exactly one undo step, taking back the moves and the layer raise; something Atlas changed by itself since (on another token, say) stays. A remote view's store still records nothing, and extension scene and collection data never enter a view's history.
+- **Sight decided in one place.** Which tokens give the players sight and which the player window always shows is decided by one policy now. `lighting.playerVisibility` reads the same players' sight as the window, so its answers are unchanged.
+
 ## Rules every group follows
 
 - **Frozen data.** What Atlas hands an extension from its own state is frozen, to its depth: store records by reference once Atlas has frozen them, frozen copies otherwise. Changing it throws in strict mode and never reaches Atlas. A list or result object built fresh for one call (`views.list()`, `scenes.list()`, the outer result of `tokens.move`) is the extension's own and may be unfrozen.

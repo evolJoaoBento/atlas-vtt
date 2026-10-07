@@ -1,7 +1,7 @@
 import type { Asset, CollectionMetadata } from '../AssetService';
 import { withoutSceneExtensions } from './bundleExtensionData';
 import { comparableSettings } from './bundleSettings';
-import { hashJson } from './hashing';
+import { hashJson } from '../../utils/hashing';
 import type { CollectionField } from './installRecord';
 
 /** Bookkeeping Atlas changes on its own; a change there is not an edit. */

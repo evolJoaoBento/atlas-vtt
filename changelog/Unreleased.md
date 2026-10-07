@@ -40,6 +40,7 @@
 - Extension API: a dice look can draw its art over each whole face (`fill: 'face'`), without Atlas's card, wear or numbers, so a dice pack's own faces show exactly
 - Extension API: a dice look's art that takes longer than 10 s still reaches the dice when it arrives, and one console line per look names every face that shows Atlas's numbers instead of the look's art, and why
 - Extension API: a plugin can choose the dice look a collection's maps throw in, for example from its own asset tab, while Atlas's dice look setting stays the default for every other map; a remote view can be told the look of its scene's collection
+- Extension API: a remote view's rolls name no token, show no portrait or ability and read nothing from the vault for it, as the player window names a token only where players see it; a measurement in a remote view that starts on a token its player doesn't see is left out
 
 ## Improved
 
@@ -52,6 +53,12 @@
 - Added checks to keep data types and rendering helpers independent of plugin services.
 - Widget shortcuts are consistently marked as GM controls.
 - Dice rolls now reject invalid formulas with a clear message and enforce limits of 64 characters, 10 terms, 100 dice and 1,000 faces per die. Exploding dice keep their existing limit.
+
+- Simplified the hashing behind bundles, library files, thumbnails and dice throws, with checks that keep their results unchanged.
+
+- Simplified how the GM view and the player view decide which tokens see and which are always shown.
+
+- Added licence notices for the two dice fonts.
 
 ## Fixed
 
@@ -70,9 +77,15 @@
 - Closing the command palette cancels its pending focus attempts, so it cannot take focus back afterwards.
 - Dice rolls, sounds and history stay in the map view that made them. The player window follows the presented view, and clearing a log leaves other views alone.
 
+- Undo and redo now change only what that edit changed. Changes Atlas made by itself since, such as following a renamed file, stay.
+
 ## Important changes
 
 - Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it. Exporting a collection reads each asset's record file to make sure.
 - Fog-covered tokens and door badges are now hidden in the player view, including token labels and drag rulers.
 - Hidden tokens no longer add sight or explore new areas in the player window. Areas already explored stay remembered.
 - Removed an unused legacy map view. Old tabs using it no longer reopen. The current player window is unchanged.
+
+- In the player window, a dice roll shows its token's portrait and ability only when players can see that token in the shown scene, and its name only when token nameplates are shown to players.
+
+- A measurement that starts on a token players can't see is no longer shown in the player view or session view. A measurement also leaves the player view while the token it started on is out of sight.

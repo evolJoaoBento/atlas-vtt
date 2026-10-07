@@ -22,7 +22,7 @@ import { diceColourSlot } from '../../src/app/extensions/slots';
 import { DiceDropdownMenu } from '../../src/app/react/components/dice/DiceDropdownMenu';
 import { DiceRollDisplay } from '../../src/app/react/components/dice/DiceRollDisplay';
 import { AtlasUIContext } from '../../src/app/react/root/AtlasUIContext';
-import { ReadableViewStoreProvider, ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
+import { ViewStoreProvider } from '../../src/app/react/ViewStoreContext';
 import { AssetService } from '../../src/app/services/AssetService';
 import { SettingsService } from '../../src/app/services/SettingsService';
 import type { DiceTool } from '../../src/app/tools/DiceTool';
@@ -30,6 +30,7 @@ import { RemoteOwnRolls } from '../../src/app/remote-view/RemoteOwnRolls';
 import { RemoteViewDice } from '../../src/app/remote-view/RemoteViewDice';
 import { initialRemoteViewState } from '../../src/app/remote-view/remoteViewState';
 import { createInMemoryApp, type InMemoryApp } from '../mocks/inMemoryVault';
+import { emitRoll, sceneState, SCENE_A_TOKENS, setupPlayerDice } from '../helpers/playerDiceRolls';
 
 const MAP = 'atlas-vtt/collections/source/scenes/Cave.atlasmap';
 
@@ -75,12 +76,12 @@ describe("Atlas's dice in a map view know the map's collection", () => {
   it("a roll in a GM map view and in the player window is thrown in the map collection's look; elsewhere the default's", async () => {
     const memory = await vault();
     const roll = { id: 'r1', timestamp: 0, formula: '1d20', rolls: [{ die: 'd20', value: 3, max: 20 }], modifiers: 0, total: 3, crit: null };
-    const show = (wrap: (children: React.ReactElement) => React.ReactElement): string | undefined => {
+    const show = (wrap: (children: React.ReactElement) => React.ReactElement, lookMapPath?: () => string | null): string | undefined => {
       const bus = new EventEmitter();
       captured.rolls = [];
       const { unmount } = render(
         <AtlasUIContext.Provider value={{ app: memory.app, view: null, pixiApp: null, renderer: null }}>
-          {wrap(<DiceRollDisplay eventBus={bus} />)}
+          {wrap(<DiceRollDisplay eventBus={bus} lookMapPath={lookMapPath} />)}
         </AtlasUIContext.Provider>,
       );
       act(() => { bus.emit('dice-rolled', { ...roll }); });
@@ -89,7 +90,8 @@ describe("Atlas's dice in a map view know the map's collection", () => {
       return lookId;
     };
     expect(show((children) => <ViewStoreProvider store={storeOn(MAP)}>{children}</ViewStoreProvider>)).toBe('ext:fire');
-    expect(show((children) => <ReadableViewStoreProvider store={storeOn(MAP)}>{children}</ReadableViewStoreProvider>)).toBe('ext:fire');
+    // The player window has no view store: it names the presented scene's map (`PlayerDiceRolls`).
+    expect(show((children) => children, () => MAP)).toBe('ext:fire');
     SettingsService.forApp(memory.app)!.setDiceLookId('ext:wood');
     expect(show((children) => <ViewStoreProvider store={storeOn('atlas-vtt/elsewhere.atlasmap')}>{children}</ViewStoreProvider>)).toBe('ext:wood');
   });
@@ -110,5 +112,21 @@ describe("Atlas's dice in a map view know the map's collection", () => {
     act(() => dice.setDiceLook('ext:fire'));
     act(() => dice.throwRoll(roll('r2')));
     expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('ext:fire');
+  });
+  it("the player window throws in the presented scene's collection look, though it lends no store since #319", async () => {
+    const harness = setupPlayerDice('full');
+    const assets = AssetService.getInstance(harness.app);
+    await assets.initialize();
+    await assets.createCollection('source');
+    await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP } });
+    await assets.updateCollectionIndexData('source', { diceLookId: 'ext:fire' });
+    act(() => { harness.store.setState(sceneState(MAP, SCENE_A_TOKENS)); });
+    captured.rolls = [];
+    emitRoll(harness.bus);
+    expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('ext:fire');
+    // The presented view now holds a scene outside every collection: the GM's look (Atlas's own).
+    act(() => { harness.store.setState(sceneState('maps/elsewhere.atlasmap', SCENE_A_TOKENS)); });
+    emitRoll(harness.bus);
+    expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('');
   });
 });

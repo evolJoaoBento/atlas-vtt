@@ -1,40 +1,34 @@
 import type { EventEmitter } from 'events';
-import React, { useCallback, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import type { App } from 'obsidian';
 import { AtlasUIContext, type AtlasUIContextValue } from '../../root/AtlasUIContext';
-import { ReadableViewStoreProvider, type ReadableViewStore } from '../../ViewStoreContext';
+import type { DiceRollOrigin } from '../../../types/diceRollOrigin';
 import type { DiceRollResult } from '../../../types/diceTypes';
-import { withoutHiddenToken } from '../../../tools/diceRolling';
+import type { PreparedDiceRoll } from './diceSourcePresentation';
 import { DiceRollDisplay } from './DiceRollDisplay';
 
 interface PlayerDiceToastsProps {
   app: App;
   eventBus: EventEmitter;
-  /** Store of the presented scene: which tokens players cannot see, and how the others look on the map. */
-  store: ReadableViewStore;
   container: HTMLElement;
+  /** Decides, when a roll arrives, what of its source players see. */
+  prepare: (result: DiceRollResult, origin: DiceRollOrigin | undefined) => PreparedDiceRoll;
+  /** The presented scene's map, whose collection's dice look the rolls throw in (`dice.useLook`). */
+  lookMapPath?: (() => string | null) | undefined;
 }
 
 /**
- * The DM's dice rolls as players see them in the player window. A roll made
- * for a token hidden on the map keeps its ability and result but not the
- * token's name or portrait, so it does not give the token away. Every other
- * token's portrait is read from the presented scene, like in the DM's window:
- * its artwork and ring on the map, not the picture of its statblock.
+ * The DM's dice rolls as players see them in the player window. Who a roll
+ * names, with what portrait, is fixed by `prepare` when it arrives; nothing
+ * here looks a token or a statblock up.
  */
-export function PlayerDiceToasts({ app, store, container, eventBus }: PlayerDiceToastsProps): React.ReactElement {
+export function PlayerDiceToasts({ app, container, eventBus, prepare, lookMapPath }: PlayerDiceToastsProps): React.ReactElement {
   const context = useMemo((): AtlasUIContextValue => ({ app, view: null, pixiApp: null, renderer: null }), [app]);
-
-  const forPlayers = useCallback((result: DiceRollResult): DiceRollResult => withoutHiddenToken(
-    result, (tokenId) => Boolean(store.getState().objects?.tokens?.[tokenId]?.isHidden),
-  ), [store]);
 
   return (
     <AtlasUIContext.Provider value={context}>
-      <ReadableViewStoreProvider store={store}>
-        {/* The DM's window plays the sound; a second one here would echo it. */}
-        <DiceRollDisplay eventBus={eventBus} container={container} prepare={forPlayers} muted />
-      </ReadableViewStoreProvider>
+      {/* The DM's window plays the sound; a second one here would echo it. */}
+      <DiceRollDisplay eventBus={eventBus} container={container} prepare={prepare} lookMapPath={lookMapPath} muted />
     </AtlasUIContext.Provider>
   );
 }

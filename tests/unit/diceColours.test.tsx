@@ -88,9 +88,9 @@ describe('tray dice in a colour', () => {
     const heard: RolledDie[][] = [];
     bus.on('dice-rolled', (result: { rolls: RolledDie[] }) => heard.push(result.rolls));
     const tool = new DiceTool(bus, () => DEFAULT_DICE_RULES, offlineDiceInputs());
-    tool.rollDice('1d6 + 1d20', undefined, [FIRE, null]);
+    tool.rollDice('1d6 + 1d20', undefined, undefined, [FIRE, null]);
     expect(heard[0]!.map((d) => d.colorName)).toEqual(['Fire', undefined]);
-    tool.rollDice('1d6', undefined, [{ color: 'red', colorName: 'Fire' }]);
+    tool.rollDice('1d6', undefined, undefined, [{ color: 'red', colorName: 'Fire' }]);
     expect(heard[1]![0]).not.toHaveProperty('color');
   });
 
