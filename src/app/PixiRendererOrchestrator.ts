@@ -40,6 +40,7 @@ import { TextRenderer } from "./pixi/TextRenderer"; // Import TextRenderer
 import { TextTool } from "./tools/TextTool"; // Import TextTool
 import type { LightingController } from './pixi/lighting/LightingController';
 import type { PlayerLighting } from './pixi/lighting/playerLightingLayers';
+import type { FogCoverage } from './fog/fogCoverage';
 import { LightingFeature } from './pixi/lighting/LightingFeature';
 import type { SceneFrame } from './pixi/lighting/engine/types';
 import { captureSceneFrame } from './pixi/sceneFrameCapture';
@@ -808,6 +809,11 @@ export class PixiRendererOrchestrator { // Renamed class
    * What the players' window decides what they see by, for players outside the player window. Null while it hides
    * nothing by lighting (the scene unlit, dynamic lighting off); undefined before the view's renderers exist.
    */
+  /** The scene's committed fog as the window draws it; null while its geometry is invalid, undefined without a fog renderer. */
+  getCommittedFog(): FogCoverage | null | undefined {
+    return this.fogRenderer ? this.fogRenderer.getCommittedCoverage() : undefined;
+  }
+
   getPlayerLighting(): PlayerLighting | null | undefined {
     if (!this.lightingFeature) return undefined;
     return this.lighting?.playerLighting() ?? null;

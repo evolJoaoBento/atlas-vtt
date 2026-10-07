@@ -4,8 +4,16 @@ import type { Disposer, ViewId } from './common';
 export type Perception = 'seen' | 'sensed' | 'unseen';
 
 export type PlayerVisibility =
-  /** Lighting hides nothing: dynamic lighting off, or the scene unlit. */
-  | { readonly status: 'unlit' }
+  /** Lighting hides nothing: dynamic lighting off, or the scene unlit. Fog still does (see `tokens`). */
+  | {
+    readonly status: 'unlit';
+    /**
+     * 1.19.0: the tokens under the scene's committed fog, which the player window hides: each reads 'unseen', and a
+     * token absent here is not under fog. Apply `hidden` yourself. Fog Atlas cannot draw makes the answer `pending`.
+     * Always set by Atlas 1.19.0 and later; optional only for answers from earlier versions.
+     */
+    readonly tokens?: Readonly<Record<string, 'unseen'>>;
+  }
   /**
    * Sight is not worked out for the scene the store holds (loading, a tab switch, no bounds yet, graphics context lost),
    * the explored memory the window shows is still being decoded, or the window forgot explored areas its saved mask

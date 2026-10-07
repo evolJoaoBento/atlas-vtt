@@ -7,7 +7,7 @@ export declare type AnyWidget = CounterWidget | ClockWidget | TimerWidget;
  * Minor: something added. Major: something removed, renamed or tightened. The API report
  * check fails when `api-report/` changes and this does not.
  */
-export declare const API_VERSION = "1.18.0";
+export declare const API_VERSION = "1.19.0";
 
 /** 1.18.0 (`asset-tabs`): what an asset manager tab is told: the collection the asset manager shows. */
 export declare interface AssetTabContext {
@@ -980,9 +980,15 @@ export declare interface PanelSpec {
 export declare type Perception = 'seen' | 'sensed' | 'unseen';
 
 export declare type PlayerVisibility = 
-/** Lighting hides nothing: dynamic lighting off, or the scene unlit. */
+/** Lighting hides nothing: dynamic lighting off, or the scene unlit. Fog still does (see `tokens`). */
     {
     readonly status: 'unlit';
+    /**
+     * 1.19.0: the tokens under the scene's committed fog, which the player window hides: each reads 'unseen', and a
+     * token absent here is not under fog. Apply `hidden` yourself. Fog Atlas cannot draw makes the answer `pending`.
+     * Always set by Atlas 1.19.0 and later; optional only for answers from earlier versions.
+     */
+    readonly tokens?: Readonly<Record<string, 'unseen'>>;
 }
 /**
 * Sight is not worked out for the scene the store holds (loading, a tab switch, no bounds yet, graphics context lost),

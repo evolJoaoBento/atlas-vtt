@@ -77,6 +77,47 @@ describe('player visibility and fog (upstream #303)', () => {
   });
 });
 
+describe('player visibility and fog on an unlit scene', () => {
+  function unlit(): { view: FakeView; api: ReturnType<typeof lightingApi> } {
+    const { view, api } = setup();
+    view.atlasStore.getState().setSceneLighting({ enabled: false });
+    view.setPlayerLighting(null);
+    return { view, api };
+  }
+
+  it('is unlit with no token unseen while the scene has no fog', () => {
+    const { api } = unlit();
+    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit', tokens: {} });
+  });
+
+  it('answers unseen for a token under committed fog, as the window hides it', () => {
+    const { view, api } = unlit();
+    view.atlasStore.getState().addFogOperation(rect('paint', 1, 700));
+    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit', tokens: { goblin: 'unseen' } });
+  });
+
+  it('also with dynamic lighting off, where the view has no lighting at all', () => {
+    const { view, api } = unlit();
+    view.setPlayerLighting(undefined);
+    view.atlasStore.getState().addFogOperation(rect('paint', 1, 700));
+    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit', tokens: { goblin: 'unseen' } });
+  });
+
+  it('is pending while the fog cannot be drawn, since the window then covers the whole map', () => {
+    const { view, api } = unlit();
+    view.atlasStore.getState().addFogOperation(rect('paint', 1, 700));
+    view.setCommittedFog(null);
+    expect(api.playerVisibility('v1')).toEqual({ status: 'pending' });
+  });
+
+  it('is pending while the scene has fog the view cannot read', () => {
+    const { view, api } = unlit();
+    view.atlasStore.getState().addFogOperation(rect('paint', 1, 700));
+    view.setCommittedFog(undefined);
+    expect(api.playerVisibility('v1')).toEqual({ status: 'pending' });
+  });
+});
+
 describe('player visibility and GM-hidden tokens (upstream #296)', () => {
   /** Daylight, a wall at x = 500. The hero sees the left half; the scout, on the right, sees the goblin there. */
   const walled = (scoutHidden: boolean) => lightingFromStore(scene({ ambient: 1 }, {

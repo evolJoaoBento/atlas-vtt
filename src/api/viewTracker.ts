@@ -2,6 +2,7 @@ import type { EventEmitter } from 'events';
 import type { App } from 'obsidian';
 import type { LaserHub } from '../app/pixi/laser/LaserHub';
 import type { PlayerLighting } from '../app/pixi/lighting/playerLightingLayers';
+import type { FogCoverage } from '../app/fog/fogCoverage';
 import type { CameraViewport } from '../app/services/presentedCamera';
 import type { ViewAtlasStore } from '../app/storeFactory';
 import type { TabMetaStore } from '../app/stores/tabMetaStore';
@@ -19,6 +20,8 @@ export interface TrackedMapView {
     getLaserHub?(): LaserHub;
     /** What the players' window decides what they see by: null while lighting hides nothing, undefined when it cannot tell. */
     getPlayerLighting?(): PlayerLighting | null | undefined;
+    /** The scene's committed fog as the window draws it; null while its geometry is invalid, undefined where the view has no fog. */
+    getCommittedFog?(): FogCoverage | null | undefined;
     /** Calls `listener` when what `getPlayerLighting` describes may have changed outside the store; returns the unsubscribe. */
     watchPlayerLighting?(listener: () => void): () => void;
   } | null;

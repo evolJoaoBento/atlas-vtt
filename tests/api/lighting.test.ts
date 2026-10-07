@@ -26,9 +26,9 @@ describe('lighting', () => {
     load(view);
     const { api } = setup(view);
     view.setPlayerLighting(null);
-    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit' });
+    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit', tokens: {} });
     view.setPlayerLighting(undefined);
-    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit' });
+    expect(api.playerVisibility('v1')).toEqual({ status: 'unlit', tokens: {} });
     view.atlasStore.getState().setSceneLighting({ enabled: true });
     expect(api.playerVisibility('v1')).toEqual({ status: 'pending' });
     view.setPlayerLighting(fixtureLighting({ ready: false }));
