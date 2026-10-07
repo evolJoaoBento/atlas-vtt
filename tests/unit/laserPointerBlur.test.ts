@@ -51,4 +51,18 @@ describe('laser pointer', () => {
     expect(remove).toHaveBeenCalledWith('blur', expect.any(Function));
     remove.mockRestore();
   });
+
+  it('hears the blur of the window the canvas moved into', () => {
+    restoreGraphics = stubJsdomGraphics();
+    const { renderer, canvas, pressAt } = makeRenderer();
+    const frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    const popout = frame.contentDocument!;
+    popout.body.appendChild(popout.adoptNode(canvas));
+    pressAt(10, 10);
+    popout.defaultView!.dispatchEvent(new Event('blur'));
+    expect((renderer as unknown as Internals).isPointing).toBe(false);
+    renderer.destroy();
+    frame.remove();
+  });
 });

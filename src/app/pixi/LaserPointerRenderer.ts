@@ -145,7 +145,17 @@ export class LaserPointerRenderer {
     return { x: world.x, y: world.y };
   }
 
+  /** The canvas can move into another window (a popout): the blur that lets the laser go is heard there. */
+  private followBlurWindow(): void {
+    const win = this.canvasEl.ownerDocument.defaultView ?? window;
+    if (win === this.blurWindow) return;
+    this.blurWindow.removeEventListener('blur', this.onWindowBlur);
+    this.blurWindow = win;
+    win.addEventListener('blur', this.onWindowBlur);
+  }
+
   private handlePointerDown(e: FederatedPointerEvent): void {
+    this.followBlurWindow();
     const button: number = e.button;
     // Middle-click → quick mode regardless of active tool; left-click when the laser tool is active
     const quick = button === 1;
