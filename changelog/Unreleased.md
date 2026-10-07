@@ -45,6 +45,8 @@
 
 ## Improved
 
+- Sight and light are worked out much faster on maps with thousands of walls, such as large imported maps.
+
 - The dice look setting and the command palette's Dice settings preview every dice look another plugin adds, drawn with its own faces where it gives no picture of itself
 - Fog paint and erase strokes now use consistent shapes.
 - Simplified how token artwork and collection rules update.

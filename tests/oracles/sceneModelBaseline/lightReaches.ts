@@ -1,7 +1,8 @@
-import type { WallSegment } from '../../types/wallTypes';
-import { kindOf, lightReach, type LightReach } from '../../vision/sight';
-import { sameCone } from '../../vision/visionCone';
-import type { EngineLight } from './engine/types';
+// Frozen from c246011fe636672a3865b52bf6f43a9138355085 src/app/pixi/lighting/lightReaches.ts. Only import paths are adapted.
+import type { WallSegment } from '../../../src/app/types/wallTypes';
+import { kindOf, lightReach, type LightReach } from '../../../src/app/vision/sight';
+import { sameCone } from '../../../src/app/vision/visionCone';
+import type { EngineLight } from '../../../src/app/pixi/lighting/engine/types';
 
 interface Entry {
   x: number;

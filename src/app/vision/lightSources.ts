@@ -1,16 +1,15 @@
-import { lightList, readEmission } from '../../lighting/lightingObjects';
-import { Color } from 'pixi.js';
-import type { TokenEntity } from '../../types';
-import type { LightEmission, LightSource } from '../../types/lightingTypes';
-import { isLightOn } from '../../lighting/lightActivity';
-import { beamOf } from '../../lighting/lightBeam';
-import { gameUnitsToWorld, type UnitScale } from '../../lighting/lightingUnits';
-import { MIN_SOFTNESS, TINT_TO_WHITE, softEdge } from '../../lighting/lightingConstants';
-import { srgbToLinear } from '../../lighting/srgb';
-import { kindOf } from '../../vision/sight';
-import { ambientAt } from '../../vision/lightLevels';
-import type { AmbientLight } from '../../vision/sight';
-import type { EngineLight } from './engine/types';
+import { lightList, readEmission } from '../lighting/lightingObjects';
+import type { TokenEntity } from '../types';
+import type { LightEmission, LightSource } from '../types/lightingTypes';
+import { isLightOn } from '../lighting/lightActivity';
+import { beamOf } from '../lighting/lightBeam';
+import { gameUnitsToWorld, type UnitScale } from '../lighting/lightingUnits';
+import { MIN_SOFTNESS, TINT_TO_WHITE, softEdge } from '../lighting/lightingConstants';
+import { srgbToLinear } from '../lighting/srgb';
+import { kindOf } from './sight';
+import { ambientAt } from './lightLevels';
+import type { AmbientLight } from './sight';
+import type { EngineLight } from '../pixi/lighting/engine/types';
 
 /** A light that shines right now: placed on the map or carried by a token. */
 export interface ActiveLight {
@@ -73,8 +72,10 @@ export function engineLight(light: ActiveLight, scale: UnitScale): EngineLight {
   };
 }
 
+/** `#rrggbb`, as `readEmission` hands every light's colour, mixed towards white and linearised. */
 function tintedLinear(hex: string): [number, number, number] {
-  const c = new Color(hex);
-  const linear = (v: number): number => srgbToLinear(1 + (v - 1) * TINT_TO_WHITE);
-  return [linear(c.red), linear(c.green), linear(c.blue)];
+  const value = Number.parseInt(hex.slice(1), 16);
+  // PIXI's Color kept each channel in single precision; rounding the same way keeps every light's colour to the last bit.
+  const linear = (channel: number): number => srgbToLinear(1 + (Math.fround(channel / 255) - 1) * TINT_TO_WHITE);
+  return [linear((value >> 16) & 0xff), linear((value >> 8) & 0xff), linear(value & 0xff)];
 }

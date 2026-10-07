@@ -4,7 +4,7 @@ import type { ExploredImage } from '../../src/app/pixi/lighting/playerDarkness/d
 import { heldForSight } from '../../src/app/lighting/sightOnDrop';
 import { playerLightingOf, type PlayerLighting } from '../../src/app/pixi/lighting/playerLightingLayers';
 import { tokenPerception } from '../../src/app/vision/tokenPerception';
-import { SceneModelBuilder, SceneSpots } from '../../src/app/pixi/lighting/sceneModel';
+import { SceneModelBuilder, SceneSpots } from '../../src/app/vision/sceneModel';
 import type { MapSize } from '../../src/app/services/viewMapSize';
 import type { ViewAtlasState } from '../../src/app/storeFactory';
 import type { Character } from '../../src/app/types';
