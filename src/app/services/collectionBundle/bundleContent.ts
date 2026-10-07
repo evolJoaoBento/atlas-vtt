@@ -87,8 +87,8 @@ export function rewriteText(file: BundleFile, text: string, rewrites: PathMap): 
  * the folders of their items. Returns `raw` itself when nothing changes, so
  * unchanged files keep their exact bytes.
  */
-export function rewriteContent(file: BundleFile, raw: ArrayBuffer, rewrites: PathMap): ArrayBuffer {
-  if (!mayRewrite(file, rewrites)) return raw;
+export function rewriteContent(file: BundleFile, raw: ArrayBuffer, rewrites: PathMap, recordsMayHoldExtensionData = true): ArrayBuffer {
+  if (!mayRewrite(file, rewrites, recordsMayHoldExtensionData)) return raw;
   const text = decoder.decode(raw);
   // Only here, never in `rewriteText`: moving a scene to another collection rewrites the user's own notes in place.
   const rewritten = rewriteText(file, withoutNoteKeys(file, text, bundleNoteKeys.keys()), rewrites);
@@ -111,7 +111,11 @@ export const refersToFiles = (file: BundleFile): boolean =>
 
 /**
  * Whether `rewriteContent` may change the file's bytes, so they must be read to know the result. Record files
- * may carry extension data, which never travels, and notes may carry a property an extension keeps out.
+ * may carry extension data, which never travels, and notes may carry a property an extension keeps out. An export
+ * from a vault whose index holds no extension data (`AssetService.holdsExtensionData`) passes
+ * `recordsMayHoldExtensionData` false, so it reads record files only where paths move, as before; an install, whose
+ * bundle comes from elsewhere, always reads them.
  */
-export const mayRewrite = (file: BundleFile, rewrites: PathMap): boolean =>
-  (refersToFiles(file) && (rewrites.size > 0 || file.role === 'asset-file')) || (isNote(file) && bundleNoteKeys.keys().size > 0);
+export const mayRewrite = (file: BundleFile, rewrites: PathMap, recordsMayHoldExtensionData = true): boolean =>
+  (refersToFiles(file) && (rewrites.size > 0 || (recordsMayHoldExtensionData && file.role === 'asset-file')))
+  || (isNote(file) && bundleNoteKeys.keys().size > 0);

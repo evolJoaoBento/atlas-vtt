@@ -83,7 +83,7 @@
 
 ## Important changes
 
-- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it. Exporting a collection reads each asset's record file to make sure.
+- Data that other plugins keep on scenes never travels in collection exports, copies or installs, and stays on the device that saved it; library sync does not carry it. While a vault holds such data, exporting a collection reads each asset's record file to make sure.
 - Fog-covered tokens and door badges are now hidden in the player view, including token labels and drag rulers.
 - Hidden tokens no longer add sight or explore new areas in the player window. Areas already explored stay remembered.
 - Removed an unused legacy map view. Old tabs using it no longer reopen. The current player window is unchanged.

@@ -177,6 +177,7 @@ export async function exportCollectionBundle(
   const files: BundleFile[] = [];
   const presets: Record<string, InstalledPreset> = {};
   if (selected.files.some((file) => file.role === PRESET_ROLE)) await flushPresetEdits(app);
+  const recordsMayHoldExtensionData = assets.holdsExtensionData();
   for (const [index, file] of selected.files.entries()) {
     reportFileStep(onProgress, 'bundle.step.adding', index, selected.files.length, 0, 0.6);
     const content = await readVaultBinary(app, file.vaultPath);
@@ -185,7 +186,7 @@ export async function exportCollectionBundle(
     const preset = file.role === PRESET_ROLE ? await packedPresetRecord(content) : null;
     if (file.role === PRESET_ROLE && !preset) continue;
     if (preset) presets[preset.localId] = preset;
-    const data = rewriteContent(file, comparedBytes(file.vaultPath, content), origin.names);
+    const data = rewriteContent(file, comparedBytes(file.vaultPath, content), origin.names, recordsMayHoldExtensionData);
     const bundlePath = named(file.vaultPath);
     files.push({
       ...file,

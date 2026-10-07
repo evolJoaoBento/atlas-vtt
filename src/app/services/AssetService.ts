@@ -24,7 +24,7 @@ import { isRecord } from '../utils/guards';
 import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
 import { CollectionChangeWatcher, SceneChangeWatcher } from './sceneChanges';
 import { collectionIndexDataOf, forgetCollectionIndexData, patchCollectionIndexData, type CollectionIndexData } from './collectionIndexData';
-import type { SceneIndexData } from './sceneIndexData';
+import { withoutSceneExtensions, type SceneIndexData } from './sceneIndexData';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
 import { trashVaultItem } from '../utils/trashVaultItem';
@@ -262,8 +262,8 @@ export class AssetService {
   private initialization: Promise<void> | null = null;
   /** Held by work that must not interleave with re-reading or checking the index, such as an import. */
   private readonly indexLock = new SerialLock();
-  private readonly sceneChanges = new SceneChangeWatcher();
-  private readonly collectionChanges = new CollectionChangeWatcher();
+  private readonly sceneChanges = new SceneChangeWatcher(() => this.metadata?.assets ?? null);
+  private readonly collectionChanges = new CollectionChangeWatcher(() => this.metadata ?? null);
   /** Metadata writes, in the order they were requested. */
   private readonly writes = new SerialLock();
   private saveCount = 0;
@@ -429,6 +429,16 @@ export class AssetService {
   /** Hears collections added, removed or renamed, and changes of the data extensions keep on one. */
   onCollectionsChanged(listener: () => void): () => void {
     return this.collectionChanges.onChange(listener);
+  }
+
+  /**
+   * Whether the index holds any data extensions keep (on a scene or a collection), or a scene an extension added.
+   * Only then can a record file carry some, so only then does an export read each record file to keep it out.
+   */
+  holdsExtensionData(): boolean {
+    if (!this.metadata) return true;
+    if (Object.keys(this.metadata.collectionIndexData ?? {}).length > 0) return true;
+    return Object.values(this.metadata.assets).some((asset) => withoutSceneExtensions(asset) !== asset);
   }
 
   /** The cached index without the library bookkeeping stored beside it, which the library sync takes. */

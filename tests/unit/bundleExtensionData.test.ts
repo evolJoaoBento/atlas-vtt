@@ -45,6 +45,16 @@ describe.each(withPrivateData)('scene data never travels in a bundle (%s)', (_na
     expect(withoutJsonExtensions({ mapPath: 'm' })).toEqual({ mapPath: 'm' });
   });
 
+  it('is not even read on export while the vault holds no extension data, so stock exports parse no record file', () => {
+    const file = { vaultPath: 'atlas-vtt/collections/c/scenes/s1.json', role: 'asset-file', sha256: 'x' } as unknown as BundleFile;
+    expect(mayRewrite(file, new Map(), false)).toBe(false);
+    const bytes = toBuffer(JSON.stringify({ name: 'Inn', mapPath: 'm.atlasmap' }));
+    expect(rewriteContent(file, bytes, new Map(), false)).toBe(bytes);
+    // Moved paths still rewrite it, as before.
+    expect(mayRewrite(file, new Map([['m.atlasmap', 'n.atlasmap']]), false)).toBe(true);
+    expect(mayRewrite(file, new Map())).toBe(true);
+  });
+
   it('does not make a scene that carries it look edited', async () => {
     expect(await assetFingerprint(sceneAsset({ data: data('m.atlasmap') }))).toBe(await assetFingerprint(sceneAsset({ data: { mapPath: 'm.atlasmap' } })));
   });
