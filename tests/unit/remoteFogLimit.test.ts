@@ -150,4 +150,16 @@ describe("a remote view's fog points and brushes are bounded too", () => {
     const hostile = { get points(): never { throw new Error('getter'); } } as unknown as FogOperation;
     expect(isFogTooLarge(sceneWith({ h: hostile }))).toBe(true);
   });
+
+  it("counts Atlas's copy too, so a getter that answers short for the check and long for the copy still covers the map", () => {
+    const { store, applier } = setup();
+    let reads = 0;
+    const long = Array.from({ length: REMOTE_FOG_OP_POINTS_MAX + 1 }, (_, i) => ({ x: i % 900, y: i % 700 }));
+    const lying = { id: 'l', kind: 'fog', type: 'lasso', timestamp: 1, isErasing: false, get points() { reads += 1; return reads === 1 ? [{ x: 1, y: 1 }] : long; } };
+    applier.apply(sceneWith({ l: lying as unknown as FogOperation }));
+    expect(isCovered(store)).toBe(true);
+    expect(applier.fogTooLarge).toBe(true);
+    applier.apply(sceneWith(fogOf(3)));
+    expect(applier.fogTooLarge).toBe(false);
+  });
 });

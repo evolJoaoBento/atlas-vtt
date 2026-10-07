@@ -117,7 +117,10 @@ export class RemoteSceneApplier {
   /** The extension's tokens, copied once each; `tokens` places those copies, so writing again never reads the extension's. */
   private readonly tokenCopies = new RecordMemo<TokenEntity, TokenEntity>();
   private readonly tokens = new RecordMemo<TokenEntity, TokenEntity>();
+  /** The extension's fog, copied once each operation; the limits are counted on these copies (`fogTooLarge`). */
+  private readonly fogCopies = new RecordMemo<FogOperation, FogOperation>();
   private readonly fog = new RecordMemo<FogOperation, FogOperation>();
+  private tooLarge = false;
   private readonly texts = new RecordMemo<TextElement, TextElement>();
   private readonly drawings = new RecordMemo<DrawingStroke, DrawingStroke>();
   private readonly grid = new KeptCopy<GridState>();
@@ -126,6 +129,11 @@ export class RemoteSceneApplier {
   private readonly initiative = new KeptCopy<InitiativeState>(initiativeWithoutVaultLinks);
   private readonly emptyInitiative: InitiativeState;
   private scene: RemoteSceneInput | null = null;
+
+  /** Whether the scene shown last has more fog than a remote view replays, as counted on Atlas's own copy of it. */
+  get fogTooLarge(): boolean {
+    return this.tooLarge;
+  }
 
   /**
    * `positionOf` places a token where this view shows it instead of the scene's position (the player's drag in
@@ -177,6 +185,11 @@ export class RemoteSceneApplier {
       return `${imageOf(id)}|${point ? `${point.x},${point.y}` : ''}`;
     };
     const initiative = this.initiative.of(scene.initiative);
+    // Counted on the extension's record first (lengths only, never a copy of too much), then on Atlas's copy, so a
+    // getter cannot answer short for the check and long for what is drawn.
+    const live = isFogTooLarge(scene);
+    const fog = live ? {} : this.fogCopies.build(scene.objects.fog, () => '', copyRecord);
+    this.tooLarge = live || isFogTooLarge({ objects: { ...scene.objects, fog }, background: scene.background });
     return {
       mapPath: this.mapPath,
       mapLoaded: true,
@@ -187,7 +200,7 @@ export class RemoteSceneApplier {
         // A token without an image URL draws as Atlas's default token.
         tokens: this.tokens.build(this.tokenCopies.build(scene.objects.tokens, () => '', copyRecord), shownAt, (id, token) => frozenCopy({ ...withoutVaultLinks(token), imagePath: imageOf(id), ...this.positionOf(id) })),
         // Fails closed: too much fog covers the whole view rather than freezing it working the operations out.
-        fog: this.fog.build(isFogTooLarge(scene) ? COVER_ALL : scene.objects.fog, () => '', copyRecord),
+        fog: this.fog.build(this.tooLarge ? COVER_ALL : fog, () => '', (_id, record) => record),
         texts: this.texts.build(scene.objects.texts, () => '', copyRecord),
         drawings: this.drawings.build(scene.objects.drawings, () => '', copyRecord),
       },
@@ -200,6 +213,7 @@ export class RemoteSceneApplier {
 
   private emptyState(): ReturnType<RemoteSceneApplier['stateOf']> {
     const none = {};
+    this.tooLarge = false;
     return {
       mapPath: null,
       mapLoaded: false,
