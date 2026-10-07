@@ -6,6 +6,7 @@ import { rollFormula } from './diceFormula';
 import { parseFormula, type FormulaError } from './parseFormula';
 import { DICE_TYPES } from './diceRolling';
 import { announceRoll } from './diceRollFeed';
+import { withDieTags, type DieTag } from './diceTags';
 
 export interface DiceToolState {
   isTrayOpen: boolean;
@@ -42,9 +43,11 @@ export class DiceTool {
     this.eventBus.emit('dice-tray-toggled', this.state.isTrayOpen);
   }
 
-  public rollDice(formula: string, source?: DiceRollResult['source']): DiceRollResult | null {
-    const result = this.parseAndRoll(formula);
-    if (!result) return null;
+  /** `tags`: one per die of the formula, in formula order, the colour each was added in (null: none); an exploded die keeps its parent's. */
+  public rollDice(formula: string, source?: DiceRollResult['source'], tags?: ReadonlyArray<DieTag | null>): DiceRollResult | null {
+    const rolled = this.parseAndRoll(formula);
+    if (!rolled) return null;
+    const result = tags && tags.some((tag) => tag !== null) ? withDieTags(rolled, tags) : rolled;
     if (source) {
       result.source = source;
     }

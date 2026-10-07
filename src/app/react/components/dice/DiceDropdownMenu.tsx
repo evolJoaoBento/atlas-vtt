@@ -6,6 +6,7 @@ import { DiceTray } from './DiceTray';
 import { trayPoolByDie } from './diceTrayPool';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { diceFontClass, useDiceLook } from '../../hooks/useDiceLook';
+import { useDiceColours } from './useDiceColours';
 
 export interface DiceDropdownMenuProps {
   diceTool: DiceTool;
@@ -24,6 +25,8 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
   const { app } = useAtlasUI();
   const look = useDiceLook(app ?? undefined);
   const keepInView = useKeepInView(trayRef, isOpen, 'top');
+  // A tray that rolls elsewhere (`onRoll`, a remote view's) has no way to carry colours.
+  const colours = useDiceColours(app ?? null, isOpen && !onRoll);
 
   // ── Click-outside ────────────────────────────
 
@@ -65,14 +68,15 @@ export function DiceDropdownMenu({ diceTool, isOpen, onToggle, triggerRef, onRol
         <DiceTray
           onChange={() => setNote(null)}
           {...(maxDice !== undefined ? { maxDice } : {})}
-          onRoll={(formula, pool, modifier) => {
+          colours={colours}
+          onRoll={(formula, pool, modifier, tags) => {
             if (onRoll) {
               const problem = onRoll(trayPoolByDie(pool), modifier);
               if (problem !== null) {
                 setNote(problem);
                 return false;
               }
-            } else if (!diceTool.rollDice(formula)) return false;
+            } else if (!(tags.some((tag) => tag !== null) ? diceTool.rollDice(formula, undefined, tags) : diceTool.rollDice(formula))) return false;
             onToggle();
             return true;
           }}

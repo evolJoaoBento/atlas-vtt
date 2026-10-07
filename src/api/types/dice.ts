@@ -53,6 +53,14 @@ export interface DiceLookSpec {
   preview?: string;
 }
 
+/** 1.18.0 (`dice-colours`): a colour dice can be rolled in, as the dice tray offers it: the shape of a die's tag. */
+export interface DiceColour {
+  /** Plain text (no markup), trimmed, at most 32 characters, e.g. "Fire". */
+  name: string;
+  /** `#rrggbb` */
+  color: string;
+}
+
 /** How `dice.publish` shows a roll (1.16.0). */
 export interface DicePublishOptions {
   /** False: logged, toasted and shown in the player window as before, but never thrown in 3D (a result card instead). Default true. */
@@ -93,4 +101,14 @@ export interface DiceApi {
    * so the look returns when it is registered again.
    */
   registerLook?(spec: DiceLookSpec): Disposer;
+  /**
+   * 1.18.0 (`dice-colours`): colours the GM can roll dice in from Atlas's dice tray, by collection. `provider` is asked
+   * with the collection of the map whose tray opens (never for a map outside a collection), guarded, and again after
+   * `ui.invalidate()`. When any provider answers colours, the tray shows a colour picker (Atlas's "No colour" first,
+   * chosen at first); dice added while a colour is picked carry it as their tag (`color`, `colorName`), in the log,
+   * the toasts and Atlas's 3D dice. An entry whose `color` is not `#rrggbb` or whose `name` is not plain text of 1 to
+   * 32 characters is left out, so is one equal to an earlier one; the tray shows at most 12. Throws for a provider
+   * that is not a function.
+   */
+  registerColours?(provider: (collectionId: string) => readonly DiceColour[]): Disposer;
 }

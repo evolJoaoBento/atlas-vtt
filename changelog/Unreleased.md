@@ -35,6 +35,7 @@
 - Extension API: the shared 3D dice module (`@atlas-vtt/shared/dice3d`) lets a page outside Obsidian install its own DOM, so it can draw Atlas's dice
 - Extension API: other plugins can add a tab to the asset manager, beside Scenes, Maps, Encounters and Tokens, that shows their own content for the chosen collection (API 1.18.0, `asset-tabs`)
 - Extension API: other plugins can keep their own data on a collection, never exported or copied, and add a tab of their own to a collection's settings
+- Extension API: other plugins can offer colours in the dice tray; dice added while a colour is picked carry it in the log and toasts
 
 ## Improved
 
