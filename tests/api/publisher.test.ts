@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const initialize = vi.hoisted(() => vi.fn<() => Promise<void>>());
 const sceneListeners = vi.hoisted(() => new Set<() => void>());
+const collectionListeners = vi.hoisted(() => new Set<() => void>());
 vi.mock('../../src/app/services/AssetService', () => ({
   AssetService: {
-    getInstance: (): { initialize: () => Promise<void>; onScenesChanged: (listener: () => void) => () => void } => ({
+    getInstance: (): { initialize: () => Promise<void>; onScenesChanged: (listener: () => void) => () => void; onCollectionsChanged: (listener: () => void) => () => void } => ({
       initialize,
       onScenesChanged: (listener: () => void): (() => void) => { sceneListeners.add(listener); return () => { sceneListeners.delete(listener); }; },
+      onCollectionsChanged: (listener: () => void): (() => void) => { collectionListeners.add(listener); return () => { collectionListeners.delete(listener); }; },
     }),
   },
 }));
@@ -35,6 +37,7 @@ describe('ExtensionApiPublisher', () => {
   beforeEach(() => {
     initialize.mockReset();
     sceneListeners.clear();
+    collectionListeners.clear();
   });
 
   it('sets plugin.api only once the asset index is ready, then announces it', async () => {
@@ -97,6 +100,19 @@ describe('ExtensionApiPublisher', () => {
     expect(listener).toHaveBeenCalledTimes(1);
     publisher.stop();
     expect(sceneListeners.size).toBe(0);
+  });
+
+  it('tells extensions collections-changed when the index reports a collection change, until stopped', async () => {
+    initialize.mockResolvedValue(undefined);
+    const { plugin } = atlas();
+    const publisher = new ExtensionApiPublisher(plugin);
+    await publisher.start();
+    const listener = vi.fn();
+    plugin.api?.connect(fakePlugin('ext')).on('collections-changed', listener);
+    for (const notify of collectionListeners) notify();
+    expect(listener).toHaveBeenCalledTimes(1);
+    publisher.stop();
+    expect(collectionListeners.size).toBe(0);
   });
 
   it('keeps the note properties extensions ask to strip in the settings, and takes them back from there', async () => {

@@ -5,7 +5,8 @@ import { tabs, getTabDisplayName } from '../types';
 import { HeaderMenu, type HeaderMenuItem } from './HeaderMenu';
 import { Skeleton } from '../../primitives/Skeleton';
 import { ObsidianIcon } from '../../../../react/components/ObsidianIcon';
-import type { ExtensionAssetTabs } from '../hooks/useExtensionAssetTabs';
+import type { ExtensionTabs } from '../../../../extensions/useExtensionTabs';
+import type { AssetTabSpec } from '../../../../../api/types/ui';
 import { t } from '../../../../i18n';
 
 export interface TabSwitcherProps {
@@ -14,7 +15,7 @@ export interface TabSwitcherProps {
   /** How many assets each tab holds; null while they are being counted. */
   assetCounts: Record<Tab, number> | null;
   /** Tabs extensions added, after Atlas's own; one of them may be shown instead. */
-  extensionTabs?: Pick<ExtensionAssetTabs, 'tabs' | 'active'> & { onSelect: (key: string) => void };
+  extensionTabs?: Pick<ExtensionTabs<AssetTabSpec>, 'tabs' | 'active'> & { onSelect: (key: string) => void };
 }
 
 /** A tab's count, or its placeholder while the collection is being counted: never a wrong 0. */

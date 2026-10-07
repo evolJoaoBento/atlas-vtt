@@ -7,6 +7,7 @@ import type { PresentationApi } from './presentation';
 import type { RemoteViewsApi } from './remoteViews';
 import type { RulesApi } from './rules';
 import type { BundlesApi, ScenesApi } from './scenes';
+import type { CollectionsApi } from './collections';
 import type { AtlasSettingKey, SettingsApi, StorageApi } from './settings';
 import type { TokensApi } from './tokens';
 import type { UiApi } from './ui';
@@ -46,6 +47,11 @@ export interface AtlasEvents {
    * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
    */
   'tabs-changed': (view: ViewInfo) => void;
+  /**
+   * 1.18.0 (`collections`): collections were added, removed or renamed, or an extension's data on one changed
+   * (`collections.setData`, by any extension). Read `collections.list` or `getData` again.
+   */
+  'collections-changed': () => void;
 }
 
 export interface AtlasExtension {
@@ -65,6 +71,8 @@ export interface AtlasExtension {
   readonly bundles: BundlesApi;
   /** Only when `has('remote-view')`. */
   readonly remoteViews?: RemoteViewsApi;
+  /** 1.18.0: only when `has('collections')`. */
+  readonly collections?: CollectionsApi;
   /**
    * Hears an Atlas event. The listener runs guarded (a throw is logged and the other listeners still run) and is dropped
    * when this extension or Atlas unloads. A listener that is not a function, or an event Atlas does not have, registers

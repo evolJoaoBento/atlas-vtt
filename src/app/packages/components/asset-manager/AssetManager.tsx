@@ -25,7 +25,8 @@ import { useHeldWhile } from './hooks/useHeldWhile';
 import { useLoadingReveal } from '../primitives/useLoadingReveal';
 import { useSidebarLayout } from './hooks/useSidebarLayout';
 import { useRememberedPlace } from './hooks/useRememberedPlace';
-import { useExtensionAssetTabs } from './hooks/useExtensionAssetTabs';
+import { useExtensionTabs } from '../../../extensions/useExtensionTabs';
+import { assetTabSlot } from '../../../extensions/slots';
 import { ExtensionAssetPane } from './components/ExtensionAssetPane';
 import { sortAssets } from './utils/assetSort';
 import { filterFolders, type AssetFilter } from './utils/assetFilter';
@@ -63,7 +64,7 @@ export default function AssetManager({ isOpen, onClose, initialTab, onExitComple
   const visibleIds = useRef<VisibleIds>({ assets: [], folders: [] });
   const sel = useSelectionHandlers(visibleIds, data.folders, activeTab, isOpen);
 
-  const extensionTabs = useExtensionAssetTabs(isOpen);
+  const extensionTabs = useExtensionTabs(assetTabSlot, isOpen);
   const changeTab = useCallback((tab: Tab): void => {
     extensionTabs.show(null);
     if (tab === activeTab) return;

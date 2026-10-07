@@ -7,7 +7,7 @@ import { LANDED_CAPABILITIES } from '../../src/api/capabilities';
 import { assetTabSlot } from '../../src/app/extensions/slots';
 import { ExtensionAssetPane } from '../../src/app/packages/components/asset-manager/components/ExtensionAssetPane';
 import { TabSwitcher } from '../../src/app/packages/components/asset-manager/components/TabSwitcher';
-import { useExtensionAssetTabs } from '../../src/app/packages/components/asset-manager/hooks/useExtensionAssetTabs';
+import { useExtensionTabs } from '../../src/app/extensions/useExtensionTabs';
 import type { AssetTabContext, AssetTabSpec } from '../../src/api/types/ui';
 import type { AtlasCapability } from '../../src/api/types/common';
 import { fakeApp, fakePlugin, fakeServices } from './apiFakes';
@@ -111,9 +111,9 @@ describe('an extension asset tab in the asset manager', () => {
   });
 
   it('falls back to Atlas\'s tab when the shown one is removed, and forgets it when the manager closes', () => {
-    let tabs: ReturnType<typeof useExtensionAssetTabs> | null = null;
+    let tabs: ReturnType<typeof useExtensionTabs<AssetTabSpec>> | null = null;
     function Probe({ open }: { open: boolean }): null {
-      tabs = useExtensionAssetTabs(open);
+      tabs = useExtensionTabs(assetTabSlot, open);
       return null;
     }
     const plugin = fakePlugin('ext');

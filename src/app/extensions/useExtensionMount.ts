@@ -20,6 +20,8 @@ interface MountOptions<C> {
   active?: boolean;
   /** The mount threw: nothing is mounted. */
   onFailed?: () => void;
+  /** Keys pressed inside stay there, all but Escape, so the dialog's own shortcuts never act behind the extension's controls. */
+  keepKeys?: boolean;
 }
 
 /**
@@ -27,7 +29,7 @@ interface MountOptions<C> {
  * reported, a teardown that throws is logged, and the element is emptied after each teardown. The teardown runs
  * on unmount, when `remountKey` changes and when `active` turns false.
  */
-export function useExtensionMount<C>({ owner, what, spec, ctx, remountKey, active = true, onFailed }: MountOptions<C>): RefObject<HTMLDivElement | null> {
+export function useExtensionMount<C>({ owner, what, spec, ctx, remountKey, active = true, onFailed, keepKeys = false }: MountOptions<C>): RefObject<HTMLDivElement | null> {
   const ref = useRef<HTMLDivElement>(null);
   const latest = useRef({ ctx, onFailed });
   latest.current = { ctx, onFailed };
@@ -51,6 +53,16 @@ export function useExtensionMount<C>({ owner, what, spec, ctx, remountKey, activ
       container.replaceChildren();
     };
   }, [spec, owner, what, remountKey, active]);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !keepKeys) return undefined;
+    const keep = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') event.stopPropagation();
+    };
+    element.addEventListener('keydown', keep);
+    return () => element.removeEventListener('keydown', keep);
+  }, [keepKeys]);
 
   return ref;
 }

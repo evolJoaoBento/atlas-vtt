@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo } from 'react';
-import type { AssetTabContext } from '../../../../../api/types/ui';
+import React, { useMemo } from 'react';
+import type { AssetTabContext, AssetTabSpec } from '../../../../../api/types/ui';
 import { useExtensionMount } from '../../../../extensions/useExtensionMount';
-import type { ExtensionAssetTab } from '../hooks/useExtensionAssetTabs';
+import type { ExtensionTab } from '../../../../extensions/useExtensionTabs';
 
 interface ExtensionAssetPaneProps {
-  entry: ExtensionAssetTab;
+  entry: ExtensionTab<AssetTabSpec>;
   collectionId: string;
 }
 
@@ -16,18 +16,7 @@ interface ExtensionAssetPaneProps {
 export function ExtensionAssetPane({ entry, collectionId }: ExtensionAssetPaneProps): React.ReactElement {
   const ctx = useMemo((): AssetTabContext => Object.freeze({ collectionId }), [collectionId]);
   const pane = useExtensionMount({
-    owner: entry.owner, what: `asset tab "${entry.tab.id}"`, spec: entry.tab, ctx, remountKey: collectionId,
+    owner: entry.owner, what: `asset tab "${entry.tab.id}"`, spec: entry.tab, ctx, remountKey: collectionId, keepKeys: true,
   });
-
-  useEffect(() => {
-    const element = pane.current;
-    if (!element) return undefined;
-    const keep = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') event.stopPropagation();
-    };
-    element.addEventListener('keydown', keep);
-    return () => element.removeEventListener('keydown', keep);
-  }, [pane]);
-
   return <div ref={pane} className="atlas-asset-manager-extension-pane" role="region" aria-label={entry.tab.title} />;
 }

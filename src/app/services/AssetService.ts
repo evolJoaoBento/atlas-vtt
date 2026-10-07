@@ -22,7 +22,8 @@ import type { Json } from '../types/json';
 import { isLegacyTokenRecord, type LegacyAssetMetadata } from './assetMetadataGuards';
 import { isRecord } from '../utils/guards';
 import { keepingExtensionData, movedLegacySceneData } from './legacySceneData';
-import { SceneChangeWatcher } from './sceneChanges';
+import { CollectionChangeWatcher, SceneChangeWatcher } from './sceneChanges';
+import { collectionIndexDataOf, forgetCollectionIndexData, patchCollectionIndexData, type CollectionIndexData } from './collectionIndexData';
 import type { SceneIndexData } from './sceneIndexData';
 import { groupLegacyTags, hasAssetTag, tagGroupOf, tagKey, type TagGroup } from './tagGroups';
 import { t } from '../i18n';
@@ -216,6 +217,8 @@ export interface AssetMetadata {
   defaultCollectionId?: string;
   /** The starter tokens were added once; deleted ones stay deleted on every device. */
   starterTokensAdded?: boolean;
+  /** What collections keep in the index alone, by collection id (`collectionIndexData.ts`); never in a library file. */
+  collectionIndexData?: Record<string, CollectionIndexData>;
 }
 
 /** What an import writes into the asset index, in one save. */
@@ -260,6 +263,7 @@ export class AssetService {
   /** Held by work that must not interleave with re-reading or checking the index, such as an import. */
   private readonly indexLock = new SerialLock();
   private readonly sceneChanges = new SceneChangeWatcher();
+  private readonly collectionChanges = new CollectionChangeWatcher();
   /** Metadata writes, in the order they were requested. */
   private readonly writes = new SerialLock();
   private saveCount = 0;
@@ -411,12 +415,20 @@ export class AssetService {
       await this.migrateCollectionFields();
       return stored.kind !== 'current';
     });
-    if (this.metadata) this.sceneChanges.check(this.metadata.assets);
+    if (this.metadata) {
+      this.sceneChanges.check(this.metadata.assets);
+      this.collectionChanges.check(this.metadata);
+    }
   }
 
   /** Calls `listener` after scene records were added, removed, renamed, moved to another collection or pointed at another map. Returns the unsubscribe. */
   onScenesChanged(listener: () => void): () => void {
     return this.sceneChanges.onChange(listener);
+  }
+
+  /** Hears collections added, removed or renamed, and changes of the data extensions keep on one. */
+  onCollectionsChanged(listener: () => void): () => void {
+    return this.collectionChanges.onChange(listener);
   }
 
   /** The cached index without the library bookkeeping stored beside it, which the library sync takes. */
@@ -567,6 +579,7 @@ export class AssetService {
   private saveMetadata(): Promise<void> {
     if (!this.metadata) return Promise.resolve();
     this.sceneChanges.check(this.metadata.assets);
+    this.collectionChanges.check(this.metadata);
     const persistFiles = this.automaticDepth === 0;
     this.saveCount++;
     return this.writes.run(async () => {
@@ -977,6 +990,7 @@ export class AssetService {
 
     // Remove from metadata
     delete this.metadata.collections[collectionId];
+    forgetCollectionIndexData(this.metadata, collectionId);
     await this.saveMetadata();
   }
 
@@ -1113,6 +1127,21 @@ export class AssetService {
     }
     this.metadata!.assets[id] = { ...asset, data: data as SceneAssetData };
     await this.saveMetadata();
+  }
+
+  /** What collection `id` keeps in the index alone (`collectionIndexData.ts`); null when it has none or does not exist. */
+  async getCollectionIndexData(id: string): Promise<CollectionIndexData | null> {
+    await this.ensureLoaded();
+    return collectionIndexDataOf(this.metadata!, id);
+  }
+
+  /** Changes it; no edit of the collection, whose record and file stay as they were. False when there is no such collection. */
+  async updateCollectionIndexData(id: string, patch: { [K in keyof CollectionIndexData]?: CollectionIndexData[K] | undefined }): Promise<boolean> {
+    await this.ensureLoaded();
+    if (!Object.hasOwn(this.metadata!.collections, id)) return false;
+    patchCollectionIndexData(this.metadata!, id, patch);
+    await this.saveMetadata();
+    return true;
   }
 
   /**

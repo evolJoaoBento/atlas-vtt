@@ -12,4 +12,5 @@ export type * from './types/rules';
 export type * from './types/settings';
 export type * from './types/ui';
 export type * from './types/scenes';
+export type * from './types/collections';
 export type * from './types/remoteViews';

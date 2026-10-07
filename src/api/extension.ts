@@ -9,6 +9,7 @@ import { lightingApi } from './lighting';
 import { presentationApi } from './presentation';
 import { remoteViewsApi } from './remoteViews';
 import { bundlesApi } from './bundles';
+import { collectionsApi } from './collections';
 import { rulesApi } from './rules';
 import { scenesApi } from './scenes';
 import { settingsApi } from './settings';
@@ -44,5 +45,6 @@ export function buildExtension(scope: ExtensionScope, services: ApiServices): At
     tokens: tokensApi(services.views), rules: rulesApi(services.app),
     settings: settingsApi(services.settings), storage: storageApi(services.app, scope.id),
     ui: uiApi(scope, services.views), scenes: scenesApi(services.app, scope, services.views), bundles: bundlesApi(scope),
-    ...(scope.capabilities.has('remote-view') ? { remoteViews: remoteViewsApi(services.app, scope, services.views) } : {}) });
+    ...(scope.capabilities.has('remote-view') ? { remoteViews: remoteViewsApi(services.app, scope, services.views) } : {}),
+    ...(scope.capabilities.has('collections') ? { collections: collectionsApi(services.app, scope) } : {}) });
 }

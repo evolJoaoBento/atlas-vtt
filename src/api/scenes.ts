@@ -5,12 +5,13 @@ import { frozenCopy } from './frozen';
 import { readSavedMap } from './savedMap';
 import { addSceneToCollection } from './sceneImport';
 import type { Json } from './types/common';
+import { plainJson } from './plainJson';
 import { replaceSceneMap } from './sceneReplace';
 import type { SceneRecord, ScenesApi } from './types/scenes';
 import type { ViewTracker } from './viewTracker';
 
 /** The asset index, once it has loaded; the API is published even when it failed, and then scene functions reject. */
-async function loadedAssets(app: App): Promise<AssetService> {
+export async function loadedAssets(app: App): Promise<AssetService> {
   const assets = AssetService.getInstance(app);
   try {
     await assets.initialize();
@@ -22,18 +23,6 @@ async function loadedAssets(app: App): Promise<AssetService> {
 
 function recordOf(scene: SceneAsset): SceneRecord {
   return { id: scene.id, name: scene.name, collectionId: scene.collection, mapPath: scene.data?.mapPath ?? null };
-}
-
-/** `value` as plain JSON, or a clear error. */
-function plainJson(value: unknown): Json {
-  let text: string | undefined;
-  try {
-    text = JSON.stringify(value);
-  } catch (error) {
-    throw new Error(`[Atlas API] scenes.setData: the value must be plain JSON: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  if (text === undefined) throw new Error('[Atlas API] scenes.setData: the value must be plain JSON, or null to clear it.');
-  return JSON.parse(text) as Json;
 }
 
 /** `views` tells `replaceMap` which maps are open; none without it. */
@@ -52,7 +41,7 @@ export function scenesApi(app: App, scope: Pick<ExtensionScope, 'id'>, views: Vi
     },
     setData: async (sceneId: string, value: Json | null): Promise<void> => {
       const assets = await loadedAssets(app);
-      const copy = value === null ? null : plainJson(value);
+      const copy = value === null ? null : plainJson('scenes.setData', value);
       // Re-read right before writing and patch only this extension's key: never anyone else's data, never the scene's own.
       await assets.runExclusive(async () => {
         const scene = await assets.getAssetById(sceneId);

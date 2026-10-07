@@ -44,7 +44,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs' | 'collections';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -64,6 +64,11 @@ export declare interface AtlasEvents {
      * view per microtask with the view as it is then; never for a remote view. `map-loaded` and `map-closed` are unchanged.
      */
     'tabs-changed': (view: ViewInfo) => void;
+    /**
+     * 1.18.0 (`collections`): collections were added, removed or renamed, or an extension's data on one changed
+     * (`collections.setData`, by any extension). Read `collections.list` or `getData` again.
+     */
+    'collections-changed': () => void;
 }
 
 export declare interface AtlasExtension {
@@ -83,6 +88,8 @@ export declare interface AtlasExtension {
     readonly bundles: BundlesApi;
     /** Only when `has('remote-view')`. */
     readonly remoteViews?: RemoteViewsApi;
+    /** 1.18.0: only when `has('collections')`. */
+    readonly collections?: CollectionsApi;
     /**
      * Hears an Atlas event. The listener runs guarded (a throw is logged and the other listeners still run) and is dropped
      * when this extension or Atlas unloads. A listener that is not a function, or an event Atlas does not have, registers
@@ -211,6 +218,51 @@ export declare interface CollectionGridDefaults {
     diagonalRule?: DiagonalRule;
     /** Full opening of the cone measurement in degrees. Unset means 90. */
     coneAngle?: number;
+}
+
+/** 1.18.0 (`collections`): a collection of the asset index; its id is its folder's name, and so is its name. */
+export declare interface CollectionRecord {
+    id: string;
+    name: string;
+}
+
+/**
+ * 1.18.0 (`collections`): the collections of the asset index, and an extension's own data on each. The data lives in
+ * the asset index alone, as `scenes.setData`'s does: never in the collection's `collection.json`, an export, an
+ * install or a copied folder, and it stays on the device that wrote it. A renamed collection keeps it; a deleted one
+ * takes it along. Changes: `collections-changed`. Every call rejects when the asset index could not load.
+ */
+export declare interface CollectionsApi {
+    /** Every collection, as frozen copies. */
+    list(): Promise<CollectionRecord[]>;
+    /** This extension's data on collection `collectionId`: a frozen copy, undefined when unset or there is no such collection. */
+    getData(collectionId: string): Promise<Json | undefined>;
+    /**
+     * Sets or (null) clears it; `value` must be plain JSON and is copied. No edit of the collection: its record, its file
+     * and `modifiedAt` stay as they were. Rejects for a collection that does not exist.
+     */
+    setData(collectionId: string, value: Json | null): Promise<void>;
+}
+
+/** 1.18.0 (`collections`): what a collection settings tab is told: the collection whose settings are open. */
+export declare interface CollectionSettingsTabContext {
+    collectionId: string;
+}
+
+/** 1.18.0 (`collections`): a tab of an extension's own in a collection's settings dialog. */
+export declare interface CollectionSettingsTabSpec {
+    /** Unique among this extension's collection settings tabs. */
+    id: string;
+    /** The tab's name, as given. */
+    title: string;
+    /** Lucide name, shown before the title; default `puzzle`. */
+    icon?: string;
+    /**
+     * Runs when the tab is shown; the returned disposer runs when another tab is chosen, the dialog closes or the tab is
+     * removed. What it changes is the extension's to save, at once (`collections.setData`): the dialog's Save button saves
+     * Atlas's own settings only. Keys pressed inside the container (all but Escape) stay with it. A throw is logged.
+     */
+    mount(container: HTMLElement, ctx: CollectionSettingsTabContext): Disposer;
 }
 
 /** A user-defined token condition, shown as a coloured badge on the token */
@@ -1643,6 +1695,11 @@ export declare interface UiApi {
      * the asset grid. `id`, `title` and `icon` must be non-empty and `mount` a function.
      */
     addAssetTab?(tab: AssetTabSpec): Disposer;
+    /**
+     * 1.18.0 (`collections`): a tab in a collection's settings dialog, after Atlas's own. `id` and `title` must be
+     * non-empty, `icon` non-empty when given, and `mount` a function.
+     */
+    addCollectionSettingsTab?(tab: CollectionSettingsTabSpec): Disposer;
     /** Re-reads `isVisible`, `isActive`, `badge`, palette commands, menu providers and scene tab menu sections now. */
     invalidate(): void;
 }
