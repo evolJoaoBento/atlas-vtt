@@ -1,6 +1,8 @@
 /**
- * The names of Atlas's widget and condition icons, written out so the extension API names them without their drawings.
- * The drawings (`widgetIcons.ts`) must hold exactly these names, which the compiler checks; changing a drawing changes nothing here.
+ * The names of Atlas's widget and condition icons, written out so the extension API names them without their drawings:
+ * `keyof typeof WIDGET_ICON_PATHS` would put every icon's path data (about 80 KB, `as const`) into the API report.
+ * The drawings (`widgetIcons.ts`) must hold exactly these names, which the compiler checks (`satisfies`), so a new icon
+ * is added in both files; changing a drawing changes nothing here.
  */
 export type WidgetIcon =
   | 'heart'

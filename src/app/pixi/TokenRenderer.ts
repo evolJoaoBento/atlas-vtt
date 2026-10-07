@@ -1,11 +1,7 @@
-import { viewConditionDefinitions } from './token-renderer/viewConditionDefinitions';
-import { viewResourceDefinitions } from './token-renderer/viewResourceDefinitions';
 import type { FogCoverage } from '../fog/fogCoverage';
 import { StatblockTokenSync } from '../plugin/StatblockTokenSync';
 import { TokenCollectionSync } from '../plugin/TokenCollectionSync';
-import type { ResourceDefinition, ResourceDefsProvider } from '../resources/resourceTypes';
-import { AssetService } from '../services/AssetService';
-import type { ConditionDefinition } from '../types/collectionSettingsTypes';
+import type { ResourceDefsProvider } from '../resources/resourceTypes';
 import { fitTokenArtwork, syncTokenArtwork } from './token-renderer/tokenArtwork';
 import type { AtlasSettings } from '../services/SettingsService';
 import { HIDDEN_TOKEN_ALPHA, gmTokenLayers, type HideableLayer, type LayerVisibility } from './playerSafeFrame';
@@ -231,12 +227,9 @@ export class TokenRenderer {
       refreshRules: () => this.refreshCollectionRules(),
       refreshArt: (path) => this.refreshArt(path),
     });
-    // The remote view's conditions and resources are the ones its owner feeds (`RemoteView.setPlayer`), never a collection's.
-    const collections = AssetService.getInstance(obsApp);
-    const conditionDefsProvider = (): ConditionDefinition[] => viewConditionDefinitions(this.store.getState(), collections);
-    this.interactionController.conditionDefsProvider = conditionDefsProvider;
-    this.uiManager.conditionDefsProvider = conditionDefsProvider;
-    this.resourceDefsProvider = (tokenId?: string): readonly ResourceDefinition[] => viewResourceDefinitions(this.store.getState(), collections, tokenId);
+    this.interactionController.conditionDefsProvider = this.collectionSync.conditions;
+    this.uiManager.conditionDefsProvider = this.collectionSync.conditions;
+    this.resourceDefsProvider = this.collectionSync.resources;
     this.interactionController.resourceDefsProvider = this.resourceDefsProvider;
     this.uiManager.resourceDefsProvider = this.resourceDefsProvider;
     this.statblockSync = new StatblockTokenSync(obsApp, store, tokenStatblockLinkService, this.resourceDefsProvider);

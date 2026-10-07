@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CanvasSource, Sprite, Texture } from 'pixi.js';
-import { safeContrastColorForSprite } from '../../src/app/grid/safeContrastColor';
+import { contrastColorForSprite } from '../../src/app/grid/gridContrastColor';
 
 /** A 2D context whose image reads as one grey level; `drawImage` behaves like the browser's for what it is given. */
 function stubContext(luminance: number, drawImage: (source: unknown) => void = () => {}): ReturnType<typeof vi.fn> {
@@ -19,22 +19,22 @@ function canvasSprite(): Sprite {
   return new Sprite(new Texture({ source: new CanvasSource({ resource: canvas }) }));
 }
 
-describe('safeContrastColorForSprite', () => {
+describe('contrastColorForSprite on any background sprite', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('reads a placeholder whose pixels are a byte array as not readable, without drawing it', () => {
     const draw = stubContext(255, () => { throw new TypeError("Failed to execute 'drawImage'"); });
-    expect(safeContrastColorForSprite(new Sprite(Texture.WHITE))).toBeNull();
+    expect(contrastColorForSprite(new Sprite(Texture.WHITE))).toBeNull();
     expect(draw).not.toHaveBeenCalled();
   });
 
   it('samples an image it can draw, as before', () => {
     stubContext(230);
-    expect(safeContrastColorForSprite(canvasSprite())).toBe(0x000000);
+    expect(contrastColorForSprite(canvasSprite())).toBe(0x000000);
   });
 
   it('reads a source that cannot be drawn (a closed bitmap) as not readable', () => {
     stubContext(230, () => { throw new DOMException('The image source is detached', 'InvalidStateError'); });
-    expect(safeContrastColorForSprite(canvasSprite())).toBeNull();
+    expect(contrastColorForSprite(canvasSprite())).toBeNull();
   });
 });

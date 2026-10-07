@@ -11,7 +11,7 @@ import type { GridOptions, GridType } from './gridTypes';
 import { createHexLayout, hexCellExtent, isHexGridType } from './hexGeometry';
 import { cellCenterAt } from './gridDistance';
 import type { HexLayout } from './hexGeometry';
-import { safeContrastColorForSprite } from './safeContrastColor';
+import { contrastColorForSprite } from './gridContrastColor';
 import { snapTokenCenter } from './gridPlacement';
 import { numberCells, type CellLattice } from './cellNumbering';
 import { hexLattice } from './hexLattice';
@@ -235,7 +235,7 @@ export class GridSystem implements UnlitGrid {
 
   /** Black or white, whichever contrasts with the map image; cached because it reads the texture's pixels. */
   private getAutoColor(bgSprite: Sprite): number {
-    this.autoColor ??= safeContrastColorForSprite(bgSprite);
+    this.autoColor ??= contrastColorForSprite(bgSprite);
     return this.autoColor ?? 0xffffff;
   }
 

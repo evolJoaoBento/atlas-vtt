@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Text } from 'pixi.js';
 import { TokenUIRenderer } from '../../src/app/pixi/TokenUIRenderer';
 import { isTokenDowned } from '../../src/app/pixi/token-renderer/isTokenDowned';
-import { viewResourceDefinitions } from '../../src/app/pixi/token-renderer/viewResourceDefinitions';
+import { TokenCollectionSync } from '../../src/app/plugin/TokenCollectionSync';
 import type { ResourceDefinition } from '../../src/app/resources/resourceTypes';
 import { RemoteViewScene } from '../../src/app/remote-view/RemoteViewScene';
 import { resolveMeasurementSettings } from '../../src/app/grid/measurementFormat';
@@ -16,7 +16,6 @@ import type { Character, TokenEntity } from '../../src/app/types';
 import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { remoteScene } from './remoteSceneFixtures';
 
-const COLLECTIONS = { getCollectionForMap: () => null, getCollectionSettings: () => { throw new Error('a remote view has no collection'); } };
 const BAR: ResourceDefinition = { key: 'bar0', name: 'Bar', field: '', direction: 'drains', color: '#22c55e', visibleToPlayers: true, slot: 0 };
 const DOWNED: ResourceDefinition = { key: 'downed', name: 'Downed', field: '', direction: 'drains', color: '#ef4444', defeatedWhenSpent: true, visibleToPlayers: false };
 const character = (id: string, resources: Character['resources']): Character => ({ id, kind: 'character', x: 70, y: 70, imagePath: '', name: id, resources });
@@ -41,8 +40,9 @@ function remoteStore(): ReturnType<typeof createViewAtlasStore> {
 }
 
 const tokenOf = (store: ReturnType<typeof remoteStore>, id: string): TokenEntity => store.getState().objects.tokens[id]!;
+/** The resources the token renderer reads, through the same collection sync it builds. */
 const definitionsOf = (store: ReturnType<typeof remoteStore>) => (id?: string): readonly ResourceDefinition[] =>
-  viewResourceDefinitions(store.getState(), COLLECTIONS, id);
+  new TokenCollectionSync(createInMemoryApp().app, store.getState, { refreshRules: () => undefined, refreshArt: async () => undefined }).resources(id);
 
 function tokenUi(store: ReturnType<typeof remoteStore>): TokenUIRenderer {
   const ui = new TokenUIRenderer(store);
