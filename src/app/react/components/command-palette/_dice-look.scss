@@ -65,3 +65,10 @@ $dice-preview: 72px;
 .atlas-dice-colour-strip__option--missing > .atlas-dice-colour-strip__label {
   font-style: italic;
 }
+
+// The chosen look's preview beside the dice look setting (`diceSettingsSection`).
+.atlas-dice-look-preview {
+  width: $dice-preview;
+  height: $dice-preview;
+  flex-shrink: 0;
+}

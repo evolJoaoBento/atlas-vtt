@@ -5,6 +5,7 @@ import { useDiceDisplay } from '../../hooks/useDiceDisplay';
 import { useDiceLook } from '../../hooks/useDiceLook';
 import { useDiceLookChoice } from '../../hooks/useDiceLookChoice';
 import { useDicePreviews } from '../../hooks/useDicePreviews';
+import { useLookPreviews } from '../../hooks/useLookPreviews';
 import { DICE_DISPLAY_HINTS, DICE_DISPLAY_OPTIONS } from '../../../dice3d/diceDisplay';
 import { DICE_FONT_OPTIONS } from '../../../dice3d/diceLook';
 import { SettingsService } from '../../../services/SettingsService';
@@ -20,6 +21,7 @@ export function DiceSettingsPanel(): React.ReactElement {
   const previews = useDicePreviews(app ?? undefined, look.font);
   const settings = SettingsService.forApp(app ?? undefined);
   const lookChoice = useDiceLookChoice(app ?? undefined);
+  const lookPreviews = useLookPreviews(lookChoice.choices.length > 1 ? app ?? undefined : undefined);
 
   return (
     <div className="atlas-command-palette-panel">
@@ -39,7 +41,7 @@ export function DiceSettingsPanel(): React.ReactElement {
         <h3 className="atlas-command-palette-panel-heading">Dice</h3>
         {/* Only once another plugin added a look (or one chosen is missing): Atlas alone has nothing to choose. */}
         {lookChoice.choices.length > 1 && (
-          <DiceLookStrip value={lookChoice.value} choices={lookChoice.choices} onChange={(id) => settings?.setDiceLookId(id)} />
+          <DiceLookStrip value={lookChoice.value} choices={lookChoice.choices} previews={lookPreviews} onChange={(id) => settings?.setDiceLookId(id)} />
         )}
         <DiceColourStrip value={look.colour} previews={previews} onChange={(colour) => settings?.setDiceLook({ colour })} />
         <SettingRow label="Numbers" hint="Medieval for high fantasy, sci-fi for futuristic games.">

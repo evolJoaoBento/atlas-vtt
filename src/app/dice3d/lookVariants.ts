@@ -33,6 +33,25 @@ function registrationOf(look: CustomDiceLook): number {
   return id;
 }
 
+const baseKey = (): string => `${base.look.colour}:${base.look.font}:${base.accent?.join(',') ?? ''}`;
+
+/** Atlas's own dice in the GM's colour and numbers. */
+export function atlasVariant(): LookVariant {
+  const own = resolveLook(base.look, base.accent);
+  return { key: `atlas#${baseKey()}`, look: () => own };
+}
+
+/** An extension's look with its loaded art, over the GM's numbers. */
+export function customVariant(custom: CustomDiceLook, art: LookArt): LookVariant {
+  const resolved = resolveCustomLook(base.look, custom, art);
+  return { key: `${custom.id}#${registrationOf(custom)}#${baseKey()}`, look: () => resolved };
+}
+
+/** The GM's numbers font, which every variant's fallback numerals use. */
+export function variantFont(): DiceLook['font'] {
+  return base.look.font;
+}
+
 /**
  * The look to paint a stage in for the choice `lookId` (a full look id, `''` for Atlas's own dice, undefined for
  * no choice): null for the look in effect, and meanwhile for a look not registered or whose art is still loading.
@@ -40,11 +59,7 @@ function registrationOf(look: CustomDiceLook): number {
 export function lookVariant(lookId: string | null | undefined): LookVariant | null {
   if (lookId === null || lookId === undefined) return null;
   if (lookId === (activeLook().lookId ?? '')) return null;
-  const baseKey = `${base.look.colour}:${base.look.font}:${base.accent?.join(',') ?? ''}`;
-  if (lookId === '') {
-    const own = resolveLook(base.look, base.accent);
-    return { key: `atlas#${baseKey}`, look: () => own };
-  }
+  if (lookId === '') return atlasVariant();
   const custom = customLook(lookId);
   if (!custom) return null;
   const art = readyArt.get(custom);
@@ -52,6 +67,5 @@ export function lookVariant(lookId: string | null | undefined): LookVariant | nu
     void lookArt(custom).then((loaded) => { readyArt.set(custom, loaded); });
     return null;
   }
-  const resolved = resolveCustomLook(base.look, custom, art);
-  return { key: `${lookId}#${registrationOf(custom)}#${baseKey}`, look: () => resolved };
+  return customVariant(custom, art);
 }

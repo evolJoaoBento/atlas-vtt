@@ -42,6 +42,7 @@
 
 ## Improved
 
+- The dice look setting and the command palette's Dice settings preview every dice look another plugin adds, drawn with its own faces where it gives no picture of itself
 - The presented scene keeps its marker on the scene tab until you choose Stop presenting, and an open player window follows the scene you present from anywhere. New commands: Present to players, Stop presenting
 - Fog paint and erase strokes now use consistent shapes.
 - Simplified how token artwork and collection rules update.
