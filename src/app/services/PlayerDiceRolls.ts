@@ -23,8 +23,11 @@ export class PlayerDiceRolls implements PlayerOverlay {
   private host: HTMLElement | undefined;
   private root: Root | undefined;
   private diceEvents: EventEmitter | undefined;
-  /** The presented view's store: its map's collection decides the dice look (`dice.useLook`); nothing else is read of it. */
-  private store: StoreApi<ViewAtlasState> | undefined;
+  /**
+   * The presented scene's map, taken when it is presented: its collection decides the dice look (`dice.useLook`).
+   * Holding keeps it, so the GM browsing other tabs does not change the look players see.
+   */
+  private lookPath: string | null = null;
   private sourceKey = 0;
   private isShown: boolean;
   private readonly scene = new PlayerRollScene();
@@ -50,7 +53,7 @@ export class PlayerDiceRolls implements PlayerOverlay {
   present(store: StoreApi<ViewAtlasState>, diceEvents?: EventEmitter, rollSources?: PlayerRollSources): void {
     if (this.diceEvents !== diceEvents) this.sourceKey++;
     this.diceEvents = diceEvents;
-    this.store = store;
+    this.lookPath = rollSources?.mapPath ?? store.getState().mapPath ?? null;
     this.scene.present(rollSources);
     this.render();
   }
@@ -62,7 +65,7 @@ export class PlayerDiceRolls implements PlayerOverlay {
 
   releaseSource(): void {
     this.diceEvents = undefined;
-    this.store = undefined;
+    this.lookPath = null;
     this.scene.release();
     this.sourceKey++;
     this.render();
@@ -70,7 +73,7 @@ export class PlayerDiceRolls implements PlayerOverlay {
 
   destroy(): void {
     this.diceEvents = undefined;
-    this.store = undefined;
+    this.lookPath = null;
     this.scene.release();
     this.unsubscribeSettings();
     this.unmount();
@@ -85,7 +88,7 @@ export class PlayerDiceRolls implements PlayerOverlay {
       },
     });
 
-  private readonly lookMapPath = (): string | null => this.store?.getState().mapPath ?? null;
+  private readonly lookMapPath = (): string | null => this.lookPath;
 
   private render(): void {
     if (!this.root || !this.host) return;

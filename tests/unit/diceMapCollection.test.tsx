@@ -121,11 +121,16 @@ describe("Atlas's dice in a map view know the map's collection", () => {
     await assets.addAsset({ type: 'scene', name: 'Cave', collection: 'source', tags: [], data: { mapPath: MAP } });
     await assets.updateCollectionIndexData('source', { diceLookId: 'ext:fire' });
     act(() => { harness.store.setState(sceneState(MAP, SCENE_A_TOKENS)); });
+    act(() => harness.service.presentCanvas(harness.sourceFor(), 'scene-cave'));
     captured.rolls = [];
     emitRoll(harness.bus);
     expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('ext:fire');
-    // The presented view now holds a scene outside every collection: the GM's look (Atlas's own).
-    act(() => { harness.store.setState(sceneState('maps/elsewhere.atlasmap', SCENE_A_TOKENS)); });
+    // While the window holds its picture the GM browses a scene outside every collection: players keep the presented look.
+    act(() => { harness.service.holdCurrentFrame(); harness.store.setState(sceneState('maps/elsewhere.atlasmap', SCENE_A_TOKENS)); });
+    emitRoll(harness.bus);
+    expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('ext:fire');
+    // That scene presented: the GM's look (Atlas's own).
+    act(() => harness.service.presentCanvas(harness.sourceFor(), 'scene-elsewhere'));
     emitRoll(harness.bus);
     expect(captured.rolls.at(-1)?.at(-1)?.scene.lookId).toBe('');
   });
