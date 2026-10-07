@@ -40,6 +40,7 @@ function assertRequest(request: unknown): asserts request is DiceRollRequest {
  */
 export function diceApi(
   app: App, disposers: DisposerSet, views: ViewTracker | null = null, registerLook?: DiceApi['registerLook'], registerColours?: DiceApi['registerColours'],
+  lookChoice?: Pick<Required<DiceApi>, 'useLook' | 'lookFor'>,
 ): DiceApi {
   const dispatch = (result: DiceRollResult): void => {
     // Atlas's own log, toasts, sounds and the player window follow each map view's bus (upstream #277): every open GM
@@ -97,5 +98,6 @@ export function diceApi(
     },
     ...(registerLook ? { registerLook } : {}),
     ...(registerColours ? { registerColours } : {}),
+    ...(lookChoice ?? {}),
   });
 }

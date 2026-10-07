@@ -44,7 +44,7 @@ export declare interface AtlasApi {
     connect(plugin: ConnectingPlugin): AtlasExtension;
 }
 
-export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs' | 'collections' | 'dice-colours';
+export declare type AtlasCapability = 'views' | 'presentation' | 'rules' | 'lighting' | 'tokens' | 'dice' | 'lasers' | 'ui' | 'scenes' | 'bundles' | 'settings' | 'storage' | 'remote-view' | 'dice-looks' | 'scene-tabs' | 'asset-tabs' | 'collections' | 'dice-colours' | 'dice-look-choice';
 
 export declare interface AtlasEvents {
     /** Atlas is unloading; everything is disposed after this. */
@@ -385,6 +385,21 @@ export declare interface DiceApi {
      * that is not a function.
      */
     registerColours?(provider: (collectionId: string) => readonly DiceColour[]): Disposer;
+    /**
+     * 1.18.0 (`dice-look-choice`): chooses the dice look. `lookId` is one of this extension's look ids (as given to
+     * `registerLook`), `''` for Atlas's own dice, or null. With `options.collectionId` it is that collection's choice:
+     * Atlas throws the rolls of its maps in it, wherever they are shown (the GM's map views, the player window,
+     * `dice.throw`), and null clears it, so the collection follows the GM's default again. Without a collection it sets
+     * the GM's default, the dice look in Atlas's settings (null: Atlas's own dice). The choice is kept by full id while
+     * the look is not registered, and the default's look shows meanwhile. A collection's choice lives in the asset index
+     * alone, as `collections.setData` does, and `collections-changed` tells it; the default's, `settings-changed`.
+     * Rejects for a collection that does not exist; throws for a malformed `lookId` or options.
+     */
+    useLook?(lookId: string | null, options?: {
+        collectionId?: string;
+    }): Promise<void>;
+    /** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in (its own choice, else the default), or (no collection) the default; frozen. */
+    lookFor?(collectionId?: string | null): Promise<DiceLookInEffect>;
 }
 
 /** 1.18.0 (`dice-colours`): a colour dice can be rolled in, as the dice tray offers it: the shape of a die's tag. */
@@ -410,6 +425,16 @@ export declare type DiceFaceArt = CanvasImageSource | string;
  * die is a d10). A d2 and a d3 are thrown as a d6 and wear its faces.
  */
 export declare type DiceLookDie = 4 | 6 | 8 | 10 | 12 | 20 | 100;
+
+/** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in, or the GM's default. */
+export declare interface DiceLookInEffect {
+    /** A full look id (`<extension id>:<look id>`), or `''` for Atlas's own dice. */
+    lookId: string;
+    /** `collection`: the collection chose it (`useLook` with `collectionId`); `default`: it follows the GM's choice. */
+    from: 'collection' | 'default';
+    /** False while the look's extension has not registered it: Atlas's dice in the GM's colour show meanwhile, and the choice stays. */
+    loaded: boolean;
+}
 
 /**
  * A dice look an extension adds (`dice.registerLook`). Atlas keeps its own dice, throw, sounds and result: only the

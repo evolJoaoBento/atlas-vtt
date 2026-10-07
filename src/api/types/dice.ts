@@ -61,6 +61,16 @@ export interface DiceColour {
   color: string;
 }
 
+/** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in, or the GM's default. */
+export interface DiceLookInEffect {
+  /** A full look id (`<extension id>:<look id>`), or `''` for Atlas's own dice. */
+  lookId: string;
+  /** `collection`: the collection chose it (`useLook` with `collectionId`); `default`: it follows the GM's choice. */
+  from: 'collection' | 'default';
+  /** False while the look's extension has not registered it: Atlas's dice in the GM's colour show meanwhile, and the choice stays. */
+  loaded: boolean;
+}
+
 /** How `dice.publish` shows a roll (1.16.0). */
 export interface DicePublishOptions {
   /** False: logged, toasted and shown in the player window as before, but never thrown in 3D (a result card instead). Default true. */
@@ -111,4 +121,17 @@ export interface DiceApi {
    * that is not a function.
    */
   registerColours?(provider: (collectionId: string) => readonly DiceColour[]): Disposer;
+  /**
+   * 1.18.0 (`dice-look-choice`): chooses the dice look. `lookId` is one of this extension's look ids (as given to
+   * `registerLook`), `''` for Atlas's own dice, or null. With `options.collectionId` it is that collection's choice:
+   * Atlas throws the rolls of its maps in it, wherever they are shown (the GM's map views, the player window,
+   * `dice.throw`), and null clears it, so the collection follows the GM's default again. Without a collection it sets
+   * the GM's default, the dice look in Atlas's settings (null: Atlas's own dice). The choice is kept by full id while
+   * the look is not registered, and the default's look shows meanwhile. A collection's choice lives in the asset index
+   * alone, as `collections.setData` does, and `collections-changed` tells it; the default's, `settings-changed`.
+   * Rejects for a collection that does not exist; throws for a malformed `lookId` or options.
+   */
+  useLook?(lookId: string | null, options?: { collectionId?: string }): Promise<void>;
+  /** 1.18.0 (`dice-look-choice`): the dice look a collection's maps throw in (its own choice, else the default), or (no collection) the default; frozen. */
+  lookFor?(collectionId?: string | null): Promise<DiceLookInEffect>;
 }

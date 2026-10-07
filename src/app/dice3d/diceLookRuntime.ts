@@ -14,6 +14,7 @@ import { refreshDieArtwork } from './dieMesh';
 import { makeDie, restImmediately } from './dieMotion';
 import { activeLook, resolveCustomLook, resolveLook, setActiveLook } from './dieSkin';
 import { borrowStage, returnStage } from './stagePool';
+import { setVariantBase } from './lookVariants';
 
 /** Obsidian's accent colour in this document, as channels; null when the theme reports none. */
 export function readAccent(doc: Document): Rgb | null {
@@ -36,7 +37,9 @@ export async function applyDiceLook(look: DiceLook, doc: Document = getDomHost()
   const serial = ++applying;
   const [art] = await Promise.all([custom ? lookArt(custom) : null, loadDiceArtwork(look.font)]);
   if (serial !== applying) return;
-  setActiveLook(custom && art ? resolveCustomLook(look, custom, art) : resolveLook(look, readAccent(doc)));
+  const accent = readAccent(doc);
+  setVariantBase(look, accent);
+  setActiveLook(custom && art ? resolveCustomLook(look, custom, art) : resolveLook(look, accent));
   refreshDieArtwork();
 }
 

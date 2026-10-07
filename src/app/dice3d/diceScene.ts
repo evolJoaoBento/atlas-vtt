@@ -60,6 +60,8 @@ const MIMIC: Record<number, { body: DieSides; fold: number }> = {
 
 export interface DiceScene {
   plan: DiePlan[];
+  /** The dice look of the roll's map (a collection's choice, else the GM's): a full look id, `''` for Atlas's own; unset paints the look in effect. */
+  lookId?: string;
   /** Face each die lands on, in plan order. */
   faces: number[];
 }

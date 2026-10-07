@@ -1,5 +1,5 @@
 import type { EventEmitter } from 'events';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAtlasUI } from '../../root/AtlasUIContext';
 import { useDiceDisplay } from '../../hooks/useDiceDisplay';
@@ -16,6 +16,9 @@ import { DiceRollStack } from '../dice3d/DiceRollStack';
 import { closeAllRolls, closeRoll, dismissRoll, pushRoll, type StackedRoll } from '../dice3d/rollStackState';
 import { canRunMapHotkeys } from '../../../keyboard/mapHotkeys';
 import { DiceToast } from './DiceToast';
+import { lookVariant } from '../../../dice3d/lookVariants';
+import { mapDiceLookId } from '../../../services/mapDiceLook';
+import { useOptionalAtlasStore } from '../../ViewStoreContext';
 import { DICE_TOAST_KNOT_PATHS, DICE_TOAST_KNOT_SYMBOL_ID } from './diceToastOrnament';
 import { useDiceToasts } from './useDiceToasts';
 
@@ -43,6 +46,11 @@ export function DiceRollDisplay({ container, prepare, muted = false, eventBus: s
   const [rolls, setRolls] = useState<readonly StackedRoll[]>([]);
   /** Where the dice stages live: a canvas and its context belong to one document. */
   const stageDoc = container?.ownerDocument ?? view?.containerEl.doc ?? document;
+  // The map's collection may choose its own dice look (`dice.useLook`), read at each throw; its art loads ahead.
+  const mapPath = useOptionalAtlasStore((state) => state.mapPath, null);
+  const lookOf = useRef((): string | undefined => undefined);
+  lookOf.current = (): string | undefined => (app ? mapDiceLookId(app, mapPath) : undefined);
+  useEffect(() => { lookVariant(lookOf.current()); }, [app, mapPath]);
 
   /** Throws `result` on `scene`, or shows it as a card without one. */
   const show = useCallback((result: DiceRollResult, scene: DiceScene | null): void => {
@@ -52,7 +60,9 @@ export function DiceRollDisplay({ container, prepare, muted = false, eventBus: s
       return;
     }
     if (!muted) warmDiceSounds();
-    setRolls((prev) => pushRoll(prev, { result, scene, style: throwStyle(display) }));
+    const lookId = lookOf.current();
+    const shown = lookId === undefined ? scene : { ...scene, lookId };
+    setRolls((prev) => pushRoll(prev, { result, scene: shown, style: throwStyle(display) }));
   }, [addToast, display, muted, stageDoc]);
 
   useEffect(() => {
