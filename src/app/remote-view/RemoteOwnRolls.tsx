@@ -4,6 +4,7 @@ import { throwStyle } from '../dice3d/diceDisplay';
 import { givenRollScene } from '../dice3d/givenThrows';
 import { warmDiceSounds } from '../dice3d/audio/diceSamples';
 import { canShowDice, warmStages } from '../dice3d/stagePool';
+import { lookVariant } from '../dice3d/lookVariants';
 import { canRunMapHotkeys } from '../keyboard/mapHotkeys';
 import { DiceRollStack } from '../react/components/dice3d/DiceRollStack';
 import { closeAllRolls, closeRoll, dismissRoll, pushRoll, type StackedRoll } from '../react/components/dice3d/rollStackState';
@@ -26,6 +27,9 @@ import { useAtlasStore } from '../react/ViewStoreContext';
 export function RemoteOwnRolls(): React.ReactElement | null {
   const { app, view } = useAtlasUI();
   const ownRoll = useAtlasStore((state) => state.remoteView?.ownRoll ?? null);
+  // The look of the scene's collection on the owner's side (`RemoteView.setDiceLook`); its art loads ahead.
+  const diceLookId = useAtlasStore((state) => state.remoteView?.diceLookId ?? null);
+  useEffect(() => { lookVariant(diceLookId); }, [diceLookId]);
   const display = useDiceDisplay(app ?? undefined);
   const look = useDiceLook(app ?? undefined);
   const { toasts, addToast, dismissToast, dismissAllToasts } = useDiceToasts();
@@ -45,8 +49,9 @@ export function RemoteOwnRolls(): React.ReactElement | null {
       return;
     }
     warmDiceSounds();
-    setRolls((prev) => pushRoll(prev, { result: ownRoll, scene, style: throwStyle(display) }));
-  }, [ownRoll, display, addToast, stageDoc]);
+    const thrown = diceLookId === null ? scene : { ...scene, lookId: diceLookId };
+    setRolls((prev) => pushRoll(prev, { result: ownRoll, scene: thrown, style: throwStyle(display) }));
+  }, [ownRoll, display, addToast, stageDoc, diceLookId]);
 
   useEffect(() => {
     if (display !== 'card') warmStages(stageDoc);

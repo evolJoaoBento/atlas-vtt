@@ -1206,6 +1206,13 @@ export declare interface RemoteView {
     /** Throws one of the player's own rolls with their Atlas dice look; a result card where WebGL is unavailable. Once per result id. */
     throwRoll(result: DiceRollResult): void;
     /**
+     * 1.18.0: the dice look the view's rolls are thrown in, for a scene whose collection chose one on the owner's side (its
+     * `dice.lookFor(collectionId).lookId`): a full look id, `''` for Atlas's own dice, or null (the default) for the
+     * player's own look. A look the player's Atlas has not registered shows the player's own meanwhile. Throws for anything
+     * but a string of at most 300 characters or null.
+     */
+    setDiceLook?(lookId: string | null): void;
+    /**
      * Shows `camera`'s world area as large as fits the view, gliding with `animate`, else at once; it keeps showing it through
      * resizes until the player moves the camera. `padded` leaves the margin the remote view's Fit map (Shift+1) leaves around the map (16 screen
      * pixels), for a Fit button of your own. Throws when `camera` is not finite numbers with a size above 0.

@@ -59,6 +59,7 @@ export class RemoteViewHandle implements RemoteViewOwner {
       onStatusAction: (listener: (id: string) => void): Disposer => this.dice?.statusActions.add(listener) ?? noop,
       setDiceLog: (entries: unknown): void => { this.dice?.setDiceLog(entries); },
       throwRoll: (result: unknown): void => { this.dice?.throwRoll(result); },
+      setDiceLook: (lookId: unknown): void => { this.dice?.setDiceLook(lookId); },
       onRoll: (listener: RollListener): Disposer => this.dice?.rolls.add(listener) ?? noop,
       onClose: (listener: () => void): Disposer => this.closeListeners.add(listener),
       close: (): void => this.close(),

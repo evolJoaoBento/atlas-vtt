@@ -125,6 +125,14 @@ export class RemoteViewDice {
     updateRemoteView(this.store, { ownRoll: frozenCopy(withCleanTags(result)) });
   }
 
+  /** The look the view's rolls are thrown in: a full look id, `''` for Atlas's dice, or null for the player's own. */
+  setDiceLook(given: unknown): void {
+    if (given !== null && (typeof given !== 'string' || given.length > 300)) {
+      throw new Error('[Atlas API] RemoteView.setDiceLook: the look must be a look id of at most 300 characters, or null.');
+    }
+    updateRemoteView(this.store, { diceLookId: given });
+  }
+
   /** Asks the listeners in turn until one sends the roll; null once sent, else the first reason given. */
   roll(dice: Readonly<Record<string, number>>, modifier: number): string | null {
     const picked: Record<string, number> = {};
