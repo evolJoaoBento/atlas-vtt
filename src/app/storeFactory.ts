@@ -28,13 +28,12 @@ import { createInitialLootRollerState, createLootRollerActions, readLootRollerSt
 import { isRecord } from './utils/guards';
 import { initialRemoteViewState, type RemoteViewState } from './remote-view/remoteViewState';
 import { getHistoryStore, withHistory } from './stores/history';
-import { withoutCollectionWidgets } from './utils/collectionWidgets';
 import { withWidgetOff } from './utils/widgetActivation';
 import { createMapObjectsActions, type MapObjectsSlice } from './stores/mapObjectsSlice';
 import { computeNextInstanceNumber } from './stores/tokenInstanceNumbers';
 import { raiseTokens } from './stores/tokenStacking';
 import type { DiceRollResult } from './types/diceTypes';
-import { persistableDiceLog } from './tools/diceRolling';
+import { createPersistedParts } from './services/persistedParts';
 import { isAtlasToolAvailable } from './tools/toolAvailability';
 import { readExploredMask } from './lighting/exploredMaskCodec';
 import { clampLitThreshold, readSceneLighting } from './lighting/sceneLightingOptions';
@@ -370,6 +369,9 @@ export function createViewAtlasStore(
   let storeRef: Pick<StoreApi<ViewAtlasState>, 'getState'> | null = null;
 
   const hydrations = new HydrationTracker();
+  // Derived parts of the saved slice keep their identity while their inputs do, so the save's comparison by reference
+  // (persistedSliceChanged) holds for them too.
+  const persistedParts = createPersistedParts();
 
   // Keep a reference to the delayed storage so we can expose flush() on the store
   let delayedStorageRef: ReturnType<typeof createDelayedStorage> | null = null;
@@ -1426,10 +1428,7 @@ export function createViewAtlasStore(
             }
 
             // Collection-wide widgets are saved in the collection settings, not in the scene
-            const sceneWidgets = withoutCollectionWidgets({
-              widgets: state.widgetSettings.widgets,
-              widgetValues: state.widgetValues,
-            });
+            const sceneWidgets = persistedParts.widgets(state.widgetSettings, state.widgetValues);
             
             return {
               schema: state.schema,
@@ -1440,12 +1439,12 @@ export function createViewAtlasStore(
               objects: state.objects,
               camera: state.camera,
               widgetValues: sceneWidgets.widgetValues,
-              widgetSettings: { ...state.widgetSettings, widgets: sceneWidgets.widgets },
+              widgetSettings: sceneWidgets.widgetSettings,
               dmNotePath: state.dmNotePath, // DM note linking
               tokenSettings: state.tokenSettings, // Token display settings
               initiative: state.initiative, // Initiative tracker state
               initiativeTrackerOpen: state.initiativeTrackerOpen, // Initiative tracker open/closed state
-              diceLog: persistableDiceLog(state.diceLog), // Dice roll history (last 20 per map); rolls by others stay in memory
+              diceLog: persistedParts.diceLog(state.diceLog), // Dice roll history (last 20 per map); rolls by others stay in memory
               pinnedNotePreviews: state.pinnedNotePreviews, // Pinned note preview windows
               lootRoller: state.lootRoller, // Loot roller window, filters and history
               lighting: state.lighting,

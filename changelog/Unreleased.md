@@ -72,6 +72,7 @@
 - A cone angle edited by hand to a value no cone can open with measures as 90 degrees, in every view alike
 - Renaming a map while its explored areas wait to be saved saves them into the renamed map
 - A statblock note rewritten on export keeps its byte order mark
+- Selecting, hovering, switching tools and other changes to nothing a map saves no longer rewrite the map file
 - A widget, condition or game system preset whose icon name is not one of Atlas's icons but a built-in word such as `constructor` shows the default icon, or the condition's initial, instead of an empty badge
 - Fog now updates correctly when returning to a map or canceling a drawing.
 - Erasing part of a drawing now keeps all saved properties on the remaining pieces.
