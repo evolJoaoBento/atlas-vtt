@@ -3,6 +3,7 @@ import { DiceGpu } from './DiceGpu';
 import { DiceRenderer, stagePixelRatio } from './DiceRenderer';
 import { bodySides, LOOK_BODIES } from './dieBody';
 import { loadDiceArtwork } from './dieArtwork';
+import { releaseDieVariants } from './dieMesh';
 import { makeDie } from './dieMotion';
 
 /**
@@ -130,6 +131,7 @@ export function releaseStagePool(doc: Document): void {
 /** Gives back every document's context: Atlas unloads. */
 export function releaseStagePools(): void {
   for (const doc of [...documents.keys()]) releaseStagePool(doc);
+  releaseDieVariants();
 }
 
 /**

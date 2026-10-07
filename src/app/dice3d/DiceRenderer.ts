@@ -24,7 +24,7 @@ import * as THREE from 'three';
 import type { DiceGpu } from './DiceGpu';
 import type { DieSides } from './dieGeometry';
 import type { DieBody } from './dieBody';
-import { dieAssets } from './dieMesh';
+import { dieVariantAssets, type LookVariant } from './dieMesh';
 import type { DieAnim } from './dieMotion';
 import { FLOOR_Y } from './dieTour';
 import { chainLengthFor, GhostTrail } from './ghostTrail';
@@ -96,9 +96,10 @@ export class DiceRenderer {
   /**
    * One mesh per planned die; dice of the same kind share geometry and
    * material. Each gets a chain of ghosts, shorter the more dice there are
-   * (`chainLengthFor`).
+   * (`chainLengthFor`). A die with a tint (`#rrggbb`, by plan index) or a stage
+   * in a look of its own (`look`) is painted with its own material (`dieVariantAssets`).
    */
-  setPlan(bodies: readonly DieBody[]): void {
+  setPlan(bodies: readonly DieBody[], options: { tints?: ReadonlyArray<string | null | undefined>; look?: LookVariant | null } = {}): void {
     for (const mesh of this.meshes) this.scene.remove(mesh);
     this.trails.clear();
     this.landed = bodies.map(() => false);
@@ -106,8 +107,8 @@ export class DiceRenderer {
 
     const chainLength = chainLengthFor(bodies.length);
 
-    this.meshes = bodies.map((body) => {
-      const assets = dieAssets(body);
+    this.meshes = bodies.map((body, index) => {
+      const assets = dieVariantAssets(body, options.look ?? null, options.tints?.[index] ?? null);
       const mesh = new THREE.Mesh(assets.geometry, assets.material);
       mesh.castShadow = true;
       mesh.visible = false;

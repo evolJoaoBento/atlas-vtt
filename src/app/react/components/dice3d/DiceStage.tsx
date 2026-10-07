@@ -115,7 +115,7 @@ export function DiceStage({ scene, crit, onSettled, muted, style, frame, seed, l
       burst: burstOf(scene.plan, i),
     }));
     stepRandoms.current = scene.plan.map((_, i) => throwRandom(seed, 1000 + i));
-    rendererRef.current?.setPlan(scene.plan.map(planBody));
+    rendererRef.current?.setPlan(scene.plan.map(planBody), { tints: scene.plan.map((die) => die.tint) });
   }, [scene, offsets, radius, seed]);
 
   const paint = useCallback((): void => {

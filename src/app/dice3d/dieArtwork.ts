@@ -25,7 +25,7 @@ import type { DiceFont } from './diceLook';
 import { bodySides, type DieBody } from './dieBody';
 import { dieGeometry, type DieSides } from './dieGeometry';
 import { loadImage, loadNumerals, numeralsReady } from './dieNumerals';
-import { activeLook, paintCard, paintWear } from './dieSkin';
+import { activeLook, paintCard, paintWear, type ResolvedLook } from './dieSkin';
 import { paintFaceMarks, paintFaceRelief } from './faceArt';
 
 let cardStock: HTMLImageElement | null = null;
@@ -92,17 +92,17 @@ export interface DieTextures {
  * Randomised separately, the relief would look like scratches on a photo of
  * paper.
  */
-export function buildTextures(body: DieBody): DieTextures {
+export function buildTextures(body: DieBody, lookOf: () => ResolvedLook = activeLook): DieTextures {
   const sides = bodySides(body);
   // Read at every redraw, so a new look reaches the faces with `refreshDieArtwork`.
-  const albedo = (look = activeLook()): HTMLCanvasElement =>
+  const albedo = (look = lookOf()): HTMLCanvasElement =>
     drawAtlas(sides, (ctx, { x, y, value }) => {
       paintCard(ctx, x, y, sides * 31 + (value ?? 0) * 7 + 5, cardStock, look);
       paintWear(ctx, x, y, value === null, look);
       if (value !== null) paintFaceMarks(ctx, x, y, body, value, look);
     });
 
-  const bump = (look = activeLook()): HTMLCanvasElement =>
+  const bump = (look = lookOf()): HTMLCanvasElement =>
     drawAtlas(sides, (ctx, { x, y, value }) => {
       ctx.fillStyle = '#8a8a8a';
       ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
