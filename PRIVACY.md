@@ -9,6 +9,8 @@ Atlas VTT works offline. Maps, tokens, notes, audio and settings stay in your va
 
 If you set a token or map background to an `http://` or `https://` image URL, or copy an image that a note embeds from an external URL, that image is downloaded from the address in question. Images stored in your vault cause no network traffic.
 
+Another Obsidian plugin can open a read-only map view through Atlas's extension API and show it a scene it supplies. Atlas loads that scene's `https:` image links from the web, and only in that view. Atlas itself never opens such a view, and without such a plugin no image is loaded this way.
+
 ## Files outside the vault
 
 Atlas VTT does not read or write files outside your vault.
