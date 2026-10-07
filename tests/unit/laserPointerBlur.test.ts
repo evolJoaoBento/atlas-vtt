@@ -15,7 +15,7 @@ function makeRenderer(): {
     scale: { x: 1 },
     toWorld: (point: { x: number; y: number }) => ({ x: point.x, y: point.y }),
   });
-  // The active tool as the renderer reads it since upstream #288: a read-only source.
+  // The active tool as the renderer reads it since #288: a read-only source.
   const activeTool = { get: () => 'laser-pointer', subscribe: () => (): void => undefined };
   const pixiApp = { renderer: { name: 'canvas' }, ticker: { add: vi.fn(), remove: vi.fn() } };
   const canvas = document.createElement('canvas');

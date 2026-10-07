@@ -61,7 +61,7 @@ export function lightingApi(tracker: ViewTracker, frames: SightFramesByView, dis
       const stopDue = frames.onDue(view, call);
       const unsubscribe = view.atlasStore.subscribe((state, previous) => {
         renderer.retry();
-        // Committed fog hides the tokens under it from the players' frame (upstream #303).
+        // Committed fog hides the tokens under it from the players' frame (#303).
         if (WATCHED.some((key) => state[key] !== previous[key]) || state.objects.fog !== previous.objects.fog) call();
       });
       let cancelClose: () => void = () => undefined;

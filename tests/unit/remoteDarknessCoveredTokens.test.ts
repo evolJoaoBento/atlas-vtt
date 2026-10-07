@@ -8,7 +8,7 @@ import type { FogOperation } from '../../src/app/types/fogTypes';
 import { stubJsdomGraphics } from '../mocks/jsdomGraphics';
 
 /**
- * A remote view is a player view, so upstream #303 hides every token whose centre is under its committed fog, and an
+ * A remote view is a player view, so #303 hides every token whose centre is under its committed fog, and an
  * extension that feeds a lit scene's darkness as a fog operation (Connect) has that darkness count as fog: a token whose
  * centre lies in a dark cell is left out whole, also while the player drags it, where before #303 the opaque fog only
  * covered the part of it under the dark. This pins that: it hides more, never less.

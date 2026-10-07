@@ -89,7 +89,7 @@ describe('text box layout', () => {
  * Atlas's token UI files hold some of these values privately, so the shared layout keeps its own copies.
  * These tests fail when one side changes a value, and say which copy to update.
  */
-describe('parity with upstream token UI values', () => {
+describe('parity with the token UI renderers' own values', () => {
   const source = (path: string): string => readFileSync(path, 'utf8');
   const bars = source('src/app/pixi/token-renderer/resources/ResourceBarView.ts');
 
@@ -98,7 +98,7 @@ describe('parity with upstream token UI values', () => {
       border: BAR_BORDER, borderColor: BAR_STYLE.border, trackColor: BAR_STYLE.inside, fillInset: BAR_FILL_INSET,
       tickColor: BAR_STYLE.tick, tickAlpha: BAR_STYLE.tickAlpha,
     });
-    // Upstream writes the tick width and count inline
+    // The renderer writes the tick width and count inline
     expect(bars).toMatch(/width: 0\.5, color: BAR_LOOK\.tickColor/);
     expect(BAR_STYLE.tickWidth).toBe(0.5);
     expect(bars).toMatch(/for \(let i = 1; i < 10; i\+\+\)/);

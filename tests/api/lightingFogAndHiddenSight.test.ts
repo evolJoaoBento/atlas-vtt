@@ -9,7 +9,7 @@ import { character, fixtureLighting, lightingFromStore, scene, wall } from '../u
 import { fakeView, framesFor, loadMap, trackerWith, type FakeView } from './apiFakes';
 
 /**
- * What upstream's player window hides since 0.6.1-beta (#296, #303), `lighting.playerVisibility` hides too: a token under
+ * What the player window hides since 0.6.1-beta (#296, #303), `lighting.playerVisibility` hides too: a token under
  * committed fog, every token while the fog cannot be drawn, and whatever only a GM-hidden token's vision would show.
  */
 
@@ -35,7 +35,7 @@ const tokensOf = (answer: PlayerVisibility): Record<string, string> => {
   return answer.status === 'ready' ? { ...answer.tokens } : {};
 };
 
-describe('player visibility and fog (upstream #303)', () => {
+describe('player visibility and fog (#303)', () => {
   it('a token under committed fog is unseen, and seen again once the fog over it is erased', () => {
     const { view, api } = setup();
     view.setPlayerLighting(fixtureLighting({ perception: () => 'seen', fog: fogCoverage({ paint: rect('paint', 1, 700) }) }));
@@ -118,7 +118,7 @@ describe('player visibility and fog on an unlit scene', () => {
   });
 });
 
-describe('player visibility and GM-hidden tokens (upstream #296)', () => {
+describe('player visibility and GM-hidden tokens (#296)', () => {
   /** Daylight, a wall at x = 500. The hero sees the left half; the scout, on the right, sees the goblin there. */
   const walled = (scoutHidden: boolean) => lightingFromStore(scene({ ambient: 1 }, {
     tokens: {

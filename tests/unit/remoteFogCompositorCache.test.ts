@@ -7,7 +7,7 @@ import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { remoteScene, remoteToken } from './remoteSceneFixtures';
 
 /**
- * A remote view's fog is fed from outside, often (a lit scene's darkness changes on its own). Upstream's fog renderer
+ * A remote view's fog is fed from outside, often (a lit scene's darkness changes on its own). Atlas's fog renderer
  * (#300) keeps one view's committed coverage in a `FogCoverageCache`, keyed by the fog record's identity and grown by an
  * appended operation. The remote view's scene applier hands the same record while its operations stay the same, so
  * feeding the scene again works nothing out anew, and one more operation is applied to the coverage there was.

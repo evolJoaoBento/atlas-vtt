@@ -111,7 +111,7 @@ describe('what the dice log saves', () => {
   });
 });
 
-describe('formulas Atlas does not roll (upstream #275)', () => {
+describe('formulas Atlas does not roll (#275)', () => {
   const rules: DiceRules = { defaultRoll: '1d20', crit: 'natural' };
 
   it('refuses them before any die is rolled, saying why', () => {

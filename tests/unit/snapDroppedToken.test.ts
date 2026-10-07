@@ -5,7 +5,7 @@ import { toGridOptions } from '../../src/app/grid/gridStateOptions';
 import type { GridState } from '../../src/app/services/MapPersistence';
 
 /**
- * A dropped token snaps as the GM's drag does (`GridSystem.snapTokenCenter`, upstream #207), on a grid
+ * A dropped token snaps as the GM's drag does (`GridSystem.snapTokenCenter`, #207), on a grid
  * the players see, one that is hidden or switched off, and none at all.
  */
 const SIZE = 70;

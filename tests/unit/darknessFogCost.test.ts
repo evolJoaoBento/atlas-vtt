@@ -1,6 +1,6 @@
 /**
  * A remote view's fog holds a lit scene's darkness as one operation after every fog operation the
- * GM painted, and the darkness changes on its own. Since upstream #300 the fog is drawn from one
+ * GM painted, and the darkness changes on its own. Since #300 the fog is drawn from one
  * committed coverage (`fogCoverage`, clipper unions), so each change must apply only the darkness
  * to the coverage of the GM's operations, never replay them all: with 2,000 GM operations a replay
  * takes seconds. `fogCoverage` keeps the shape before the operation applied last for that.

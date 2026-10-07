@@ -43,7 +43,7 @@ export function diceApi(
   lookChoice?: Pick<Required<DiceApi>, 'useLook' | 'lookFor'>,
 ): DiceApi {
   const dispatch = (result: DiceRollResult): void => {
-    // Atlas's own log, toasts, sounds and the player window follow each map view's bus (upstream #277): every open GM
+    // Atlas's own log, toasts, sounds and the player window follow each map view's bus (#277): every open GM
     // map view hears the roll, a remote view none (its log is its owner's). One view's failure never stops the others.
     for (const view of views?.views() ?? []) {
       if (isRemoteView(view)) continue;
@@ -62,7 +62,7 @@ export function diceApi(
       try {
         rolled = rollByRules(request.formula, mapDiceRules(app, request.mapPath ?? null));
       } catch (error) {
-        // Atlas's dice tray refuses the same formulas (upstream #275); nothing was rolled or logged.
+        // Atlas's dice tray refuses the same formulas (#275); nothing was rolled or logged.
         if (error instanceof DiceFormulaError) throw new Error(`[Atlas API] dice.roll: ${error.message}`);
         throw error;
       }

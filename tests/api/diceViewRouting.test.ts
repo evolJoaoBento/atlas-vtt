@@ -10,7 +10,7 @@ import { createInMemoryApp } from '../mocks/inMemoryVault';
 import { fakeView, trackerWith, type FakeView } from './apiFakes';
 
 /**
- * Upstream #277 keeps Atlas's own rolls in the map view that made them: each view's log, toasts, sounds and the player
+ * #277 keeps Atlas's own rolls in the map view that made them: each view's log, toasts, sounds and the player
  * window hear its `dice-rolled` bus event. The API keeps its contract on top of that: `roll` and `publish` reach every
  * open GM map view (never a remote view, whose log is its owner's), and `onRolled` hears every roll Atlas logs once.
  */

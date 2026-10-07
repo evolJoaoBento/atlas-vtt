@@ -1,7 +1,7 @@
 /**
  * Every roll Atlas logs, announced once to whoever follows them all (`dice.onRolled`). Atlas's own displays (the dice
  * log, toasts, sounds, the player window) never listen here: they follow their own map view's `dice-rolled` bus event
- * (upstream #277), so a roll stays in the view that made it. Nothing is dispatched on `document`.
+ * (#277), so a roll stays in the view that made it. Nothing is dispatched on `document`.
  */
 import type { DiceRollResult } from '../types/diceTypes';
 

@@ -9,7 +9,7 @@ import { perceive } from '../../src/app/vision/perception';
 import { pointInPolygon } from '../../src/app/vision/visibility';
 import { character, exploredImage, light, MAP, lightingFromStore, scene, wall, type Scene } from './lightingFixtures';
 
-/** What the window's rules say of one point, asked point by point with upstream's own functions. */
+/** What the window's rules say of one point, asked point by point with Atlas's own functions. */
 function shownByTheRules(lighting: PlayerLighting, explored: ExploredImage | null, x: number, y: number): boolean {
   const point = { x, y };
   const level = (): ReturnType<typeof lightLevelAt> => lightLevelAt(point, lighting.ambient, lighting.reaches);

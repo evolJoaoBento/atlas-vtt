@@ -4,7 +4,7 @@ import { DiceToastObserver } from '../../src/app/services/DiceToastObserver';
 import type { SoundEffectService } from '../../src/app/services/SoundEffectService';
 import { rollFormula, type DiceRollResult } from '../../src/app/tools/diceRolling';
 
-/** The view's bus, where its sound observer hears its rolls (upstream #277). */
+/** The view's bus, where its sound observer hears its rolls (#277). */
 const bus = new EventEmitter();
 
 function observe(display: 'card' | 'fast' | 'full'): { playDiceResult: ReturnType<typeof vi.fn>; observer: DiceToastObserver } {

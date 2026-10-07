@@ -147,6 +147,7 @@ Later 0.6.1 betas, in API 1.18.0 (no type changed shape):
 - **Errors.** A malformed call throws (an async call rejects) with `[Atlas API] <namespace>.<method>: <what is wrong>`, in English whatever Atlas's language.
 - **Optional members.** From 1.12.0 on, a member added to a namespace that already shipped is typed optional (`dice.throw`, `scenes.replaceMap`, `RemoteView.onStatusAction`, `dice.registerLook`, `views.showTab`, `ui.addSceneTabMenuSection`, `PresentationTarget.tabBadge`, `SceneSnapshot.tabId`, `ui.addAssetTab`, `ui.addCollectionSettingsTab`, `collections`, `dice.registerColours`, `dice.useLook`, `dice.lookFor`, `RemoteView.setDiceLook`), so call it as `extension.dice.throw?.(...)`. Earlier additions (`bundles.forgetNoteProperties`, 1.11.0) and the members of the 1.1.0 to 1.8.0 namespaces are required. Whole namespaces are gated by `has()`.
 - **Unknown views.** A call naming a view that is not open never throws: it answers `null`, `false` or a pending result, or gives a disposer that does nothing.
+- **Spelling.** Names the API itself gives are spelled `colour`, as Atlas's own dice settings are (`settings.get('diceLook').colour`): the `dice-colours` capability, `dice.registerColours`, `DiceColour` and a look's `body.colour`. A field that carries the colour of one of Atlas's records keeps that record's spelling, `color`: a die's tag (`color`, `colorName`, the shape Atlas's physical dice write), a `DiceColour` entry's `color` (which becomes that tag), a laser's `color` and `settings.get('laserPointer').color`.
 
 ## Reference by group
 
