@@ -89,6 +89,32 @@ describe('ExtensionApiPublisher', () => {
     expect(triggered).toEqual([{ name: 'atlas-vtt:api-ready', data: [plugin.api] }]);
   });
 
+  it('does no work for extensions until the first one connects: no tracker, no watches', async () => {
+    initialize.mockResolvedValue(undefined);
+    const { plugin } = atlas();
+    const on = vi.spyOn(plugin.app.workspace, 'on');
+    const onChange = vi.spyOn(plugin.settingsService, 'onChange');
+    const publisher = new ExtensionApiPublisher(plugin);
+    await publisher.start();
+    expect(plugin.api).toBeDefined();
+    expect(on).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled();
+    expect(sceneListeners.size).toBe(0);
+    expect(collectionListeners.size).toBe(0);
+    plugin.api?.connect(fakePlugin('ext'));
+    expect(on.mock.calls.map(([name]) => name)).toEqual(expect.arrayContaining(['layout-change', 'atlas-vtt:collection-settings-changed']));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(sceneListeners.size).toBe(1);
+    expect(collectionListeners.size).toBe(1);
+    // A second extension, or a reconnect, starts nothing more.
+    plugin.api?.connect(fakePlugin('other'));
+    plugin.api?.connect(fakePlugin('ext'));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(sceneListeners.size).toBe(1);
+    publisher.stop();
+    expect(sceneListeners.size).toBe(0);
+  });
+
   it('C-scenes-4: tells extensions when the index reports a scene change, until stopped', async () => {
     initialize.mockResolvedValue(undefined);
     const { plugin } = atlas();

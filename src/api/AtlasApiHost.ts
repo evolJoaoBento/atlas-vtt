@@ -10,6 +10,8 @@ export interface ApiHostOptions {
   app: App;
   capabilities: readonly AtlasCapability[];
   build(scope: ExtensionScope): AtlasExtension;
+  /** Runs once, as the first extension connects: what Atlas does only for extensions starts here, never before. */
+  onFirstConnect?(): void;
 }
 
 /** The published API object and every connected extension's registrations. */
@@ -22,6 +24,7 @@ export class AtlasApiHost {
   /** What those callbacks reach the host through; cleared on dispose so an old host is not retained. */
   private readonly link: { host: AtlasApiHost | null } = { host: this };
   private disposed = false;
+  private started = false;
   private readonly capabilities: ReadonlySet<AtlasCapability>;
 
   constructor(private readonly options: ApiHostOptions) {
@@ -67,6 +70,10 @@ export class AtlasApiHost {
     }
     if (typeof plugin.register !== 'function') {
       throw new Error('[Atlas API] connect: connect(plugin) needs an Obsidian plugin with a register function.');
+    }
+    if (!this.started) {
+      this.started = true;
+      this.options.onFirstConnect?.();
     }
     this.connected.get(id)?.disposers.disposeAll();
     const disposers = new DisposerSet();

@@ -38,6 +38,7 @@ export class ExtensionApiPublisher {
       app: this.plugin.app,
       capabilities: LANDED_CAPABILITIES,
       build: (scope) => buildExtension(scope, services),
+      onFirstConnect: () => this.watch(host, views, sightFrames),
     });
     const views = new ViewTracker(this.plugin.app, host.apiEvents, ATLAS_VIEW_HOOKS);
     const sightFrames = new SightFramesByView();
@@ -45,12 +46,21 @@ export class ExtensionApiPublisher {
     this.host = host;
     this.views = views;
     this.sightFrames = sightFrames;
-    this.stopWatches.push(host.apiEvents.on('map-closed', (viewId) => sightFrames.close(viewId)));
-    views.start();
     this.plugin.api = host.api;
     host.publish();
-    this.stopWatches.push(AssetService.getInstance(this.plugin.app).onScenesChanged(() => host.apiEvents.emit('scenes-changed')));
-    this.stopWatches.push(AssetService.getInstance(this.plugin.app).onCollectionsChanged(() => host.apiEvents.emit('collections-changed')));
+  }
+
+  /**
+   * The view tracker and the watches behind the API's events, started as the first extension connects: until then
+   * stock Atlas carries no listener for extensions.
+   */
+  private watch(host: AtlasApiHost, views: ViewTracker, sightFrames: SightFramesByView): void {
+    if (this.stopped) return;
+    const assets = AssetService.getInstance(this.plugin.app);
+    this.stopWatches.push(host.apiEvents.on('map-closed', (viewId) => sightFrames.close(viewId)));
+    views.start();
+    this.stopWatches.push(assets.onScenesChanged(() => host.apiEvents.emit('scenes-changed')));
+    this.stopWatches.push(assets.onCollectionsChanged(() => host.apiEvents.emit('collections-changed')));
     this.stopWatches.push(watchRules(this.plugin.app, host.apiEvents, true), watchSettings(this.plugin.settingsService, host.apiEvents));
   }
 
