@@ -9,7 +9,7 @@ vi.mock('../../../src/app/dice3d/dieNumerals', async (original) => ({
 }));
 
 import type { LookArt } from '../../../src/app/dice3d/customLookArt';
-import { artKey, artKeys, bodySides, planBody } from '../../../src/app/dice3d/dieBody';
+import { artKey, artKeys, bodySides, planBody, warmBodies } from '../../../src/app/dice3d/dieBody';
 import { resolveCustomLook, resolveLook, type ResolvedLook } from '../../../src/app/dice3d/dieSkin';
 import { paintFaceMarks, paintFaceRelief } from '../../../src/app/dice3d/faceArt';
 import { dieGeometry } from '../../../src/app/dice3d/dieGeometry';
@@ -37,8 +37,12 @@ describe('the face art of a dice look', () => {
     expect(artKey(10, 10)).toBe(10);
     expect(artKeys(4)).toEqual([1, 2, 3, 4]);
     expect(bodySides(100)).toBe(10);
-    expect(planBody({ sides: 10, role: 'tens' })).toBe(100);
-    expect(planBody({ sides: 10, role: 'units' })).toBe(10);
+    // The tens die is a body of its own only while a registered look has tens art; otherwise it is a d10 like the units.
+    expect(planBody({ sides: 10, role: 'tens' }, true)).toBe(100);
+    expect(planBody({ sides: 10, role: 'tens' }, false)).toBe(10);
+    expect(planBody({ sides: 10, role: 'units' }, true)).toBe(10);
+    expect(warmBodies(false)).toEqual([4, 6, 8, 10, 12, 20]);
+    expect(warmBodies(true)).toEqual([4, 6, 8, 10, 12, 20, 100]);
   });
 
   it('paints art where the look has some and Atlas numerals elsewhere, face by face', () => {

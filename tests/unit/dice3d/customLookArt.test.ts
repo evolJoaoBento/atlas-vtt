@@ -7,7 +7,8 @@ vi.mock('../../../src/app/dice3d/dieNumerals', async (original) => ({
 }));
 
 import { installDomHost, getDomHost } from '../../../src/app/host/dom';
-import { copyFaceImage, LOOK_ART_TIMEOUT_MS, lookArt, onLateLookArt } from '../../../src/app/dice3d/customLookArt';
+import { copyFaceImage, LOOK_ART_TIMEOUT_MS, lookArt, onLateLookArt, registeredLookHasTensArt } from '../../../src/app/dice3d/customLookArt';
+import { addCustomLook } from '../../../src/app/dice3d/customLooks';
 import type { CustomDiceLook, FaceArtSet } from '../../../src/app/dice3d/customLooks';
 import { artKeys, type DieBody } from '../../../src/app/dice3d/dieBody';
 
@@ -57,6 +58,32 @@ describe('copyFaceImage', () => {
     expect(copyFaceImage(source(0, 10))).toBeNull();
     expect(copyFaceImage(source(8193, 10))).toBeNull();
     expect(copyFaceImage(source(64, 64, true))).toBeNull();
+  });
+});
+
+describe('registeredLookHasTensArt', () => {
+  const art = (bodies: DieBody[]) => async (body: DieBody): Promise<FaceArtSet> =>
+    (bodies.includes(body) ? Object.fromEntries(artKeys(body).map((key) => [key, source(64, 64)])) : {});
+
+  it('is false with no look, and for a registered look whose art has no tens die', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(registeredLookHasTensArt()).toBe(false);
+    const plain = { ...look(art([10, 20])), id: 'ext:plain' };
+    const remove = addCustomLook(plain);
+    await lookArt(plain);
+    expect(registeredLookHasTensArt()).toBe(false);
+    remove();
+  });
+
+  it("is true once a registered look's art for the tens die has loaded, and false again when it is removed", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const tens = { ...look(art([10, 100])), id: 'ext:tens' };
+    const remove = addCustomLook(tens);
+    expect(registeredLookHasTensArt()).toBe(false);
+    await lookArt(tens);
+    expect(registeredLookHasTensArt()).toBe(true);
+    remove();
+    expect(registeredLookHasTensArt()).toBe(false);
   });
 });
 

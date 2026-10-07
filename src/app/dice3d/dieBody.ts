@@ -1,7 +1,8 @@
 /**
- * What a thrown die is painted as. Each body has its own face atlas; the d100's tens die is a d10
+ * What a thrown die is painted as. Each body has its own face atlas; the d100's tens die can be a d10
  * body of its own, so a dice look can print tens on it (`00` to `90`) while the units die and every
- * other d10 keep theirs. With Atlas's own looks both carry the same numerals 1 to 10.
+ * other d10 keep theirs. With Atlas's own looks both carry the same numerals 1 to 10, so the tens die
+ * is a body of its own only while a registered look has art for it (`planBody`).
  */
 
 import type { DieSides } from './dieGeometry';
@@ -18,9 +19,18 @@ export function bodySides(body: DieBody): DieSides {
   return body === 100 ? 10 : body;
 }
 
-/** The body a planned die is painted as. */
-export function planBody(die: Pick<DiePlan, 'sides' | 'role'>): DieBody {
-  return die.role === 'tens' ? 100 : die.sides;
+/**
+ * The body a planned die is painted as. The tens die is a body of its own only while `tensBody` (a registered look has
+ * art for it, `registeredLookHasTensArt`): otherwise it is a d10 like the units die, so stock Atlas never builds a
+ * seventh body.
+ */
+export function planBody(die: Pick<DiePlan, 'sides' | 'role'>, tensBody: boolean): DieBody {
+  return die.role === 'tens' && tensBody ? 100 : die.sides;
+}
+
+/** The bodies a stage warms: the six, and the tens die only while it is a body of its own (`planBody`). */
+export function warmBodies(tensBody: boolean): readonly DieBody[] {
+  return tensBody ? LOOK_BODIES : LOOK_BODIES.filter((body) => body !== 100);
 }
 
 /**

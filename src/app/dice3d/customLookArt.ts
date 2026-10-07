@@ -10,7 +10,7 @@
 
 import { getDomHost } from '../host/dom';
 import { CELL } from './atlasCell';
-import type { CustomDiceLook, FaceArtSet, FaceArtSource } from './customLooks';
+import { customLooks, type CustomDiceLook, type FaceArtSet, type FaceArtSource } from './customLooks';
 import { artKeys, LOOK_BODIES, type DieBody } from './dieBody';
 import { loadImage } from './dieNumerals';
 
@@ -29,6 +29,16 @@ export interface LookArt {
 }
 
 const loaded = new WeakMap<CustomDiceLook, Promise<LookArt>>();
+/** The looks whose loaded art has faces or relief for the d100's tens die. */
+const withTensArt = new WeakSet<CustomDiceLook>();
+
+/**
+ * True while a registered look's loaded art has the tens die: only then is it a body of its own (`planBody`), so stock
+ * Atlas, and a look without tens art, never build and warm a seventh body.
+ */
+export function registeredLookHasTensArt(): boolean {
+  return customLooks().some((look) => withTensArt.has(look));
+}
 
 class TimedOut extends Error {}
 
@@ -208,6 +218,7 @@ async function bodyArt(look: CustomDiceLook, ask: (body: DieBody) => Promise<Fac
     void within(answer, Date.now() + LATE_LOOK_ART_MS).then(async (late) => {
       const lateFallbacks = new Fallbacks();
       await takeFaces(late, body, Date.now() + LOOK_ART_TIMEOUT_MS, art, lateFallbacks);
+      if (body === 100 && art.size > 0) withTensArt.add(look);
       const line = lateFallbacks.line(look.id);
       if (line) console.warn(`${line} (d${body}, which arrived late)`);
       if (art.size > 0) tellLate(look);
@@ -230,6 +241,7 @@ async function loadArt(look: CustomDiceLook): Promise<LookArt> {
   ]));
   const line = fallbacks.line(look.id);
   if (line) console.warn(line);
+  if ((faces.get(100)?.size ?? 0) > 0 || (bump.get(100)?.size ?? 0) > 0) withTensArt.add(look);
   return { faces, bump };
 }
 
