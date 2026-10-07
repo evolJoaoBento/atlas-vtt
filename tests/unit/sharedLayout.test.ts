@@ -89,7 +89,7 @@ describe('text box layout', () => {
  * Atlas's token UI files hold some of these values privately, so the shared layout keeps its own copies.
  * These tests fail when one side changes a value, and say which copy to update.
  */
-describe('parity with the token UI renderers' own values', () => {
+describe('parity with the values the token UI renderers use', () => {
   const source = (path: string): string => readFileSync(path, 'utf8');
   const bars = source('src/app/pixi/token-renderer/resources/ResourceBarView.ts');
 
