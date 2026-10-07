@@ -196,9 +196,6 @@ export declare interface Character extends BaseToken {
     statblockPath?: string;
     /** Name read from the linked statblock; the nameplate falls back to it when `name` is empty. */
     statblockName?: string | null;
-    playerLinked?: boolean;
-    playerId?: string;
-    playerCharacterId?: string;
 }
 
 /** A progress clock (Blades in the Dark): a circle of `segments` wedges the GM fills one by one. */

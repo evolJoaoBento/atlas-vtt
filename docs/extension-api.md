@@ -135,6 +135,7 @@ Later 0.6.1 betas, in API 1.18.0 (no type changed shape):
 ### API 1.19.0
 
 - **Unlit scenes fail closed for fog too.** On an unlit scene (or with dynamic lighting off) `lighting.playerVisibility` still answers `unlit`, and its new `tokens` lists every token under the scene's committed fog as `'unseen'`, as the player window hides them; a token absent from it is not under fog. Fog Atlas cannot draw makes the answer `pending`, as on a lit scene, since the window then covers the whole map, and so does fog the view cannot read. Apply hidden tokens yourself. `tokens` is typed optional only because an older Atlas leaves it out.
+- **`Character` drops three fields Atlas never sets.** `playerLinked`, `playerId` and `playerCharacterId` were removed from Atlas's token records in #282; the API's `Character` no longer carries them either. Atlas never wrote them, so no answer changes.
 
 ## Rules every group follows
 
