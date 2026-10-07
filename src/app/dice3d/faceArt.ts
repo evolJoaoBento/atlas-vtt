@@ -27,6 +27,63 @@ function paintArt(ctx: CanvasRenderingContext2D, x: number, y: number, mark: Num
   ctx.restore();
 }
 
+/** The art covering the whole face of `body` standing for `value` in a `fill: 'face'` look; null for a face without art. */
+function fillArt(body: DieBody, value: number, look: ResolvedLook): HTMLCanvasElement | null {
+  return look.fill === 'face' ? look.art?.faces.get(body)?.get(artKey(body, value)) ?? null : null;
+}
+
+/** `art` scaled to cover the cell centred on `x`, `y`, turned as the face's numeral reads, and clipped to the cell. */
+function paintCover(ctx: CanvasRenderingContext2D, x: number, y: number, body: DieBody, value: number, art: HTMLCanvasElement): void {
+  const geometry = dieGeometry(bodySides(body));
+  const marks = faceMarks(geometry, faceIndexForValue(geometry, value), CELL);
+  const mark = marks.find((candidate) => candidate.value === value) ?? marks[0];
+  const k = CELL / Math.min(art.width, art.height);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  ctx.clip();
+  ctx.translate(x, y);
+  if (mark && marks.length === 1) ctx.rotate(Math.atan2(mark.up[0], mark.up[1]));
+  ctx.drawImage(art, (-art.width * k) / 2, (-art.height * k) / 2, art.width * k, art.height * k);
+  ctx.restore();
+}
+
+/**
+ * A `fill: 'face'` look's face: its art over the whole cell, on the look's body colour where the art is transparent,
+ * and nothing of Atlas's. False (nothing painted) for any other look or a face it has no art for.
+ */
+export function paintFaceFill(ctx: CanvasRenderingContext2D, x: number, y: number, body: DieBody, value: number, look: ResolvedLook): boolean {
+  const art = fillArt(body, value, look);
+  if (!art) return false;
+  if (look.body !== null) {
+    ctx.fillStyle = look.body;
+    ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  }
+  paintCover(ctx, x, y, body, value, art);
+  return true;
+}
+
+/** The relief of such a face: the look's relief art over the whole cell, else none (flat). False for any other face. */
+export function paintFaceFillRelief(ctx: CanvasRenderingContext2D, x: number, y: number, body: DieBody, value: number, look: ResolvedLook): boolean {
+  if (!fillArt(body, value, look)) return false;
+  const relief = look.art?.bump.get(body)?.get(artKey(body, value));
+  if (relief) {
+    ctx.save();
+    ctx.filter = 'grayscale(1)';
+    paintCover(ctx, x, y, body, value, relief);
+    ctx.restore();
+  }
+  return true;
+}
+
+/** The bare cell (chamfers and corners) of a `fill: 'face'` look with a body colour: that colour alone, so the edges match its faces. */
+export function paintBareFill(ctx: CanvasRenderingContext2D, x: number, y: number, look: ResolvedLook): boolean {
+  if (look.fill !== 'face' || look.body === null) return false;
+  ctx.fillStyle = look.body;
+  ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+  return true;
+}
+
 /**
  * The marks of the face of `body` that stands for `value`: a look's art for its key where it has
  * some, Atlas's numeral (in `look`'s font and ink) everywhere else.

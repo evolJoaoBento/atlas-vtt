@@ -37,6 +37,7 @@
 - Extension API: other plugins can keep their own data on a collection, never exported or copied, and add a tab of their own to a collection's settings
 - Extension API: other plugins can offer colours in the dice tray; dice added while a colour is picked carry it in the log and toasts
 - Extension API: a die rolled in a colour (its tag) is thrown in that colour with Atlas's 3D dice, in Atlas's look and in looks other plugins add
+- Extension API: a dice look can draw its art over each whole face (`fill: 'face'`), without Atlas's card, wear or numbers, so a dice pack's own faces show exactly
 - Extension API: a dice look's art that takes longer than 10 s still reaches the dice when it arrives, and one console line per look names every face that shows Atlas's numbers instead of the look's art, and why
 - Extension API: a plugin can choose the dice look a collection's maps throw in, for example from its own asset tab, while Atlas's dice look setting stays the default for every other map; a remote view can be told the look of its scene's collection
 

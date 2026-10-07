@@ -50,6 +50,14 @@ describe('dice.registerLook', () => {
     expect(customLook('ext:fire')).toBeNull();
   });
 
+  it("keeps fill: 'face', and 'numeral' or none as Atlas's default placement", () => {
+    const extension = started().api.connect(fakePlugin('ext'));
+    extension.dice.registerLook!(spec({ fill: 'face' }));
+    expect(customLook('ext:fire')?.fill).toBe('face');
+    extension.dice.registerLook!({ ...spec(), id: 'ice', fill: 'numeral' });
+    expect(customLook('ext:ice')).not.toHaveProperty('fill');
+  });
+
   it('a faces() that throws or rejects becomes a rejection, never a throw into Atlas', async () => {
     const extension = started().api.connect(fakePlugin('ext'));
     extension.dice.registerLook!(spec({ faces: () => { throw new Error('boom'); } }));
@@ -77,6 +85,7 @@ describe('dice.registerLook', () => {
     ['a body colour that is not #rrggbb', { id: 'a', name: 'A', faces: async () => ({}), body: { colour: 'red' } }, /body\.colour/],
     ['an ink that is not #rrggbb', { id: 'a', name: 'A', faces: async () => ({}), body: { ink: '#fff' } }, /body\.ink/],
     ['a preview that is no string', { id: 'a', name: 'A', faces: async () => ({}), preview: 4 }, /"preview"/],
+    ['a fill that is neither numeral nor face', { id: 'a', name: 'A', faces: async () => ({}), fill: 'cell' }, /"fill"/],
   ])('throws for %s', (_case, given, message) => {
     const extension = started().api.connect(fakePlugin('ext'));
     expect(() => extension.dice.registerLook!(given as never)).toThrow(message);

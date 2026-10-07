@@ -24,6 +24,8 @@ export interface ResolvedLook {
   lookId: string | null;
   /** That look's face art, painted where it has some; null for Atlas's own look. */
   art: LookArt | null;
+  /** `face`: the art covers its whole face cell (`DiceLookSpec.fill`); unset paints it where the numeral goes. */
+  fill?: 'face';
 }
 
 /** The card tone while the paper image has not arrived yet. */
@@ -65,12 +67,12 @@ export function resolveLook(look: DiceLook, accent: Rgb | null): ResolvedLook {
  * An extension's look with its art: its body colour (the card stock without one), and for faces it has no art for,
  * Atlas's numerals in the user's font and the look's ink, or the ink that reads on its body.
  */
-export function resolveCustomLook(look: DiceLook, custom: Pick<CustomDiceLook, 'id' | 'body' | 'ink'>, art: LookArt): ResolvedLook {
+export function resolveCustomLook(look: DiceLook, custom: Pick<CustomDiceLook, 'id' | 'body' | 'ink' | 'fill'>, art: LookArt): ResolvedLook {
   const body = custom.body !== null && parseHex(custom.body) ? custom.body : null;
   const bodyRgb = body === null ? null : parseHex(body);
   const fallbackInk = bodyRgb ? readableInk(bodyRgb) : look.font === 'medieval' ? null : DARK_INK;
   const ink = custom.ink !== null && parseHex(custom.ink) ? custom.ink : fallbackInk;
-  return { colour: look.colour, font: look.font, body, ink, lookId: custom.id, art };
+  return { colour: look.colour, font: look.font, body, ink, lookId: custom.id, art, ...(custom.fill === 'face' ? { fill: 'face' as const } : {}) };
 }
 
 /**

@@ -370,7 +370,7 @@ export declare interface DiceApi {
      * Adds a dice look the GM can choose in Atlas's dice settings, after Atlas's own; only when `has('dice-looks')`. It
      * paints Atlas's 3D dice everywhere they are thrown (the dice tray, the player window, remote views, `throw`). The
      * spec is read once. Throws for an `id` or `name` that is not a non-empty string, an `id` this extension already
-     * registered, a `faces` that is not a function, or a `body` colour that is not `#rrggbb`. The GM's choice is kept by
+     * registered, a `faces` that is not a function, a `body` colour that is not `#rrggbb`, or a `fill` other than `'numeral'` or `'face'`. The GM's choice is kept by
      * full id: while this extension is not loaded, or after the disposer ran, Atlas paints its own look and keeps the choice,
      * so the look returns when it is registered again.
      */
@@ -466,6 +466,14 @@ export declare interface DiceLookSpec {
     };
     /** An image of the look for the dice settings: a URL as in `DiceFaceArt`. */
     preview?: string;
+    /**
+     * 1.18.0: how a face's art is drawn. `'numeral'` (the default, as before 1.18.0): where Atlas prints the numeral, on
+     * Atlas's card with its grain and worn rim. `'face'`: the art covers the whole face cell, scaled to fill it and turned
+     * as the numeral reads, with no card, numeral or wear of Atlas's, so a pack's own face design shows as it is; its
+     * relief is the look's `bump` art, else flat. The chamfers and corners, and faces without art, keep `body.colour`
+     * (faces without art also keep Atlas's numeral). Anything else throws.
+     */
+    fill?: 'numeral' | 'face';
 }
 
 /** How `dice.publish` shows a roll (1.16.0). */

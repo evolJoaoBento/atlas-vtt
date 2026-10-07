@@ -26,7 +26,7 @@ import { bodySides, type DieBody } from './dieBody';
 import { dieGeometry, type DieSides } from './dieGeometry';
 import { loadImage, loadNumerals, numeralsReady } from './dieNumerals';
 import { activeLook, paintCard, paintWear, type ResolvedLook } from './dieSkin';
-import { paintFaceMarks, paintFaceRelief } from './faceArt';
+import { paintBareFill, paintFaceFill, paintFaceFillRelief, paintFaceMarks, paintFaceRelief } from './faceArt';
 
 let cardStock: HTMLImageElement | null = null;
 let cardPending: Promise<void> | null = null;
@@ -97,6 +97,8 @@ export function buildTextures(body: DieBody, lookOf: () => ResolvedLook = active
   // Read at every redraw, so a new look reaches the faces with `refreshDieArtwork`.
   const albedo = (look = lookOf()): HTMLCanvasElement =>
     drawAtlas(sides, (ctx, { x, y, value }) => {
+      // A `fill: 'face'` look's art is the whole face: no card, wear or numeral of Atlas's under or over it.
+      if (value === null ? paintBareFill(ctx, x, y, look) : paintFaceFill(ctx, x, y, body, value, look)) return;
       paintCard(ctx, x, y, sides * 31 + (value ?? 0) * 7 + 5, cardStock, look);
       paintWear(ctx, x, y, value === null, look);
       if (value !== null) paintFaceMarks(ctx, x, y, body, value, look);
@@ -106,6 +108,7 @@ export function buildTextures(body: DieBody, lookOf: () => ResolvedLook = active
     drawAtlas(sides, (ctx, { x, y, value }) => {
       ctx.fillStyle = '#8a8a8a';
       ctx.fillRect(x - CELL / 2, y - CELL / 2, CELL, CELL);
+      if (value === null ? look.fill === 'face' && look.body !== null : paintFaceFillRelief(ctx, x, y, body, value, look)) return;
       ctx.save();
       ctx.globalAlpha = 0.8;
       ctx.filter = 'grayscale(1) contrast(2.1)';

@@ -26,6 +26,8 @@ export interface CustomDiceLook {
   readonly ink: string | null;
   /** An image of the look for the settings, a URL. */
   readonly preview: string | null;
+  /** `face`: a face's art covers its whole cell, without Atlas's card, numeral and wear; unset draws it where the numeral goes. */
+  readonly fill?: 'face';
 }
 
 const looks = new Map<string, CustomDiceLook>();

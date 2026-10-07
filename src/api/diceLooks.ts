@@ -30,13 +30,14 @@ function guarded(ask: (sides: DieBody) => unknown, owner: object): (body: DieBod
 function checkedLook(extensionId: string, spec: unknown): CustomDiceLook {
   if (typeof spec !== 'object' || spec === null) fail('the look must be a DiceLookSpec');
   const given = spec as Record<string, unknown>;
-  const { id, name, faces, bump, body, preview } = given;
+  const { id, name, faces, bump, body, preview, fill } = given;
   if (!isText(id)) fail('"id" must be a non-empty string');
   if (!isText(name)) fail('"name" must be a non-empty string');
   if (name.trim().length > MAX_LOOK_NAME) fail(`"name" must be at most ${MAX_LOOK_NAME} characters`);
   if (typeof faces !== 'function') fail('"faces" must be a function');
   if (bump !== undefined && typeof bump !== 'function') fail('"bump" must be a function when given');
   if (preview !== undefined && typeof preview !== 'string') fail('"preview" must be a URL when given');
+  if (fill !== undefined && fill !== 'numeral' && fill !== 'face') fail('"fill" must be "numeral" or "face" when given');
   let colour: unknown;
   let ink: unknown;
   if (body !== undefined) {
@@ -53,6 +54,7 @@ function checkedLook(extensionId: string, spec: unknown): CustomDiceLook {
     body: typeof colour === 'string' ? colour : null,
     ink: typeof ink === 'string' ? ink : null,
     preview: typeof preview === 'string' && preview !== '' ? preview : null,
+    ...(fill === 'face' ? { fill: 'face' as const } : {}),
   });
 }
 
