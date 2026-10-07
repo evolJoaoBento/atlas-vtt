@@ -101,8 +101,9 @@ describe('shared modules package', { timeout: 30_000 }, () => {
   it('keeps the module closure small, so the package .d.ts stays small', () => {
     const all = new Set<string>();
     for (const entry of ENTRIES) for (const file of reach(entry, false).files) all.add(file);
-    // About 170 of these are Atlas's translations (en and ru), which the declarations reach through t(); the packages'
-    // JavaScript carries only the English texts it uses (src/shared/englishTexts.ts).
+    // About 170 of these are Atlas's translations (en and ru), which tsc reads through t(). The packages' JavaScript
+    // carries only the English texts it uses (src/shared/englishTexts.ts), and their types only the declarations the
+    // entries' types reach, none of them a translation (scripts/declaration-tree.mjs, tests/api/declarationTree.test.ts).
     expect(all.size).toBeLessThan(270);
   });
 });

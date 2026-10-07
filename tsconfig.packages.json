@@ -4,7 +4,7 @@
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "outDir": "dist-packages/shared/types",
+    "outDir": "build/shared-dts",
     "rootDir": ".",
     "inlineSourceMap": false,
     "inlineSources": false

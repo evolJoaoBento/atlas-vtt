@@ -103,7 +103,7 @@ Version 1.18.0 also adds `dice.registerColours(provider)` (optional, with the `d
 
 From 1.18.0 Atlas's 3D dice wear their tag's colour: a die whose `color` is `#rrggbb` is thrown with its body painted in it, grain and wear kept, and Atlas's numerals in an ink that reads on it, in Atlas's look and in an extension's look (whose face art stays as it is). Both dice of a d100 take its colour, a d2 or d3 colours the d6 it is thrown on, and a die rolled for an explosion its own tag's. Untagged dice look as before. This holds wherever Atlas throws (the dice tray, `publish`, `throw`, the player window, remote views). Each body and colour is painted once and kept (at most 32 at a time) until Atlas unloads.
 
-Rows marked planned are not in the running Atlas yet. The report in `api-report/atlas-vtt-api.d.ts` is the source of truth for what the running version contains.
+Rows marked planned are not in the running Atlas yet. The report in `api-report/` (entry `api-report/src/api/public.d.ts`) is the source of truth for what the running version contains.
 
 ### Atlas 0.6
 
@@ -150,7 +150,7 @@ Later 0.6.1 betas, in API 1.18.0 (no type changed shape):
 
 ## Reference by group
 
-The report (`api-report/atlas-vtt-api.d.ts`) has every member with its JSDoc; this is what each group is for and how it behaves.
+The report (`api-report/`, entry `src/api/public.d.ts`) has every member with its JSDoc; this is what each group is for and how it behaves.
 
 - **`views`.** `list()` and `active()` describe the open map views (`active()` never a remote view); `snapshot(viewId)` gives the scene in a view's store, and `subscribe` hears each store change that replaced one of its fields. `camera(viewId)` gives the visible world area and `watchCamera` hears it after every viewport frame. `map-loaded` fires once per map load, `map-closed` when a view closes. With `scene-tabs` (1.17.0), `tabs-changed` fires when a GM map view's tabs or active tab change, a snapshot's `tabId` names the tab whose scene it holds (null while loading), and `showTab(viewId, tabId)` opens a tab without presenting it; see Scene tabs below.
 - **`rules`.** `forMap(mapPath)` gives the collection's grid defaults, measurement (with the GM's cone angle), dice, initiative, conditions and resources, or Atlas's defaults outside a collection. `rules-changed` names the collection whose rules changed, or `null` once the asset index has loaded.
@@ -238,7 +238,9 @@ Not part of `scene-tabs`: live state or player visibility of a tab that is not a
 - **Capabilities** let the API grow without a major version. Atlas may ship a capability as experimental: present, documented and excluded from semver guarantees until promoted.
 - **Record types are part of the contract on purpose.** When Atlas adds a field to a record type (a minor version), an extension that keeps a `Record<keyof TokenEntity, ...>` table fails to compile until its author decides what to do with the field. New data stays private by default.
 
-`npm run api:check` regenerates the rollup, fails when `api-report/` differs from the committed copy, and fails when the report changed against `API_BASE_REF` without a change to `API_VERSION`. `API_BASE_REF` must be set: the check fails without it. CI sets it to the pull request's base branch (`origin/<base>`, `origin/beta` on a push); locally, name the ref to compare against, for example `API_BASE_REF=origin/beta npm run api:check`.
+`npm run api:report` writes the report: `tsc -p tsconfig.api.json --declaration --emitDeclarationOnly` emits declarations, and `scripts/declaration-tree.mjs` copies into `api-report/` only those `src/api/public.d.ts` reaches (the API's types and the Atlas record types they name; no translations). The tree is committed. `npm run api:check` regenerates it, then:
+- **Up to date** (`scripts/api-report-check.js`). A report that differs from the committed tree fails a change that touches the API: `src/api/`, the report itself, or a source file the report includes (its `.d.ts` is in the tree). Any other change only prints the difference, so a pull request that touches none of these never fails here; the next API change brings the report up to date. CI names what the change is compared with in `API_CHANGES_BASE` (the pull request's base branch, or the commit before a push); without it, as locally, a stale report always fails.
+- **Version moved** (`scripts/api-version-check.js`). The report as committed (or staged) must not differ from the base's unless `API_VERSION` differs too. The base is `API_BASE_REF` when set (CI sets the pull request's base branch, `origin/beta` on a push), else the latest Atlas release tag (`x.y.z`, betas left out) reachable from HEAD. A base without a report is the first API change and passes.
 
 ## Deprecation
 
@@ -293,8 +295,8 @@ export class AtlasLink {
 
 The API types and the shared modules are not published to npm.
 
-- `api-report/atlas-vtt-api.d.ts` is the rolled-up declaration file of `src/api/`. It is committed, and it imports nothing but `obsidian`. An extension vendors it as `@atlas-vtt/api-types`.
-- Some record fields use types the report declares but does not export by name, such as `DieType`, `RolledDie`, `WallType`, `Widget`, `WidgetIcon` and `InitiativeSide`. Name them through the record that holds them, for example `DiceRollResult['rolls'][number]` or `WidgetSettings['widgets'][string]['icon']`. Comments on Atlas's own record types may name Atlas functions (`lightKindOf`, `tokenSenses`, `FogCanvasCompositor`); they describe Atlas, and an extension cannot call them.
+- `api-report/` is the declaration tree of `src/api/` (entry `src/api/public.d.ts`, with the Atlas record types it names under `src/app/`). It is committed, and nothing in it imports anything outside the tree but `obsidian`. An extension vendors the folder as `@atlas-vtt/api-types`, with `src/api/public.d.ts` as its `types` entry.
+- Some record fields use types the entry does not export by name, such as `DieType`, `RolledDie`, `WallType`, `Widget`, `WidgetIcon` and `InitiativeSide`. Name them through the record that holds them, for example `DiceRollResult['rolls'][number]` or `WidgetSettings['widgets'][string]['icon']`, or import them from their file in the tree. Comments on Atlas's own record types may name Atlas functions (`lightKindOf`, `tokenSenses`, `FogCanvasCompositor`); they describe Atlas, and an extension cannot call them.
 - `npm run build:packages` builds `src/shared/` into `dist-packages/shared` (gitignored). Atlas CI uploads that folder as an artifact. An extension vendors it as `@atlas-vtt/shared`. Its entries are `grid`, `draw`, `rules`, `dice3d` (needs three.js) and `diceDisplay` (how a roll is presented and the six tray icons, without three.js; `dice3d` re-exports it). `dice3d` creates its canvases through a DOM host that Atlas installs when it starts; a page outside Obsidian calls `installDomHost(host)` from `dice3d` before it draws dice, with the browser's own DOM (`createCanvas(doc, size?)`, `createDiv(parent, cls)`, `ownerWindow(node)`, `activeDocument()`, typed `DomHost`); the returned function puts back the host before it. Without one, drawing dice throws "DOM host has not been installed".
 
 Record the Atlas commit and the API version of every vendored copy, and verify the copy's hashes in your own CI.

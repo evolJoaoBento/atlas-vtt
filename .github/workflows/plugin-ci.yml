@@ -37,10 +37,14 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # Regenerates the API report (a tsc declaration tree in api-report/). A stale report fails only a change that
+      # touches the API (src/api/, the report, or a source file it includes); any other change just prints the
+      # difference (scripts/api-report-check.js). Then checks the API version moved if the report did.
       - name: Extension API report
         run: npm run api:check
         env:
           API_BASE_REF: origin/${{ github.base_ref || 'beta' }}
+          API_CHANGES_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
 
       # The rule set Obsidian's community directory scores the plugin with.
       # Zero tolerance; accepted exceptions live in eslint.suppressions.json.
