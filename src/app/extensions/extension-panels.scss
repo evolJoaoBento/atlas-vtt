@@ -40,7 +40,7 @@ $extension-panel-top: 64px; // below the scene tabs, where the loot roller first
   }
 
   &.is-dragging {
-    box-shadow: $shadow-elevated, 0 18px 48px rgba(0, 0, 0, 0.28);
+    box-shadow: $shadow-dragging;
     user-select: none;
   }
 }
